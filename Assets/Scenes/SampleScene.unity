@@ -416,7 +416,7 @@ MonoBehaviour:
   networkManager: {fileID: 947039382}
   voxelWorld: {fileID: 1566503039}
   worldSync: {fileID: 490447447}
-  port: 7777
+  port: 50000
 --- !u!4 &490447446
 Transform:
   m_ObjectHideFlags: 0
@@ -578,7 +578,7 @@ MonoBehaviour:
   m_DisconnectTimeoutMS: 30000
   ConnectionData:
     Address: 127.0.0.1
-    Port: 7777
+    Port: 50000
     WebSocketPath: /
     ServerListenAddress: 
     ClientBindPort: 0
