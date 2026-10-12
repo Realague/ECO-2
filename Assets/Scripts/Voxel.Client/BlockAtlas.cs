@@ -19,9 +19,9 @@ namespace Voxel.Client
         private static readonly Color Dirt = new Color(0.47f, 0.33f, 0.20f);
         private static readonly Color Grass = new Color(0.33f, 0.60f, 0.25f);
 
-        public static int TileFor(byte block, int face)
+        public static int TileFor(ushort block, int face)
         {
-            switch (block)
+            switch (Blocks.TypeOf(block))
             {
                 case Blocks.Dirt:
                     return DirtTile;

@@ -26,7 +26,7 @@ namespace Voxel.Client
         private Vector3 velocity;
         private bool grounded;
         private float pitch;
-        private byte selectedBlock = Blocks.Dirt;
+        private ushort selectedBlock = Blocks.Dirt;
 
         private void Start()
         {

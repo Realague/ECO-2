@@ -63,8 +63,8 @@ namespace Voxel.Client
                 {
                     for (int x = 0; x < Chunk.Size; x++)
                     {
-                        byte block = chunk.Get(x, y, z);
-                        if (block == Blocks.Air) continue;
+                        ushort block = chunk.Get(x, y, z);
+                        if (Blocks.TypeOf(block) == Blocks.Air) continue;
 
                         for (int face = 0; face < FaceCount; face++)
                         {

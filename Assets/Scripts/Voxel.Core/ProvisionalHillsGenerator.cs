@@ -9,6 +9,8 @@ namespace Voxel.Core
         private const double WaveAmplitude = 2.0;
         private const int DirtDepth = 3;
 
+        public int Version => 1;
+
         public void Generate(Chunk chunk, int seed)
         {
             int originX = chunk.Coord.X * Chunk.Size;
@@ -35,7 +37,7 @@ namespace Voxel.Core
             return BaseHeight + (int)Math.Round(waves * WaveAmplitude);
         }
 
-        private static byte BlockAt(int y, int surface)
+        private static ushort BlockAt(int y, int surface)
         {
             if (y > surface) return Blocks.Air;
             if (y == surface) return Blocks.Grass;

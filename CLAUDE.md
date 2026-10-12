@@ -18,6 +18,9 @@ Key rules:
 
 - `World.SetBlock` is the only way gameplay code changes a block. It marks the chunk modified and raises `World.BlockChanged`, which remeshing listens to (networking and saving will hook in the same way). `Chunk.Set` is a raw write for generators only.
 - `World.IsSolid` treats everything outside the world's sides and bottom as solid (keeps players in, culls unseen faces); `World.GetBlock` returns air there. Use `IsSolid` for collision and face culling, `GetBlock` for gameplay such as raycasts.
+- A block is a `ushort`: low 12 bits are the type, high 4 bits the orientation. Compare types through `Blocks.TypeOf(block)`, never the raw value.
+- `WorldSave` stores a header (seed, generator version, dimensions) plus **only the modified chunks**; untouched chunks are regenerated on load. Any change to what a generator produces must bump `IChunkGenerator.Version`, which makes older saves fail to load instead of loading corrupted. `ChunkSerializer` (run-length encoded) is meant to be reused as the network chunk format.
+- In Play mode `VoxelWorld` loads `world.dat` from `Application.persistentDataPath` and writes it back in `OnDestroy`. A save whose seed or dimensions differ from the inspector settings, or that fails to load, is ignored with a warning and overwritten on exit. Delete the file to reset the world.
 - Terrain comes from an `IChunkGenerator`. `ProvisionalHillsGenerator` is a placeholder until real procedural generation; do not build features that depend on its output.
 - The player uses voxel collision (`VoxelCollision.Move`), not Unity physics; chunks have no `MeshCollider`. `transform.position` of the player is the centre of its feet.
 - `VoxelWorld` (scene object `World`) creates the world in `Awake`; other components read `VoxelWorld.World` from `Start` onwards.

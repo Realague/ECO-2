@@ -32,11 +32,15 @@ namespace Voxel.Core
         }
 
         // Arguments : position, ancien bloc, nouveau bloc.
-        public event Action<BlockPos, byte, byte> BlockChanged;
+        public event Action<BlockPos, ushort, ushort> BlockChanged;
 
         public int ChunksX { get; }
         public int ChunksY { get; }
         public int ChunksZ { get; }
+
+        // Renseignés par Generate : avec les chunks modifiés, ils suffisent à reconstruire le monde.
+        public int Seed { get; private set; }
+        public int GeneratorVersion { get; private set; }
 
         public int SizeX => ChunksX * Chunk.Size;
         public int SizeY => ChunksY * Chunk.Size;
@@ -46,6 +50,9 @@ namespace Voxel.Core
 
         public void Generate(IChunkGenerator generator, int seed)
         {
+            Seed = seed;
+            GeneratorVersion = generator.Version;
+
             foreach (Chunk chunk in chunks)
             {
                 generator.Generate(chunk, seed);
@@ -61,9 +68,9 @@ namespace Voxel.Core
             return inside ? chunks[ChunkIndex(coord.X, coord.Y, coord.Z)] : null;
         }
 
-        public byte GetBlock(BlockPos pos) => GetBlock(pos.X, pos.Y, pos.Z);
+        public ushort GetBlock(BlockPos pos) => GetBlock(pos.X, pos.Y, pos.Z);
 
-        public byte GetBlock(int x, int y, int z)
+        public ushort GetBlock(int x, int y, int z)
         {
             if (!InBounds(x, y, z)) return Blocks.Air;
             return ChunkAt(x, y, z).Get(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask);
@@ -78,10 +85,10 @@ namespace Voxel.Core
             return Blocks.IsSolid(GetBlock(x, y, z));
         }
 
-        public bool SetBlock(BlockPos pos, byte block) => SetBlock(pos.X, pos.Y, pos.Z, block);
+        public bool SetBlock(BlockPos pos, ushort block) => SetBlock(pos.X, pos.Y, pos.Z, block);
 
         // Seul point d'entrée pour modifier un bloc en jeu. Renvoie faux si rien n'a changé.
-        public bool SetBlock(int x, int y, int z, byte block)
+        public bool SetBlock(int x, int y, int z, ushort block)
         {
             if (!InBounds(x, y, z)) return false;
 
@@ -90,7 +97,7 @@ namespace Voxel.Core
             int localY = y & Chunk.SizeMask;
             int localZ = z & Chunk.SizeMask;
 
-            byte previous = chunk.Get(localX, localY, localZ);
+            ushort previous = chunk.Get(localX, localY, localZ);
             if (previous == block) return false;
 
             chunk.Set(localX, localY, localZ, block);

@@ -1,10 +1,13 @@
+using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // Crée le monde, l'affiche et remaille les chunks touchés par un changement de bloc.
+    // Charge ou crée le monde, l'affiche, remaille les chunks touchés par un changement de bloc,
+    // et sauvegarde le monde à la fermeture.
     public class VoxelWorld : MonoBehaviour
     {
         private static readonly BlockPos[] NeighbourOffsets =
@@ -17,6 +20,7 @@ namespace Voxel.Client
         [SerializeField] private Vector3Int sizeInChunks = new Vector3Int(8, 4, 8);
         [SerializeField] private int seed = 1;
         [SerializeField] private Material blockMaterial;
+        [SerializeField] private string saveFileName = "world.dat";
 
         private readonly Dictionary<Chunk, Mesh> meshes = new Dictionary<Chunk, Mesh>();
         private readonly HashSet<Chunk> dirtyChunks = new HashSet<Chunk>();
@@ -25,10 +29,11 @@ namespace Voxel.Client
 
         public World World { get; private set; }
 
+        private string SavePath => Path.Combine(Application.persistentDataPath, saveFileName);
+
         private void Awake()
         {
-            World = new World(sizeInChunks.x, sizeInChunks.y, sizeInChunks.z);
-            World.Generate(new ProvisionalHillsGenerator(), seed);
+            World = LoadOrCreateWorld();
             World.BlockChanged += OnBlockChanged;
 
             atlas = BlockAtlas.CreateTexture();
@@ -54,7 +59,11 @@ namespace Voxel.Client
 
         private void OnDestroy()
         {
-            if (World != null) World.BlockChanged -= OnBlockChanged;
+            if (World != null)
+            {
+                World.BlockChanged -= OnBlockChanged;
+                SaveWorld();
+            }
 
             foreach (Mesh mesh in meshes.Values)
             {
@@ -63,6 +72,53 @@ namespace Voxel.Client
 
             Destroy(materialInstance);
             Destroy(atlas);
+        }
+
+        private World LoadOrCreateWorld()
+        {
+            var generator = new ProvisionalHillsGenerator();
+
+            if (File.Exists(SavePath))
+            {
+                try
+                {
+                    World saved = WorldSave.LoadFromFile(SavePath, generator);
+                    if (MatchesSettings(saved)) return saved;
+
+                    Debug.LogWarning(
+                        $"Sauvegarde ignorée : sa graine ou ses dimensions ne correspondent pas aux réglages du monde. " +
+                        $"Elle sera remplacée à la fermeture. ({SavePath})");
+                }
+                catch (Exception e) when (e is IOException || e is InvalidDataException)
+                {
+                    Debug.LogWarning(
+                        $"Sauvegarde illisible, un nouveau monde est généré et la remplacera à la fermeture : {e.Message} ({SavePath})");
+                }
+            }
+
+            var world = new World(sizeInChunks.x, sizeInChunks.y, sizeInChunks.z);
+            world.Generate(generator, seed);
+            return world;
+        }
+
+        private bool MatchesSettings(World world)
+        {
+            return world.Seed == seed
+                && world.ChunksX == sizeInChunks.x
+                && world.ChunksY == sizeInChunks.y
+                && world.ChunksZ == sizeInChunks.z;
+        }
+
+        private void SaveWorld()
+        {
+            try
+            {
+                WorldSave.SaveToFile(SavePath, World);
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                Debug.LogError($"Échec de la sauvegarde du monde : {e.Message} ({SavePath})");
+            }
         }
 
         private void CreateChunkObject(Chunk chunk)
@@ -78,7 +134,7 @@ namespace Voxel.Client
             chunkObject.AddComponent<MeshRenderer>().sharedMaterial = materialInstance;
         }
 
-        private void OnBlockChanged(BlockPos pos, byte previous, byte current)
+        private void OnBlockChanged(BlockPos pos, ushort previous, ushort current)
         {
             MarkDirty(pos);
 

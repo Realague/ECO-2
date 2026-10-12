@@ -5,6 +5,8 @@ namespace Voxel.Core.Tests
     {
         public const int GroundHeight = 8;
 
+        public int Version { get; set; } = 1;
+
         public static World CreateWorld()
         {
             var world = new World(1, 1, 1);
@@ -17,7 +19,7 @@ namespace Voxel.Core.Tests
             int originY = chunk.Coord.Y * Chunk.Size;
             for (int y = 0; y < Chunk.Size; y++)
             {
-                byte block = originY + y < GroundHeight ? Blocks.Stone : Blocks.Air;
+                ushort block = originY + y < GroundHeight ? Blocks.Stone : Blocks.Air;
                 for (int z = 0; z < Chunk.Size; z++)
                 {
                     for (int x = 0; x < Chunk.Size; x++)

@@ -41,8 +41,8 @@ namespace Voxel.Core.Tests
             var target = new BlockPos(3, FlatGenerator.GroundHeight - 1, 5);
             int raised = 0;
             BlockPos reportedPos = default;
-            byte reportedPrevious = 0;
-            byte reportedCurrent = 0;
+            ushort reportedPrevious = 0;
+            ushort reportedCurrent = 0;
             world.BlockChanged += (pos, previous, current) =>
             {
                 raised++;
