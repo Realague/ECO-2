@@ -9,9 +9,11 @@ using Voxel.Core;
 namespace Voxel.Client
 {
     // Démarre et arrête une partie : héberger (serveur et joueur local) ou rejoindre un hôte.
-    // L'argument de ligne de commande « -connect <adresse> » rejoint directement un hôte au lancement.
+    // Arguments de ligne de commande : « -host » héberge directement au lancement,
+    // « -connect <adresse> » rejoint directement un hôte.
     public class GameSession : MonoBehaviour
     {
+        private const string HostArgument = "-host";
         private const string ConnectArgument = "-connect";
         private const string LocalAddress = "127.0.0.1";
         private const string AnyAddress = "0.0.0.0";
@@ -21,6 +23,7 @@ namespace Voxel.Client
 
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private VoxelWorld voxelWorld;
+        [SerializeField] private WorldSync worldSync;
         [SerializeField] private ushort port = 7777;
 
         private string address = LocalAddress;
@@ -36,10 +39,15 @@ namespace Voxel.Client
             networkManager.ConnectionApprovalCallback = ApproveConnection;
             networkManager.OnClientStopped += OnClientStopped;
 
-            string requestedAddress = CommandLineValue(ConnectArgument);
-            if (requestedAddress != null)
+            string[] arguments = Environment.GetCommandLineArgs();
+            int connectIndex = Array.IndexOf(arguments, ConnectArgument);
+            if (Array.IndexOf(arguments, HostArgument) >= 0)
             {
-                address = requestedAddress;
+                StartHost();
+            }
+            else if (connectIndex >= 0 && connectIndex + 1 < arguments.Length)
+            {
+                address = arguments[connectIndex + 1];
                 StartClient();
             }
         }
@@ -104,7 +112,7 @@ namespace Voxel.Client
         {
             message = "";
             leaving = false;
-            voxelWorld.Load(true);
+            voxelWorld.LoadPersistent();
 
             // L'hôte écoute sur toutes les interfaces pour être joignable depuis d'autres machines.
             Transport.SetConnectionData(LocalAddress, port, AnyAddress);
@@ -112,7 +120,10 @@ namespace Voxel.Client
             {
                 voxelWorld.Unload();
                 message = $"Impossible d'héberger une partie sur le port {port}.";
+                return;
             }
+
+            worldSync.StartServer();
         }
 
         public void StartClient()
@@ -125,16 +136,15 @@ namespace Voxel.Client
                 return;
             }
 
-            // Provisoire : tant que le serveur n'envoie pas les chunks, le client génère le même
-            // monde que lui à partir de la graine.
-            voxelWorld.Load(false);
-
             Transport.SetConnectionData(address, port);
             if (!networkManager.StartClient())
             {
-                voxelWorld.Unload();
                 message = $"Impossible de lancer la connexion à {address}.";
+                return;
             }
+
+            // Le monde du client est créé par WorldSync à partir de ce que le serveur envoie.
+            worldSync.StartClient();
         }
 
         // Exécuté par le serveur pour chaque joueur, hôte compris : il décide où le joueur apparaît.
@@ -159,6 +169,7 @@ namespace Voxel.Client
         // Appelé à la fin de toute partie, côté hôte comme côté client, y compris après un échec de connexion.
         private void OnClientStopped(bool wasHost)
         {
+            worldSync.Stop();
             voxelWorld.Unload();
             Cursor.lockState = CursorLockMode.None;
 
@@ -183,6 +194,11 @@ namespace Voxel.Client
             if (!networkManager.IsServer && !networkManager.IsConnectedClient)
             {
                 return $"Connexion à {address}…\nF10 : annuler";
+            }
+
+            if (worldSync.World == null)
+            {
+                return $"Chargement du monde… {Mathf.RoundToInt(worldSync.LoadingProgress * 100f)} %\nF10 : annuler";
             }
 
             if (Cursor.lockState != CursorLockMode.Locked)
@@ -211,13 +227,6 @@ namespace Voxel.Client
             {
                 address += character;
             }
-        }
-
-        private static string CommandLineValue(string name)
-        {
-            string[] arguments = Environment.GetCommandLineArgs();
-            int index = Array.IndexOf(arguments, name);
-            return index >= 0 && index + 1 < arguments.Length ? arguments[index + 1] : null;
         }
     }
 }

@@ -11,6 +11,8 @@ namespace Voxel.Core
         public const ushort Dirt = 2;
         public const ushort Grass = 3;
 
+        private const ushort LastType = Grass;
+
         public static ushort TypeOf(ushort block) => (ushort)(block & TypeMask);
 
         public static int OrientationOf(ushort block) => block >> TypeBits;
@@ -19,5 +21,8 @@ namespace Voxel.Core
             (ushort)(TypeOf(type) | (orientation << TypeBits));
 
         public static bool IsSolid(ushort block) => TypeOf(block) != Air;
+
+        // Un bloc reçu du réseau n'est accepté que si son type existe. Aucun type n'est encore orientable.
+        public static bool IsValid(ushort block) => TypeOf(block) <= LastType && OrientationOf(block) == 0;
     }
 }

@@ -5,7 +5,8 @@
         "Voxel.Core",
         "Unity.InputSystem",
         "Unity.Netcode.Runtime",
-        "Unity.Networking.Transport"
+        "Unity.Networking.Transport",
+        "Unity.Collections"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

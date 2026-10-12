@@ -9,9 +9,6 @@ namespace Voxel.Client
     // Seul le propriétaire simule son joueur ; les autres copies suivent le NetworkTransform.
     public class PlayerController : NetworkBehaviour
     {
-        private const float HalfWidth = 0.3f;
-        private const float Height = 1.8f;
-        private const float EyeHeight = 1.62f;
         private const float MaxFallSpeed = 50f;
         private const float MaxDeltaTime = 0.05f;
         private const float MaxPitch = 89f;
@@ -22,8 +19,8 @@ namespace Voxel.Client
         [SerializeField] private float jumpHeight = 1.25f;
         [SerializeField] private float gravity = 25f;
         [SerializeField] private float mouseSensitivity = 0.1f;
-        [SerializeField] private float reach = 5f;
 
+        private WorldSync worldSync;
         private World world;
         private Transform cameraTransform;
         private Vector3 velocity;
@@ -41,7 +38,7 @@ namespace Voxel.Client
         {
             if (!IsOwner) return;
 
-            world = FindAnyObjectByType<VoxelWorld>().World;
+            worldSync = FindAnyObjectByType<WorldSync>();
             cameraTransform = Camera.main.transform;
             body.SetActive(false);
             enabled = true;
@@ -57,6 +54,10 @@ namespace Voxel.Client
 
         private void Update()
         {
+            // Sur un client, le joueur apparaît avant que le serveur ait envoyé le monde : on attend.
+            world = worldSync.World;
+            if (world == null) return;
+
             Keyboard keyboard = Keyboard.current;
             Mouse mouse = Mouse.current;
             bool hasDevices = keyboard != null && mouse != null;
@@ -90,6 +91,8 @@ namespace Voxel.Client
 
         private void OnGUI()
         {
+            if (world == null) return;
+
             var crosshair = new Rect(
                 (Screen.width - CrosshairSize) / 2f,
                 (Screen.height - CrosshairSize) / 2f,
@@ -109,7 +112,7 @@ namespace Voxel.Client
         private void PlaceCamera()
         {
             cameraTransform.SetPositionAndRotation(
-                transform.position + Vector3.up * EyeHeight,
+                transform.position + Vector3.up * PlayerRules.EyeHeight,
                 Quaternion.Euler(pitch, transform.eulerAngles.y, 0f));
         }
 
@@ -128,19 +131,21 @@ namespace Voxel.Client
 
             System.Numerics.Vector3 origin = cameraTransform.position.ToNumerics();
             System.Numerics.Vector3 direction = cameraTransform.forward.ToNumerics();
-            if (!VoxelRaycast.Cast(world, origin, direction, reach, out VoxelHit hit)) return;
+            if (!VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, out VoxelHit hit)) return;
 
+            // Le serveur a le dernier mot : la demande passe par WorldSync, jamais par World.SetBlock.
             if (breakBlock)
             {
-                world.SetBlock(hit.Block, Blocks.Air);
+                worldSync.RequestSetBlock(hit.Block, Blocks.Air);
                 return;
             }
 
             BlockPos target = hit.Block + hit.Normal;
-            bool insidePlayer = VoxelCollision.IntersectsBlock(transform.position.ToNumerics(), HalfWidth, Height, target);
+            bool insidePlayer = VoxelCollision.IntersectsBlock(
+                transform.position.ToNumerics(), PlayerRules.HalfWidth, PlayerRules.Height, target);
             if (target != hit.Block && !insidePlayer)
             {
-                world.SetBlock(target, selectedBlock);
+                worldSync.RequestSetBlock(target, selectedBlock);
             }
         }
 
@@ -178,8 +183,8 @@ namespace Voxel.Client
             MoveResult result = VoxelCollision.Move(
                 world,
                 transform.position.ToNumerics(),
-                HalfWidth,
-                Height,
+                PlayerRules.HalfWidth,
+                PlayerRules.Height,
                 displacement.ToNumerics());
 
             transform.position = result.Position.ToUnity();

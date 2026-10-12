@@ -6,8 +6,8 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // Charge ou crée le monde d'une partie, l'affiche et remaille les chunks touchés par un
-    // changement de bloc. Le monde n'existe qu'entre Load et Unload.
+    // Détient le monde d'une partie, l'affiche et remaille les chunks qui changent. Le monde n'existe
+    // qu'entre LoadPersistent ou CreateRemote et Unload.
     public class VoxelWorld : MonoBehaviour
     {
         private static readonly BlockPos[] NeighbourOffsets =
@@ -58,19 +58,29 @@ namespace Voxel.Client
             Destroy(atlas);
         }
 
-        // Un monde persistant est lu depuis la sauvegarde et réécrit à Unload : c'est celui de l'hôte.
-        // Sinon il est seulement généré à partir de la graine, sans toucher au disque.
-        public void Load(bool persistent)
+        // Monde du serveur : lu depuis la sauvegarde, ou généré s'il n'y en a pas, et réécrit à Unload.
+        public void LoadPersistent()
         {
-            Unload();
+            Show(LoadOrCreateWorld(), true);
+        }
 
-            this.persistent = persistent;
-            World = persistent ? LoadOrCreateWorld() : CreateWorld();
-            World.BlockChanged += OnBlockChanged;
+        // Monde d'un client : vide au départ, rempli par les chunks que le serveur envoie, jamais sauvegardé.
+        public void CreateRemote(int chunksX, int chunksY, int chunksZ)
+        {
+            Show(new World(chunksX, chunksY, chunksZ), false);
+        }
 
-            foreach (Chunk chunk in World.Chunks)
+        // À appeler quand les blocs d'un chunk ont été remplacés en bloc, sans passer par World.SetBlock.
+        public void RefreshChunk(Chunk chunk)
+        {
+            dirtyChunks.Add(chunk);
+
+            // Les faces des chunks voisins tournées vers celui-ci changent aussi.
+            foreach (BlockPos offset in NeighbourOffsets)
             {
-                CreateChunkObject(chunk);
+                var coord = new ChunkCoord(chunk.Coord.X + offset.X, chunk.Coord.Y + offset.Y, chunk.Coord.Z + offset.Z);
+                Chunk neighbour = World.GetChunk(coord);
+                if (neighbour != null) dirtyChunks.Add(neighbour);
             }
         }
 
@@ -95,6 +105,20 @@ namespace Voxel.Client
             meshes.Clear();
             dirtyChunks.Clear();
             World = null;
+        }
+
+        private void Show(World world, bool isPersistent)
+        {
+            Unload();
+
+            persistent = isPersistent;
+            World = world;
+            World.BlockChanged += OnBlockChanged;
+
+            foreach (Chunk chunk in World.Chunks)
+            {
+                CreateChunkObject(chunk);
+            }
         }
 
         private World LoadOrCreateWorld()
