@@ -1,0 +1,17 @@
+{
+    "name": "Voxel.Client",
+    "rootNamespace": "Voxel.Client",
+    "references": [
+        "Voxel.Core",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
