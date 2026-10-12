@@ -96,24 +96,9 @@ namespace Voxel.Core
             }
         }
 
-        // Écrit d'abord un fichier temporaire : une coupure en cours d'écriture laisse l'ancienne
-        // sauvegarde intacte.
         public static void SaveToFile(string path, World world)
         {
-            string temporaryPath = path + ".tmp";
-            using (FileStream stream = File.Create(temporaryPath))
-            {
-                Write(stream, world);
-            }
-
-            if (File.Exists(path))
-            {
-                File.Replace(temporaryPath, path, null);
-            }
-            else
-            {
-                File.Move(temporaryPath, path);
-            }
+            AtomicFile.Write(path, stream => Write(stream, world));
         }
 
         public static World LoadFromFile(string path, IChunkGenerator generator)

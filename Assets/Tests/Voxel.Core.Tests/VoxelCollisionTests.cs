@@ -87,6 +87,40 @@ namespace Voxel.Core.Tests
         }
 
         [Test]
+        public void Overlaps_IsFalseStandingOnGround_AndTrueInsideIt()
+        {
+            World world = FlatGenerator.CreateWorld();
+            var standing = new Vector3(8.5f, FlatGenerator.GroundHeight + 0.001f, 8.5f);
+            var buried = new Vector3(8.5f, FlatGenerator.GroundHeight - 0.5f, 8.5f);
+
+            Assert.IsFalse(VoxelCollision.Overlaps(world, standing, HalfWidth, Height));
+            Assert.IsTrue(VoxelCollision.Overlaps(world, buried, HalfWidth, Height));
+        }
+
+        [Test]
+        public void RaiseToFreeSpace_LeavesAFreePositionUntouched()
+        {
+            World world = FlatGenerator.CreateWorld();
+            var standing = new Vector3(8.5f, FlatGenerator.GroundHeight + 0.001f, 8.5f);
+
+            Assert.AreEqual(standing, VoxelCollision.RaiseToFreeSpace(world, standing, HalfWidth, Height));
+        }
+
+        [Test]
+        public void RaiseToFreeSpace_LiftsAPlayerOutOfBlocksBuiltWhereTheyStood()
+        {
+            World world = FlatGenerator.CreateWorld();
+            world.SetBlock(8, FlatGenerator.GroundHeight, 8, Blocks.Stone);
+            world.SetBlock(8, FlatGenerator.GroundHeight + 1, 8, Blocks.Stone);
+            var saved = new Vector3(8.5f, FlatGenerator.GroundHeight + 0.001f, 8.5f);
+
+            Vector3 raised = VoxelCollision.RaiseToFreeSpace(world, saved, HalfWidth, Height);
+
+            Assert.AreEqual(new Vector3(8.5f, FlatGenerator.GroundHeight + 2f, 8.5f), raised);
+            Assert.IsFalse(VoxelCollision.Overlaps(world, raised, HalfWidth, Height));
+        }
+
+        [Test]
         public void IntersectsBlock_DetectsOverlapWithPlayerBox()
         {
             var position = new Vector3(8.5f, 8f, 8.5f);

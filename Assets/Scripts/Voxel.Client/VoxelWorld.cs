@@ -27,14 +27,17 @@ namespace Voxel.Client
         private readonly HashSet<Chunk> dirtyChunks = new HashSet<Chunk>();
         private Material materialInstance;
         private Texture2D atlas;
-        private bool persistent;
+        private string savePath;
+        private bool rendering;
 
         public World World { get; private set; }
 
-        private string SavePath => Path.Combine(Application.persistentDataPath, saveFileName);
-
         private void Awake()
         {
+            // Un serveur sans affichage détient le monde mais ne le maille pas.
+            rendering = !Application.isBatchMode;
+            if (!rendering) return;
+
             atlas = BlockAtlas.CreateTexture();
             materialInstance = new Material(blockMaterial) { mainTexture = atlas };
         }
@@ -58,21 +61,40 @@ namespace Voxel.Client
             Destroy(atlas);
         }
 
-        // Monde du serveur : lu depuis la sauvegarde, ou généré s'il n'y en a pas, et réécrit à Unload.
-        public void LoadPersistent()
+        // Monde du serveur : lu depuis la sauvegarde du dossier donné, ou généré s'il n'y en a pas,
+        // et réécrit par Save et Unload.
+        public void LoadPersistent(string directory)
         {
-            Show(LoadOrCreateWorld(), true);
+            string path = Path.Combine(directory, saveFileName);
+            Show(LoadOrCreateWorld(path), path);
         }
 
         // Monde d'un client : vide au départ, rempli par les chunks que le serveur envoie, jamais sauvegardé.
         public void CreateRemote(int chunksX, int chunksY, int chunksZ)
         {
-            Show(new World(chunksX, chunksY, chunksZ), false);
+            Show(new World(chunksX, chunksY, chunksZ), null);
+        }
+
+        // Écrit le monde sur le disque s'il est persistant. Un échec est signalé sans interrompre la partie.
+        public void Save()
+        {
+            if (World == null || savePath == null) return;
+
+            try
+            {
+                WorldSave.SaveToFile(savePath, World);
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                Debug.LogError($"Échec de la sauvegarde du monde : {e.Message} ({savePath})");
+            }
         }
 
         // À appeler quand les blocs d'un chunk ont été remplacés en bloc, sans passer par World.SetBlock.
         public void RefreshChunk(Chunk chunk)
         {
+            if (!rendering) return;
+
             dirtyChunks.Add(chunk);
 
             // Les faces des chunks voisins tournées vers celui-ci changent aussi.
@@ -89,7 +111,7 @@ namespace Voxel.Client
             if (World == null) return;
 
             World.BlockChanged -= OnBlockChanged;
-            if (persistent) SaveWorld();
+            Save();
 
             foreach (GameObject chunkObject in chunkObjects)
             {
@@ -105,39 +127,42 @@ namespace Voxel.Client
             meshes.Clear();
             dirtyChunks.Clear();
             World = null;
+            savePath = null;
         }
 
-        private void Show(World world, bool isPersistent)
+        // Un chemin de sauvegarde nul désigne un monde qui n'est jamais écrit sur le disque.
+        private void Show(World world, string path)
         {
             Unload();
 
-            persistent = isPersistent;
+            savePath = path;
             World = world;
-            World.BlockChanged += OnBlockChanged;
+            if (!rendering) return;
 
+            World.BlockChanged += OnBlockChanged;
             foreach (Chunk chunk in World.Chunks)
             {
                 CreateChunkObject(chunk);
             }
         }
 
-        private World LoadOrCreateWorld()
+        private World LoadOrCreateWorld(string path)
         {
-            if (File.Exists(SavePath))
+            if (File.Exists(path))
             {
                 try
                 {
-                    World saved = WorldSave.LoadFromFile(SavePath, new ProvisionalHillsGenerator());
+                    World saved = WorldSave.LoadFromFile(path, new ProvisionalHillsGenerator());
                     if (MatchesSettings(saved)) return saved;
 
                     Debug.LogWarning(
                         $"Sauvegarde ignorée : sa graine ou ses dimensions ne correspondent pas aux réglages du monde. " +
-                        $"Elle sera remplacée à la fermeture. ({SavePath})");
+                        $"Elle sera remplacée à la prochaine sauvegarde. ({path})");
                 }
                 catch (Exception e) when (e is IOException || e is InvalidDataException)
                 {
                     Debug.LogWarning(
-                        $"Sauvegarde illisible, un nouveau monde est généré et la remplacera à la fermeture : {e.Message} ({SavePath})");
+                        $"Sauvegarde illisible, un nouveau monde est généré et la remplacera à la prochaine sauvegarde : {e.Message} ({path})");
                 }
             }
 
@@ -157,18 +182,6 @@ namespace Voxel.Client
                 && world.ChunksX == sizeInChunks.x
                 && world.ChunksY == sizeInChunks.y
                 && world.ChunksZ == sizeInChunks.z;
-        }
-
-        private void SaveWorld()
-        {
-            try
-            {
-                WorldSave.SaveToFile(SavePath, World);
-            }
-            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
-            {
-                Debug.LogError($"Échec de la sauvegarde du monde : {e.Message} ({SavePath})");
-            }
         }
 
         private void CreateChunkObject(Chunk chunk)

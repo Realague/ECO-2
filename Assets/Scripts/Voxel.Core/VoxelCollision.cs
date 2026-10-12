@@ -40,6 +40,27 @@ namespace Voxel.Core
             return result;
         }
 
+        public static bool Overlaps(World world, Vector3 position, float halfWidth, float height)
+        {
+            return AnySolid(
+                world,
+                Floor(position.X - halfWidth), Floor(position.X + halfWidth),
+                Floor(position.Y), Floor(position.Y + height),
+                Floor(position.Z - halfWidth), Floor(position.Z + halfWidth));
+        }
+
+        // Remonte la position jusqu'à ce que la boîte ne touche plus aucun bloc : sert à replacer un
+        // joueur là où le monde a changé depuis sa dernière visite.
+        public static Vector3 RaiseToFreeSpace(World world, Vector3 position, float halfWidth, float height)
+        {
+            while (Overlaps(world, position, halfWidth, height))
+            {
+                position.Y = MathF.Floor(position.Y) + 1f;
+            }
+
+            return position;
+        }
+
         public static bool IntersectsBlock(Vector3 position, float halfWidth, float height, BlockPos block)
         {
             return position.X + halfWidth > block.X && position.X - halfWidth < block.X + 1

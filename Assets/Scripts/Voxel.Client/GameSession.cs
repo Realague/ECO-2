@@ -1,4 +1,6 @@
 using System;
+using System.Globalization;
+using System.IO;
 using System.Net;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
@@ -8,27 +10,41 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // Démarre et arrête une partie : héberger (serveur et joueur local) ou rejoindre un hôte.
-    // Arguments de ligne de commande : « -host » héberge directement au lancement,
-    // « -connect <adresse> » rejoint directement un hôte.
+    // Démarre et arrête une partie : héberger (serveur et joueur local), rejoindre un serveur, ou
+    // tourner en serveur dédié, sans joueur local ni affichage.
+    //
+    // Arguments de ligne de commande :
+    //   -server               serveur dédié (implicite avec -batchmode)
+    //   -host                 héberge une partie dès le lancement
+    //   -connect <adresse>    rejoint un serveur dès le lancement
+    //   -port <port>          port UDP, 7777 par défaut
+    //   -password <mot>       mot de passe exigé par le serveur, ou présenté par le client
+    //   -data <dossier>       dossier des sauvegardes du serveur
+    //   -autosave <secondes>  intervalle de sauvegarde automatique du serveur
+    //   -playerid <id>        identifiant de joueur, à la place de celui enregistré sur la machine
     public class GameSession : MonoBehaviour
     {
-        private const string HostArgument = "-host";
-        private const string ConnectArgument = "-connect";
         private const string LocalAddress = "127.0.0.1";
         private const string AnyAddress = "0.0.0.0";
         private const int MaxAddressLength = 15;
-        private const int SpawnSlots = 8;
-        private const int SpawnSpacing = 2;
+        private const int MaxPasswordLength = 32;
 
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private VoxelWorld voxelWorld;
         [SerializeField] private WorldSync worldSync;
         [SerializeField] private ushort port = 7777;
+        [SerializeField] private float autosaveInterval = 60f;
 
         private string address = LocalAddress;
+        private string password = "";
+        private string playerId;
+        private string dataDirectory;
         private string message = "";
+        private bool editingPassword;
+        private bool sessionActive;
         private bool leaving;
+        private PlayerRegistry registry;
+        private float nextAutosave;
         private Keyboard textInputKeyboard;
         private GUIStyle textStyle;
 
@@ -36,18 +52,23 @@ namespace Voxel.Client
 
         private void Start()
         {
-            networkManager.ConnectionApprovalCallback = ApproveConnection;
-            networkManager.OnClientStopped += OnClientStopped;
+            networkManager.OnClientStopped += OnSessionStopped;
+            networkManager.OnServerStopped += OnSessionStopped;
 
             string[] arguments = Environment.GetCommandLineArgs();
-            int connectIndex = Array.IndexOf(arguments, ConnectArgument);
-            if (Array.IndexOf(arguments, HostArgument) >= 0)
+            ReadSettings(arguments);
+
+            if (Array.IndexOf(arguments, "-server") >= 0 || Application.isBatchMode)
+            {
+                StartDedicatedServer();
+            }
+            else if (Array.IndexOf(arguments, "-host") >= 0)
             {
                 StartHost();
             }
-            else if (connectIndex >= 0 && connectIndex + 1 < arguments.Length)
+            else if (ArgumentValue(arguments, "-connect") != null)
             {
-                address = arguments[connectIndex + 1];
+                address = ArgumentValue(arguments, "-connect");
                 StartClient();
             }
         }
@@ -55,11 +76,30 @@ namespace Voxel.Client
         private void OnDestroy()
         {
             ListenToTextInput(null);
-            if (networkManager != null) networkManager.OnClientStopped -= OnClientStopped;
+            if (networkManager != null)
+            {
+                networkManager.OnClientStopped -= OnSessionStopped;
+                networkManager.OnServerStopped -= OnSessionStopped;
+            }
+        }
+
+        private void OnApplicationQuit()
+        {
+            SaveSession();
         }
 
         private void Update()
         {
+            if (registry != null)
+            {
+                registry.TrackPlayers();
+                if (Time.unscaledTime >= nextAutosave)
+                {
+                    nextAutosave = Time.unscaledTime + autosaveInterval;
+                    SaveSession();
+                }
+            }
+
             Keyboard keyboard = Keyboard.current;
             ListenToTextInput(keyboard);
             if (keyboard == null || networkManager.ShutdownInProgress) return;
@@ -68,6 +108,8 @@ namespace Voxel.Client
             {
                 if (keyboard.f10Key.wasPressedThisFrame)
                 {
+                    // Les joueurs disparaissent pendant l'arrêt : on relève leur position avant.
+                    SaveSession();
                     leaving = true;
                     networkManager.Shutdown();
                 }
@@ -75,9 +117,15 @@ namespace Voxel.Client
                 return;
             }
 
-            if (keyboard.backspaceKey.wasPressedThisFrame && address.Length > 0)
+            if (keyboard.tabKey.wasPressedThisFrame)
             {
-                address = address.Substring(0, address.Length - 1);
+                editingPassword = !editingPassword;
+            }
+
+            if (keyboard.backspaceKey.wasPressedThisFrame)
+            {
+                if (editingPassword) password = WithoutLastCharacter(password);
+                else address = WithoutLastCharacter(address);
             }
 
             if (keyboard.f1Key.wasPressedThisFrame)
@@ -110,20 +158,12 @@ namespace Voxel.Client
 
         public void StartHost()
         {
-            message = "";
-            leaving = false;
-            voxelWorld.LoadPersistent();
+            StartServerSession(true);
+        }
 
-            // L'hôte écoute sur toutes les interfaces pour être joignable depuis d'autres machines.
-            Transport.SetConnectionData(LocalAddress, port, AnyAddress);
-            if (!networkManager.StartHost())
-            {
-                voxelWorld.Unload();
-                message = $"Impossible d'héberger une partie sur le port {port}.";
-                return;
-            }
-
-            worldSync.StartServer();
+        public void StartDedicatedServer()
+        {
+            StartServerSession(false);
         }
 
         public void StartClient()
@@ -136,6 +176,7 @@ namespace Voxel.Client
                 return;
             }
 
+            networkManager.NetworkConfig.ConnectionData = OwnConnectionRequest();
             Transport.SetConnectionData(address, port);
             if (!networkManager.StartClient())
             {
@@ -145,40 +186,125 @@ namespace Voxel.Client
 
             // Le monde du client est créé par WorldSync à partir de ce que le serveur envoie.
             worldSync.StartClient();
+            sessionActive = true;
         }
 
-        // Exécuté par le serveur pour chaque joueur, hôte compris : il décide où le joueur apparaît.
-        private void ApproveConnection(
-            NetworkManager.ConnectionApprovalRequest request,
-            NetworkManager.ConnectionApprovalResponse response)
+        private void StartServerSession(bool withLocalPlayer)
         {
-            response.Approved = true;
-            response.CreatePlayerObject = true;
-            response.Position = SpawnPosition(request.ClientNetworkId);
-            response.Rotation = Quaternion.identity;
+            message = "";
+            leaving = false;
+
+            Directory.CreateDirectory(dataDirectory);
+            voxelWorld.LoadPersistent(dataDirectory);
+            registry = new PlayerRegistry(networkManager, voxelWorld.World, dataDirectory, password);
+
+            // Le serveur écoute sur toutes les interfaces pour être joignable depuis d'autres machines.
+            Transport.SetConnectionData(LocalAddress, port, AnyAddress);
+
+            bool started;
+            if (withLocalPlayer)
+            {
+                networkManager.NetworkConfig.ConnectionData = OwnConnectionRequest();
+                started = networkManager.StartHost();
+            }
+            else
+            {
+                // Sans affichage, rien ne limite la cadence : on la cale sur celle du réseau.
+                Application.targetFrameRate = (int)networkManager.NetworkConfig.TickRate;
+                started = networkManager.StartServer();
+            }
+
+            if (!started)
+            {
+                EndSession();
+                message = $"Impossible de démarrer un serveur sur le port {port}.";
+                Debug.LogError(message);
+                QuitIfDedicated();
+                return;
+            }
+
+            worldSync.StartServer();
+            sessionActive = true;
+            nextAutosave = Time.unscaledTime + autosaveInterval;
+            Debug.Log($"Serveur démarré sur le port {port}. Sauvegardes dans {dataDirectory}, toutes les {autosaveInterval} s.");
         }
 
-        private Vector3 SpawnPosition(ulong clientId)
+        // Écrit le monde et les joueurs sur le disque. Sans effet hors du rôle de serveur.
+        private void SaveSession()
         {
-            World world = voxelWorld.World;
-            int x = world.SizeX / 2 + (int)(clientId % SpawnSlots) * SpawnSpacing;
-            int z = world.SizeZ / 2;
-            return new Vector3(x + 0.5f, world.GetSurfaceHeight(x, z), z + 0.5f);
+            if (registry == null) return;
+
+            registry.Save();
+            voxelWorld.Save();
         }
 
-        // Appelé à la fin de toute partie, côté hôte comme côté client, y compris après un échec de connexion.
-        private void OnClientStopped(bool wasHost)
+        private void EndSession()
         {
             worldSync.Stop();
+            if (registry != null)
+            {
+                registry.Close();
+                registry = null;
+            }
+
             voxelWorld.Unload();
             Cursor.lockState = CursorLockMode.None;
+        }
+
+        // Appelé à la fin de toute partie, y compris après un échec de connexion. Un hôte le reçoit
+        // deux fois, pour son rôle de serveur et pour son rôle de client.
+        private void OnSessionStopped(bool wasHost)
+        {
+            if (!sessionActive) return;
+
+            bool wasServer = registry != null;
+            sessionActive = false;
+            EndSession();
 
             if (!leaving)
             {
-                message = wasHost ? "La partie hébergée s'est arrêtée." : "Connexion au serveur perdue ou impossible.";
+                string reason = networkManager.DisconnectReason;
+                if (ConnectionRefusal.IsKnown(reason)) message = reason;
+                else message = wasServer ? "Le serveur s'est arrêté." : "Connexion au serveur perdue ou impossible.";
+
+                if (wasServer) Debug.LogError(message);
             }
 
             leaving = false;
+            if (wasServer) QuitIfDedicated();
+        }
+
+        // Un serveur dédié qui n'a plus de partie n'a plus de raison de tourner.
+        private static void QuitIfDedicated()
+        {
+            if (Application.isBatchMode) Application.Quit(1);
+        }
+
+        private byte[] OwnConnectionRequest()
+        {
+            if (playerId == null) playerId = PlayerIdentity.GetOrCreate();
+            return new ConnectionRequest(playerId, password).ToBytes();
+        }
+
+        private void ReadSettings(string[] arguments)
+        {
+            if (ushort.TryParse(ArgumentValue(arguments, "-port"), out ushort requestedPort) && requestedPort > 0)
+            {
+                port = requestedPort;
+            }
+
+            bool validInterval = float.TryParse(
+                ArgumentValue(arguments, "-autosave"), NumberStyles.Float, CultureInfo.InvariantCulture, out float interval);
+            if (validInterval && interval > 0f)
+            {
+                autosaveInterval = interval;
+            }
+
+            password = ArgumentValue(arguments, "-password") ?? "";
+            dataDirectory = ArgumentValue(arguments, "-data") ?? Application.persistentDataPath;
+
+            string requestedId = ArgumentValue(arguments, "-playerid");
+            if (ConnectionRequest.IsValidPlayerId(requestedId)) playerId = requestedId;
         }
 
         private string ScreenText()
@@ -186,8 +312,10 @@ namespace Voxel.Client
             if (!networkManager.IsListening)
             {
                 return "F1 : héberger une partie\n"
-                    + $"Entrée : rejoindre {address}_\n"
-                    + "Chiffres, point et Retour arrière : modifier l'adresse\n\n"
+                    + "Entrée : rejoindre une partie\n\n"
+                    + $"Adresse : {address}{(editingPassword ? "" : "_")}\n"
+                    + $"Mot de passe : {new string('*', password.Length)}{(editingPassword ? "_" : "")}\n"
+                    + "Tab : changer de champ   Retour arrière : effacer\n\n"
                     + message;
             }
 
@@ -221,12 +349,26 @@ namespace Voxel.Client
 
         private void OnTextInput(char character)
         {
-            if (networkManager.IsListening || address.Length >= MaxAddressLength) return;
+            if (networkManager.IsListening) return;
 
-            if (char.IsDigit(character) || character == '.')
+            if (editingPassword)
+            {
+                bool printable = character > ' ' && character < 127;
+                if (printable && password.Length < MaxPasswordLength) password += character;
+            }
+            else if ((char.IsDigit(character) || character == '.') && address.Length < MaxAddressLength)
             {
                 address += character;
             }
+        }
+
+        private static string WithoutLastCharacter(string text) =>
+            text.Length > 0 ? text.Substring(0, text.Length - 1) : text;
+
+        private static string ArgumentValue(string[] arguments, string name)
+        {
+            int index = Array.IndexOf(arguments, name);
+            return index >= 0 && index + 1 < arguments.Length ? arguments[index + 1] : null;
         }
     }
 }
