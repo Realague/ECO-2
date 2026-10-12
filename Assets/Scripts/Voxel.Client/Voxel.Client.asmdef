@@ -3,7 +3,9 @@
     "rootNamespace": "Voxel.Client",
     "references": [
         "Voxel.Core",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "Unity.Netcode.Runtime",
+        "Unity.Networking.Transport"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

@@ -6,8 +6,8 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // Charge ou crée le monde, l'affiche, remaille les chunks touchés par un changement de bloc,
-    // et sauvegarde le monde à la fermeture.
+    // Charge ou crée le monde d'une partie, l'affiche et remaille les chunks touchés par un
+    // changement de bloc. Le monde n'existe qu'entre Load et Unload.
     public class VoxelWorld : MonoBehaviour
     {
         private static readonly BlockPos[] NeighbourOffsets =
@@ -23,9 +23,11 @@ namespace Voxel.Client
         [SerializeField] private string saveFileName = "world.dat";
 
         private readonly Dictionary<Chunk, Mesh> meshes = new Dictionary<Chunk, Mesh>();
+        private readonly List<GameObject> chunkObjects = new List<GameObject>();
         private readonly HashSet<Chunk> dirtyChunks = new HashSet<Chunk>();
         private Material materialInstance;
         private Texture2D atlas;
+        private bool persistent;
 
         public World World { get; private set; }
 
@@ -33,16 +35,8 @@ namespace Voxel.Client
 
         private void Awake()
         {
-            World = LoadOrCreateWorld();
-            World.BlockChanged += OnBlockChanged;
-
             atlas = BlockAtlas.CreateTexture();
             materialInstance = new Material(blockMaterial) { mainTexture = atlas };
-
-            foreach (Chunk chunk in World.Chunks)
-            {
-                CreateChunkObject(chunk);
-            }
         }
 
         private void LateUpdate()
@@ -59,10 +53,37 @@ namespace Voxel.Client
 
         private void OnDestroy()
         {
-            if (World != null)
+            Unload();
+            Destroy(materialInstance);
+            Destroy(atlas);
+        }
+
+        // Un monde persistant est lu depuis la sauvegarde et réécrit à Unload : c'est celui de l'hôte.
+        // Sinon il est seulement généré à partir de la graine, sans toucher au disque.
+        public void Load(bool persistent)
+        {
+            Unload();
+
+            this.persistent = persistent;
+            World = persistent ? LoadOrCreateWorld() : CreateWorld();
+            World.BlockChanged += OnBlockChanged;
+
+            foreach (Chunk chunk in World.Chunks)
             {
-                World.BlockChanged -= OnBlockChanged;
-                SaveWorld();
+                CreateChunkObject(chunk);
+            }
+        }
+
+        public void Unload()
+        {
+            if (World == null) return;
+
+            World.BlockChanged -= OnBlockChanged;
+            if (persistent) SaveWorld();
+
+            foreach (GameObject chunkObject in chunkObjects)
+            {
+                Destroy(chunkObject);
             }
 
             foreach (Mesh mesh in meshes.Values)
@@ -70,19 +91,19 @@ namespace Voxel.Client
                 Destroy(mesh);
             }
 
-            Destroy(materialInstance);
-            Destroy(atlas);
+            chunkObjects.Clear();
+            meshes.Clear();
+            dirtyChunks.Clear();
+            World = null;
         }
 
         private World LoadOrCreateWorld()
         {
-            var generator = new ProvisionalHillsGenerator();
-
             if (File.Exists(SavePath))
             {
                 try
                 {
-                    World saved = WorldSave.LoadFromFile(SavePath, generator);
+                    World saved = WorldSave.LoadFromFile(SavePath, new ProvisionalHillsGenerator());
                     if (MatchesSettings(saved)) return saved;
 
                     Debug.LogWarning(
@@ -96,8 +117,13 @@ namespace Voxel.Client
                 }
             }
 
+            return CreateWorld();
+        }
+
+        private World CreateWorld()
+        {
             var world = new World(sizeInChunks.x, sizeInChunks.y, sizeInChunks.z);
-            world.Generate(generator, seed);
+            world.Generate(new ProvisionalHillsGenerator(), seed);
             return world;
         }
 
@@ -132,6 +158,7 @@ namespace Voxel.Client
             chunkObject.transform.localPosition = new Vector3(chunk.Coord.X, chunk.Coord.Y, chunk.Coord.Z) * Chunk.Size;
             chunkObject.AddComponent<MeshFilter>().sharedMesh = mesh;
             chunkObject.AddComponent<MeshRenderer>().sharedMaterial = materialInstance;
+            chunkObjects.Add(chunkObject);
         }
 
         private void OnBlockChanged(BlockPos pos, ushort previous, ushort current)

@@ -11,7 +11,7 @@ Unity **6000.6.5f1** project (URP 3D template): a multiplayer block-world game i
 Code is split into assemblies so that a future dedicated server can run the world without rendering:
 
 - `Assets/Scripts/Voxel.Core` — blocks, chunks, world, generation, collision, raycast. **Pure C#: the asmdef sets `noEngineReferences`, so `UnityEngine` is unavailable here.** Vectors are `System.Numerics.Vector3`; positions are `BlockPos` / `ChunkCoord`.
-- `Assets/Scripts/Voxel.Client` — meshing, rendering, input, player. Converts vectors at the boundary with `ToNumerics()` / `ToUnity()`.
+- `Assets/Scripts/Voxel.Client` — meshing, rendering, input, player, and for now the session/network code. Converts vectors at the boundary with `ToNumerics()` / `ToUnity()`.
 - `Assets/Tests/Voxel.Core.Tests` — EditMode tests for `Voxel.Core`.
 
 Key rules:
@@ -20,10 +20,18 @@ Key rules:
 - `World.IsSolid` treats everything outside the world's sides and bottom as solid (keeps players in, culls unseen faces); `World.GetBlock` returns air there. Use `IsSolid` for collision and face culling, `GetBlock` for gameplay such as raycasts.
 - A block is a `ushort`: low 12 bits are the type, high 4 bits the orientation. Compare types through `Blocks.TypeOf(block)`, never the raw value.
 - `WorldSave` stores a header (seed, generator version, dimensions) plus **only the modified chunks**; untouched chunks are regenerated on load. Any change to what a generator produces must bump `IChunkGenerator.Version`, which makes older saves fail to load instead of loading corrupted. `ChunkSerializer` (run-length encoded) is meant to be reused as the network chunk format.
-- In Play mode `VoxelWorld` loads `world.dat` from `Application.persistentDataPath` and writes it back in `OnDestroy`. A save whose seed or dimensions differ from the inspector settings, or that fails to load, is ignored with a warning and overwritten on exit. Delete the file to reset the world.
+- A persistent world is loaded from `world.dat` in `Application.persistentDataPath` and written back on `Unload`. A save whose seed or dimensions differ from the inspector settings, or that fails to load, is ignored with a warning and overwritten on exit. Delete the file to reset the world.
 - Terrain comes from an `IChunkGenerator`. `ProvisionalHillsGenerator` is a placeholder until real procedural generation; do not build features that depend on its output.
 - The player uses voxel collision (`VoxelCollision.Move`), not Unity physics; chunks have no `MeshCollider`. `transform.position` of the player is the centre of its feet.
-- `VoxelWorld` (scene object `World`) creates the world in `Awake`; other components read `VoxelWorld.World` from `Start` onwards.
+- `VoxelWorld.World` only exists during a session, between `VoxelWorld.Load` and `Unload`; it is `null` in the menu. `GameSession` loads it right before starting the network and unloads it when the session stops.
+
+Networking (Netcode for GameObjects 2.x, Unity Transport, direct IP on UDP 7777):
+
+- `GameSession` owns starting and stopping: F1 hosts, Enter joins the typed IPv4 address, F10 leaves. `-connect <address>` on the command line joins at launch (useful to test with a standalone build next to the Editor).
+- The host's world is persistent (loaded from and saved to `world.dat`). **A client never reads or writes the save**: until the server streams chunks (next step of the plan), a client generates the same world from the same seed, so saved modifications and block edits are not shared between players yet.
+- The server chooses each player's spawn position in `GameSession.ApproveConnection` (connection approval is enabled for that reason). Scene management is disabled in the `NetworkManager`: there is a single scene and a reload would destroy the loaded world.
+- `Assets/Prefabs/Player.prefab` is the player prefab. Its `NetworkTransform` is **owner-authoritative**; `PlayerController` is a `NetworkBehaviour` that stays disabled except on the owner, which simulates movement locally. The scene's Main Camera is not parented to the player; the owner repositions it every frame.
+- The on-screen text is drawn with `OnGUI` for display only. IMGUI gets no input with the new Input System, so all input (including typing the address) is read from `Keyboard.current`.
 - The block texture atlas is generated at runtime by `BlockAtlas`; `Assets/Materials/Blocks.mat` only supplies the shader settings.
 
 ## Working with the Unity Editor

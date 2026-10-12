@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Voxel.Core;
@@ -5,17 +6,18 @@ using Voxel.Core;
 namespace Voxel.Client
 {
     // Joueur à la première personne. transform.position est le centre des pieds.
-    public class PlayerController : MonoBehaviour
+    // Seul le propriétaire simule son joueur ; les autres copies suivent le NetworkTransform.
+    public class PlayerController : NetworkBehaviour
     {
         private const float HalfWidth = 0.3f;
         private const float Height = 1.8f;
+        private const float EyeHeight = 1.62f;
         private const float MaxFallSpeed = 50f;
         private const float MaxDeltaTime = 0.05f;
         private const float MaxPitch = 89f;
         private const float CrosshairSize = 6f;
 
-        [SerializeField] private VoxelWorld voxelWorld;
-        [SerializeField] private Transform cameraTransform;
+        [SerializeField] private GameObject body;
         [SerializeField] private float moveSpeed = 5f;
         [SerializeField] private float jumpHeight = 1.25f;
         [SerializeField] private float gravity = 25f;
@@ -23,50 +25,67 @@ namespace Voxel.Client
         [SerializeField] private float reach = 5f;
 
         private World world;
+        private Transform cameraTransform;
         private Vector3 velocity;
         private bool grounded;
         private float pitch;
         private ushort selectedBlock = Blocks.Dirt;
 
-        private void Start()
+        private void Awake()
         {
-            world = voxelWorld.World;
+            // Activé seulement pour le propriétaire, une fois apparu sur le réseau.
+            enabled = false;
+        }
 
-            int x = world.SizeX / 2;
-            int z = world.SizeZ / 2;
-            transform.position = new Vector3(x + 0.5f, world.GetSurfaceHeight(x, z), z + 0.5f);
+        public override void OnNetworkSpawn()
+        {
+            if (!IsOwner) return;
+
+            world = FindAnyObjectByType<VoxelWorld>().World;
+            cameraTransform = Camera.main.transform;
+            body.SetActive(false);
+            enabled = true;
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            if (!IsOwner) return;
+
+            enabled = false;
+            Cursor.lockState = CursorLockMode.None;
         }
 
         private void Update()
         {
             Keyboard keyboard = Keyboard.current;
             Mouse mouse = Mouse.current;
-            if (keyboard == null || mouse == null)
-            {
-                // Sans clavier ni souris, la gravité s'applique quand même.
-                Move(keyboard, false);
-                return;
-            }
+            bool hasDevices = keyboard != null && mouse != null;
 
-            if (keyboard.escapeKey.wasPressedThisFrame)
+            if (hasDevices && keyboard.escapeKey.wasPressedThisFrame)
             {
                 Cursor.lockState = CursorLockMode.None;
             }
 
-            bool hasControl = Cursor.lockState == CursorLockMode.Locked;
+            bool hasControl = hasDevices && Cursor.lockState == CursorLockMode.Locked;
             if (hasControl)
             {
                 Look(mouse);
+            }
+
+            // Sans clavier ni souris, la gravité s'applique quand même.
+            Move(keyboard, hasControl);
+            PlaceCamera();
+
+            if (hasControl)
+            {
                 SelectBlock(keyboard);
                 Interact(mouse);
             }
-            else if (mouse.leftButton.wasPressedThisFrame)
+            else if (hasDevices && mouse.leftButton.wasPressedThisFrame)
             {
                 // Le premier clic capture la souris, sans casser de bloc.
                 Cursor.lockState = CursorLockMode.Locked;
             }
-
-            Move(keyboard, hasControl);
         }
 
         private void OnGUI()
@@ -84,7 +103,14 @@ namespace Voxel.Client
             Vector2 delta = mouse.delta.ReadValue() * mouseSensitivity;
             transform.Rotate(0f, delta.x, 0f);
             pitch = Mathf.Clamp(pitch - delta.y, -MaxPitch, MaxPitch);
-            cameraTransform.localRotation = Quaternion.Euler(pitch, 0f, 0f);
+        }
+
+        // La caméra de la scène suit le joueur local sans lui être rattachée : elle survit à sa disparition.
+        private void PlaceCamera()
+        {
+            cameraTransform.SetPositionAndRotation(
+                transform.position + Vector3.up * EyeHeight,
+                Quaternion.Euler(pitch, transform.eulerAngles.y, 0f));
         }
 
         private void SelectBlock(Keyboard keyboard)
