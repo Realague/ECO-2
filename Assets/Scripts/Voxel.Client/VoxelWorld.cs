@@ -62,11 +62,16 @@ namespace Voxel.Client
         }
 
         // Monde du serveur : lu depuis la sauvegarde du dossier donné, ou généré s'il n'y en a pas,
-        // et réécrit par Save et Unload.
-        public void LoadPersistent(string directory)
+        // et réécrit par Save et Unload. Une taille en chunks peut remplacer celle réglée dans la scène.
+        public void LoadPersistent(string directory, Vector3Int? size = null)
         {
+            if (size.HasValue) sizeInChunks = size.Value;
+
+            var timer = System.Diagnostics.Stopwatch.StartNew();
             string path = Path.Combine(directory, saveFileName);
             Show(LoadOrCreateWorld(path), path);
+            Debug.Log(
+                $"Monde de {World.SizeX} × {World.SizeY} × {World.SizeZ} blocs ({World.Chunks.Count} chunks) prêt en {timer.Elapsed.TotalSeconds:0.0} s.");
         }
 
         // Monde d'un client : vide au départ, rempli par les chunks que le serveur envoie, jamais sauvegardé.
@@ -90,19 +95,16 @@ namespace Voxel.Client
             }
         }
 
-        // À appeler quand les blocs d'un chunk ont été remplacés en bloc, sans passer par World.SetBlock.
-        public void RefreshChunk(Chunk chunk)
+        // À appeler quand les blocs du monde ont été remplacés en masse, sans passer par World.SetBlock :
+        // un client le fait une fois tous les chunks reçus. Mailler chunk par chunk pendant la réception
+        // referait plusieurs fois chaque maillage, voisins compris, et le client ne suivrait plus le flux.
+        public void RemeshAll()
         {
             if (!rendering) return;
 
-            dirtyChunks.Add(chunk);
-
-            // Les faces des chunks voisins tournées vers celui-ci changent aussi.
-            foreach (BlockPos offset in NeighbourOffsets)
+            foreach (Chunk chunk in World.Chunks)
             {
-                var coord = new ChunkCoord(chunk.Coord.X + offset.X, chunk.Coord.Y + offset.Y, chunk.Coord.Z + offset.Z);
-                Chunk neighbour = World.GetChunk(coord);
-                if (neighbour != null) dirtyChunks.Add(neighbour);
+                dirtyChunks.Add(chunk);
             }
         }
 

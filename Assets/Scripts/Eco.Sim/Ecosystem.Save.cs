@@ -20,7 +20,7 @@ namespace Eco.Sim
                 writer.Write(FormatVersion);
 
                 // Les plantes désignent leur espèce par son rang : la liste doit être la même au chargement.
-                writer.Write(species.Count);
+                writer.Write(species.Length);
                 foreach (Species kind in species)
                 {
                     writer.Write(kind.Name);
@@ -38,9 +38,10 @@ namespace Eco.Sim
                     writer.Write(capacity[i]);
                 }
 
-                writer.Write(plants.Count);
-                foreach (Plant plant in plants)
+                writer.Write(plantCount);
+                for (int i = 0; i < plantCount; i++)
                 {
+                    Plant plant = plants[i];
                     writer.Write(plant.Id);
                     writer.Write(plant.SpeciesIndex);
                     writer.Write(plant.X);
@@ -102,8 +103,9 @@ namespace Eco.Sim
                     ecosystem.capacity[i] = reader.ReadSingle();
                 }
 
-                int plantCount = reader.ReadInt32();
-                for (int i = 0; i < plantCount; i++)
+                int savedCount = reader.ReadInt32();
+                int previousId = 0;
+                for (int i = 0; i < savedCount; i++)
                 {
                     var plant = new Plant
                     {
@@ -116,18 +118,18 @@ namespace Eco.Sim
                         Growth = reader.ReadSingle()
                     };
 
+                    // Les plantes sont enregistrées par identifiant croissant, ordre que le reste du code suppose.
                     bool valid = (uint)plant.SpeciesIndex < (uint)species.Count
                         && (uint)plant.X < (uint)world.SizeX
                         && (uint)plant.Z < (uint)world.SizeZ
-                        && !ecosystem.indexById.ContainsKey(plant.Id);
+                        && plant.Id > previousId;
                     if (!valid)
                     {
                         throw new InvalidDataException($"Plante invalide dans la sauvegarde d'écosystème (numéro {plant.Id}).");
                     }
 
-                    ecosystem.indexById[plant.Id] = ecosystem.plants.Count;
-                    ecosystem.plants.Add(plant);
-                    ecosystem.plantAtColumn[ecosystem.ColumnIndex(plant.X, plant.Z)] = plant.Id;
+                    previousId = plant.Id;
+                    ecosystem.Append(plant);
                 }
 
                 return ecosystem;

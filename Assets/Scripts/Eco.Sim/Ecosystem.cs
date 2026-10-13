@@ -20,7 +20,7 @@ namespace Eco.Sim
         private const int CapacityPatchCells = 4;
 
         private readonly World world;
-        private readonly IReadOnlyList<Species> species;
+        private readonly Species[] species;
         private readonly SimRandom random;
         private readonly int cellsX;
         private readonly int cellsZ;
@@ -29,19 +29,31 @@ namespace Eco.Sim
         private readonly float[] fertility;
         private readonly float[] capacity;
 
-        // Plantes dans l'ordre de leur apparition : l'ordre de parcours fait partie du résultat.
-        private readonly List<Plant> plants = new List<Plant>();
-        private readonly Dictionary<int, int> indexById = new Dictionary<int, int>();
+        // Plantes dans l'ordre de leur apparition, donc par identifiant croissant : l'ordre de parcours
+        // fait partie du résultat. Un tableau plutôt qu'une liste, parce que Step le parcourt en entier
+        // à chaque pas et que son coût domine celui de la simulation.
+        // Une plante se retrouve par recherche dichotomique sur son identifiant : pas de table d'index à
+        // tenir à jour quand des plantes meurent.
+        private Plant[] plants = new Plant[256];
+        private int plantCount;
 
         // Pour chaque colonne de blocs, l'identifiant de la plante qui s'y trouve, ou 0.
         private readonly int[] plantAtColumn;
         private readonly List<int> dying = new List<int>();
+
+        // Plantes dont le sol ou le pied a changé depuis le dernier pas : elles seules sont revérifiées.
+        private readonly List<int> disturbed = new List<int>();
         private int nextPlantId = 1;
 
         public Ecosystem(World world, IReadOnlyList<Species> species, int seed)
         {
             this.world = world;
-            this.species = species;
+            this.species = new Species[species.Count];
+            for (int i = 0; i < species.Count; i++)
+            {
+                this.species[i] = species[i];
+            }
+
             random = new SimRandom(seed);
 
             cellsX = (world.SizeX + CellSize - 1) / CellSize;
@@ -51,6 +63,7 @@ namespace Eco.Sim
             plantAtColumn = new int[world.SizeX * world.SizeZ];
 
             FillCapacity();
+            world.BlockChanged += OnBlockChanged;
         }
 
         public event Action<Plant> PlantAdded;
@@ -61,7 +74,8 @@ namespace Eco.Sim
 
         public long StepCount { get; private set; }
 
-        public IReadOnlyList<Plant> Plants => plants;
+        // Vue de l'instant : elle n'est plus valable après un Step, un Remove ou un TryPlant.
+        public IReadOnlyList<Plant> Plants => new ArraySegment<Plant>(plants, 0, plantCount);
 
         public IReadOnlyList<Species> AllSpecies => species;
 
@@ -69,7 +83,8 @@ namespace Eco.Sim
 
         public bool TryGet(int plantId, out Plant plant)
         {
-            if (indexById.TryGetValue(plantId, out int index))
+            int index = IndexOf(plantId);
+            if (index >= 0)
             {
                 plant = plants[index];
                 return true;
@@ -85,7 +100,7 @@ namespace Eco.Sim
             int created = 0;
             for (int i = 0; i < attempts; i++)
             {
-                int speciesIndex = i % species.Count;
+                int speciesIndex = i % species.Length;
                 int x = random.NextInt(world.SizeX);
                 int z = random.NextInt(world.SizeZ);
                 int age = random.NextInt(Math.Max(1, species[speciesIndex].LifespanSteps / 2));
@@ -101,16 +116,13 @@ namespace Eco.Sim
         // Retire une plante, par exemple abattue par un joueur. Renvoie faux si elle n'existe pas.
         public bool Remove(int plantId)
         {
-            if (!indexById.TryGetValue(plantId, out int index)) return false;
+            int index = IndexOf(plantId);
+            if (index < 0) return false;
 
             Plant plant = plants[index];
-            plants.RemoveAt(index);
+            Array.Copy(plants, index + 1, plants, index, plantCount - index - 1);
+            plantCount--;
             Forget(plant);
-            for (int i = index; i < plants.Count; i++)
-            {
-                indexById[plants[i].Id] = i;
-            }
-
             return true;
         }
 
@@ -118,6 +130,7 @@ namespace Eco.Sim
         public void Step()
         {
             StepCount++;
+            RemoveUprooted();
 
             for (int i = 0; i < fertility.Length; i++)
             {
@@ -125,27 +138,26 @@ namespace Eco.Sim
             }
 
             // Les plantes nées pendant ce pas n'agissent qu'au suivant.
-            int count = plants.Count;
+            int count = plantCount;
             for (int i = 0; i < count; i++)
             {
+                // Copie de travail : semer peut agrandir le tableau, une référence vers lui ne serait plus sûre.
                 Plant plant = plants[i];
-                if (!Live(ref plant))
-                {
-                    dying.Add(i);
-                    continue;
-                }
-
+                bool alive = Live(ref plant, out bool seeds);
                 plants[i] = plant;
+
+                if (!alive) dying.Add(i);
+                else if (seeds) Seed(plant);
             }
 
             RemoveDying();
         }
 
         // Fait vivre une plante pendant un pas. Renvoie faux si elle meurt.
-        private bool Live(ref Plant plant)
+        private bool Live(ref Plant plant, out bool seeds)
         {
+            seeds = false;
             Species kind = species[plant.SpeciesIndex];
-            if (!HasGroundAndRoom(plant.X, plant.Y, plant.Z)) return false;
 
             plant.Age++;
             if (plant.Age > kind.LifespanSteps) return false;
@@ -164,16 +176,17 @@ namespace Eco.Sim
             }
 
             fertility[cell] = Math.Max(0f, soil - kind.FertilityUse * plant.Growth);
-
-            if (plant.Growth >= 1f && random.NextFloat() < kind.SeedChance)
-            {
-                int reach = 2 * kind.SeedRange + 1;
-                int x = plant.X + random.NextInt(reach) - kind.SeedRange;
-                int z = plant.Z + random.NextInt(reach) - kind.SeedRange;
-                TryAdd(plant.SpeciesIndex, x, z, 0f, 0);
-            }
-
+            seeds = plant.Growth >= 1f && random.NextFloat() < kind.SeedChance;
             return true;
+        }
+
+        private void Seed(Plant parent)
+        {
+            Species kind = species[parent.SpeciesIndex];
+            int reach = 2 * kind.SeedRange + 1;
+            int x = parent.X + random.NextInt(reach) - kind.SeedRange;
+            int z = parent.Z + random.NextInt(reach) - kind.SeedRange;
+            TryAdd(parent.SpeciesIndex, x, z, 0f, 0);
         }
 
         private bool TryAdd(int speciesIndex, int x, int z, float growth, int age)
@@ -197,11 +210,40 @@ namespace Eco.Sim
                 Growth = growth
             };
 
-            indexById[plant.Id] = plants.Count;
-            plants.Add(plant);
-            plantAtColumn[ColumnIndex(x, z)] = plant.Id;
+            Append(plant);
             PlantAdded?.Invoke(plant);
             return true;
+        }
+
+        private void Append(Plant plant)
+        {
+            if (plantCount == plants.Length) Array.Resize(ref plants, plants.Length * 2);
+
+            plants[plantCount++] = plant;
+            plantAtColumn[ColumnIndex(plant.X, plant.Z)] = plant.Id;
+        }
+
+        // Le monde ne change que par World.SetBlock : plutôt que de relire le sol de chaque plante à
+        // chaque pas, on note celles qu'un changement de bloc a pu déranger.
+        private void OnBlockChanged(BlockPos pos, ushort previous, ushort current)
+        {
+            if ((uint)pos.X >= (uint)world.SizeX || (uint)pos.Z >= (uint)world.SizeZ) return;
+
+            int plantId = plantAtColumn[ColumnIndex(pos.X, pos.Z)];
+            if (plantId != 0) disturbed.Add(plantId);
+        }
+
+        // Retire, au début du pas, les plantes qui ont perdu leur sol ou dont le pied est occupé par un bloc.
+        private void RemoveUprooted()
+        {
+            if (disturbed.Count == 0) return;
+
+            foreach (int plantId in disturbed)
+            {
+                if (TryGet(plantId, out Plant plant) && !HasGroundAndRoom(plant.X, plant.Y, plant.Z)) Remove(plantId);
+            }
+
+            disturbed.Clear();
         }
 
         // Répartit la fertilité maximale en larges taches douces, riches ou pauvres : des valeurs tirées
@@ -264,7 +306,7 @@ namespace Eco.Sim
                     if ((uint)nx >= (uint)world.SizeX || (uint)nz >= (uint)world.SizeZ) continue;
 
                     int neighbourId = plantAtColumn[ColumnIndex(nx, nz)];
-                    if (neighbourId != 0 && plants[indexById[neighbourId]].SpeciesIndex == speciesIndex) return false;
+                    if (neighbourId != 0 && plants[IndexOf(neighbourId)].SpeciesIndex == speciesIndex) return false;
                 }
             }
 
@@ -278,7 +320,7 @@ namespace Eco.Sim
 
             int nextDying = 0;
             int kept = 0;
-            for (int i = 0; i < plants.Count; i++)
+            for (int i = 0; i < plantCount; i++)
             {
                 if (nextDying < dying.Count && dying[nextDying] == i)
                 {
@@ -287,21 +329,35 @@ namespace Eco.Sim
                     continue;
                 }
 
-                Plant survivor = plants[i];
-                plants[kept] = survivor;
-                indexById[survivor.Id] = kept;
-                kept++;
+                plants[kept++] = plants[i];
             }
 
-            plants.RemoveRange(kept, plants.Count - kept);
+            plantCount = kept;
             dying.Clear();
         }
 
         private void Forget(Plant plant)
         {
-            indexById.Remove(plant.Id);
             plantAtColumn[ColumnIndex(plant.X, plant.Z)] = 0;
             PlantRemoved?.Invoke(plant.Id);
+        }
+
+        // Indice de la plante dans le tableau, trié par identifiant, ou une valeur négative si elle n'existe pas.
+        private int IndexOf(int plantId)
+        {
+            int low = 0;
+            int high = plantCount - 1;
+            while (low <= high)
+            {
+                int middle = (low + high) / 2;
+                int id = plants[middle].Id;
+                if (id == plantId) return middle;
+
+                if (id < plantId) low = middle + 1;
+                else high = middle - 1;
+            }
+
+            return -1;
         }
 
         private int CellIndex(int x, int z) => x / CellSize + cellsX * (z / CellSize);

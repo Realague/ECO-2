@@ -15,97 +15,188 @@ namespace Voxel.Client
         public int Stage;
     }
 
-    // Dessine toutes les plantes par lots (instanciation GPU), sans créer un objet par plante.
+    // Dessine les plantes par lots (instanciation GPU), sans créer un objet par plante. Les plantes sont
+    // rangées par région du monde : seules les régions proches de la caméra sont préparées et dessinées,
+    // ce qui garde un coût constant quelle que soit la taille du monde.
     internal sealed class PlantRenderer
     {
+        private const int RegionSize = 32;
         private const int MaxInstancesPerCall = 1023;
 
-        private readonly SpeciesAsset[] species;
+        // Marge autour d'une région pour le feuillage qui dépasse, et hauteur couverte au-dessus du sol le plus bas.
+        private const float RegionMargin = 4f;
+        private const float RegionHeight = 512f;
 
-        // Par espèce puis par partie : les matrices des plantes de cette espèce.
-        private readonly Matrix4x4[][][] matrices;
-        private readonly int[] counts;
+        private readonly SpeciesAsset[] species;
         private readonly RenderParams[][] renderParams;
+        private readonly Dictionary<long, Region> regions = new Dictionary<long, Region>();
 
         public PlantRenderer(SpeciesAsset[] species)
         {
             this.species = species;
-            matrices = new Matrix4x4[species.Length][][];
-            counts = new int[species.Length];
             renderParams = new RenderParams[species.Length][];
-
-            // Les plantes sont réparties dans tout le monde : pas d'élimination par boîte englobante.
-            var everywhere = new Bounds(Vector3.zero, Vector3.one * 100000f);
             for (int s = 0; s < species.Length; s++)
             {
                 IReadOnlyList<SpeciesAsset.Part> parts = species[s].Parts;
-                matrices[s] = new Matrix4x4[parts.Count][];
                 renderParams[s] = new RenderParams[parts.Count];
                 for (int p = 0; p < parts.Count; p++)
                 {
-                    matrices[s][p] = new Matrix4x4[0];
                     renderParams[s][p] = new RenderParams(parts[p].material)
                     {
                         shadowCastingMode = ShadowCastingMode.On,
-                        receiveShadows = true,
-                        worldBounds = everywhere
+                        receiveShadows = true
                     };
                 }
             }
         }
 
-        // À appeler quand la liste des plantes a changé.
-        public void Rebuild(Dictionary<int, PlantView> plants)
+        // Ajoute une plante ou met à jour son palier de croissance. Une plante ne change jamais de place.
+        public void Set(int plantId, PlantView plant)
         {
-            for (int s = 0; s < species.Length; s++)
+            long key = KeyOf(plant.X / RegionSize, plant.Z / RegionSize);
+            if (!regions.TryGetValue(key, out Region region))
             {
-                counts[s] = 0;
+                region = new Region(plant.X / RegionSize, plant.Z / RegionSize, species);
+                regions.Add(key, region);
             }
 
-            foreach (PlantView plant in plants.Values)
-            {
-                counts[plant.SpeciesIndex]++;
-            }
+            region.Plants[plantId] = plant;
+            region.Dirty = true;
+        }
 
-            for (int s = 0; s < species.Length; s++)
+        public void Remove(int plantId, PlantView plant)
+        {
+            if (!regions.TryGetValue(KeyOf(plant.X / RegionSize, plant.Z / RegionSize), out Region region)) return;
+
+            if (region.Plants.Remove(plantId)) region.Dirty = true;
+        }
+
+        public void Clear()
+        {
+            regions.Clear();
+        }
+
+        // À appeler à chaque image. Les plantes au-delà de viewDistance ne sont pas dessinées.
+        public void Render(Vector3 cameraPosition, float viewDistance)
+        {
+            int minX = Mathf.FloorToInt((cameraPosition.x - viewDistance) / RegionSize);
+            int maxX = Mathf.FloorToInt((cameraPosition.x + viewDistance) / RegionSize);
+            int minZ = Mathf.FloorToInt((cameraPosition.z - viewDistance) / RegionSize);
+            int maxZ = Mathf.FloorToInt((cameraPosition.z + viewDistance) / RegionSize);
+
+            for (int rz = minZ; rz <= maxZ; rz++)
             {
-                for (int p = 0; p < matrices[s].Length; p++)
+                for (int rx = minX; rx <= maxX; rx++)
                 {
-                    if (matrices[s][p].Length < counts[s]) matrices[s][p] = new Matrix4x4[Mathf.NextPowerOfTwo(counts[s])];
+                    if (!regions.TryGetValue(KeyOf(rx, rz), out Region region) || region.Plants.Count == 0) continue;
+                    if (region.DistanceSquaredTo(cameraPosition) > viewDistance * viewDistance) continue;
+
+                    if (region.Dirty) region.Rebuild(species);
+                    Draw(region);
                 }
-
-                counts[s] = 0;
-            }
-
-            foreach (PlantView plant in plants.Values)
-            {
-                int s = plant.SpeciesIndex;
-                float size = PlantShape.Scale(plant.Stage);
-                var foot = new Vector3(plant.X + 0.5f, plant.Y, plant.Z + 0.5f);
-                IReadOnlyList<SpeciesAsset.Part> parts = species[s].Parts;
-                for (int p = 0; p < parts.Count; p++)
-                {
-                    matrices[s][p][counts[s]] = Matrix4x4.TRS(foot + parts[p].offset * size, Quaternion.identity, parts[p].scale * size);
-                }
-
-                counts[s]++;
             }
         }
 
-        // À appeler à chaque image.
-        public void Render()
+        private void Draw(Region region)
         {
             for (int s = 0; s < species.Length; s++)
             {
                 IReadOnlyList<SpeciesAsset.Part> parts = species[s].Parts;
                 for (int p = 0; p < parts.Count; p++)
                 {
-                    for (int start = 0; start < counts[s]; start += MaxInstancesPerCall)
+                    // Chaque lot porte la boîte de sa région : Unity écarte lui-même ceux hors du champ de vision.
+                    RenderParams parameters = renderParams[s][p];
+                    parameters.worldBounds = region.Bounds;
+
+                    for (int start = 0; start < region.Counts[s]; start += MaxInstancesPerCall)
                     {
-                        int count = Mathf.Min(MaxInstancesPerCall, counts[s] - start);
-                        Graphics.RenderMeshInstanced(renderParams[s][p], parts[p].mesh, 0, matrices[s][p], count, start);
+                        int count = Mathf.Min(MaxInstancesPerCall, region.Counts[s] - start);
+                        Graphics.RenderMeshInstanced(parameters, parts[p].mesh, 0, region.Matrices[s][p], count, start);
                     }
                 }
+            }
+        }
+
+        private static long KeyOf(int regionX, int regionZ) => ((long)regionX << 32) | (uint)regionZ;
+
+        private sealed class Region
+        {
+            public readonly Dictionary<int, PlantView> Plants = new Dictionary<int, PlantView>();
+
+            // Par espèce puis par partie : les matrices des plantes de la région, recalculées quand Dirty est vrai.
+            public readonly Matrix4x4[][][] Matrices;
+            public readonly int[] Counts;
+            public readonly Bounds Bounds;
+            public bool Dirty = true;
+
+            private readonly float minX;
+            private readonly float minZ;
+
+            public Region(int regionX, int regionZ, SpeciesAsset[] species)
+            {
+                minX = regionX * RegionSize;
+                minZ = regionZ * RegionSize;
+
+                var centre = new Vector3(minX + RegionSize * 0.5f, RegionHeight * 0.5f, minZ + RegionSize * 0.5f);
+                Bounds = new Bounds(centre, new Vector3(RegionSize + 2f * RegionMargin, RegionHeight, RegionSize + 2f * RegionMargin));
+
+                Counts = new int[species.Length];
+                Matrices = new Matrix4x4[species.Length][][];
+                for (int s = 0; s < species.Length; s++)
+                {
+                    Matrices[s] = new Matrix4x4[species[s].Parts.Count][];
+                    for (int p = 0; p < Matrices[s].Length; p++)
+                    {
+                        Matrices[s][p] = new Matrix4x4[0];
+                    }
+                }
+            }
+
+            // Distance horizontale entre un point et le rectangle de la région.
+            public float DistanceSquaredTo(Vector3 point)
+            {
+                float dx = Mathf.Max(0f, Mathf.Max(minX - point.x, point.x - (minX + RegionSize)));
+                float dz = Mathf.Max(0f, Mathf.Max(minZ - point.z, point.z - (minZ + RegionSize)));
+                return dx * dx + dz * dz;
+            }
+
+            public void Rebuild(SpeciesAsset[] species)
+            {
+                for (int s = 0; s < Counts.Length; s++)
+                {
+                    Counts[s] = 0;
+                }
+
+                foreach (PlantView plant in Plants.Values)
+                {
+                    Counts[plant.SpeciesIndex]++;
+                }
+
+                for (int s = 0; s < Counts.Length; s++)
+                {
+                    for (int p = 0; p < Matrices[s].Length; p++)
+                    {
+                        if (Matrices[s][p].Length < Counts[s]) Matrices[s][p] = new Matrix4x4[Mathf.NextPowerOfTwo(Counts[s])];
+                    }
+
+                    Counts[s] = 0;
+                }
+
+                foreach (PlantView plant in Plants.Values)
+                {
+                    int s = plant.SpeciesIndex;
+                    float size = PlantShape.Scale(plant.Stage);
+                    var foot = new Vector3(plant.X + 0.5f, plant.Y, plant.Z + 0.5f);
+                    IReadOnlyList<SpeciesAsset.Part> parts = species[s].Parts;
+                    for (int p = 0; p < parts.Count; p++)
+                    {
+                        Matrices[s][p][Counts[s]] = Matrix4x4.TRS(foot + parts[p].offset * size, Quaternion.identity, parts[p].scale * size);
+                    }
+
+                    Counts[s]++;
+                }
+
+                Dirty = false;
             }
         }
     }

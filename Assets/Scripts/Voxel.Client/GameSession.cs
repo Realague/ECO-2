@@ -24,6 +24,7 @@ namespace Voxel.Client
     //   -playerid <id>        identifiant de joueur, à la place de celui enregistré sur la machine
     //   -timescale <facteur>  vitesse de la simulation au démarrage du serveur, 1 par défaut
     //   -admin <id,id,...>    identifiants des joueurs autorisés à régler la vitesse de la simulation
+    //   -worldsize <x,y,z>    taille du monde du serveur en chunks, à la place de celle réglée dans la scène
     public class GameSession : MonoBehaviour
     {
         private const string LocalAddress = "127.0.0.1";
@@ -47,6 +48,7 @@ namespace Voxel.Client
         private string dataDirectory;
         private float startTimeScale = 1f;
         private string[] adminIds = Array.Empty<string>();
+        private Vector3Int? worldSize;
         private string message = "";
         private bool editingPassword;
         private bool sessionActive;
@@ -216,7 +218,7 @@ namespace Voxel.Client
             leaving = false;
 
             Directory.CreateDirectory(dataDirectory);
-            voxelWorld.LoadPersistent(dataDirectory);
+            voxelWorld.LoadPersistent(dataDirectory, worldSize);
             registry = new PlayerRegistry(networkManager, voxelWorld.World, dataDirectory, password);
 
             // Le serveur écoute sur toutes les interfaces pour être joignable depuis d'autres machines.
@@ -286,10 +288,14 @@ namespace Voxel.Client
 
         private void EndSession()
         {
+            // Dernier moment où l'état de la partie existe encore. Quand le jeu se ferme, le réseau peut
+            // s'arrêter avant que SaveSession ait été appelé : on enregistre donc ici aussi.
+            ecosystemSync.Save();
             ecosystemSync.Stop();
             worldSync.Stop();
             if (registry != null)
             {
+                registry.Save();
                 registry.Close();
                 registry = null;
             }
@@ -329,7 +335,9 @@ namespace Voxel.Client
 
         private byte[] OwnConnectionRequest()
         {
-            if (playerId == null) playerId = PlayerIdentity.GetOrCreate();
+            // Vide et non seulement nul : après un rechargement de scripts, l'éditeur Unity rend les
+            // chaînes nulles sous forme de chaînes vides.
+            if (string.IsNullOrEmpty(playerId)) playerId = PlayerIdentity.GetOrCreate();
             return new ConnectionRequest(playerId, password).ToBytes();
         }
 
@@ -362,6 +370,14 @@ namespace Voxel.Client
 
             string admins = ArgumentValue(arguments, "-admin");
             if (admins != null) adminIds = admins.Split(',');
+
+            string[] size = (ArgumentValue(arguments, "-worldsize") ?? "").Split(',');
+            if (size.Length == 3
+                && int.TryParse(size[0], out int sizeX) && int.TryParse(size[1], out int sizeY) && int.TryParse(size[2], out int sizeZ)
+                && sizeX > 0 && sizeY > 0 && sizeZ > 0)
+            {
+                worldSize = new Vector3Int(sizeX, sizeY, sizeZ);
+            }
         }
 
         private string ScreenText()

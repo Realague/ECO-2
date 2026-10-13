@@ -95,6 +95,48 @@ namespace Eco.Sim.Tests
         }
 
         [Test]
+        public void Step_PlantSurvives_WhenBlocksChangeAroundItButNotUnderIt()
+        {
+            World world = MeadowGenerator.CreateWorld(2);
+            var ecosystem = new Ecosystem(world, TestSpecies.TreeOnly(), Seed);
+            ecosystem.TryPlant(0, 10, 10);
+
+            world.SetBlock(11, Ground, 10, Blocks.Air);
+            world.SetBlock(10, MeadowGenerator.Surface + 3, 10, Blocks.Stone);
+            world.SetBlock(10, Ground - 1, 10, Blocks.Stone);
+            ecosystem.Step();
+
+            Assert.AreEqual(1, ecosystem.Plants.Count);
+        }
+
+        [Test]
+        public void TryGetAndRemove_FindPlantsById_AfterOthersHaveDied()
+        {
+            Species shortLived = TestSpecies.Tree();
+            shortLived.LifespanSteps = 5;
+            Species longLived = TestSpecies.Tree();
+            longLived.Name = "Chêne";
+            var ecosystem = new Ecosystem(MeadowGenerator.CreateWorld(2), new[] { shortLived, longLived }, Seed);
+            ecosystem.TryPlant(0, 4, 4);
+            ecosystem.TryPlant(1, 8, 8);
+            ecosystem.TryPlant(0, 12, 12);
+            ecosystem.TryPlant(1, 16, 16);
+            Assert.AreEqual(4, ecosystem.Plants.Count);
+            int firstOak = ecosystem.Plants[1].Id;
+            int secondOak = ecosystem.Plants[3].Id;
+
+            // Les deux arbres à vie courte meurent : les chênes changent de place dans le tableau.
+            for (int i = 0; i < 6; i++) ecosystem.Step();
+
+            Assert.AreEqual(2, ecosystem.Plants.Count);
+            Assert.IsTrue(ecosystem.TryGet(secondOak, out Plant found));
+            Assert.AreEqual(16, found.X);
+            Assert.IsTrue(ecosystem.Remove(firstOak));
+            Assert.IsTrue(ecosystem.TryGet(secondOak, out found));
+            Assert.AreEqual(16, found.X);
+        }
+
+        [Test]
         public void Step_PlantDiesOfOldAge_AndFreesItsColumn()
         {
             Species shortLived = TestSpecies.Tree();

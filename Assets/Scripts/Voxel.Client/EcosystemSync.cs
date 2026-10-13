@@ -12,7 +12,7 @@ namespace Voxel.Client
     // Fait vivre l'écosystème sur le serveur et le montre aux joueurs.
     // Serveur : exécute les pas de simulation au rythme de l'horloge, valide les demandes des joueurs
     // (abattre une plante, régler la vitesse du temps) et diffuse les changements. Client : tient à jour
-    // la liste des plantes reçue. Toutes les machines avec affichage dessinent les plantes.
+    // la liste des plantes reçue. Toutes les machines avec affichage dessinent les plantes proches.
     public class EcosystemSync : MonoBehaviour
     {
         private const string UpdateMessage = "Eco.Update";
@@ -27,6 +27,10 @@ namespace Voxel.Client
         private const int UpdateHeaderSize = sizeof(long) + sizeof(float) + sizeof(bool) + 2 * sizeof(int);
         private const int PlantEntrySize = 4 * sizeof(int) + 2 * sizeof(byte);
 
+        // Un joueur qui arrive reçoit les plantes existantes par lots, un par tick réseau, pour ne pas
+        // saturer sa connexion : 500 plantes font environ 9 Ko.
+        private const int SnapshotPlantsPerTick = 500;
+
         // Temps de calcul accordé à la simulation par image : au-delà, les pas restants attendent.
         private const double StepBudgetMilliseconds = 8.0;
         private const float ClockSendInterval = 0.5f;
@@ -34,6 +38,7 @@ namespace Voxel.Client
 
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private SpeciesAsset[] speciesAssets;
+        [SerializeField] private float plantViewDistance = 128f;
 
         // Plantes connues de cette machine : elles servent à l'affichage et à la visée.
         private readonly Dictionary<int, PlantView> plants = new Dictionary<int, PlantView>();
@@ -43,7 +48,6 @@ namespace Voxel.Client
         private readonly System.Diagnostics.Stopwatch stepTimer = new System.Diagnostics.Stopwatch();
         private List<Species> species;
         private PlantRenderer plantRenderer;
-        private bool plantsDirty;
         private bool running;
 
         // Rôle de serveur uniquement.
@@ -53,6 +57,10 @@ namespace Voxel.Client
         private string savePath;
         private float nextClockSend;
         private bool clockChanged;
+
+        // Pour chaque joueur en cours d'arrivée, l'identifiant de la dernière plante qui lui a été envoyée.
+        private readonly Dictionary<ulong, int> snapshots = new Dictionary<ulong, int>();
+        private readonly List<ulong> snapshotClients = new List<ulong>();
 
         // Horloge de la simulation telle que cette machine la connaît.
         private long stepCount;
@@ -115,13 +123,8 @@ namespace Voxel.Client
         {
             if (plantRenderer == null) return;
 
-            if (plantsDirty)
-            {
-                plantRenderer.Rebuild(plants);
-                plantsDirty = false;
-            }
-
-            plantRenderer.Render();
+            Camera viewer = Camera.main;
+            if (viewer != null) plantRenderer.Render(viewer.transform.position, plantViewDistance);
         }
 
         // À appeler juste après le démarrage du serveur ou de l'hôte, une fois son monde chargé.
@@ -135,17 +138,17 @@ namespace Voxel.Client
 
             foreach (Plant plant in ecosystem.Plants)
             {
-                plants[plant.Id] = ViewOf(plant);
+                SetView(plant.Id, ViewOf(plant));
             }
 
-            plantsDirty = true;
             ecosystem.PlantAdded += OnPlantUpserted;
             ecosystem.PlantChanged += OnPlantUpserted;
             ecosystem.PlantRemoved += OnPlantRemoved;
 
             Messaging.RegisterNamedMessageHandler(FellMessage, OnFellRequest);
             Messaging.RegisterNamedMessageHandler(CommandMessage, OnCommand);
-            networkManager.OnClientConnectedCallback += SendSnapshot;
+            networkManager.OnClientConnectedCallback += OnClientConnected;
+            networkManager.OnClientDisconnectCallback += OnClientDisconnected;
             networkManager.NetworkTickSystem.Tick += SendChanges;
         }
 
@@ -162,16 +165,18 @@ namespace Voxel.Client
 
             if (ecosystem != null)
             {
-                networkManager.OnClientConnectedCallback -= SendSnapshot;
+                networkManager.OnClientConnectedCallback -= OnClientConnected;
+                networkManager.OnClientDisconnectCallback -= OnClientDisconnected;
                 if (networkManager.NetworkTickSystem != null) networkManager.NetworkTickSystem.Tick -= SendChanges;
             }
 
             ecosystem = null;
             clock = null;
             plants.Clear();
+            plantRenderer?.Clear();
             changedPlants.Clear();
             removedPlants.Clear();
-            plantsDirty = true;
+            snapshots.Clear();
             running = false;
             stepCount = 0;
             multiplier = 1f;
@@ -231,7 +236,7 @@ namespace Voxel.Client
                 return;
             }
 
-            if (plants.Remove(plantId)) plantsDirty = true;
+            RemoveView(plantId);
             using (var writer = new FastBufferWriter(sizeof(int), Allocator.Temp))
             {
                 writer.WriteValueSafe(plantId);
@@ -288,19 +293,31 @@ namespace Voxel.Client
             return created;
         }
 
+        private void SetView(int plantId, PlantView view)
+        {
+            plants[plantId] = view;
+            plantRenderer?.Set(plantId, view);
+        }
+
+        private void RemoveView(int plantId)
+        {
+            if (!plants.TryGetValue(plantId, out PlantView view)) return;
+
+            plants.Remove(plantId);
+            plantRenderer?.Remove(plantId, view);
+        }
+
         private void OnPlantUpserted(Plant plant)
         {
-            plants[plant.Id] = ViewOf(plant);
+            SetView(plant.Id, ViewOf(plant));
             changedPlants.Add(plant.Id);
-            plantsDirty = true;
         }
 
         private void OnPlantRemoved(int plantId)
         {
-            plants.Remove(plantId);
+            RemoveView(plantId);
             changedPlants.Remove(plantId);
             removedPlants.Add(plantId);
-            plantsDirty = true;
         }
 
         private bool TryFell(ulong clientId, int plantId)
@@ -358,19 +375,22 @@ namespace Voxel.Client
             }
         }
 
-        private void SendSnapshot(ulong clientId)
+        private void OnClientConnected(ulong clientId)
         {
-            if (clientId == networkManager.LocalClientId) return;
+            if (clientId != networkManager.LocalClientId) snapshots[clientId] = 0;
+        }
 
-            outgoing.Clear();
-            outgoing.AddRange(ecosystem.Plants);
-            SendUpdate(clientId, outgoing, null);
+        private void OnClientDisconnected(ulong clientId)
+        {
+            snapshots.Remove(clientId);
         }
 
         // Une fois par tick réseau : seul l'état final de chaque plante modifiée part, même si la
         // simulation accélérée l'a fait changer plusieurs fois entre-temps.
         private void SendChanges()
         {
+            SendSnapshots();
+
             bool clockDue = clockChanged && Time.unscaledTime >= nextClockSend;
             if (changedPlants.Count == 0 && removedPlants.Count == 0 && !clockDue) return;
 
@@ -389,6 +409,50 @@ namespace Voxel.Client
             removedPlants.Clear();
             clockChanged = false;
             nextClockSend = Time.unscaledTime + ClockSendInterval;
+        }
+
+        // Envoie à chaque joueur en cours d'arrivée le lot suivant de plantes existantes. Les plantes
+        // sont rangées par identifiant croissant : reprendre après le dernier identifiant envoyé reste
+        // juste même si des plantes sont nées ou mortes entre deux lots.
+        private void SendSnapshots()
+        {
+            if (snapshots.Count == 0) return;
+
+            IReadOnlyList<Plant> all = ecosystem.Plants;
+            snapshotClients.Clear();
+            snapshotClients.AddRange(snapshots.Keys);
+
+            foreach (ulong clientId in snapshotClients)
+            {
+                int start = FirstIndexAfter(all, snapshots[clientId]);
+                int end = Mathf.Min(all.Count, start + SnapshotPlantsPerTick);
+
+                outgoing.Clear();
+                for (int i = start; i < end; i++)
+                {
+                    outgoing.Add(all[i]);
+                }
+
+                // Le premier lot part même vide : il donne l'horloge au joueur.
+                SendUpdate(clientId, outgoing, null);
+
+                if (end >= all.Count) snapshots.Remove(clientId);
+                else snapshots[clientId] = all[end - 1].Id;
+            }
+        }
+
+        private static int FirstIndexAfter(IReadOnlyList<Plant> sortedById, int plantId)
+        {
+            int low = 0;
+            int high = sortedById.Count;
+            while (low < high)
+            {
+                int middle = (low + high) / 2;
+                if (sortedById[middle].Id <= plantId) low = middle + 1;
+                else high = middle;
+            }
+
+            return low;
         }
 
         private void SendUpdate(ulong clientId, List<Plant> upserted, HashSet<int> removed)
@@ -444,17 +508,15 @@ namespace Voxel.Client
                 // Une espèce inconnue de ce client ne peut pas être affichée : on l'ignore.
                 if (speciesIndex >= species.Count) continue;
 
-                plants[plantId] = new PlantView { SpeciesIndex = speciesIndex, X = x, Y = y, Z = z, Stage = stage };
+                SetView(plantId, new PlantView { SpeciesIndex = speciesIndex, X = x, Y = y, Z = z, Stage = stage });
             }
 
             reader.ReadValueSafe(out int removedCount);
             for (int i = 0; i < removedCount; i++)
             {
                 reader.ReadValueSafe(out int plantId);
-                plants.Remove(plantId);
+                RemoveView(plantId);
             }
-
-            plantsDirty = true;
         }
 
         private static PlantView ViewOf(Plant plant)

@@ -194,6 +194,9 @@ namespace Voxel.Client
 
             foreach (ulong clientId in finishedStreams)
             {
+                ChunkStream finished = streams[clientId];
+                Debug.Log(
+                    $"Monde envoyé au joueur {clientId} : {finished.BytesSent / 1024} Ko en {Time.unscaledTime - finished.StartedAt:0.0} s.");
                 streams.Remove(clientId);
             }
 
@@ -223,13 +226,12 @@ namespace Voxel.Client
                 ChunkBatch.Read(batchReader, voxelWorld.World, receivedChunks);
             }
 
-            foreach (Chunk chunk in receivedChunks)
-            {
-                voxelWorld.RefreshChunk(chunk);
-            }
-
             receivedChunkCount += receivedChunks.Count;
-            if (receivedChunkCount >= expectedChunkCount) ready = true;
+            if (receivedChunkCount >= expectedChunkCount && !ready)
+            {
+                voxelWorld.RemeshAll();
+                ready = true;
+            }
         }
 
         private void OnBlockChanged(ulong senderId, FastBufferReader reader)
@@ -269,9 +271,14 @@ namespace Voxel.Client
             {
                 chunks = new List<Chunk>(world.Chunks);
                 chunks.Sort((a, b) => DistanceSquared(a, playerPosition).CompareTo(DistanceSquared(b, playerPosition)));
+                StartedAt = Time.unscaledTime;
             }
 
             public bool IsFinished => next >= chunks.Count;
+
+            public float StartedAt { get; }
+
+            public long BytesSent { get; private set; }
 
             // Les chunks sont sérialisés au moment de l'envoi : un bloc modifié entre-temps est donc inclus.
             public byte[] NextBatch(int maxBytes)
@@ -282,7 +289,9 @@ namespace Voxel.Client
                     next += ChunkBatch.Write(writer, chunks, next, maxBytes);
                 }
 
-                return stream.ToArray();
+                byte[] batch = stream.ToArray();
+                BytesSent += batch.Length;
+                return batch;
             }
 
             private static float DistanceSquared(Chunk chunk, Vector3 position)
