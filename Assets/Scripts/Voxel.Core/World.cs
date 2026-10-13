@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Voxel.Core
 {
-    // Monde de taille fixe : tous les chunks existent dès la construction.
+    // Fixed-size world: every chunk exists from construction.
     public sealed class World
     {
         private readonly Chunk[] chunks;
@@ -31,19 +31,19 @@ namespace Voxel.Core
             }
         }
 
-        // Arguments : position, ancien bloc, nouveau bloc.
+        // Arguments: position, old block, new block.
         public event Action<BlockPos, ushort, ushort> BlockChanged;
 
         public int ChunksX { get; }
         public int ChunksY { get; }
         public int ChunksZ { get; }
 
-        // Renseignés par Generate : avec les chunks modifiés, ils suffisent à reconstruire le monde.
+        // Set by Generate: together with the modified chunks, they are enough to rebuild the world.
         public int Seed { get; private set; }
         public int GeneratorVersion { get; private set; }
 
-        // Empreinte du terrain tel que généré, avant toute modification. Un client la compare à celle
-        // du serveur pour s'assurer qu'il a généré le même monde.
+        // Fingerprint of the terrain as generated, before any edit. A client compares it to the
+        // server's to make sure it generated the same world.
         public ulong TerrainFingerprint { get; private set; }
 
         public int SizeX => ChunksX * Chunk.Size;
@@ -65,7 +65,7 @@ namespace Voxel.Core
             TerrainFingerprint = ComputeFingerprint();
         }
 
-        // Résume le relief par la hauteur et le bloc de surface d'un échantillon régulier de colonnes.
+        // Summarises the relief by the height and surface block of a regular sample of columns.
         private ulong ComputeFingerprint()
         {
             const int samplesPerAxis = 32;
@@ -105,8 +105,8 @@ namespace Voxel.Core
             return ChunkAt(x, y, z).Get(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask);
         }
 
-        // Hors du monde, les côtés et le dessous comptent comme pleins : ils retiennent les joueurs
-        // et évitent de mailler des faces invisibles. Au-dessus du monde, c'est de l'air.
+        // Outside the world, the sides and the bottom count as solid: they keep players in
+        // and avoid meshing invisible faces. Above the world, it is air.
         public bool IsSolid(int x, int y, int z)
         {
             if (y >= SizeY) return false;
@@ -116,7 +116,7 @@ namespace Voxel.Core
 
         public bool SetBlock(BlockPos pos, ushort block) => SetBlock(pos.X, pos.Y, pos.Z, block);
 
-        // Seul point d'entrée pour modifier un bloc en jeu. Renvoie faux si rien n'a changé.
+        // Only entry point to change a block in game. Returns false if nothing changed.
         public bool SetBlock(int x, int y, int z, ushort block)
         {
             if (!InBounds(x, y, z)) return false;
@@ -135,7 +135,7 @@ namespace Voxel.Core
             return true;
         }
 
-        // Hauteur du premier bloc d'air au-dessus du plus haut bloc plein de la colonne.
+        // Height of the first air block above the topmost solid block of the column.
         public int GetSurfaceHeight(int x, int z)
         {
             for (int y = SizeY - 1; y >= 0; y--)

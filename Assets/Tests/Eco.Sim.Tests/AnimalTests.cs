@@ -20,7 +20,7 @@ namespace Eco.Sim.Tests
             Ecosystem ecosystem = CreateEcosystem(Rabbit(hungerPerStep: 0.11f), Fox());
             ecosystem.TryPlant(BushIndex, 10, 10);
             Run(ecosystem, 3 * SimClock.StepsPerDay);
-            Assert.AreEqual(1f, ecosystem.Plants[0].Growth, "le buisson est adulte avant l'arrivée du lapin");
+            Assert.AreEqual(1f, ecosystem.Plants[0].Growth, "the bush is adult before the rabbit arrives");
             ecosystem.TryPlaceAnimal(RabbitIndex, 14, 10);
 
             Run(ecosystem, 2);
@@ -42,7 +42,7 @@ namespace Eco.Sim.Tests
 
             Run(ecosystem, 3);
 
-            Assert.That(ecosystem.Animals[0].Hunger, Is.GreaterThan(0.35f), "ni l'arbre ni la jeune pousse ne l'ont nourri");
+            Assert.That(ecosystem.Animals[0].Hunger, Is.GreaterThan(0.35f), "neither the tree nor the young shoot fed it");
         }
 
         [Test]
@@ -87,7 +87,7 @@ namespace Eco.Sim.Tests
             Assert.AreEqual(0, ecosystem.CountAnimals(RabbitIndex));
             Assert.AreEqual(1, ecosystem.CountAnimals(FoxIndex));
             Animal fox = ecosystem.Animals[0];
-            Assert.AreEqual((11, 10), (fox.X, fox.Z), "le renard s'arrête à côté de sa proie, pas dessus");
+            Assert.AreEqual((11, 10), (fox.X, fox.Z), "the fox stops next to its prey, not on it");
             Assert.AreEqual(0f, fox.Hunger);
         }
 
@@ -122,7 +122,7 @@ namespace Eco.Sim.Tests
             Assert.AreEqual(1, Math.Max(Math.Abs(young.X - parent.X), Math.Abs(young.Z - parent.Z)));
 
             Run(ecosystem, 3);
-            Assert.AreEqual(2, ecosystem.Animals.Count, "le parent a trop faim pour recommencer, le petit est trop jeune");
+            Assert.AreEqual(2, ecosystem.Animals.Count, "the parent is too hungry to breed again, the young is too young");
         }
 
         [Test]
@@ -140,7 +140,7 @@ namespace Eco.Sim.Tests
 
             ecosystem.Step();
 
-            Assert.AreEqual(4, ecosystem.Animals.Count, "seul le lapin isolé a un petit");
+            Assert.AreEqual(4, ecosystem.Animals.Count, "only the isolated rabbit has a young");
             Animal young = ecosystem.Animals[3];
             Assert.AreEqual(1, Math.Max(Math.Abs(young.X - 25), Math.Abs(young.Z - 25)));
         }
@@ -163,9 +163,9 @@ namespace Eco.Sim.Tests
                 var occupied = new HashSet<(int, int)>();
                 foreach (Animal animal in ecosystem.Animals)
                 {
-                    Assert.IsTrue(world.InBounds(animal.X, animal.Y, animal.Z), $"Animal {animal.Id} hors du monde");
+                    Assert.IsTrue(world.InBounds(animal.X, animal.Y, animal.Z), $"Animal {animal.Id} outside the world");
                     Assert.AreEqual(MeadowGenerator.Surface, animal.Y);
-                    Assert.IsTrue(occupied.Add((animal.X, animal.Z)), $"Deux animaux en ({animal.X}, {animal.Z})");
+                    Assert.IsTrue(occupied.Add((animal.X, animal.Z)), $"Two animals at ({animal.X}, {animal.Z})");
 
                     (int X, int Z) previous = before[animal.Id];
                     Assert.That(Math.Max(Math.Abs(animal.X - previous.X), Math.Abs(animal.Z - previous.Z)), Is.LessThanOrEqualTo(3));
@@ -209,7 +209,7 @@ namespace Eco.Sim.Tests
             Assert.IsFalse(ecosystem.TryGetAnimal(rabbit, out _));
             Assert.IsTrue(ecosystem.TryGetAnimal(fox, out Animal survivor));
             Assert.AreEqual(20, survivor.X);
-            Assert.IsTrue(ecosystem.TryPlaceAnimal(RabbitIndex, 10, 10), "la colonne du lapin est de nouveau libre");
+            Assert.IsTrue(ecosystem.TryPlaceAnimal(RabbitIndex, 10, 10), "the rabbit's column is free again");
         }
 
         [Test]
@@ -223,7 +223,7 @@ namespace Eco.Sim.Tests
             Run(ecosystem, 400);
 
             Assert.That(ecosystem.CountAnimals(RabbitIndex), Is.GreaterThan(0));
-            Assert.AreEqual(0, ecosystem.CountAnimals(FoxIndex), "le renard, sans minimum, ne revient pas");
+            Assert.AreEqual(0, ecosystem.CountAnimals(FoxIndex), "the fox, with no minimum, does not come back");
         }
 
         [Test]
@@ -267,8 +267,8 @@ namespace Eco.Sim.Tests
             var stream = new MemoryStream();
             withoutAnimals.Write(stream);
 
-            // L'ancien format s'arrêtait après les plantes : on retire la section des animaux (trois
-            // entiers pour un écosystème sans espèce animale) et on remet l'ancien numéro de format.
+            // The old format stopped after the plants: the animal section is removed (three
+            // integers for an ecosystem without animal species) and the old format number is put back.
             byte[] data = stream.ToArray();
             var oldFormat = new byte[data.Length - 3 * sizeof(int)];
             Array.Copy(data, oldFormat, oldFormat.Length);
@@ -297,7 +297,7 @@ namespace Eco.Sim.Tests
         {
             return new AnimalSpecies
             {
-                Name = "Lapin",
+                Name = "Rabbit",
                 EatsPlants = new[] { BushIndex },
                 MoveRange = moveRange,
                 SenseRange = 5,
@@ -314,7 +314,7 @@ namespace Eco.Sim.Tests
         {
             return new AnimalSpecies
             {
-                Name = "Renard",
+                Name = "Fox",
                 EatsAnimals = new[] { RabbitIndex },
                 MoveRange = moveRange,
                 SenseRange = 6,
@@ -328,7 +328,7 @@ namespace Eco.Sim.Tests
             };
         }
 
-        // Des espèces qui mangent, se reproduisent et reviennent de l'extérieur, pour les essais de longue durée.
+        // Species that eat, breed and come back from outside, for long-running tests.
         private static AnimalSpecies[] LivingSpecies()
         {
             AnimalSpecies rabbit = Rabbit(hungerPerStep: 0.004f);
@@ -349,7 +349,7 @@ namespace Eco.Sim.Tests
             return ecosystem;
         }
 
-        // Un monde sans graines : les essais posent eux-mêmes les plantes dont ils ont besoin.
+        // A world without seeds: tests place the plants they need themselves.
         private static Ecosystem CreateEcosystem(AnimalSpecies rabbit, AnimalSpecies fox)
         {
             Species tree = TestSpecies.Tree();

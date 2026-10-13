@@ -1,6 +1,6 @@
 namespace Voxel.Core
 {
-    // Dimensions et portée du joueur, partagées entre sa simulation locale et les contrôles du serveur.
+    // Size and reach of the player, shared between its local simulation and the server checks.
     public static class PlayerRules
     {
         public const float HalfWidth = 0.3f;

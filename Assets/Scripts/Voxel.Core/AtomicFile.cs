@@ -5,8 +5,8 @@ namespace Voxel.Core
 {
     public static class AtomicFile
     {
-        // Écrit d'abord un fichier temporaire : une coupure en cours d'écriture laisse l'ancien
-        // fichier intact.
+        // Writes a temporary file first: a failure while writing leaves the old
+        // file intact.
         public static void Write(string path, Action<Stream> write)
         {
             string temporaryPath = path + ".tmp";

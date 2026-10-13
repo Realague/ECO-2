@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Voxel.Core
 {
-    // Ce qu'un client envoie au serveur en demandant à se connecter : qui il est, et le mot de passe.
+    // What a client sends to the server when asking to connect: who it is, and the password.
     public sealed class ConnectionRequest
     {
         public const int MaxLength = 64;
@@ -17,7 +17,7 @@ namespace Voxel.Core
             Password = password;
         }
 
-        // Identifiant stable du joueur, sous lequel le serveur retient ses données d'une partie à l'autre.
+        // Stable id of the player, under which the server keeps their data from one session to the next.
         public string PlayerId { get; }
 
         public string Password { get; }
@@ -52,7 +52,7 @@ namespace Voxel.Core
             return stream.ToArray();
         }
 
-        // Les données viennent du réseau : tout ce qui est mal formé est refusé, sans exception.
+        // The data comes from the network: anything malformed is refused, without an exception.
         public static bool TryParse(byte[] data, out ConnectionRequest request)
         {
             request = null;

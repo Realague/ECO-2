@@ -6,8 +6,8 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // Détient le monde d'une partie, l'affiche et remaille les chunks qui changent. Le monde n'existe
-    // qu'entre LoadPersistent ou CreateRemote et Unload.
+    // Holds the world of a game, displays it and remeshes the chunks that change. The world only
+    // exists between LoadPersistent or CreateRemote and Unload.
     public class VoxelWorld : MonoBehaviour
     {
         private static readonly BlockPos[] NeighbourOffsets =
@@ -34,7 +34,7 @@ namespace Voxel.Client
 
         private void Awake()
         {
-            // Un serveur sans affichage détient le monde mais ne le maille pas.
+            // A server without a display holds the world but does not mesh it.
             rendering = !Application.isBatchMode;
             if (!rendering) return;
 
@@ -61,8 +61,8 @@ namespace Voxel.Client
             Destroy(atlas);
         }
 
-        // Monde du serveur : lu depuis la sauvegarde du dossier donné, ou généré s'il n'y en a pas,
-        // et réécrit par Save et Unload. Une taille en chunks peut remplacer celle réglée dans la scène.
+        // Server world: read from the save in the given folder, or generated if there is none,
+        // and written back by Save and Unload. A size in chunks can replace the one set in the scene.
         public void LoadPersistent(string directory, Vector3Int? size = null)
         {
             if (size.HasValue) sizeInChunks = size.Value;
@@ -71,11 +71,11 @@ namespace Voxel.Client
             string path = Path.Combine(directory, saveFileName);
             Show(LoadOrCreateWorld(path), path);
             Debug.Log(
-                $"Monde de {World.SizeX} × {World.SizeY} × {World.SizeZ} blocs ({World.Chunks.Count} chunks) prêt en {timer.Elapsed.TotalSeconds:0.0} s.");
+                $"World of {World.SizeX} × {World.SizeY} × {World.SizeZ} blocks ({World.Chunks.Count} chunks) ready in {timer.Elapsed.TotalSeconds:0.0} s.");
         }
 
-        // Monde d'un client : généré ici à partir de la graine du serveur, puis complété par les chunks
-        // modifiés que le serveur envoie. Il n'est jamais sauvegardé.
+        // Client world: generated here from the server's seed, then completed by the modified chunks
+        // the server sends. It is never saved.
         public void CreateRemote(int chunksX, int chunksY, int chunksZ, int serverSeed)
         {
             var world = new World(chunksX, chunksY, chunksZ);
@@ -83,7 +83,7 @@ namespace Voxel.Client
             Show(world, null);
         }
 
-        // Écrit le monde sur le disque s'il est persistant. Un échec est signalé sans interrompre la partie.
+        // Writes the world to disk if it is persistent. A failure is reported without interrupting the game.
         public void Save()
         {
             if (World == null || savePath == null) return;
@@ -94,19 +94,19 @@ namespace Voxel.Client
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
             {
-                Debug.LogError($"Échec de la sauvegarde du monde : {e.Message} ({savePath})");
+                Debug.LogError($"Failed to save the world: {e.Message} ({savePath})");
             }
         }
 
-        // À appeler quand les blocs d'un chunk ont été remplacés en bloc, sans passer par World.SetBlock :
-        // un client le fait pour chaque chunk modifié reçu du serveur.
+        // To call when the blocks of a chunk were replaced wholesale, without going through World.SetBlock:
+        // a client does so for each modified chunk received from the server.
         public void RefreshChunk(Chunk chunk)
         {
             if (!rendering) return;
 
             dirtyChunks.Add(chunk);
 
-            // Les faces des chunks voisins tournées vers celui-ci changent aussi.
+            // The faces of neighbouring chunks turned toward this one change too.
             foreach (BlockPos offset in NeighbourOffsets)
             {
                 var coord = new ChunkCoord(chunk.Coord.X + offset.X, chunk.Coord.Y + offset.Y, chunk.Coord.Z + offset.Z);
@@ -139,7 +139,7 @@ namespace Voxel.Client
             savePath = null;
         }
 
-        // Un chemin de sauvegarde nul désigne un monde qui n'est jamais écrit sur le disque.
+        // A null save path marks a world that is never written to disk.
         private void Show(World world, string path)
         {
             Unload();
@@ -165,13 +165,13 @@ namespace Voxel.Client
                     if (MatchesSettings(saved)) return saved;
 
                     Debug.LogWarning(
-                        $"Sauvegarde ignorée : sa graine ou ses dimensions ne correspondent pas aux réglages du monde. " +
-                        $"Elle sera remplacée à la prochaine sauvegarde. ({path})");
+                        $"Save ignored: its seed or dimensions do not match the world's settings. " +
+                        $"It will be replaced at the next save. ({path})");
                 }
                 catch (Exception e) when (e is IOException || e is InvalidDataException)
                 {
                     Debug.LogWarning(
-                        $"Sauvegarde illisible, un nouveau monde est généré et la remplacera à la prochaine sauvegarde : {e.Message} ({path})");
+                        $"Unreadable save, a new world is generated and will replace it at the next save: {e.Message} ({path})");
                 }
             }
 
@@ -211,7 +211,7 @@ namespace Voxel.Client
         {
             MarkDirty(pos);
 
-            // Un bloc en bord de chunk change aussi les faces visibles du chunk voisin.
+            // A block on a chunk edge also changes the visible faces of the neighbouring chunk.
             foreach (BlockPos offset in NeighbourOffsets)
             {
                 MarkDirty(pos + offset);

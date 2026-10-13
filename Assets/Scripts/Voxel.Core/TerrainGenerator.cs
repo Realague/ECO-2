@@ -3,45 +3,45 @@ using System.Collections.Generic;
 
 namespace Voxel.Core
 {
-    // Relief procédural : des plaines, des collines et des massifs rocheux. Le terrain ne dépend que des
-    // coordonnées et de la graine, et tout le calcul est en entiers (voir IntNoise) : le serveur et
-    // chaque client obtiennent donc exactement le même monde. Le relief tient dans 64 blocs de haut.
+    // Procedural relief: plains, hills and rocky massifs. The terrain only depends on the
+    // coordinates and the seed, and all the math is in integers (see IntNoise): the server and
+    // every client therefore get exactly the same world. The relief fits within 64 blocks of height.
     public sealed class TerrainGenerator : IChunkGenerator
     {
         private const int BaseHeight = 20;
 
-        // Dénivelé des plaines, et dénivelé ajouté au cœur des massifs, en blocs.
+        // Height range of the plains, and height added at the heart of the massifs, in blocks.
         private const int PlainsRelief = 7;
         private const int MountainRelief = 33;
 
-        // Le bruit brut se concentre autour de sa moyenne : on l'étire pour obtenir de vraies plaines
-        // et de vrais sommets. En dessous du seuil, la valeur tombe à zéro ; le gain est en dixièmes.
-        // Avec ces réglages, plus de la moitié du terrain est en plaine et environ 5 % en haute roche.
+        // Raw noise clusters around its mean: it is stretched to get real plains
+        // and real peaks. Below the floor, the value drops to zero; the gain is in tenths.
+        // With these settings, more than half of the terrain is plain and about 5% is high rock.
         private const int MassifFloor = IntNoise.One * 35 / 100;
         private const int MassifGainTenths = 25;
         private const int HillsFloor = IntNoise.One * 20 / 100;
         private const int HillsGainTenths = 17;
 
-        // Les massifs s'étendent sur environ 128 blocs, les plus grandes collines sur environ 64.
+        // Massifs span about 128 blocks, the largest hills about 64.
         private const int MassifCellShift = 7;
         private const int HillsCellShift = 6;
         private const int HillsOctaves = 4;
         private const uint MassifSeedMask = 0xA5A5A5A5u;
 
-        // La roche est à nu en altitude et sur les pentes raides ; ailleurs, de la terre sous de l'herbe.
+        // Rock is bare at altitude and on steep slopes; elsewhere, dirt under grass.
         private const int RockAltitude = 46;
         private const int RockSlope = 3;
         private const int DirtDepth = 3;
 
         private const int Patch = Chunk.Size + 2;
 
-        // Relief déjà calculé, par colonne de chunks : les chunks empilés partagent le même.
+        // Relief already computed, per column of chunks: stacked chunks share the same one.
         private readonly Dictionary<long, ColumnData> cache = new Dictionary<long, ColumnData>();
         private int cachedSeed;
 
         public int Version => 2;
 
-        // Hauteur du bloc le plus haut de la colonne.
+        // Height of the topmost block of the column.
         public static int SurfaceHeight(int x, int z, int seed)
         {
             uint noiseSeed = unchecked((uint)seed);
@@ -105,7 +105,7 @@ namespace Voxel.Core
 
         private static ColumnData ComputeColumns(int originX, int originZ, int seed)
         {
-            // Hauteurs du chunk et d'une colonne autour, pour connaître la pente à ses bords.
+            // Heights of the chunk and of one column around it, to know the slope at its edges.
             var heights = new int[Patch * Patch];
             for (int z = 0; z < Patch; z++)
             {

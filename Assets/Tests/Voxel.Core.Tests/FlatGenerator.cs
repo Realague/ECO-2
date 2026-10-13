@@ -1,6 +1,6 @@
 namespace Voxel.Core.Tests
 {
-    // Sol de pierre plat : plein en dessous de GroundHeight, vide au-dessus.
+    // Flat stone ground: solid below GroundHeight, empty above.
     internal sealed class FlatGenerator : IChunkGenerator
     {
         public const int GroundHeight = 8;

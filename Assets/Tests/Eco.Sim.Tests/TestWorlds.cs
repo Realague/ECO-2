@@ -3,10 +3,10 @@ using Voxel.Core;
 
 namespace Eco.Sim.Tests
 {
-    // Prairie plate : pierre, une couche de terre, une couche d'herbe, puis de l'air.
+    // Flat meadow: stone, one layer of dirt, one layer of grass, then air.
     internal sealed class MeadowGenerator : IChunkGenerator
     {
-        // Hauteur de la première case d'air au-dessus de l'herbe.
+        // Height of the first air cell above the grass.
         public const int Surface = 8;
 
         public int Version => 1;
@@ -38,7 +38,7 @@ namespace Eco.Sim.Tests
     {
         public static Species Tree() => new Species
         {
-            Name = "Arbre",
+            Name = "Tree",
             MaturitySteps = 3 * SimClock.StepsPerDay,
             LifespanSteps = 30 * SimClock.StepsPerDay,
             SeedChance = 0.01f,
@@ -52,7 +52,7 @@ namespace Eco.Sim.Tests
 
         public static Species Bush() => new Species
         {
-            Name = "Buisson",
+            Name = "Bush",
             MaturitySteps = SimClock.StepsPerDay,
             LifespanSteps = 10 * SimClock.StepsPerDay,
             SeedChance = 0.02f,

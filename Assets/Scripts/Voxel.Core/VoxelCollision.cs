@@ -11,14 +11,14 @@ namespace Voxel.Core
         public bool HitWall;
     }
 
-    // Collision d'une boîte alignée sur les axes contre la grille de blocs.
-    // La position désigne le centre du bas de la boîte.
+    // Collision of an axis-aligned box against the block grid.
+    // The position is the centre of the bottom of the box.
     public static class VoxelCollision
     {
         private const float Skin = 0.001f;
         private const float GroundProbe = 0.005f;
 
-        // Chaque sous-pas reste inférieur à un bloc, pour ne jamais traverser un mur.
+        // Each sub-step stays under one block, so as never to go through a wall.
         private const float MaxStep = 0.4f;
 
         public static MoveResult Move(World world, Vector3 position, float halfWidth, float height, Vector3 delta)
@@ -49,8 +49,8 @@ namespace Voxel.Core
                 Floor(position.Z - halfWidth), Floor(position.Z + halfWidth));
         }
 
-        // Remonte la position jusqu'à ce que la boîte ne touche plus aucun bloc : sert à replacer un
-        // joueur là où le monde a changé depuis sa dernière visite.
+        // Raises the position until the box no longer touches any block: used to put a player back
+        // where the world has changed since their last visit.
         public static Vector3 RaiseToFreeSpace(World world, Vector3 position, float halfWidth, float height)
         {
             while (Overlaps(world, position, halfWidth, height))

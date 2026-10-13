@@ -3,11 +3,11 @@ using System.IO;
 
 namespace Voxel.Core
 {
-    // Lot de chunks envoyé du serveur à un client : pour chaque chunk, ses coordonnées puis ses blocs.
+    // Batch of chunks sent from the server to a client: for each chunk, its coordinates then its blocks.
     public static class ChunkBatch
     {
-        // Écrit des chunks à partir de l'indice start tant que le flux reste sous maxBytes, et au moins
-        // un. Renvoie le nombre de chunks écrits. Le flux doit pouvoir être tronqué.
+        // Writes chunks starting at index start while the stream stays under maxBytes, and at least
+        // one. Returns the number of chunks written. The stream must be truncatable.
         public static int Write(BinaryWriter writer, IReadOnlyList<Chunk> chunks, int start, int maxBytes)
         {
             Stream stream = writer.BaseStream;
@@ -36,7 +36,7 @@ namespace Voxel.Core
             return written;
         }
 
-        // Remplace les blocs des chunks du lot dans le monde et ajoute ces chunks à received.
+        // Replaces the blocks of the batch's chunks in the world and adds those chunks to received.
         public static void Read(BinaryReader reader, World world, List<Chunk> received)
         {
             Stream stream = reader.BaseStream;
@@ -46,7 +46,7 @@ namespace Voxel.Core
                 Chunk chunk = world.GetChunk(coord);
                 if (chunk == null)
                 {
-                    throw new InvalidDataException($"Chunk reçu hors du monde : {coord}.");
+                    throw new InvalidDataException($"Received a chunk outside the world: {coord}.");
                 }
 
                 ChunkSerializer.Read(reader, chunk);

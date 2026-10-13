@@ -10,21 +10,21 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // Démarre et arrête une partie : héberger (serveur et joueur local), rejoindre un serveur, ou
-    // tourner en serveur dédié, sans joueur local ni affichage.
+    // Starts and stops a game: hosting (server and local player), joining a server, or running
+    // as a dedicated server, with no local player and no display.
     //
-    // Arguments de ligne de commande :
-    //   -server               serveur dédié (implicite avec -batchmode)
-    //   -host                 héberge une partie dès le lancement
-    //   -connect <adresse>    rejoint un serveur dès le lancement
-    //   -port <port>          port UDP, 7777 par défaut
-    //   -password <mot>       mot de passe exigé par le serveur, ou présenté par le client
-    //   -data <dossier>       dossier des sauvegardes du serveur
-    //   -autosave <secondes>  intervalle de sauvegarde automatique du serveur
-    //   -playerid <id>        identifiant de joueur, à la place de celui enregistré sur la machine
-    //   -timescale <facteur>  vitesse de la simulation au démarrage du serveur, 1 par défaut
-    //   -admin <id,id,...>    identifiants des joueurs autorisés à régler la vitesse de la simulation
-    //   -worldsize <x,y,z>    taille du monde du serveur en chunks, à la place de celle réglée dans la scène
+    // Command line arguments:
+    //   -server               dedicated server (implied by -batchmode)
+    //   -host                 hosts a game at launch
+    //   -connect <address>    joins a server at launch
+    //   -port <port>          UDP port, 7777 by default
+    //   -password <password>  password required by the server, or presented by the client
+    //   -data <directory>     folder of the server's saves
+    //   -autosave <seconds>   interval of the server's automatic saves
+    //   -playerid <id>        player id, instead of the one stored on this machine
+    //   -timescale <factor>   simulation speed when the server starts, 1 by default
+    //   -admin <id,id,...>    ids of the players allowed to set the simulation speed
+    //   -worldsize <x,y,z>    server world size in chunks, instead of the one set in the scene
     public class GameSession : MonoBehaviour
     {
         private const string LocalAddress = "127.0.0.1";
@@ -32,7 +32,7 @@ namespace Voxel.Client
         private const int MaxAddressLength = 15;
         private const int MaxPasswordLength = 32;
 
-        // Vitesses de simulation parcourues par les touches F5 et F6. Zéro met le temps en pause.
+        // Simulation speeds cycled through by the F5 and F6 keys. Zero pauses time.
         private static readonly float[] TimeScales = { 0f, 1f, 10f, 100f, 1000f, 10000f };
 
         [SerializeField] private NetworkManager networkManager;
@@ -96,7 +96,7 @@ namespace Voxel.Client
 
         private void OnApplicationQuit()
         {
-            // Fermer le jeu est un arrêt voulu : la fin de partie qui suit n'est pas une erreur à signaler.
+            // Closing the game is a deliberate stop: the end of session that follows is not an error to report.
             leaving = true;
             SaveSession();
         }
@@ -121,7 +121,7 @@ namespace Voxel.Client
             {
                 if (keyboard.f10Key.wasPressedThisFrame)
                 {
-                    // Les joueurs disparaissent pendant l'arrêt : on relève leur position avant.
+                    // Players disappear during shutdown: their position is recorded before.
                     SaveSession();
                     leaving = true;
                     networkManager.Shutdown();
@@ -173,7 +173,7 @@ namespace Voxel.Client
                 textStyle = new GUIStyle(GUI.skin.label) { fontSize = 18 };
             }
 
-            // Texte doublé d'une ombre pour rester lisible sur le ciel comme sur le terrain.
+            // Text doubled with a shadow to stay readable on the sky as well as on the terrain.
             var area = new Rect(20f, 20f, Screen.width - 40f, Screen.height - 40f);
             textStyle.normal.textColor = Color.black;
             GUI.Label(new Rect(area.x + 1f, area.y + 1f, area.width, area.height), text, textStyle);
@@ -197,7 +197,7 @@ namespace Voxel.Client
             leaving = false;
             if (address.Split('.').Length != 4 || !IPAddress.TryParse(address, out _))
             {
-                message = $"« {address} » n'est pas une adresse IPv4 valide.";
+                message = $"'{address}' is not a valid IPv4 address.";
                 return;
             }
 
@@ -205,11 +205,11 @@ namespace Voxel.Client
             Transport.SetConnectionData(address, port);
             if (!networkManager.StartClient())
             {
-                message = $"Impossible de lancer la connexion à {address}.";
+                message = $"Could not start the connection to {address}.";
                 return;
             }
 
-            // Le monde du client est créé par WorldSync à partir de ce que le serveur envoie.
+            // The client's world is created by WorldSync from what the server sends.
             worldSync.StartClient();
             ecosystemSync.StartClient();
             inventorySync.StartClient();
@@ -225,7 +225,7 @@ namespace Voxel.Client
             voxelWorld.LoadPersistent(dataDirectory, worldSize);
             registry = new PlayerRegistry(networkManager, voxelWorld.World, dataDirectory, password);
 
-            // Le serveur écoute sur toutes les interfaces pour être joignable depuis d'autres machines.
+            // The server listens on every interface so it can be reached from other machines.
             Transport.SetConnectionData(LocalAddress, port, AnyAddress);
 
             bool started;
@@ -236,7 +236,7 @@ namespace Voxel.Client
             }
             else
             {
-                // Sans affichage, rien ne limite la cadence : on la cale sur celle du réseau.
+                // Without a display, nothing limits the frame rate: it is set to the network's.
                 Application.targetFrameRate = (int)networkManager.NetworkConfig.TickRate;
                 started = networkManager.StartServer();
             }
@@ -244,7 +244,7 @@ namespace Voxel.Client
             if (!started)
             {
                 EndSession();
-                message = $"Impossible de démarrer un serveur sur le port {port}.";
+                message = $"Could not start a server on port {port}.";
                 Debug.LogError(message);
                 QuitIfDedicated();
                 return;
@@ -255,10 +255,10 @@ namespace Voxel.Client
             inventorySync.StartServer(registry);
             sessionActive = true;
             nextAutosave = Time.unscaledTime + autosaveInterval;
-            Debug.Log($"Serveur démarré sur le port {port}. Sauvegardes dans {dataDirectory}, toutes les {autosaveInterval} s.");
+            Debug.Log($"Server started on port {port}. Saves in {dataDirectory}, every {autosaveInterval} s.");
         }
 
-        // Écrit le monde, l'écosystème et les joueurs sur le disque. Sans effet hors du rôle de serveur.
+        // Writes the world, the ecosystem and the players to disk. No effect outside the server role.
         private void SaveSession()
         {
             if (registry == null) return;
@@ -268,8 +268,8 @@ namespace Voxel.Client
             ecosystemSync.Save();
         }
 
-        // L'hôte est administrateur de sa propre partie ; sur un serveur dédié, ce sont les joueurs
-        // désignés par l'argument -admin.
+        // The host is admin of its own game; on a dedicated server, admins are the players
+        // named by the -admin argument.
         private bool IsAdmin(ulong clientId)
         {
             if (networkManager.IsHost && clientId == networkManager.LocalClientId) return true;
@@ -279,7 +279,7 @@ namespace Voxel.Client
                 && Array.IndexOf(adminIds, id) >= 0;
         }
 
-        // Vitesse suivante ou précédente dans la liste, à partir de la vitesse actuelle.
+        // Next or previous speed in the list, starting from the current speed.
         private float NextTimeScale(int direction)
         {
             int current = 0;
@@ -293,8 +293,8 @@ namespace Voxel.Client
 
         private void EndSession()
         {
-            // Dernier moment où l'état de la partie existe encore. Quand le jeu se ferme, le réseau peut
-            // s'arrêter avant que SaveSession ait été appelé : on enregistre donc ici aussi.
+            // Last moment when the state of the game still exists. When the game closes, the network can
+            // stop before SaveSession has been called: so we save here too.
             ecosystemSync.Save();
             ecosystemSync.Stop();
             inventorySync.Stop();
@@ -310,8 +310,8 @@ namespace Voxel.Client
             Cursor.lockState = CursorLockMode.None;
         }
 
-        // Appelé à la fin de toute partie, y compris après un échec de connexion. Un hôte le reçoit
-        // deux fois, pour son rôle de serveur et pour son rôle de client.
+        // Called at the end of every session, including after a failed connection. A host gets it
+        // twice, for its server role and for its client role.
         private void OnSessionStopped(bool wasHost)
         {
             if (!sessionActive) return;
@@ -325,7 +325,7 @@ namespace Voxel.Client
                 string reason = networkManager.DisconnectReason;
                 if (!string.IsNullOrEmpty(worldSync.Failure)) message = worldSync.Failure;
                 else if (ConnectionRefusal.IsKnown(reason)) message = reason;
-                else message = wasServer ? "Le serveur s'est arrêté." : "Connexion au serveur perdue ou impossible.";
+                else message = wasServer ? "The server has stopped." : "Connection to the server lost or impossible.";
 
                 if (wasServer) Debug.LogError(message);
             }
@@ -334,7 +334,7 @@ namespace Voxel.Client
             if (wasServer) QuitIfDedicated();
         }
 
-        // Un serveur dédié qui n'a plus de partie n'a plus de raison de tourner.
+        // A dedicated server with no game left has no reason to keep running.
         private static void QuitIfDedicated()
         {
             if (Application.isBatchMode) Application.Quit(1);
@@ -342,8 +342,8 @@ namespace Voxel.Client
 
         private byte[] OwnConnectionRequest()
         {
-            // Vide et non seulement nul : après un rechargement de scripts, l'éditeur Unity rend les
-            // chaînes nulles sous forme de chaînes vides.
+            // Empty and not only null: after a script reload, the Unity Editor gives null strings
+            // back as empty strings.
             if (string.IsNullOrEmpty(playerId)) playerId = PlayerIdentity.GetOrCreate();
             return new ConnectionRequest(playerId, password).ToBytes();
         }
@@ -391,30 +391,30 @@ namespace Voxel.Client
         {
             if (!networkManager.IsListening)
             {
-                return "F1 : héberger une partie\n"
-                    + "Entrée : rejoindre une partie\n\n"
-                    + $"Adresse : {address}{(editingPassword ? "" : "_")}\n"
-                    + $"Mot de passe : {new string('*', password.Length)}{(editingPassword ? "_" : "")}\n"
-                    + "Tab : changer de champ   Retour arrière : effacer\n\n"
+                return "F1: host a game\n"
+                    + "Enter: join a game\n\n"
+                    + $"Address: {address}{(editingPassword ? "" : "_")}\n"
+                    + $"Password: {new string('*', password.Length)}{(editingPassword ? "_" : "")}\n"
+                    + "Tab: switch field   Backspace: delete\n\n"
                     + message;
             }
 
             if (!networkManager.IsServer && !networkManager.IsConnectedClient)
             {
-                return $"Connexion à {address}…\nF10 : annuler";
+                return $"Connecting to {address}…\nF10: cancel";
             }
 
             if (worldSync.World == null)
             {
-                return $"Chargement du monde… {Mathf.RoundToInt(worldSync.LoadingProgress * 100f)} %\nF10 : annuler";
+                return $"Loading the world… {Mathf.RoundToInt(worldSync.LoadingProgress * 100f)}%\nF10: cancel";
             }
 
             if (Cursor.lockState != CursorLockMode.Locked)
             {
-                string role = networkManager.IsHost ? $"Partie hébergée sur le port {port}" : $"Connecté à {address}";
+                string role = networkManager.IsHost ? $"Game hosted on port {port}" : $"Connected to {address}";
                 return ecosystemSync.ClockText + "\n" + role
-                    + "\nClic : prendre le contrôle\nF10 : quitter la partie"
-                    + "\nAdministrateurs : F5 / F6 ralentir ou accélérer le temps, F7 avancer d'un jour";
+                    + "\nClick: take control\nF10: leave the game"
+                    + "\nAdmins: F5 / F6 slow down or speed up time, F7 advance one day";
             }
 
             return ecosystemSync.ClockText;

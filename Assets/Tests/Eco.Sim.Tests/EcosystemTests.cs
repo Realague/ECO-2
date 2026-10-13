@@ -37,11 +37,11 @@ namespace Eco.Sim.Tests
             var ecosystem = new Ecosystem(world, TestSpecies.TreeOnly(), Seed);
             ecosystem.TryPlant(0, 10, 10);
 
-            Assert.IsFalse(ecosystem.TryPlant(0, 5, 5), "sur de la pierre");
-            Assert.IsFalse(ecosystem.TryPlant(0, -1, 3), "hors du monde");
-            Assert.IsFalse(ecosystem.TryPlant(0, 10, 10), "même colonne");
-            Assert.IsFalse(ecosystem.TryPlant(0, 11, 11), "colonne voisine, espacement de 2");
-            Assert.IsTrue(ecosystem.TryPlant(0, 12, 10), "à deux blocs");
+            Assert.IsFalse(ecosystem.TryPlant(0, 5, 5), "on stone");
+            Assert.IsFalse(ecosystem.TryPlant(0, -1, 3), "outside the world");
+            Assert.IsFalse(ecosystem.TryPlant(0, 10, 10), "same column");
+            Assert.IsFalse(ecosystem.TryPlant(0, 11, 11), "neighbouring column, spacing of 2");
+            Assert.IsTrue(ecosystem.TryPlant(0, 12, 10), "two blocks away");
         }
 
         [Test]
@@ -50,8 +50,8 @@ namespace Eco.Sim.Tests
             var ecosystem = new Ecosystem(MeadowGenerator.CreateWorld(2), TestSpecies.TreeAndBush(), Seed);
             ecosystem.TryPlant(1, 10, 10);
 
-            Assert.IsTrue(ecosystem.TryPlant(0, 11, 10), "un arbre à côté d'un buisson");
-            Assert.IsFalse(ecosystem.TryPlant(0, 10, 10), "un arbre dans la colonne du buisson");
+            Assert.IsTrue(ecosystem.TryPlant(0, 11, 10), "a tree next to a bush");
+            Assert.IsFalse(ecosystem.TryPlant(0, 10, 10), "a tree in the bush's column");
         }
 
         [Test]
@@ -66,7 +66,7 @@ namespace Eco.Sim.Tests
                 if (plant.Id == firstId) stages.Add(plant.Stage);
             };
 
-            // Même sur le sol le plus pauvre (fertilité 0,4), trois jours de croissance en demandent moins de huit.
+            // Even on the poorest soil (fertility 0.4), three days of growth need fewer than eight.
             Run(ecosystem, 8 * SimClock.StepsPerDay);
 
             Assert.IsTrue(ecosystem.TryGet(firstId, out Plant adult));
@@ -115,7 +115,7 @@ namespace Eco.Sim.Tests
             Species shortLived = TestSpecies.Tree();
             shortLived.LifespanSteps = 5;
             Species longLived = TestSpecies.Tree();
-            longLived.Name = "Chêne";
+            longLived.Name = "Oak";
             var ecosystem = new Ecosystem(MeadowGenerator.CreateWorld(2), new[] { shortLived, longLived }, Seed);
             ecosystem.TryPlant(0, 4, 4);
             ecosystem.TryPlant(1, 8, 8);
@@ -125,7 +125,7 @@ namespace Eco.Sim.Tests
             int firstOak = ecosystem.Plants[1].Id;
             int secondOak = ecosystem.Plants[3].Id;
 
-            // Les deux arbres à vie courte meurent : les chênes changent de place dans le tableau.
+            // The two short-lived trees die: the oaks move within the array.
             for (int i = 0; i < 6; i++) ecosystem.Step();
 
             Assert.AreEqual(2, ecosystem.Plants.Count);
@@ -183,7 +183,7 @@ namespace Eco.Sim.Tests
 
             Assert.That(ecosystem.Plants.Count, Is.GreaterThan(20));
             int farthest = ecosystem.Plants.Max(plant => System.Math.Max(System.Math.Abs(plant.X - 32), System.Math.Abs(plant.Z - 32)));
-            Assert.That(farthest, Is.GreaterThan(TestSpecies.Tree().SeedRange), "la forêt dépasse la portée d'une seule graine");
+            Assert.That(farthest, Is.GreaterThan(TestSpecies.Tree().SeedRange), "the forest spreads beyond the range of a single seed");
         }
 
         [Test]
@@ -197,9 +197,9 @@ namespace Eco.Sim.Tests
             Run(ecosystem, 120 * SimClock.StepsPerDay);
 
             int cells = world.SizeX / Ecosystem.CellSize * (world.SizeZ / Ecosystem.CellSize);
-            Assert.That(ecosystem.Plants.Count, Is.GreaterThan(cells / 2), "la forêt occupe le terrain");
-            Assert.That(ecosystem.Plants.Count, Is.LessThan(cells * 4), "moins que ce que l'espacement seul permettrait");
-            Assert.That(AverageFertility(ecosystem, world), Is.LessThan(fertilityBefore), "la forêt puise dans le sol");
+            Assert.That(ecosystem.Plants.Count, Is.GreaterThan(cells / 2), "the forest covers the ground");
+            Assert.That(ecosystem.Plants.Count, Is.LessThan(cells * 4), "fewer than spacing alone would allow");
+            Assert.That(AverageFertility(ecosystem, world), Is.LessThan(fertilityBefore), "the forest draws from the soil");
         }
 
         [Test]
@@ -210,7 +210,7 @@ namespace Eco.Sim.Tests
             Run(ecosystem, 10 * SimClock.StepsPerDay);
             Assert.That(ecosystem.Plants.Count, Is.GreaterThan(0));
 
-            // Chaque jour, on coupe tout ce qui a atteint la moitié de sa taille : rien n'a le temps de semer.
+            // Every day, everything that reached half its size is cut: nothing has time to sow.
             for (int day = 0; day < 20; day++)
             {
                 foreach (int id in ecosystem.Plants.Where(plant => plant.Growth >= 0.5f).Select(plant => plant.Id).ToList())
@@ -249,7 +249,7 @@ namespace Eco.Sim.Tests
             Ecosystem accelerated = CreatePopulated();
             Ecosystem realTime = CreatePopulated();
 
-            // Très accéléré, à deux images par seconde.
+            // Highly accelerated, at two frames per second.
             var fastClock = new SimClock { Multiplier = 1000f };
             while (accelerated.StepCount < totalSteps)
             {
@@ -257,7 +257,7 @@ namespace Eco.Sim.Tests
                 while (accelerated.StepCount < totalSteps && fastClock.TryTakeStep()) accelerated.Step();
             }
 
-            // Peu accéléré, à soixante images par seconde.
+            // Slightly accelerated, at sixty frames per second.
             var slowClock = new SimClock { Multiplier = 10f };
             while (realTime.StepCount < totalSteps)
             {
@@ -301,7 +301,7 @@ namespace Eco.Sim.Tests
                 () => Ecosystem.Read(new MemoryStream(data), MeadowGenerator.CreateWorld(4), TestSpecies.TreeAndBush()));
             Assert.Throws<InvalidDataException>(
                 () => Ecosystem.Read(new MemoryStream(data), MeadowGenerator.CreateWorld(2, seed: 5), TestSpecies.TreeAndBush()),
-                "même taille, mais un terrain issu d'une autre graine");
+                "same size, but a terrain from another seed");
             Assert.Throws<InvalidDataException>(() => Ecosystem.Read(new MemoryStream(new byte[64]), world, TestSpecies.TreeAndBush()));
             Assert.Throws<EndOfStreamException>(
                 () => Ecosystem.Read(new MemoryStream(data, 0, data.Length / 2), world, TestSpecies.TreeAndBush()));

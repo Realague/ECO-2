@@ -5,8 +5,8 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // Joueur à la première personne. transform.position est le centre des pieds.
-    // Seul le propriétaire simule son joueur ; les autres copies suivent le NetworkTransform.
+    // First-person player. transform.position is the centre of the feet.
+    // Only the owner simulates its player; the other copies follow the NetworkTransform.
     public class PlayerController : NetworkBehaviour
     {
         private const float MaxFallSpeed = 50f;
@@ -32,7 +32,7 @@ namespace Voxel.Client
 
         private void Awake()
         {
-            // Activé seulement pour le propriétaire, une fois apparu sur le réseau.
+            // Enabled only for the owner, once spawned on the network.
             enabled = false;
         }
 
@@ -59,7 +59,7 @@ namespace Voxel.Client
 
         private void Update()
         {
-            // Sur un client, le joueur apparaît avant que le serveur ait envoyé le monde : on attend.
+            // On a client, the player spawns before the server has sent the world: we wait.
             world = worldSync.World;
             if (world == null) return;
 
@@ -78,7 +78,7 @@ namespace Voxel.Client
                 Look(mouse);
             }
 
-            // Sans clavier ni souris, la gravité s'applique quand même.
+            // Without keyboard or mouse, gravity still applies.
             Move(keyboard, hasControl);
             PlaceCamera();
 
@@ -88,7 +88,7 @@ namespace Voxel.Client
             }
             else if (hasDevices && mouse.leftButton.wasPressedThisFrame)
             {
-                // Le premier clic capture la souris, sans casser de bloc.
+                // The first click captures the mouse, without breaking a block.
                 Cursor.lockState = CursorLockMode.Locked;
             }
         }
@@ -112,7 +112,7 @@ namespace Voxel.Client
             pitch = Mathf.Clamp(pitch - delta.y, -MaxPitch, MaxPitch);
         }
 
-        // La caméra de la scène suit le joueur local sans lui être rattachée : elle survit à sa disparition.
+        // The scene camera follows the local player without being parented to it: it survives the player's despawn.
         private void PlaceCamera()
         {
             cameraTransform.SetPositionAndRotation(
@@ -130,7 +130,7 @@ namespace Voxel.Client
             System.Numerics.Vector3 direction = cameraTransform.forward.ToNumerics();
             bool blockHit = VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, out VoxelHit hit);
 
-            // Le clic gauche frappe l'animal ou la plante visés s'ils se trouvent avant le bloc visé.
+            // A left click strikes the targeted animal or plant if it is in front of the targeted block.
             if (breakBlock)
             {
                 float blockDistance = blockHit ? hit.Distance : PlayerRules.Reach;
@@ -139,14 +139,14 @@ namespace Voxel.Client
 
             if (!blockHit) return;
 
-            // Le serveur a le dernier mot : la demande passe par WorldSync, jamais par World.SetBlock.
+            // The server has the last word: the request goes through WorldSync, never through World.SetBlock.
             if (breakBlock)
             {
                 worldSync.RequestSetBlock(hit.Block, Blocks.Air);
                 return;
             }
 
-            // Le clic droit utilise l'objet tenu : une graine se plante dans la colonne visée, un bloc se pose.
+            // A right click uses the held item: a seed is planted in the targeted column, a block is placed.
             int held = inventoryHud.SelectedItem;
             if (Items.IsSeed(held))
             {
@@ -169,8 +169,8 @@ namespace Voxel.Client
         {
             float deltaTime = Mathf.Min(Time.deltaTime, MaxDeltaTime);
 
-            // Les touches de l'Input System désignent une position physique (disposition QWERTY) :
-            // wKey/aKey/sKey/dKey correspondent donc à Z/Q/S/D sur un clavier AZERTY.
+            // Input System keys designate a physical position (QWERTY layout):
+            // wKey/aKey/sKey/dKey therefore map to Z/Q/S/D on an AZERTY keyboard.
             Vector3 direction = Vector3.zero;
             if (hasControl)
             {
@@ -189,8 +189,8 @@ namespace Voxel.Client
                 velocity.y = Mathf.Sqrt(2f * gravity * jumpHeight);
             }
 
-            // Déplacement vertical avec la moyenne des vitesses avant et après gravité : exact pour une
-            // accélération constante, donc la hauteur de saut ne dépend pas de la fréquence d'images.
+            // Vertical move with the average of the speeds before and after gravity: exact for a
+            // constant acceleration, so jump height does not depend on the frame rate.
             float nextVerticalSpeed = Mathf.Max(velocity.y - gravity * deltaTime, -MaxFallSpeed);
             Vector3 displacement = velocity * deltaTime;
             displacement.y = (velocity.y + nextVerticalSpeed) * 0.5f * deltaTime;

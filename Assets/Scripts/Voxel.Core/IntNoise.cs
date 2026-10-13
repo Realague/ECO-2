@@ -1,14 +1,14 @@
 namespace Voxel.Core
 {
-    // Bruit de valeur en deux dimensions, calculé uniquement en entiers. Le terrain qui en découle est
-    // ainsi identique au bit près sur toutes les machines, ce que des flottants ne garantissent pas :
-    // c'est ce qui permet à un client de générer lui-même le même monde que le serveur.
-    // Les valeurs sont en virgule fixe : One représente 1.
+    // Two-dimensional value noise, computed with integers only. The resulting terrain is thus
+    // bit-identical on every machine, which floats do not guarantee:
+    // this is what lets a client generate the same world as the server by itself.
+    // Values are fixed point: One stands for 1.
     public static class IntNoise
     {
         public const int One = 1 << 16;
 
-        // Bruit lissé sur une grille de mailles de 2^cellShift blocs de côté. Résultat dans [0, One[.
+        // Smoothed noise on a grid of cells 2^cellShift blocks wide. Result in [0, One).
         public static int Sample(int x, int z, int cellShift, uint seed)
         {
             int mask = (1 << cellShift) - 1;
@@ -27,8 +27,8 @@ namespace Voxel.Core
             return (int)(near + (((far - near) * tz) >> 16));
         }
 
-        // Somme de plusieurs couches de bruit : chacune a des mailles deux fois plus petites que la
-        // précédente et pèse deux fois moins. Résultat dans [0, One[.
+        // Sum of several layers of noise: each has cells half the size of the previous one's
+        // and weighs half as much. Result in [0, One).
         public static int Fractal(int x, int z, int firstCellShift, int octaves, uint seed)
         {
             long sum = 0;
@@ -45,7 +45,7 @@ namespace Voxel.Core
             return (int)((sum << 16) / total);
         }
 
-        // Valeur pseudo-aléatoire d'un point de la grille, dans [0, One[.
+        // Pseudo-random value of a grid point, in [0, One).
         private static long Lattice(int x, int z, uint seed)
         {
             unchecked
@@ -60,7 +60,7 @@ namespace Voxel.Core
             }
         }
 
-        // Courbe en S (3t² − 2t³) : elle efface les angles aux limites des mailles.
+        // S-curve (3t² − 2t³): it smooths out the corners at cell boundaries.
         private static long Smooth(long t) => (((t * t) >> 16) * (3L * One - 2L * t)) >> 16;
     }
 }

@@ -4,19 +4,19 @@ using Voxel.Core;
 
 namespace Eco.Sim
 {
-    // État vivant du monde : la fertilité du sol et les plantes. Il ne change que par Step, appelé par
-    // le serveur, et par les actions des joueurs (Remove). Aucun accès à l'heure réelle ni à Unity :
-    // deux écosystèmes partis de la même graine et soumis aux mêmes appels restent identiques.
+    // Living state of the world: soil fertility and plants. It only changes through Step, called by
+    // the server, and through player actions (Remove). No access to real time or to Unity:
+    // two ecosystems started from the same seed and given the same calls stay identical.
     public sealed partial class Ecosystem
     {
-        // La fertilité est stockée sur une grille grossière : une case pour CellSize × CellSize colonnes de blocs.
+        // Fertility is stored on a coarse grid: one cell for CellSize × CellSize block columns.
         public const int CellSize = 4;
 
         private const float FertilityRegenPerStep = 0.004f;
         private const float StarvationChancePerStep = 0.02f;
         private const float MinCapacity = 0.4f;
 
-        // Largeur, en cases de fertilité, des taches de sol riche ou pauvre.
+        // Width, in fertility cells, of the patches of rich or poor soil.
         private const int CapacityPatchCells = 4;
 
         private readonly World world;
@@ -25,23 +25,23 @@ namespace Eco.Sim
         private readonly int cellsX;
         private readonly int cellsZ;
 
-        // Fertilité actuelle de chaque case, et le maximum vers lequel elle se régénère.
+        // Current fertility of each cell, and the maximum it regenerates toward.
         private readonly float[] fertility;
         private readonly float[] capacity;
 
-        // Plantes dans l'ordre de leur apparition, donc par identifiant croissant : l'ordre de parcours
-        // fait partie du résultat. Un tableau plutôt qu'une liste, parce que Step le parcourt en entier
-        // à chaque pas et que son coût domine celui de la simulation.
-        // Une plante se retrouve par recherche dichotomique sur son identifiant : pas de table d'index à
-        // tenir à jour quand des plantes meurent.
+        // Plants in order of appearance, hence by increasing id: the iteration order is part of the
+        // result. An array rather than a list, because Step walks all of it at every step and its
+        // cost dominates that of the simulation.
+        // A plant is found by binary search on its id: no index table to keep up to date when
+        // plants die.
         private Plant[] plants = new Plant[256];
         private int plantCount;
 
-        // Pour chaque colonne de blocs, l'identifiant de la plante qui s'y trouve, ou 0.
+        // For each block column, the id of the plant standing there, or 0.
         private readonly int[] plantAtColumn;
         private readonly List<int> dying = new List<int>();
 
-        // Plantes dont le sol ou le pied a changé depuis le dernier pas : elles seules sont revérifiées.
+        // Plants whose ground or base has changed since the last step: only those are rechecked.
         private readonly List<int> disturbed = new List<int>();
         private int nextPlantId = 1;
 
@@ -74,13 +74,13 @@ namespace Eco.Sim
 
         public event Action<Plant> PlantAdded;
 
-        // Levé quand une plante change de palier de croissance, pas à chaque pas.
+        // Raised when a plant moves to another growth stage, not at every step.
         public event Action<Plant> PlantChanged;
         public event Action<int> PlantRemoved;
 
         public long StepCount { get; private set; }
 
-        // Vue de l'instant : elle n'est plus valable après un Step, un Remove ou un TryPlant.
+        // Snapshot: no longer valid after a Step, a Remove or a TryPlant.
         public IReadOnlyList<Plant> Plants => new ArraySegment<Plant>(plants, 0, plantCount);
 
         public IReadOnlyList<Species> AllSpecies => species;
@@ -100,7 +100,7 @@ namespace Eco.Sim
             return false;
         }
 
-        // Sème des plantes adultes au hasard pour démarrer un monde neuf. Renvoie le nombre de plantes créées.
+        // Sows adult plants at random to start a new world. Returns the number of plants created.
         public int Populate(int attempts)
         {
             int created = 0;
@@ -116,10 +116,10 @@ namespace Eco.Sim
             return created;
         }
 
-        // Fait germer une graine dans la colonne donnée, si le sol, la place et la fertilité le permettent.
+        // Sprouts a seed in the given column, if the ground, the room and the fertility allow it.
         public bool TryPlant(int speciesIndex, int x, int z) => TryAdd(speciesIndex, x, z, 0f, 0);
 
-        // Retire une plante, par exemple abattue par un joueur. Renvoie faux si elle n'existe pas.
+        // Removes a plant, for instance one felled by a player. Returns false if it does not exist.
         public bool Remove(int plantId)
         {
             int index = IndexOf(plantId);
@@ -132,7 +132,7 @@ namespace Eco.Sim
             return true;
         }
 
-        // Avance la simulation d'un pas de temps simulé.
+        // Advances the simulation by one step of simulated time.
         public void Step()
         {
             StepCount++;
@@ -143,11 +143,11 @@ namespace Eco.Sim
                 fertility[i] = Math.Min(capacity[i], fertility[i] + FertilityRegenPerStep);
             }
 
-            // Les plantes nées pendant ce pas n'agissent qu'au suivant.
+            // Plants born during this step only act from the next one.
             int count = plantCount;
             for (int i = 0; i < count; i++)
             {
-                // Copie de travail : semer peut agrandir le tableau, une référence vers lui ne serait plus sûre.
+                // Working copy: sowing can grow the array, so a reference into it would no longer be safe.
                 Plant plant = plants[i];
                 bool alive = Live(ref plant, out bool seeds);
                 plants[i] = plant;
@@ -160,7 +160,7 @@ namespace Eco.Sim
             StepAnimals();
         }
 
-        // Fait vivre une plante pendant un pas. Renvoie faux si elle meurt.
+        // Runs one step of a plant's life. Returns false if it dies.
         private bool Live(ref Plant plant, out bool seeds)
         {
             seeds = false;
@@ -230,8 +230,8 @@ namespace Eco.Sim
             plantAtColumn[ColumnIndex(plant.X, plant.Z)] = plant.Id;
         }
 
-        // Le monde ne change que par World.SetBlock : plutôt que de relire le sol de chaque plante à
-        // chaque pas, on note celles qu'un changement de bloc a pu déranger.
+        // The world only changes through World.SetBlock: rather than reading the ground of every
+        // plant again at every step, we note those a block change may have disturbed.
         private void OnBlockChanged(BlockPos pos, ushort previous, ushort current)
         {
             if ((uint)pos.X >= (uint)world.SizeX || (uint)pos.Z >= (uint)world.SizeZ) return;
@@ -243,7 +243,7 @@ namespace Eco.Sim
             if (plantId != 0) disturbed.Add(plantId);
         }
 
-        // Retire, au début du pas, les plantes qui ont perdu leur sol ou dont le pied est occupé par un bloc.
+        // Removes, at the start of the step, plants that lost their ground or whose base is taken by a block.
         private void RemoveUprooted()
         {
             if (disturbed.Count == 0) return;
@@ -256,8 +256,8 @@ namespace Eco.Sim
             disturbed.Clear();
         }
 
-        // Répartit la fertilité maximale en larges taches douces, riches ou pauvres : des valeurs tirées
-        // au hasard sur une grille grossière, puis interpolées entre ses points.
+        // Lays out the maximum fertility in wide smooth patches, rich or poor: values drawn at random
+        // on a coarse grid, then interpolated between its points.
         private void FillCapacity()
         {
             int latticeX = cellsX / CapacityPatchCells + 2;
@@ -289,7 +289,7 @@ namespace Eco.Sim
 
         private static float Lerp(float from, float to, float t) => from + (to - from) * t;
 
-        // Une plante a besoin de terre ou d'herbe sous elle, et d'air à son pied.
+        // A plant needs dirt or grass under it, and air at its base.
         private bool HasGroundAndRoom(int x, int y, int z)
         {
             if (y <= 0 || y >= world.SizeY) return false;
@@ -300,8 +300,8 @@ namespace Eco.Sim
             return !Blocks.IsSolid(world.GetBlock(x, y, z));
         }
 
-        // Une colonne ne porte qu'une plante. L'espacement, lui, ne joue qu'entre plantes de la même
-        // espèce : un arbre peut germer au milieu des buissons, pas collé à un autre arbre.
+        // A column holds a single plant. Spacing only applies between plants of the same species:
+        // a tree can sprout among bushes, but not right next to another tree.
         private bool IsSpaceFree(int x, int z, int speciesIndex, int spacing)
         {
             if (plantAtColumn[ColumnIndex(x, z)] != 0) return false;
@@ -323,7 +323,7 @@ namespace Eco.Sim
             return true;
         }
 
-        // Retire les plantes mortes pendant le pas, en conservant l'ordre des survivantes.
+        // Removes the plants that died during the step, keeping the survivors in order.
         private void RemoveDying()
         {
             if (dying.Count == 0) return;
@@ -352,7 +352,7 @@ namespace Eco.Sim
             PlantRemoved?.Invoke(plant.Id);
         }
 
-        // Indice de la plante dans le tableau, trié par identifiant, ou une valeur négative si elle n'existe pas.
+        // Index of the plant in the array, sorted by id, or a negative value if it does not exist.
         private int IndexOf(int plantId)
         {
             int low = 0;

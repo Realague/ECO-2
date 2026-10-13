@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Voxel.Client
 {
-    // Voxel.Core n'utilise pas UnityEngine : ses vecteurs sont ceux de System.Numerics.
+    // Voxel.Core does not use UnityEngine: its vectors are those of System.Numerics.
     internal static class VectorConversions
     {
         public static System.Numerics.Vector3 ToNumerics(this Vector3 v) => new System.Numerics.Vector3(v.x, v.y, v.z);

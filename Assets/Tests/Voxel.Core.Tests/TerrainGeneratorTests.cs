@@ -6,9 +6,9 @@ namespace Voxel.Core.Tests
     {
         private const int Seed = 1;
 
-        // Valeurs relevées avec la version 2 du générateur. Si ce test échoue, le terrain produit a
-        // changé : les sauvegardes existantes ne correspondent plus et les clients d'une autre version
-        // généreraient un autre monde. Incrémenter TerrainGenerator.Version, puis mettre ces valeurs à jour.
+        // Values recorded with version 2 of the generator. If this test fails, the produced terrain has
+        // changed: existing saves no longer match and clients on another version
+        // would generate another world. Bump TerrainGenerator.Version, then update these values.
         [TestCase(0, 0, 1, 25)]
         [TestCase(64, 64, 1, 39)]
         [TestCase(500, -300, 1, 25)]
@@ -18,7 +18,7 @@ namespace Voxel.Core.Tests
         [TestCase(64, 64, 42, 35)]
         public void SurfaceHeight_IsUnchangedSinceThisGeneratorVersion(int x, int z, int seed, int expected)
         {
-            Assert.AreEqual(2, new TerrainGenerator().Version, "valeurs de référence à mettre à jour pour la nouvelle version");
+            Assert.AreEqual(2, new TerrainGenerator().Version, "reference values to update for the new version");
             Assert.AreEqual(expected, TerrainGenerator.SurfaceHeight(x, z, seed));
         }
 
@@ -55,9 +55,9 @@ namespace Voxel.Core.Tests
                 }
             }
 
-            Assert.That(lowest, Is.GreaterThanOrEqualTo(20), "le socle de pierre reste intact sous le relief");
-            Assert.That(highest, Is.LessThan(62), "le relief tient sous le plafond du monde");
-            Assert.That(highest - lowest, Is.GreaterThan(20), "il y a des plaines et des massifs");
+            Assert.That(lowest, Is.GreaterThanOrEqualTo(20), "the stone base stays intact under the relief");
+            Assert.That(highest, Is.LessThan(62), "the relief fits under the world's ceiling");
+            Assert.That(highest - lowest, Is.GreaterThan(20), "there are plains and massifs");
         }
 
         [Test]
@@ -70,16 +70,16 @@ namespace Voxel.Core.Tests
                 for (int x = 0; x < world.SizeX; x++)
                 {
                     int top = TerrainGenerator.SurfaceHeight(x, z, Seed);
-                    Assert.AreEqual(top + 1, world.GetSurfaceHeight(x, z), $"Colonne ({x}, {z})");
+                    Assert.AreEqual(top + 1, world.GetSurfaceHeight(x, z), $"Column ({x}, {z})");
 
                     for (int y = 0; y <= top; y++)
                     {
-                        Assert.AreNotEqual(Blocks.Air, world.GetBlock(x, y, z), $"Trou en ({x}, {y}, {z})");
+                        Assert.AreNotEqual(Blocks.Air, world.GetBlock(x, y, z), $"Hole at ({x}, {y}, {z})");
                     }
 
                     ushort surface = world.GetBlock(x, top, z);
-                    if (surface == Blocks.Grass) Assert.AreEqual(Blocks.Dirt, world.GetBlock(x, top - 1, z), $"Sous l'herbe en ({x}, {z})");
-                    else Assert.AreEqual(Blocks.Stone, surface, $"Surface en ({x}, {z})");
+                    if (surface == Blocks.Grass) Assert.AreEqual(Blocks.Dirt, world.GetBlock(x, top - 1, z), $"Under the grass at ({x}, {z})");
+                    else Assert.AreEqual(Blocks.Stone, surface, $"Surface at ({x}, {z})");
                 }
             }
         }
@@ -102,13 +102,13 @@ namespace Voxel.Core.Tests
                         || System.Math.Abs(TerrainGenerator.SurfaceHeight(x, z - 1, Seed) - height) >= 3;
 
                     ushort surface = world.GetBlock(x, height, z);
-                    if (steep) Assert.AreEqual(Blocks.Stone, surface, $"Pente raide en ({x}, {z})");
+                    if (steep) Assert.AreEqual(Blocks.Stone, surface, $"Steep slope at ({x}, {z})");
                     if (surface == Blocks.Grass) grass++;
                     else rock++;
                 }
             }
 
-            Assert.That(grass, Is.GreaterThan(rock), "l'herbe domine : les plantes ont où pousser");
+            Assert.That(grass, Is.GreaterThan(rock), "grass dominates: plants have room to grow");
         }
 
         [Test]
@@ -128,7 +128,7 @@ namespace Voxel.Core.Tests
                     {
                         for (int x = 0; x < Chunk.Size; x++)
                         {
-                            Assert.AreEqual(inWorld.Get(x, y, z), alone.Get(x, y, z), $"Chunk {coord}, bloc ({x}, {y}, {z})");
+                            Assert.AreEqual(inWorld.Get(x, y, z), alone.Get(x, y, z), $"Chunk {coord}, block ({x}, {y}, {z})");
                         }
                     }
                 }
@@ -189,11 +189,11 @@ namespace Voxel.Core.Tests
         [Test]
         public void Sample_IsSmooth_NeighbouringBlocksAreClose()
         {
-            // Sur des mailles de 16 blocs, la pente maximale de la courbe de lissage donne moins d'un huitième par bloc.
+            // On 16-block cells, the steepest slope of the smoothing curve gives less than one eighth per block.
             for (int x = -200; x < 200; x++)
             {
                 int step = System.Math.Abs(IntNoise.Sample(x + 1, 37, 4, 5u) - IntNoise.Sample(x, 37, 4, 5u));
-                Assert.That(step, Is.LessThan(IntNoise.One / 8), $"Entre x = {x} et x = {x + 1}");
+                Assert.That(step, Is.LessThan(IntNoise.One / 8), $"Between x = {x} and x = {x + 1}");
             }
         }
 

@@ -5,20 +5,20 @@ namespace Eco.Sim
 {
     public struct Plant
     {
-        // La croissance est affichée et transmise par paliers, pas en continu.
+        // Growth is displayed and sent in stages, not continuously.
         public const int StageCount = 8;
 
         public int Id;
         public int SpeciesIndex;
 
-        // Case d'air occupée par le pied de la plante, juste au-dessus du sol.
+        // Air cell occupied by the base of the plant, just above the ground.
         public int X;
         public int Y;
         public int Z;
 
         public int Age;
 
-        // De 0 (graine) à 1 (adulte).
+        // From 0 (seed) to 1 (adult).
         public float Growth;
 
         public int Stage => StageOf(Growth);
@@ -26,7 +26,7 @@ namespace Eco.Sim
         public static int StageOf(float growth) => Math.Min(StageCount - 1, (int)(growth * StageCount));
     }
 
-    // Volume occupé par une plante, pour la viser et pour vérifier qu'elle est à portée.
+    // Volume occupied by a plant, to aim at it and to check that it is within reach.
     public static class PlantShape
     {
         private const float MinHalfWidth = 0.15f;
@@ -43,8 +43,8 @@ namespace Eco.Sim
             max = new Vector3(x + 0.5f + halfWidth, y + height, z + 0.5f + halfWidth);
         }
 
-        // Distance le long du rayon jusqu'à la boîte, ou une valeur négative si le rayon la manque.
-        // La direction doit être normalisée.
+        // Distance along the ray to the box, or a negative value if the ray misses it.
+        // The direction must be normalized.
         public static float RayDistance(Vector3 origin, Vector3 direction, Vector3 min, Vector3 max)
         {
             float near = 0f;

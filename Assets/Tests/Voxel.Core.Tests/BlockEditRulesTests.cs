@@ -7,7 +7,7 @@ namespace Voxel.Core.Tests
     {
         private const int Ground = FlatGenerator.GroundHeight;
 
-        // Yeux d'un joueur debout au centre du monde plat.
+        // Eyes of a player standing at the centre of the flat world.
         private static readonly Vector3 Eyes = new Vector3(8.5f, Ground + PlayerRules.EyeHeight, 8.5f);
 
         [Test]

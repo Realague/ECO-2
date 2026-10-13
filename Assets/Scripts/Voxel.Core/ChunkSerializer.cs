@@ -3,8 +3,8 @@ using System.IO;
 
 namespace Voxel.Core
 {
-    // Blocs d'un chunk compressés par plages : (longueur, bloc) répété jusqu'à couvrir le chunk.
-    // Sert à la sauvegarde et servira tel quel à l'envoi des chunks sur le réseau.
+    // Blocks of a chunk compressed in runs: (length, block) repeated until the chunk is covered.
+    // Used for saving, and as is for sending chunks over the network.
     public static class ChunkSerializer
     {
         public static void Write(BinaryWriter writer, Chunk chunk)
@@ -20,7 +20,7 @@ namespace Voxel.Core
                     run++;
                 }
 
-                // Une plage couvre au plus un chunk entier (4096 blocs) : elle tient sur deux octets.
+                // A run covers at most a whole chunk (4096 blocks): it fits in two bytes.
                 writer.Write((ushort)run);
                 writer.Write(block);
                 index += run;
@@ -37,7 +37,7 @@ namespace Voxel.Core
                 ushort block = reader.ReadUInt16();
                 if (run == 0 || index + run > blocks.Length)
                 {
-                    throw new InvalidDataException($"Données corrompues pour le chunk {chunk.Coord}.");
+                    throw new InvalidDataException($"Corrupted data for chunk {chunk.Coord}.");
                 }
 
                 Array.Fill(blocks, block, index, run);

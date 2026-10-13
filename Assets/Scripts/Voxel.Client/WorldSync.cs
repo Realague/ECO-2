@@ -8,9 +8,9 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // Synchronise le monde entre le serveur et les clients par messages nommés.
-    // Serveur : envoie tous les chunks à chaque client qui arrive, valide les demandes de modification
-    // de bloc et diffuse chaque changement. Client : reconstruit le monde reçu et applique les changements.
+    // Synchronises the world between the server and the clients with named messages.
+    // Server: sends the modified chunks to each joining client, validates block edit requests
+    // and broadcasts every change. Client: rebuilds the received world and applies the changes.
     public class WorldSync : MonoBehaviour
     {
         private const string WorldInfoMessage = "World.Info";
@@ -18,7 +18,7 @@ namespace Voxel.Client
         private const string SetBlockRequestMessage = "World.SetBlockRequest";
         private const string BlockChangedMessage = "World.BlockChanged";
 
-        // Un lot de chunks par client et par tick réseau, pour ne pas saturer la connexion.
+        // One batch of chunks per client and per network tick, so as not to flood the connection.
         private const int MaxBatchBytes = 16 * 1024;
         private const int BlockMessageSize = 3 * sizeof(int) + sizeof(ushort);
         private const int WorldInfoSize = 6 * sizeof(int) + sizeof(ulong);
@@ -36,18 +36,18 @@ namespace Voxel.Client
         private int expectedChunkCount;
         private int receivedChunkCount;
 
-        // Le monde de la partie, ou null tant qu'il n'est pas entièrement disponible sur cette machine.
+        // The world of the game, or null until it is fully available on this machine.
         public World World => ready ? voxelWorld.World : null;
 
         public float LoadingProgress => expectedChunkCount > 0 ? (float)receivedChunkCount / expectedChunkCount : 0f;
 
-        // Raison pour laquelle ce client a quitté le serveur de lui-même, ou null. Conservée après
-        // l'arrêt pour pouvoir être affichée, effacée au prochain démarrage.
+        // Reason why this client left the server on its own, or null. Kept after the session
+        // stops so it can be displayed, cleared at the next start.
         public string Failure { get; private set; }
 
         private CustomMessagingManager Messaging => networkManager.CustomMessagingManager;
 
-        // À appeler juste après le démarrage du serveur ou de l'hôte, une fois son monde chargé.
+        // To call right after the server or host has started, once its world is loaded.
         public void StartServer()
         {
             Failure = null;
@@ -62,7 +62,7 @@ namespace Voxel.Client
             networkManager.NetworkTickSystem.Tick += SendChunkBatches;
         }
 
-        // À appeler juste après le lancement de la connexion d'un client.
+        // To call right after a client's connection has been launched.
         public void StartClient()
         {
             Failure = null;
@@ -92,8 +92,8 @@ namespace Voxel.Client
             receivedChunkCount = 0;
         }
 
-        // Modification demandée par le joueur local. Le serveur décide ; un client l'applique tout de
-        // suite pour la réactivité, et le serveur la corrige s'il la refuse.
+        // Edit requested by the local player. The server decides; a client applies it right away
+        // for responsiveness, and the server corrects it if it refuses.
         public void RequestSetBlock(BlockPos pos, ushort block)
         {
             if (!ready) return;
@@ -112,7 +112,7 @@ namespace Voxel.Client
         {
             if (!IsEditAllowed(clientId, pos, block)) return false;
 
-            // Poser un bloc le prend dans l'inventaire du joueur ; en casser un le lui donne.
+            // Placing a block takes it from the player's inventory; breaking one gives it to them.
             bool placing = Blocks.IsSolid(block);
             if (placing && !inventorySync.TryConsume(clientId, Items.OfBlock(block))) return false;
 
@@ -152,7 +152,7 @@ namespace Voxel.Client
 
             if (!TryApplyEdit(senderId, pos, block))
             {
-                // Refus : on renvoie au demandeur l'état réel du bloc, qui annule son application anticipée.
+                // Refusal: the real state of the block is sent back to the requester, which undoes its anticipated edit.
                 SendBlock(BlockChangedMessage, senderId, pos, serverWorld.GetBlock(pos));
             }
         }
@@ -172,8 +172,8 @@ namespace Voxel.Client
         {
             if (clientId == networkManager.LocalClientId) return;
 
-            // Le client génère lui-même le terrain à partir de la graine : seuls les chunks modifiés
-            // depuis la génération lui sont envoyés.
+            // The client generates the terrain itself from the seed: only the chunks modified
+            // since generation are sent to it.
             Vector3 playerPosition = networkManager.ConnectedClients[clientId].PlayerObject.transform.position;
             var stream = new ChunkStream(serverWorld, playerPosition);
 
@@ -218,7 +218,7 @@ namespace Voxel.Client
             {
                 ChunkStream finished = streams[clientId];
                 Debug.Log(
-                    $"Monde envoyé au joueur {clientId} : {finished.BytesSent / 1024} Ko en {Time.unscaledTime - finished.StartedAt:0.0} s.");
+                    $"World sent to player {clientId}: {finished.BytesSent / 1024} KB in {Time.unscaledTime - finished.StartedAt:0.0} s.");
                 streams.Remove(clientId);
             }
 
@@ -237,12 +237,12 @@ namespace Voxel.Client
 
             voxelWorld.CreateRemote(chunksX, chunksY, chunksZ, seed);
 
-            // Un terrain différent de celui du serveur donnerait des murs invisibles et des trous : mieux
-            // vaut ne pas jouer. Cela n'arrive que si les deux n'ont pas la même version du jeu.
+            // A terrain different from the server's would give invisible walls and holes: better not
+            // to play. This only happens if the two do not run the same version of the game.
             World generated = voxelWorld.World;
             if (generated.GeneratorVersion != generatorVersion || generated.TerrainFingerprint != fingerprint)
             {
-                Failure = "Ce serveur n'utilise pas la même version du jeu : le monde généré ne correspond pas au sien.";
+                Failure = "This server does not run the same version of the game: the generated world does not match its own.";
                 Debug.LogError(Failure);
                 networkManager.Shutdown();
                 return;
@@ -301,7 +301,7 @@ namespace Voxel.Client
             pos = new BlockPos(x, y, z);
         }
 
-        // Chunks restant à envoyer à un client, les plus proches de son joueur d'abord.
+        // Chunks left to send to a client, those nearest to its player first.
         private sealed class ChunkStream
         {
             private readonly List<Chunk> chunks;
@@ -327,7 +327,7 @@ namespace Voxel.Client
 
             public long BytesSent { get; private set; }
 
-            // Les chunks sont sérialisés au moment de l'envoi : un bloc modifié entre-temps est donc inclus.
+            // Chunks are serialized when sent: a block changed in the meantime is therefore included.
             public byte[] NextBatch(int maxBytes)
             {
                 var stream = new MemoryStream();

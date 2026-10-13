@@ -7,8 +7,8 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // Côté serveur : admet les joueurs (mot de passe, identifiant unique) et retient où chacun se
-    // trouvait, pour le faire réapparaître au même endroit à sa prochaine connexion.
+    // Server side: admits players (password, unique id) and remembers where each one was,
+    // to respawn them at the same place at their next connection.
     internal sealed class PlayerRegistry
     {
         private const string FileName = "players.dat";
@@ -22,7 +22,7 @@ namespace Voxel.Client
         private readonly PlayerStore store;
         private readonly Dictionary<ulong, string> connectedPlayers = new Dictionary<ulong, string>();
 
-        // Un mot de passe vide laisse entrer tout le monde.
+        // An empty password lets everyone in.
         public PlayerRegistry(NetworkManager networkManager, World world, string directory, string password)
         {
             this.networkManager = networkManager;
@@ -39,7 +39,7 @@ namespace Voxel.Client
 
         public bool TryGetPlayerId(ulong clientId, out string playerId) => connectedPlayers.TryGetValue(clientId, out playerId);
 
-        // L'état sauvegardé d'un joueur connecté : position, spécialité et inventaire.
+        // The saved state of a connected player: position, speciality and inventory.
         public bool TryGetState(ulong clientId, out PlayerState state)
         {
             state = null;
@@ -55,8 +55,8 @@ namespace Voxel.Client
             networkManager.OnClientDisconnectCallback -= OnClientDisconnected;
         }
 
-        // Relève la position de chaque joueur connecté. À appeler à chaque image : quand le serveur
-        // apprend une déconnexion, l'objet du joueur n'est déjà plus lisible, il faut donc l'avoir relevée avant.
+        // Records the position of every connected player. To call every frame: when the server learns
+        // of a disconnection, the player's object is already unreadable, so it must have been recorded before.
         public void TrackPlayers()
         {
             foreach (KeyValuePair<ulong, string> player in connectedPlayers)
@@ -81,7 +81,7 @@ namespace Voxel.Client
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
             {
-                Debug.LogError($"Échec de la sauvegarde des joueurs : {e.Message} ({filePath})");
+                Debug.LogError($"Failed to save the players: {e.Message} ({filePath})");
             }
         }
 
@@ -96,7 +96,7 @@ namespace Voxel.Client
                 catch (Exception e) when (e is IOException || e is InvalidDataException)
                 {
                     Debug.LogWarning(
-                        $"Sauvegarde des joueurs illisible, elle sera remplacée à la prochaine sauvegarde : {e.Message} ({filePath})");
+                        $"Unreadable player save, it will be replaced at the next save: {e.Message} ({filePath})");
                 }
             }
 
@@ -112,7 +112,7 @@ namespace Voxel.Client
             {
                 response.Approved = false;
                 response.Reason = refusal;
-                Debug.Log($"Connexion refusée : {refusal}");
+                Debug.Log($"Connection refused: {refusal}");
                 return;
             }
 
@@ -124,10 +124,10 @@ namespace Voxel.Client
             response.Position = state.Position.ToUnity();
             response.Rotation = Quaternion.Euler(0f, state.Yaw, 0f);
 
-            Debug.Log($"Joueur {connection.PlayerId} connecté ({connectedPlayers.Count} en ligne).");
+            Debug.Log($"Player {connection.PlayerId} connected ({connectedPlayers.Count} online).");
         }
 
-        // Renvoie le motif du refus, ou null si la connexion est acceptée.
+        // Returns the reason for the refusal, or null if the connection is accepted.
         private string RefusalFor(byte[] payload, out ConnectionRequest connection)
         {
             if (!ConnectionRequest.TryParse(payload, out connection)) return ConnectionRefusal.InvalidRequest;
@@ -143,14 +143,14 @@ namespace Voxel.Client
                 System.Numerics.Vector3 p = saved.Position;
                 if (world.InBounds((int)MathF.Floor(p.X), (int)MathF.Floor(p.Y), (int)MathF.Floor(p.Z)))
                 {
-                    // Le monde a pu changer depuis : on ne fait jamais réapparaître un joueur dans un bloc.
+                    // The world may have changed since: a player is never respawned inside a block.
                     saved.Position = VoxelCollision.RaiseToFreeSpace(world, p, PlayerRules.HalfWidth, PlayerRules.Height);
                     return saved;
                 }
             }
 
-            // Nouveau joueur, ou position sauvegardée hors du monde : il apparaît au centre, et son état
-            // (inventaire compris) est conservé à partir de maintenant.
+            // New player, or saved position outside the world: they spawn at the centre, and their state
+            // (inventory included) is kept from now on.
             int x = world.SizeX / 2 + (int)(clientId % SpawnSlots) * SpawnSpacing;
             int z = world.SizeZ / 2;
             PlayerState state = store.GetOrAdd(playerId);
@@ -163,11 +163,11 @@ namespace Voxel.Client
         {
             if (!connectedPlayers.TryGetValue(clientId, out string playerId)) return;
 
-            // Sa dernière position a été relevée par TrackPlayers : il reste à l'écrire.
+            // Their last position was recorded by TrackPlayers: it only remains to write it.
             connectedPlayers.Remove(clientId);
             Save();
 
-            Debug.Log($"Joueur {playerId} déconnecté ({connectedPlayers.Count} en ligne).");
+            Debug.Log($"Player {playerId} disconnected ({connectedPlayers.Count} online).");
         }
     }
 }

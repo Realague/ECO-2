@@ -1,7 +1,7 @@
 namespace Eco.Sim
 {
-    // Générateur aléatoire propre à la simulation (xorshift64*). Son état se sauvegarde, et il donne la
-    // même suite sur toutes les machines, ce que System.Random ne garantit pas.
+    // Random generator dedicated to the simulation (xorshift64*). Its state can be saved, and it gives
+    // the same sequence on every machine, which System.Random does not guarantee.
     public sealed class SimRandom
     {
         private const ulong DefaultState = 0x9E3779B97F4A7C15UL;
@@ -13,7 +13,7 @@ namespace Eco.Sim
             State = (ulong)(uint)seed * DefaultState + 1UL;
         }
 
-        // L'état ne doit jamais valoir zéro : la suite resterait à zéro.
+        // The state must never be zero: the sequence would stay at zero.
         public ulong State
         {
             get => state;
@@ -30,10 +30,10 @@ namespace Eco.Sim
             return x * 0x2545F4914F6CDD1DUL;
         }
 
-        // Dans [0, 1[.
+        // In [0, 1).
         public float NextFloat() => (NextULong() >> 40) * (1f / 16777216f);
 
-        // Dans [0, exclusiveMax[.
+        // In [0, exclusiveMax).
         public int NextInt(int exclusiveMax) => (int)((NextULong() >> 33) % (ulong)exclusiveMax);
     }
 }

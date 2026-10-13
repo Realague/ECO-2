@@ -101,7 +101,7 @@ namespace Voxel.Core.Tests
             Assert.AreEqual(1, store.Count);
         }
 
-        // Une sauvegarde d'avant les inventaires : le joueur garde sa position et repart les mains vides.
+        // A save from before inventories: the player keeps their position and starts empty-handed.
         [Test]
         public void Read_SaveWithoutInventory_KeepsThePosition()
         {

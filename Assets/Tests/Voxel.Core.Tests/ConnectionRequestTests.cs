@@ -63,7 +63,7 @@ namespace Voxel.Core.Tests
         [TestCase("", false)]
         [TestCase(null, false)]
         [TestCase("with space", false)]
-        [TestCase("accentué", false)]
+        [TestCase("naïve", false)]
         public void IsValidPlayerId_AcceptsOnlyLettersDigitsDashAndUnderscore(string playerId, bool expected)
         {
             Assert.AreEqual(expected, ConnectionRequest.IsValidPlayerId(playerId));

@@ -4,9 +4,9 @@ using Voxel.Core;
 
 namespace Eco.Sim
 {
-    // Les animaux : ils se déplacent d'une colonne de blocs à une autre à chaque pas, cherchent à manger
-    // quand ils ont faim, se reproduisent quand ils sont bien nourris, et meurent de faim ou de vieillesse.
-    // Comme pour les plantes, tout passe par Step et par le générateur aléatoire de l'écosystème.
+    // Animals: at each step they move from one block column to another, look for food when hungry,
+    // breed when well fed, and die of hunger or old age.
+    // As with plants, everything goes through Step and the ecosystem's random generator.
     public sealed partial class Ecosystem
     {
         private const float SeeksFoodAbove = 0.35f;
@@ -14,10 +14,10 @@ namespace Eco.Sim
         private const float BirthCost = 0.2f;
         private const float NewbornHunger = 0.25f;
 
-        // Brouter retire cette part de croissance à la plante, qui doit en avoir au moins autant.
+        // Grazing removes this share of growth from the plant, which must have at least that much.
         private const float GrazedGrowth = 0.5f;
 
-        // Dénivelé qu'un animal franchit en un déplacement.
+        // Height difference an animal can cross in one move.
         private const int MaxClimb = 3;
         private const float ImmigrationChancePerStep = 0.05f;
         private const float ColumnsPerDensityUnit = 10000f;
@@ -29,8 +29,8 @@ namespace Eco.Sim
 
         private AnimalSpecies[] animalSpecies;
 
-        // Comme les plantes : un tableau trié par identifiant, et l'identifiant de l'animal présent dans
-        // chaque colonne (une colonne ne porte qu'un animal).
+        // Like plants: an array sorted by id, and the id of the animal standing in each column
+        // (a column holds a single animal).
         private Animal[] animals = new Animal[64];
         private int animalCount;
         private int[] animalAtColumn;
@@ -39,11 +39,11 @@ namespace Eco.Sim
         private int nextAnimalId = 1;
         private bool animalsDied;
 
-        // Hauteur du sol de chaque colonne, plus un ; zéro tant qu'elle n'a pas été lue. Les animaux la
-        // consultent à chaque déplacement : la relire dans le monde coûterait une colonne entière à chaque fois.
+        // Ground height of each column, plus one; zero until it has been read. Animals look it up at
+        // every move: reading it from the world again would cost a whole column each time.
         private int[] surfaceCache;
 
-        // Vue de l'instant : elle n'est plus valable après un Step ou un RemoveAnimal.
+        // Snapshot: no longer valid after a Step or a RemoveAnimal.
         public IReadOnlyList<Animal> Animals => new ArraySegment<Animal>(animals, 0, animalCount);
 
         public IReadOnlyList<AnimalSpecies> AllAnimalSpecies => animalSpecies;
@@ -63,7 +63,7 @@ namespace Eco.Sim
             return false;
         }
 
-        // Retire un animal, par exemple tué par un joueur. Renvoie faux s'il n'existe pas.
+        // Removes an animal, for instance one killed by a player. Returns false if it does not exist.
         public bool RemoveAnimal(int animalId)
         {
             int index = AnimalIndexOf(animalId);
@@ -74,7 +74,7 @@ namespace Eco.Sim
             return true;
         }
 
-        // Place un adulte dans la colonne donnée, si elle est praticable et libre.
+        // Places an adult in the given column, if it is walkable and free.
         public bool TryPlaceAnimal(int speciesIndex, int x, int z)
         {
             if (!CanStandAt(x, z, out int y)) return false;
@@ -83,8 +83,8 @@ namespace Eco.Sim
             return true;
         }
 
-        // Peuple un monde neuf : quelques fois l'effectif minimal de chaque espèce, au hasard. Renvoie
-        // le nombre d'animaux créés.
+        // Populates a new world: a few times the minimum population of each species, at random. Returns
+        // the number of animals created.
         public int PopulateAnimals()
         {
             int created = 0;
@@ -114,7 +114,7 @@ namespace Eco.Sim
             animalFloor = new int[animalSpecies.Length];
             for (int s = 0; s < animalSpecies.Length; s++)
             {
-                // Une densité nulle désigne une espèce qui peut disparaître pour de bon.
+                // A zero density marks a species that can disappear for good.
                 float density = animalSpecies[s].MinDensity;
                 animalFloor[s] = density > 0f ? Math.Max(1, (int)Math.Round(density * columns / ColumnsPerDensityUnit)) : 0;
             }
@@ -122,11 +122,11 @@ namespace Eco.Sim
 
         private void StepAnimals()
         {
-            // Les animaux nés pendant ce pas n'agissent qu'au suivant.
+            // Animals born during this step only act from the next one.
             int count = animalCount;
             for (int i = 0; i < count; i++)
             {
-                // Copie de travail : une naissance peut agrandir le tableau.
+                // Working copy: a birth can grow the array.
                 Animal animal = animals[i];
                 if (animal.Age == DeadAge) continue;
 
@@ -139,7 +139,7 @@ namespace Eco.Sim
             Immigrate();
         }
 
-        // Fait vivre un animal pendant un pas. Renvoie faux s'il meurt.
+        // Runs one step of an animal's life. Returns false if it dies.
         private bool LiveAnimal(ref Animal animal)
         {
             AnimalSpecies kind = animalSpecies[animal.SpeciesIndex];
@@ -150,7 +150,7 @@ namespace Eco.Sim
             animal.Hunger += kind.HungerPerStep;
             if (animal.Hunger >= 1f) return false;
 
-            // Le sol a pu changer sous lui depuis le dernier pas.
+            // The ground may have changed under it since the last step.
             animal.Y = SurfaceAt(animal.X, animal.Z);
 
             bool busy = animal.Hunger > SeeksFoodAbove && SeekFood(ref animal, kind);
@@ -191,8 +191,8 @@ namespace Eco.Sim
             return true;
         }
 
-        // Va vers la nourriture la plus proche et la mange si elle est à portée. Renvoie faux s'il n'y en
-        // a pas en vue ou si le chemin est barré : l'animal erre alors au hasard.
+        // Moves toward the nearest food and eats it if within reach. Returns false if none is in
+        // sight or if the way is blocked: the animal then wanders at random.
         private bool SeekFood(ref Animal animal, AnimalSpecies kind)
         {
             if (!FindFood(animal, kind, out int foodX, out int foodZ, out bool isPrey)) return false;
@@ -202,7 +202,7 @@ namespace Eco.Sim
             int x = animal.X + stepX;
             int z = animal.Z + stepZ;
 
-            // Une proie occupe sa colonne : le prédateur s'arrête juste avant.
+            // A prey occupies its column: the predator stops just before it.
             if (isPrey && x == foodX && z == foodZ)
             {
                 x -= Math.Sign(stepX);
@@ -228,7 +228,7 @@ namespace Eco.Sim
             return true;
         }
 
-        // Cherche, de proche en proche autour de l'animal, la première colonne qui porte de quoi manger.
+        // Searches outward around the animal for the first column that holds something to eat.
         private bool FindFood(Animal animal, AnimalSpecies kind, out int foodX, out int foodZ, out bool isPrey)
         {
             for (int radius = 0; radius <= kind.SenseRange; radius++)
@@ -237,7 +237,7 @@ namespace Eco.Sim
                 {
                     for (int dx = -radius; dx <= radius; dx++)
                     {
-                        // Seulement le pourtour du carré : l'intérieur a été vu aux rayons précédents.
+                        // Only the outline of the square: the inside was covered by the previous radii.
                         if (Math.Max(Math.Abs(dx), Math.Abs(dz)) != radius) continue;
 
                         int x = animal.X + dx;
@@ -286,7 +286,7 @@ namespace Eco.Sim
             return other.Age != DeadAge && Array.IndexOf(kind.EatsAnimals, other.SpeciesIndex) >= 0;
         }
 
-        // Une plante broutée perd du feuillage mais survit : elle repousse si on lui en laisse le temps.
+        // A grazed plant loses foliage but survives: it grows back if given the time.
         private void Graze(int plantIndex)
         {
             Plant plant = plants[plantIndex];
@@ -325,7 +325,7 @@ namespace Eco.Sim
             }
         }
 
-        // Tant qu'une espèce est sous son effectif minimal, des individus arrivent par les bords de la carte.
+        // While a species is below its minimum population, individuals arrive from the map edges.
         private void Immigrate()
         {
             for (int s = 0; s < animalSpecies.Length; s++)
@@ -357,7 +357,7 @@ namespace Eco.Sim
             return surfaceCache[column] - 1;
         }
 
-        // Les identifiants doivent être ajoutés par ordre croissant : le tableau reste ainsi trié.
+        // Ids must be added in increasing order: this keeps the array sorted.
         private void AddAnimal(int id, int speciesIndex, int x, int y, int z, int age, float hunger)
         {
             if (animalCount == animals.Length) Array.Resize(ref animals, animals.Length * 2);
@@ -368,7 +368,7 @@ namespace Eco.Sim
             animalPopulation[speciesIndex]++;
         }
 
-        // Marque l'animal comme mort et libère sa colonne. Il est retiré du tableau par CompactAnimals.
+        // Marks the animal as dead and frees its column. CompactAnimals removes it from the array.
         private void Kill(int index)
         {
             Animal animal = animals[index];

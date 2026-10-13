@@ -7,14 +7,14 @@ namespace Voxel.Core
     {
         public BlockPos Block;
 
-        // Face touchée, vers l'extérieur du bloc. Nulle si le rayon part de l'intérieur d'un bloc.
+        // Face hit, pointing out of the block. Zero if the ray starts inside a block.
         public BlockPos Normal;
         public float Distance;
     }
 
     public static class VoxelRaycast
     {
-        // Parcours de grille bloc par bloc (Amanatides et Woo).
+        // Block-by-block grid traversal (Amanatides and Woo).
         public static bool Cast(World world, Vector3 origin, Vector3 direction, float maxDistance, out VoxelHit hit)
         {
             hit = default;

@@ -1,13 +1,13 @@
 namespace Voxel.Core
 {
-    // Un objet d'inventaire est désigné par un entier. Les blocs gardent leur numéro de type ; les
-    // autres objets occupent des plages réservées au-dessus.
+    // An inventory item is designated by an integer. Blocks keep their type number; other
+    // items use reserved ranges above.
     public static class Items
     {
         public const int None = 0;
         public const int Wood = 100;
 
-        // Une graine par espèce de plante : FirstSeed + rang de l'espèce.
+        // One seed per plant species: FirstSeed + index of the species.
         public const int MaxSeedSpecies = 100;
         private const int FirstSeed = 200;
 
@@ -25,26 +25,26 @@ namespace Voxel.Core
 
         public static bool IsValid(int item) => IsBlock(item) || item == Wood || IsSeed(item);
 
-        // Ce que rapporte un bloc cassé. L'herbe ne se ramasse pas : on récupère de la terre.
+        // What a broken block yields. Grass cannot be picked up: it gives dirt.
         public static int DropOf(ushort block)
         {
             ushort type = Blocks.TypeOf(block);
             return type == Blocks.Grass ? Blocks.Dirt : type;
         }
 
-        // Nom affiché. Une graine porte en plus le nom de son espèce, que seul l'écosystème connaît.
+        // Display name. A seed also carries the name of its species, which only the ecosystem knows.
         public static string NameOf(int item)
         {
             switch (item)
             {
-                case Blocks.Stone: return "Pierre";
-                case Blocks.Dirt: return "Terre";
-                case Blocks.Grass: return "Herbe";
-                case Blocks.Planks: return "Planches";
-                case Blocks.Bricks: return "Briques";
-                case Blocks.Timbered: return "Colombages";
-                case Wood: return "Bois";
-                default: return IsSeed(item) ? "Graine" : "Objet inconnu";
+                case Blocks.Stone: return "Stone";
+                case Blocks.Dirt: return "Dirt";
+                case Blocks.Grass: return "Grass";
+                case Blocks.Planks: return "Planks";
+                case Blocks.Bricks: return "Bricks";
+                case Blocks.Timbered: return "Timber frame";
+                case Wood: return "Wood";
+                default: return IsSeed(item) ? "Seed" : "Unknown item";
             }
         }
     }

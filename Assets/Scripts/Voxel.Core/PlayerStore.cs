@@ -5,12 +5,12 @@ using System.Text;
 
 namespace Voxel.Core
 {
-    // Ce que le serveur retient d'un joueur d'une partie à l'autre.
+    // What the server remembers of a player from one session to the next.
     public sealed class PlayerState
     {
         public Vector3 Position;
 
-        // Direction du regard autour de l'axe vertical, en degrés.
+        // Direction of the gaze around the vertical axis, in degrees.
         public float Yaw;
 
         public Speciality Speciality;
@@ -18,13 +18,13 @@ namespace Voxel.Core
         public Inventory Inventory { get; } = new Inventory();
     }
 
-    // L'état de chaque joueur connu du serveur, par identifiant de joueur.
+    // The state of every player known to the server, by player id.
     public sealed class PlayerStore
     {
-        private const uint Magic = 0x504F4345; // « ECOP »
+        private const uint Magic = 0x504F4345; // "ECOP"
         private const int FormatVersion = 2;
 
-        // Dernier format sans spécialité ni inventaire. Il se lit encore : le joueur garde sa position.
+        // Last format without speciality or inventory. It still loads: the player keeps their position.
         private const int FormatWithoutInventory = 1;
 
         private readonly Dictionary<string, PlayerState> players = new Dictionary<string, PlayerState>();
@@ -35,7 +35,7 @@ namespace Voxel.Core
 
         public void Set(string playerId, PlayerState state) => players[playerId] = state;
 
-        // L'état du joueur, créé vide s'il n'était pas encore connu.
+        // The player's state, created empty if they were not known yet.
         public PlayerState GetOrAdd(string playerId)
         {
             if (!players.TryGetValue(playerId, out PlayerState state))
@@ -68,21 +68,21 @@ namespace Voxel.Core
             }
         }
 
-        // Lève InvalidDataException si le fichier n'est pas valide, EndOfStreamException s'il est tronqué.
+        // Throws InvalidDataException if the file is not valid, EndOfStreamException if it is truncated.
         public static PlayerStore Read(Stream stream)
         {
             using (var reader = new BinaryReader(stream, Encoding.UTF8, true))
             {
                 if (reader.ReadUInt32() != Magic)
                 {
-                    throw new InvalidDataException("Ce fichier n'est pas une sauvegarde de joueurs.");
+                    throw new InvalidDataException("This file is not a player save.");
                 }
 
                 int formatVersion = reader.ReadInt32();
                 if (formatVersion != FormatVersion && formatVersion != FormatWithoutInventory)
                 {
                     throw new InvalidDataException(
-                        $"Format de sauvegarde des joueurs {formatVersion} non pris en charge (attendu : {FormatVersion}).");
+                        $"Unsupported player save format {formatVersion} (expected: {FormatVersion}).");
                 }
 
                 var store = new PlayerStore();
@@ -101,7 +101,7 @@ namespace Voxel.Core
                         var speciality = (Speciality)reader.ReadByte();
                         if (speciality != Speciality.None && !Specialities.IsChoice(speciality))
                         {
-                            throw new InvalidDataException($"Spécialité inconnue pour le joueur {playerId}.");
+                            throw new InvalidDataException($"Unknown speciality for player {playerId}.");
                         }
 
                         state.Speciality = speciality;

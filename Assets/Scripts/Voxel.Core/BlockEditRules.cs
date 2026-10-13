@@ -3,18 +3,18 @@ using System.Numerics;
 
 namespace Voxel.Core
 {
-    // Règles qu'une modification de bloc demandée par un joueur doit respecter. Le serveur les applique
-    // à chaque demande ; elles ne dépendent que du monde et de la position des yeux du joueur.
+    // Rules a block edit requested by a player must follow. The server applies them to every
+    // request; they only depend on the world and on the position of the player's eyes.
     public static class BlockEditRules
     {
-        // La position d'un joueur connue du serveur a un peu de retard sur celle du joueur lui-même.
+        // A player's position as known by the server lags a little behind the player's own.
         public const float ReachTolerance = 1.5f;
 
         public static bool IsAllowed(World world, Vector3 eyePosition, BlockPos pos, ushort block)
         {
             if (!world.InBounds(pos.X, pos.Y, pos.Z) || !Blocks.IsValid(block)) return false;
 
-            // Poser exige une case vide, casser exige un bloc : on ne remplace pas un bloc par un autre.
+            // Placing requires an empty cell, breaking requires a block: a block is never replaced by another.
             bool placing = Blocks.IsSolid(block);
             bool occupied = Blocks.IsSolid(world.GetBlock(pos));
             if (placing == occupied) return false;

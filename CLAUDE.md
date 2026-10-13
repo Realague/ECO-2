@@ -108,6 +108,8 @@ Check that scripts compile headless (exit code is non-zero on compile errors):
 
 ## Conventions that are easy to get wrong
 
+- **Language**: everything in the code is English — comments, log and exception messages, inspector headers and tooltips, and the text shown to players. The species assets are the exception: they are still named `Arbre`, `Buisson`, `Lapin` and `Renard`, and a seed is displayed with its asset name. Renaming them makes existing `ecosystem.dat` files fail to load (the save records species names).
+
 - **Input**: active input handling is the new Input System only (`activeInputHandler: 1`). `UnityEngine.Input` (`Input.GetKey`, `Input.GetAxis`) throws at runtime; use `UnityEngine.InputSystem`.
 - **Keyboard layout**: the target layout is AZERTY (ZQSD movement). Input System `Key` values are physical positions named after the QWERTY layout, so `Keyboard.current.wKey/aKey/sKey/dKey` is ZQSD on AZERTY. Do not use `zKey`/`qKey` for movement.
 - `Assets/InputSystem_Actions.inputactions` is registered as the project-wide actions asset, but `PlayerController` currently polls `Keyboard.current` / `Mouse.current` directly and does not use it.

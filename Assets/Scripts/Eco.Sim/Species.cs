@@ -1,32 +1,32 @@
 namespace Eco.Sim
 {
-    // Règles d'une espèce de plante. Les durées sont en pas de simulation.
+    // Rules of a plant species. Durations are in simulation steps.
     public sealed class Species
     {
         public string Name { get; set; }
 
-        // Pas nécessaires pour atteindre la taille adulte sur un sol de fertilité 1.
+        // Steps needed to reach adult size on soil of fertility 1.
         public int MaturitySteps { get; set; }
 
         public int LifespanSteps { get; set; }
 
-        // Probabilité, à chaque pas, qu'une plante adulte tente de semer.
+        // Chance, at each step, that an adult plant tries to sow.
         public float SeedChance { get; set; }
 
-        // Distance maximale, en blocs, à laquelle une graine tombe.
+        // Maximum distance, in blocks, at which a seed lands.
         public int SeedRange { get; set; }
 
-        // Une graine ne germe pas à moins de cette distance d'une plante de la même espèce (1 = aucune contrainte).
-        // Dans tous les cas, une colonne de blocs ne porte qu'une seule plante.
+        // A seed does not sprout within this distance of a plant of the same species (1 = no constraint).
+        // In any case, a block column holds a single plant.
         public int Spacing { get; set; }
 
-        // En dessous de cette fertilité, la graine ne germe pas et la plante dépérit.
+        // Below this fertility, the seed does not sprout and the plant withers.
         public float MinFertility { get; set; }
 
-        // Fertilité prélevée à chaque pas par une plante adulte.
+        // Fertility drawn at each step by an adult plant.
         public float FertilityUse { get; set; }
 
-        // Dimensions adultes, en blocs : elles servent à viser la plante.
+        // Adult size, in blocks: used to aim at the plant.
         public float Height { get; set; }
         public float Width { get; set; }
     }

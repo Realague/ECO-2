@@ -3,11 +3,11 @@ using System.Text;
 
 namespace Voxel.Core
 {
-    // Sauvegarde d'un monde : un en-tête (graine, version du générateur, dimensions) suivi des seuls
-    // chunks modifiés. Les chunks intacts sont régénérés au chargement.
+    // Save of a world: a header (seed, generator version, dimensions) followed by the modified
+    // chunks only. Untouched chunks are regenerated on load.
     public static class WorldSave
     {
-        private const uint Magic = 0x574F4345; // « ECOW »
+        private const uint Magic = 0x574F4345; // "ECOW"
         private const int FormatVersion = 1;
 
         public static void Write(Stream stream, World world)
@@ -41,22 +41,22 @@ namespace Voxel.Core
             }
         }
 
-        // Lève InvalidDataException si le fichier n'est pas une sauvegarde valide pour ce générateur,
-        // et EndOfStreamException s'il est tronqué.
+        // Throws InvalidDataException if the file is not a valid save for this generator,
+        // and EndOfStreamException if it is truncated.
         public static World Read(Stream stream, IChunkGenerator generator)
         {
             using (var reader = new BinaryReader(stream, Encoding.UTF8, true))
             {
                 if (reader.ReadUInt32() != Magic)
                 {
-                    throw new InvalidDataException("Ce fichier n'est pas une sauvegarde de monde.");
+                    throw new InvalidDataException("This file is not a world save.");
                 }
 
                 int formatVersion = reader.ReadInt32();
                 if (formatVersion != FormatVersion)
                 {
                     throw new InvalidDataException(
-                        $"Format de sauvegarde {formatVersion} non pris en charge (attendu : {FormatVersion}).");
+                        $"Unsupported save format {formatVersion} (expected: {FormatVersion}).");
                 }
 
                 int seed = reader.ReadInt32();
@@ -64,7 +64,7 @@ namespace Voxel.Core
                 if (generatorVersion != generator.Version)
                 {
                     throw new InvalidDataException(
-                        $"Sauvegarde créée avec la version {generatorVersion} du générateur, incompatible avec la version {generator.Version}.");
+                        $"Save created with generator version {generatorVersion}, incompatible with version {generator.Version}.");
                 }
 
                 int chunksX = reader.ReadInt32();
@@ -72,7 +72,7 @@ namespace Voxel.Core
                 int chunksZ = reader.ReadInt32();
                 if (chunksX <= 0 || chunksY <= 0 || chunksZ <= 0)
                 {
-                    throw new InvalidDataException("Dimensions du monde invalides dans la sauvegarde.");
+                    throw new InvalidDataException("Invalid world dimensions in the save.");
                 }
 
                 var world = new World(chunksX, chunksY, chunksZ);
@@ -85,7 +85,7 @@ namespace Voxel.Core
                     Chunk chunk = world.GetChunk(coord);
                     if (chunk == null)
                     {
-                        throw new InvalidDataException($"La sauvegarde contient un chunk hors du monde : {coord}.");
+                        throw new InvalidDataException($"The save contains a chunk outside the world: {coord}.");
                     }
 
                     ChunkSerializer.Read(reader, chunk);

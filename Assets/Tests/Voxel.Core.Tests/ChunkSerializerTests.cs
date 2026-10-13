@@ -29,7 +29,7 @@ namespace Voxel.Core.Tests
                 {
                     for (int x = 0; x < Chunk.Size; x++)
                     {
-                        Assert.AreEqual(original.Get(x, y, z), copy.Get(x, y, z), $"Bloc ({x}, {y}, {z})");
+                        Assert.AreEqual(original.Get(x, y, z), copy.Get(x, y, z), $"Block ({x}, {y}, {z})");
                     }
                 }
             }

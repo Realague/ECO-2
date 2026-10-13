@@ -5,14 +5,14 @@ using Voxel.Core;
 
 namespace Eco.Sim
 {
-    // Sauvegarde de l'écosystème : tout ce qu'il faut pour que la simulation reprenne exactement où
-    // elle s'était arrêtée, y compris l'état du générateur aléatoire.
+    // Ecosystem save: everything needed for the simulation to resume exactly where it stopped,
+    // including the state of the random generator.
     public sealed partial class Ecosystem
     {
-        private const uint Magic = 0x454F4345; // « ECOE »
+        private const uint Magic = 0x454F4345; // "ECOE"
         private const int FormatVersion = 3;
 
-        // Dernier format sans animaux. Il se lit encore : les animaux arrivent alors par les bords de la carte.
+        // Last format without animals. It still loads: animals then arrive from the map edges.
         private const int FormatWithoutAnimals = 2;
 
         public void Write(Stream stream)
@@ -22,15 +22,15 @@ namespace Eco.Sim
                 writer.Write(Magic);
                 writer.Write(FormatVersion);
 
-                // Les plantes désignent leur espèce par son rang : la liste doit être la même au chargement.
+                // Plants refer to their species by index: the list must be the same when loading.
                 writer.Write(species.Length);
                 foreach (Species kind in species)
                 {
                     writer.Write(kind.Name);
                 }
 
-                // Les plantes sont posées sur un terrain précis : celui de ce monde, de cette graine et de
-                // cette version du générateur.
+                // Plants stand on one specific terrain: that of this world, this seed and this generator
+                // version.
                 writer.Write(world.SizeX);
                 writer.Write(world.SizeZ);
                 writer.Write(world.Seed);
@@ -85,28 +85,28 @@ namespace Eco.Sim
             return Read(stream, world, species, System.Array.Empty<AnimalSpecies>());
         }
 
-        // Lève InvalidDataException si le fichier ne correspond pas à ce monde ou à ces espèces, et
-        // EndOfStreamException s'il est tronqué.
+        // Throws InvalidDataException if the file does not match this world or these species, and
+        // EndOfStreamException if it is truncated.
         public static Ecosystem Read(Stream stream, World world, IReadOnlyList<Species> species, IReadOnlyList<AnimalSpecies> animalSpecies)
         {
             using (var reader = new BinaryReader(stream, Encoding.UTF8, true))
             {
                 if (reader.ReadUInt32() != Magic)
                 {
-                    throw new InvalidDataException("Ce fichier n'est pas une sauvegarde d'écosystème.");
+                    throw new InvalidDataException("This file is not an ecosystem save.");
                 }
 
                 int formatVersion = reader.ReadInt32();
                 if (formatVersion != FormatVersion && formatVersion != FormatWithoutAnimals)
                 {
                     throw new InvalidDataException(
-                        $"Format de sauvegarde d'écosystème {formatVersion} non pris en charge (attendu : {FormatVersion}).");
+                        $"Unsupported ecosystem save format {formatVersion} (expected: {FormatVersion}).");
                 }
 
                 int speciesCount = reader.ReadInt32();
                 if (speciesCount != species.Count)
                 {
-                    throw new InvalidDataException("La liste des espèces a changé depuis cette sauvegarde.");
+                    throw new InvalidDataException("The species list has changed since this save.");
                 }
 
                 for (int i = 0; i < speciesCount; i++)
@@ -115,18 +115,18 @@ namespace Eco.Sim
                     if (name != species[i].Name)
                     {
                         throw new InvalidDataException(
-                            $"La liste des espèces a changé depuis cette sauvegarde : « {name} » au lieu de « {species[i].Name} ».");
+                            $"The species list has changed since this save: '{name}' instead of '{species[i].Name}'.");
                     }
                 }
 
                 if (reader.ReadInt32() != world.SizeX || reader.ReadInt32() != world.SizeZ)
                 {
-                    throw new InvalidDataException("La sauvegarde d'écosystème ne correspond pas aux dimensions du monde.");
+                    throw new InvalidDataException("The ecosystem save does not match the world's dimensions.");
                 }
 
                 if (reader.ReadInt32() != world.Seed || reader.ReadInt32() != world.GeneratorVersion)
                 {
-                    throw new InvalidDataException("La sauvegarde d'écosystème a été faite sur un autre terrain que celui de ce monde.");
+                    throw new InvalidDataException("The ecosystem save was made on a different terrain than this world's.");
                 }
 
                 var ecosystem = new Ecosystem(world, species, animalSpecies, 0);
@@ -155,14 +155,14 @@ namespace Eco.Sim
                         Growth = reader.ReadSingle()
                     };
 
-                    // Les plantes sont enregistrées par identifiant croissant, ordre que le reste du code suppose.
+                    // Plants are stored by increasing id, an order the rest of the code relies on.
                     bool valid = (uint)plant.SpeciesIndex < (uint)species.Count
                         && (uint)plant.X < (uint)world.SizeX
                         && (uint)plant.Z < (uint)world.SizeZ
                         && plant.Id > previousId;
                     if (!valid)
                     {
-                        throw new InvalidDataException($"Plante invalide dans la sauvegarde d'écosystème (numéro {plant.Id}).");
+                        throw new InvalidDataException($"Invalid plant in the ecosystem save (id {plant.Id}).");
                     }
 
                     previousId = plant.Id;
@@ -193,7 +193,7 @@ namespace Eco.Sim
             int speciesCount = reader.ReadInt32();
             if (speciesCount != animalSpecies.Length)
             {
-                throw new InvalidDataException("La liste des espèces animales a changé depuis cette sauvegarde.");
+                throw new InvalidDataException("The animal species list has changed since this save.");
             }
 
             for (int i = 0; i < speciesCount; i++)
@@ -202,7 +202,7 @@ namespace Eco.Sim
                 if (name != animalSpecies[i].Name)
                 {
                     throw new InvalidDataException(
-                        $"La liste des espèces animales a changé depuis cette sauvegarde : « {name} » au lieu de « {animalSpecies[i].Name} ».");
+                        $"The animal species list has changed since this save: '{name}' instead of '{animalSpecies[i].Name}'.");
                 }
             }
 
@@ -227,7 +227,7 @@ namespace Eco.Sim
                     && animalAtColumn[ColumnIndex(x, z)] == 0;
                 if (!valid)
                 {
-                    throw new InvalidDataException($"Animal invalide dans la sauvegarde d'écosystème (numéro {id}).");
+                    throw new InvalidDataException($"Invalid animal in the ecosystem save (id {id}).");
                 }
 
                 previousId = id;

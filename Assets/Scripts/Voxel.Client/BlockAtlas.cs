@@ -3,7 +3,7 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // Atlas provisoire généré au lancement : une tuile par apparence de bloc, dessinée par quelques règles simples.
+    // Placeholder atlas generated at startup: one tile per block appearance, drawn by a few simple rules.
     internal static class BlockAtlas
     {
         public const int TileCount = 7;
@@ -101,7 +101,7 @@ namespace Voxel.Client
             }
         }
 
-        // Des rangées de briques décalées d'une demi-brique une rangée sur deux.
+        // Rows of bricks, shifted by half a brick every other row.
         private static bool IsMortar(int x, int y)
         {
             if (y % BrickHeight == 0) return true;
@@ -110,7 +110,7 @@ namespace Voxel.Client
             return (x + offset) % BrickLength == 0;
         }
 
-        // Un cadre de poutres et une diagonale sur un fond d'enduit.
+        // A frame of beams and a diagonal on a plaster background.
         private static bool IsBeam(int x, int y)
         {
             bool frame = x == 0 || y == 0 || x == TileSize - 1 || y == TileSize - 1;

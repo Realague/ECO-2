@@ -2,8 +2,8 @@ using System.Collections.Generic;
 
 namespace Voxel.Core
 {
-    // Un joueur n'a qu'une spécialité, choisie une fois pour toutes : c'est ce qui rend les joueurs
-    // utiles les uns aux autres.
+    // A player has a single speciality, chosen once and for all: this is what makes players
+    // useful to one another.
     public enum Speciality : byte
     {
         None = 0,
@@ -23,10 +23,10 @@ namespace Voxel.Core
         {
             switch (speciality)
             {
-                case Speciality.Carpenter: return "Menuisier";
-                case Speciality.Mason: return "Maçon";
-                case Speciality.Gardener: return "Jardinier";
-                default: return "Aucune";
+                case Speciality.Carpenter: return "Carpenter";
+                case Speciality.Mason: return "Mason";
+                case Speciality.Gardener: return "Gardener";
+                default: return "None";
             }
         }
 
@@ -34,9 +34,9 @@ namespace Voxel.Core
         {
             switch (speciality)
             {
-                case Speciality.Carpenter: return "transforme le bois en planches";
-                case Speciality.Mason: return "transforme la pierre en briques";
-                case Speciality.Gardener: return "replante les graines d'arbres et de buissons";
+                case Speciality.Carpenter: return "turns wood into planks";
+                case Speciality.Mason: return "turns stone into bricks";
+                case Speciality.Gardener: return "replants the seeds of trees and bushes";
                 default: return "";
             }
         }
@@ -52,7 +52,7 @@ namespace Voxel.Core
             Inputs = inputs;
         }
 
-        // Speciality.None : tout le monde peut fabriquer.
+        // Speciality.None: anyone can craft it.
         public Speciality Requires { get; }
         public int Output { get; }
         public int OutputCount { get; }
@@ -61,8 +61,8 @@ namespace Voxel.Core
 
     public static class Recipes
     {
-        // Les colombages demandent des planches et des briques : aucun joueur ne peut produire les deux,
-        // il faut donc s'entendre avec quelqu'un d'une autre spécialité.
+        // Timbered blocks need planks and bricks: no player can produce both,
+        // so one has to come to terms with someone of another speciality.
         public static readonly IReadOnlyList<Recipe> All = new[]
         {
             new Recipe(Speciality.Carpenter, Blocks.Planks, 2, (Items.Wood, 1)),
@@ -83,8 +83,8 @@ namespace Voxel.Core
             return true;
         }
 
-        // Fabrique une fois la recette : retire les ingrédients et ajoute le produit. Renvoie faux,
-        // sans rien changer, si la recette n'existe pas, si la spécialité manque ou s'il manque un ingrédient.
+        // Crafts the recipe once: removes the inputs and adds the output. Returns false, changing
+        // nothing, if the recipe does not exist, if the speciality is missing or if an input is missing.
         public static bool TryCraft(Inventory inventory, Speciality speciality, int recipeIndex)
         {
             if (recipeIndex < 0 || recipeIndex >= All.Count) return false;

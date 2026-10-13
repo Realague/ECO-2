@@ -5,9 +5,9 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // L'inventaire et la spécialité des joueurs. Le serveur les détient (dans l'état sauvegardé de chaque
-    // joueur) et décide de tout : fabriquer, choisir une spécialité, donner, planter. Chaque client ne
-    // connaît que son propre inventaire, que le serveur lui renvoie à chaque changement.
+    // Players' inventory and speciality. The server holds them (in each player's saved state) and
+    // decides everything: crafting, choosing a speciality, giving, planting. Each client only
+    // knows its own inventory, which the server sends back at every change.
     public class InventorySync : MonoBehaviour
     {
         private const string StateMessage = "Inv.State";
@@ -19,20 +19,20 @@ namespace Voxel.Client
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private EcosystemSync ecosystemSync;
 
-        // Copie locale de l'inventaire du joueur de cette machine, quand elle n'est pas le serveur.
+        // Local copy of the inventory of this machine's player, when it is not the server.
         private readonly Inventory received = new Inventory();
         private Speciality receivedSpeciality;
         private PlayerRegistry registry;
         private bool running;
 
-        // Inventaire et spécialité du joueur local. Sur l'hôte, ce sont directement ceux du serveur.
+        // Inventory and speciality of the local player. On the host, they are the server's own.
         public Inventory Inventory => TryGetLocalState(out PlayerState state) ? state.Inventory : received;
 
         public Speciality Speciality => TryGetLocalState(out PlayerState state) ? state.Speciality : receivedSpeciality;
 
         private CustomMessagingManager Messaging => networkManager.CustomMessagingManager;
 
-        // À appeler juste après le démarrage du serveur ou de l'hôte.
+        // To call right after the server or host has started.
         internal void StartServer(PlayerRegistry playerRegistry)
         {
             running = true;
@@ -44,7 +44,7 @@ namespace Voxel.Client
             networkManager.OnClientConnectedCallback += Publish;
         }
 
-        // À appeler juste après le lancement de la connexion d'un client.
+        // To call right after a client's connection has been launched.
         public void StartClient()
         {
             running = true;
@@ -63,7 +63,7 @@ namespace Voxel.Client
             running = false;
         }
 
-        // Côté serveur : retire des objets à un joueur. Renvoie faux, sans rien changer, s'il n'en a pas assez.
+        // Server side: takes items from a player. Returns false, changing nothing, if they do not have enough.
         public bool TryConsume(ulong clientId, int item, int count = 1)
         {
             if (registry == null || !registry.TryGetState(clientId, out PlayerState state)) return false;
@@ -73,7 +73,7 @@ namespace Voxel.Client
             return true;
         }
 
-        // Côté serveur : ajoute des objets à un joueur.
+        // Server side: gives items to a player.
         public void Give(ulong clientId, int item, int count)
         {
             if (item == Items.None || count <= 0) return;
@@ -99,7 +99,7 @@ namespace Voxel.Client
             else Send(SpecialityMessage, (int)speciality);
         }
 
-        // Donne des objets au joueur le plus proche, s'il est à portée.
+        // Gives items to the nearest player, if within reach.
         public void RequestGive(int item, int count)
         {
             if (!running) return;
@@ -108,7 +108,7 @@ namespace Voxel.Client
             else Send(GiveMessage, item, count);
         }
 
-        // Plante une graine dans la colonne de blocs donnée. Réservé aux jardiniers.
+        // Plants a seed in the given block column. Gardeners only.
         public void RequestPlant(int seed, int x, int z)
         {
             if (!running) return;
@@ -130,7 +130,7 @@ namespace Voxel.Client
             if (Recipes.TryCraft(state.Inventory, state.Speciality, recipeIndex)) Publish(clientId);
         }
 
-        // Une spécialité se choisit une seule fois.
+        // A speciality is chosen only once.
         private void Choose(ulong clientId, Speciality speciality)
         {
             if (!registry.TryGetState(clientId, out PlayerState state)) return;
@@ -175,7 +175,7 @@ namespace Voxel.Client
             if (!registry.TryGetState(clientId, out PlayerState state)) return;
             if (state.Speciality != Speciality.Gardener || !Items.IsSeed(seed) || !state.Inventory.Has(seed)) return;
 
-            // La graine n'est dépensée que si elle a réellement germé.
+            // The seed is only spent if it actually sprouted.
             if (ecosystemSync.TryPlantSeed(clientId, Items.SeedSpecies(seed), x, z)) TryConsume(clientId, seed);
         }
 
@@ -206,7 +206,7 @@ namespace Voxel.Client
             Plant(senderId, seed, x, z);
         }
 
-        // Envoie à un joueur son inventaire et sa spécialité. L'hôte lit les siens directement.
+        // Sends a player their inventory and speciality. The host reads its own directly.
         private void Publish(ulong clientId)
         {
             if (clientId == networkManager.LocalClientId) return;

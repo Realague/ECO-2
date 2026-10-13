@@ -3,10 +3,10 @@ using System.IO;
 
 namespace Voxel.Core
 {
-    // Les objets que possède un joueur : une quantité par type d'objet, sans limite de place.
+    // The items a player owns: a count per item type, with no capacity limit.
     public sealed class Inventory
     {
-        // Trié par numéro d'objet : l'ordre d'affichage ne change pas quand les quantités changent.
+        // Sorted by item number: the display order does not change when counts change.
         private readonly SortedDictionary<int, int> counts = new SortedDictionary<int, int>();
 
         public int DistinctCount => counts.Count;
@@ -24,7 +24,7 @@ namespace Voxel.Core
             counts[item] = Count(item) + count;
         }
 
-        // Retire la quantité demandée, ou rien du tout si le joueur n'en a pas assez.
+        // Removes the requested count, or nothing at all if the player does not have enough.
         public bool TryRemove(int item, int count = 1)
         {
             if (count <= 0 || !Has(item, count)) return false;
@@ -46,8 +46,8 @@ namespace Voxel.Core
             }
         }
 
-        // Fait passer des objets d'un inventaire à un autre. Renvoie faux, sans rien changer, si le
-        // premier n'en a pas assez.
+        // Moves items from one inventory to another. Returns false, changing nothing, if the
+        // first does not have enough.
         public static bool Transfer(Inventory from, Inventory to, int item, int count)
         {
             if (!from.TryRemove(item, count)) return false;
@@ -66,7 +66,7 @@ namespace Voxel.Core
             }
         }
 
-        // Les données peuvent venir d'un fichier abîmé : tout objet inconnu ou quantité invalide est refusé.
+        // The data may come from a damaged file: any unknown item or invalid count is refused.
         public void Read(BinaryReader reader)
         {
             counts.Clear();
@@ -77,7 +77,7 @@ namespace Voxel.Core
                 int count = reader.ReadInt32();
                 if (!Items.IsValid(item) || count <= 0 || counts.ContainsKey(item))
                 {
-                    throw new InvalidDataException($"Inventaire invalide : objet {item}, quantité {count}.");
+                    throw new InvalidDataException($"Invalid inventory: item {item}, count {count}.");
                 }
 
                 counts.Add(item, count);

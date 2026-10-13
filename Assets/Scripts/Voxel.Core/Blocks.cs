@@ -1,6 +1,6 @@
 namespace Voxel.Core
 {
-    // Un bloc tient sur deux octets : 12 bits de type (poids faibles), 4 bits d'orientation.
+    // A block fits in two bytes: 12 bits of type (low bits), 4 bits of orientation.
     public static class Blocks
     {
         public const int TypeBits = 12;
@@ -11,7 +11,7 @@ namespace Voxel.Core
         public const ushort Dirt = 2;
         public const ushort Grass = 3;
 
-        // Blocs de construction : ils n'existent pas dans le terrain, les joueurs les fabriquent.
+        // Building blocks: they do not exist in the terrain, players craft them.
         public const ushort Planks = 4;
         public const ushort Bricks = 5;
         public const ushort Timbered = 6;
@@ -27,7 +27,7 @@ namespace Voxel.Core
 
         public static bool IsSolid(ushort block) => TypeOf(block) != Air;
 
-        // Un bloc reçu du réseau n'est accepté que si son type existe. Aucun type n'est encore orientable.
+        // A block received from the network is only accepted if its type exists. No type can be oriented yet.
         public static bool IsValid(ushort block) => TypeOf(block) <= LastType && OrientationOf(block) == 0;
     }
 }

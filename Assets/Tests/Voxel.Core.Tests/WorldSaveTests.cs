@@ -152,7 +152,7 @@ namespace Voxel.Core.Tests
                 {
                     for (int x = 0; x < expected.SizeX; x++)
                     {
-                        Assert.AreEqual(expected.GetBlock(x, y, z), actual.GetBlock(x, y, z), $"Bloc ({x}, {y}, {z})");
+                        Assert.AreEqual(expected.GetBlock(x, y, z), actual.GetBlock(x, y, z), $"Block ({x}, {y}, {z})");
                     }
                 }
             }

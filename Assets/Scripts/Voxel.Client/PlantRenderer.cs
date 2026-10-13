@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Voxel.Client
 {
-    // Ce qu'une machine sait d'une plante pour l'afficher et la viser.
+    // What a machine knows about a plant to display it and aim at it.
     internal struct PlantView
     {
         public int SpeciesIndex;
@@ -15,15 +15,15 @@ namespace Voxel.Client
         public int Stage;
     }
 
-    // Dessine les plantes par lots (instanciation GPU), sans créer un objet par plante. Les plantes sont
-    // rangées par région du monde : seules les régions proches de la caméra sont préparées et dessinées,
-    // ce qui garde un coût constant quelle que soit la taille du monde.
+    // Draws plants in batches (GPU instancing), without creating one object per plant. Plants are
+    // grouped by world region: only the regions near the camera are prepared and drawn,
+    // which keeps the cost constant whatever the size of the world.
     internal sealed class PlantRenderer
     {
         private const int RegionSize = 32;
         private const int MaxInstancesPerCall = 1023;
 
-        // Marge autour d'une région pour le feuillage qui dépasse, et hauteur couverte au-dessus du sol le plus bas.
+        // Margin around a region for foliage that sticks out, and height covered above the lowest ground.
         private const float RegionMargin = 4f;
         private const float RegionHeight = 512f;
 
@@ -50,7 +50,7 @@ namespace Voxel.Client
             }
         }
 
-        // Ajoute une plante ou met à jour son palier de croissance. Une plante ne change jamais de place.
+        // Adds a plant or updates its growth stage. A plant never changes place.
         public void Set(int plantId, PlantView plant)
         {
             long key = KeyOf(plant.X / RegionSize, plant.Z / RegionSize);
@@ -76,7 +76,7 @@ namespace Voxel.Client
             regions.Clear();
         }
 
-        // À appeler à chaque image. Les plantes au-delà de viewDistance ne sont pas dessinées.
+        // To call every frame. Plants beyond viewDistance are not drawn.
         public void Render(Vector3 cameraPosition, float viewDistance)
         {
             int minX = Mathf.FloorToInt((cameraPosition.x - viewDistance) / RegionSize);
@@ -104,7 +104,7 @@ namespace Voxel.Client
                 IReadOnlyList<SpeciesAsset.Part> parts = species[s].Parts;
                 for (int p = 0; p < parts.Count; p++)
                 {
-                    // Chaque lot porte la boîte de sa région : Unity écarte lui-même ceux hors du champ de vision.
+                    // Each batch carries the box of its region: Unity itself culls those out of view.
                     RenderParams parameters = renderParams[s][p];
                     parameters.worldBounds = region.Bounds;
 
@@ -123,7 +123,7 @@ namespace Voxel.Client
         {
             public readonly Dictionary<int, PlantView> Plants = new Dictionary<int, PlantView>();
 
-            // Par espèce puis par partie : les matrices des plantes de la région, recalculées quand Dirty est vrai.
+            // By species then by part: the matrices of the region's plants, recomputed when Dirty is true.
             public readonly Matrix4x4[][][] Matrices;
             public readonly int[] Counts;
             public readonly Bounds Bounds;
@@ -152,7 +152,7 @@ namespace Voxel.Client
                 }
             }
 
-            // Distance horizontale entre un point et le rectangle de la région.
+            // Horizontal distance between a point and the region's rectangle.
             public float DistanceSquaredTo(Vector3 point)
             {
                 float dx = Mathf.Max(0f, Mathf.Max(minX - point.x, point.x - (minX + RegionSize)));

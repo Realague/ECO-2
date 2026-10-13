@@ -29,8 +29,8 @@ namespace Eco.Sim.Tests
             var origin = new Vector3(5f, 10f, 20.5f);
 
             Assert.AreEqual(5f, PlantShape.RayDistance(origin, Vector3.UnitX, min, max), Tolerance);
-            Assert.That(PlantShape.RayDistance(origin, -Vector3.UnitX, min, max), Is.LessThan(0f), "boîte derrière");
-            Assert.That(PlantShape.RayDistance(origin, Vector3.UnitY, min, max), Is.LessThan(0f), "rayon parallèle, à côté");
+            Assert.That(PlantShape.RayDistance(origin, -Vector3.UnitX, min, max), Is.LessThan(0f), "box behind");
+            Assert.That(PlantShape.RayDistance(origin, Vector3.UnitY, min, max), Is.LessThan(0f), "parallel ray, beside it");
             Assert.AreEqual(0f, PlantShape.RayDistance(new Vector3(10.5f, 9f, 20.5f), Vector3.UnitZ, min, max), Tolerance);
         }
 

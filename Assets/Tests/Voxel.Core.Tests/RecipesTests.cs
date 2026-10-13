@@ -69,7 +69,7 @@ namespace Voxel.Core.Tests
             Assert.AreEqual(3, inventory.Count(Items.Wood));
         }
 
-        // Le cœur de la spécialisation : les colombages demandent le travail de deux joueurs différents.
+        // The heart of specialisation: timbered blocks need the work of two different players.
         [Test]
         public void Timbered_NeedsTheWorkOfTwoSpecialities()
         {
@@ -99,7 +99,7 @@ namespace Voxel.Core.Tests
                 bool planks = Recipes.HasSkill(Recipes.All[PlanksRecipe], speciality);
                 bool bricks = Recipes.HasSkill(Recipes.All[BricksRecipe], speciality);
 
-                Assert.IsFalse(planks && bricks, $"{speciality} fabrique les planches et les briques.");
+                Assert.IsFalse(planks && bricks, $"{speciality} makes both planks and bricks.");
             }
         }
 

@@ -5,9 +5,9 @@ using UnityEngine.Rendering;
 
 namespace Voxel.Client
 {
-    // Les animaux proches du joueur local, tels que le serveur les décrit, et leur affichage. Le serveur
-    // envoie de temps en temps la liste complète des animaux alentour : entre deux listes, chaque animal
-    // glisse de son ancienne position vers la nouvelle.
+    // Animals near the local player, as the server describes them, and their display. From time to
+    // time the server sends the full list of nearby animals: between two lists, each animal
+    // glides from its old position to the new one.
     internal sealed class AnimalViews
     {
         private const int MaxInstancesPerCall = 1023;
@@ -16,13 +16,13 @@ namespace Voxel.Client
         private readonly IReadOnlyList<AnimalSpecies> species;
         private readonly Dictionary<int, View> views = new Dictionary<int, View>();
         private readonly List<int> gone = new List<int>();
-        // Par espèce puis par partie : les matrices des animaux affichés, recalculées à chaque image.
+        // By species then by part: the matrices of the displayed animals, recomputed every frame.
         private readonly Matrix4x4[][][] matrices;
         private readonly int[] counts;
         private readonly RenderParams[][] renderParams;
         private int stamp;
 
-        // Les animaux ne sont pas dessinés sans affichage : assets est alors nul.
+        // Animals are not drawn without a display: assets is then null.
         public AnimalViews(AnimalSpeciesAsset[] assets, IReadOnlyList<AnimalSpecies> species, bool rendering)
         {
             this.species = species;
@@ -53,7 +53,7 @@ namespace Voxel.Client
 
         public int Count => views.Count;
 
-        // Début d'une nouvelle liste : les animaux qui n'y figureront pas seront retirés par EndList.
+        // Start of a new list: animals that do not appear in it will be removed by EndList.
         public void BeginList()
         {
             stamp++;
@@ -111,7 +111,7 @@ namespace Voxel.Client
             views.Clear();
         }
 
-        // Cherche l'animal le plus proche le long du rayon, à au plus maxDistance. La direction doit être normalisée.
+        // Finds the nearest animal along the ray, at most maxDistance away. The direction must be normalized.
         public bool TryPick(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance, out int animalId, out float distance)
         {
             animalId = 0;
@@ -138,7 +138,7 @@ namespace Voxel.Client
             return found;
         }
 
-        // À appeler à chaque image.
+        // To call every frame.
         public void Render()
         {
             if (assets == null || views.Count == 0) return;

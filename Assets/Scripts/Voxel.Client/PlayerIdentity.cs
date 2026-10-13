@@ -5,12 +5,12 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // Identifiant stable de ce joueur, créé au premier lancement et relu ensuite. Le serveur s'en sert
-    // pour retrouver les données du joueur ; il n'est pas secret et ne prouve pas l'identité.
+    // Stable id of this player, created at first launch and read back afterwards. The server uses it
+    // to find the player's data; it is not secret and does not prove identity.
     internal static class PlayerIdentity
     {
-        // L'éditeur a son propre identifiant : on peut ainsi tester à deux sur une même machine,
-        // l'éditeur d'un côté et le jeu construit de l'autre.
+        // The Editor has its own id: two players can thus be tested on one machine,
+        // the Editor on one side and the built game on the other.
         private static string FilePath =>
             Path.Combine(Application.persistentDataPath, Application.isEditor ? "player-editor.id" : "player.id");
 
@@ -30,7 +30,7 @@ namespace Voxel.Client
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
             {
-                Debug.LogWarning($"Identifiant de joueur non enregistré, il changera au prochain lancement : {e.Message}");
+                Debug.LogWarning($"Player id not saved, it will change at the next launch: {e.Message}");
                 return Guid.NewGuid().ToString("N");
             }
         }

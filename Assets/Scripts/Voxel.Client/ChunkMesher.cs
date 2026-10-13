@@ -5,7 +5,7 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // Maillage simple : une face par côté de bloc exposé à l'air. À appeler depuis le thread principal.
+    // Simple meshing: one face per block side exposed to air. To call from the main thread.
     internal static class ChunkMesher
     {
         public const int TopFace = 2;
@@ -24,8 +24,8 @@ namespace Voxel.Client
             new Vector3Int(0, 0, -1)
         };
 
-        // Quatre coins par face, dans le sens horaire vu de l'extérieur.
-        // Sur les côtés : bas, haut, haut, bas, pour que le haut de la tuile reste en haut.
+        // Four corners per face, clockwise seen from outside.
+        // On the sides: bottom, top, top, bottom, so that the top of the tile stays up.
         private static readonly Vector3[][] FaceCorners =
         {
             new[] { new Vector3(1, 0, 0), new Vector3(1, 1, 0), new Vector3(1, 1, 1), new Vector3(1, 0, 1) },

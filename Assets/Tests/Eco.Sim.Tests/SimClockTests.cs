@@ -64,7 +64,7 @@ namespace Eco.Sim.Tests
 
             Assert.IsTrue(clock.IsBehind);
             Assert.IsFalse(clock.TryTakeStep());
-            Assert.IsFalse(clock.IsBehind, "à jour dès qu'il n'y a plus de pas en attente");
+            Assert.IsFalse(clock.IsBehind, "up to date as soon as no step is pending");
         }
 
         [Test]

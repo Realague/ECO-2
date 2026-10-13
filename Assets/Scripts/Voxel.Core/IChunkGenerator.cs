@@ -2,12 +2,12 @@ namespace Voxel.Core
 {
     public interface IChunkGenerator
     {
-        // À incrémenter dès que le terrain produit change : les sauvegardes ne stockent que les
-        // chunks modifiés, elles deviennent donc invalides si le reste du monde n'est plus le même.
+        // To increment whenever the produced terrain changes: saves only store the modified
+        // chunks, so they become invalid if the rest of the world is no longer the same.
         int Version { get; }
 
-        // Remplit le chunk. Le résultat ne doit dépendre que de ses coordonnées et de la graine, jamais
-        // de l'ordre des appels ni de la machine : un client régénère ainsi le même monde que le serveur.
+        // Fills the chunk. The result must only depend on its coordinates and the seed, never on
+        // the order of calls or on the machine: a client thus regenerates the same world as the server.
         void Generate(Chunk chunk, int seed);
     }
 }

@@ -5,12 +5,12 @@ using UnityEngine;
 
 namespace Voxel.Client
 {
-    // Une espèce de plante décrite par des données : ses règles de simulation et son apparence.
-    // Ajouter une espèce revient à créer un de ces fichiers et à l'ajouter à la liste d'EcosystemSync.
-    [CreateAssetMenu(menuName = "Eco/Espèce de plante", fileName = "Species")]
+    // A plant species described by data: its simulation rules and its appearance.
+    // Adding a species means creating one of these files and adding it to EcosystemSync's list.
+    [CreateAssetMenu(menuName = "Eco/Plant species", fileName = "Species")]
     public class SpeciesAsset : ScriptableObject
     {
-        // Forme affichée à la taille adulte ; elle est réduite selon le palier de croissance.
+        // Shape displayed at adult size; it is scaled down according to the growth stage.
         [Serializable]
         public struct Part
         {
@@ -20,7 +20,7 @@ namespace Voxel.Client
             public Vector3 scale;
         }
 
-        [Header("Simulation (durées en jours de jeu)")]
+        [Header("Simulation (durations in game days)")]
         [SerializeField] private float maturityDays = 3f;
         [SerializeField] private float lifespanDays = 30f;
         [SerializeField] private float seedAttemptsPerDay = 1.5f;
@@ -29,11 +29,11 @@ namespace Voxel.Client
         [SerializeField, Range(0f, 1f)] private float minFertility = 0.2f;
         [SerializeField] private float fertilityUsePerDay = 0.2f;
 
-        [Header("Récolte")]
-        [Tooltip("Bois obtenu en abattant une plante adulte ; une plante plus jeune en donne moins.")]
+        [Header("Harvest")]
+        [Tooltip("Wood obtained by felling an adult plant; a younger plant gives less.")]
         [SerializeField] private int woodYield;
 
-        [Header("Apparence et visée")]
+        [Header("Appearance and aiming")]
         [SerializeField] private float height = 5.5f;
         [SerializeField] private float width = 1f;
         [SerializeField] private Part[] parts;

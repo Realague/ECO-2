@@ -5,16 +5,16 @@ using UnityEngine;
 
 namespace Voxel.Client
 {
-    // Une espèce animale décrite par des données : ses règles de simulation, ce qu'elle mange et son
-    // apparence. Ajouter une espèce revient à créer un de ces fichiers et à l'ajouter à la liste d'EcosystemSync.
-    [CreateAssetMenu(menuName = "Eco/Espèce animale", fileName = "Animal")]
+    // An animal species described by data: its simulation rules, what it eats and its appearance.
+    // Adding a species means creating one of these files and adding it to EcosystemSync's list.
+    [CreateAssetMenu(menuName = "Eco/Animal species", fileName = "Animal")]
     public class AnimalSpeciesAsset : ScriptableObject
     {
-        [Header("Régime alimentaire")]
+        [Header("Diet")]
         [SerializeField] private SpeciesAsset[] eatsPlants = Array.Empty<SpeciesAsset>();
         [SerializeField] private AnimalSpeciesAsset[] eatsAnimals = Array.Empty<AnimalSpeciesAsset>();
 
-        [Header("Simulation (durées en jours de jeu, distances en blocs)")]
+        [Header("Simulation (durations in game days, distances in blocks)")]
         [SerializeField] private int moveRange = 3;
         [SerializeField] private int senseRange = 5;
         [SerializeField] private float lifespanDays = 15f;
@@ -23,20 +23,20 @@ namespace Voxel.Client
         [SerializeField, Range(0f, 1f)] private float mealValue = 0.5f;
         [SerializeField] private float birthsPerDay = 1f;
 
-        [Tooltip("Ne se reproduit pas s'il compte déjà ce nombre de congénères dans ce rayon. Rayon 0 : aucune limite.")]
+        [Tooltip("Does not breed if it already counts this many of its kind within this range. Range 0: no limit.")]
         [SerializeField] private int territoryRange = 8;
         [SerializeField] private int maxNeighbours = 2;
         [SerializeField, Range(0f, 1f)] private float catchChance = 0.5f;
         [SerializeField] private float minPerTenThousandColumns = 10f;
 
-        [Header("Apparence et visée")]
+        [Header("Appearance and aiming")]
         [SerializeField] private float height = 0.6f;
         [SerializeField] private float width = 0.6f;
         [SerializeField] private SpeciesAsset.Part[] parts;
 
         public IReadOnlyList<SpeciesAsset.Part> Parts => parts;
 
-        // Les régimes désignent les espèces par leur rang dans les listes données, celles d'EcosystemSync.
+        // Diets refer to species by their index in the given lists, those of EcosystemSync.
         public AnimalSpecies ToSpecies(SpeciesAsset[] allPlants, AnimalSpeciesAsset[] allAnimals)
         {
             return new AnimalSpecies

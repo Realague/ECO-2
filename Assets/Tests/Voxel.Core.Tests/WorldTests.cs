@@ -16,7 +16,7 @@ namespace Voxel.Core.Tests
                 {
                     for (int x = 0; x < first.SizeX; x++)
                     {
-                        Assert.AreEqual(first.GetBlock(x, y, z), second.GetBlock(x, y, z), $"Bloc ({x}, {y}, {z})");
+                        Assert.AreEqual(first.GetBlock(x, y, z), second.GetBlock(x, y, z), $"Block ({x}, {y}, {z})");
                     }
                 }
             }

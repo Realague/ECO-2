@@ -7,9 +7,9 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // Affiche l'inventaire du joueur local et lit les touches qui s'y rapportent : choisir l'objet tenu,
-    // fabriquer, choisir une spécialité, donner. Le texte est dessiné avec OnGUI, pour l'affichage
-    // seulement ; les touches sont lues sur le clavier, comme partout ailleurs.
+    // Shows the local player's inventory and reads the related keys: choosing the held item,
+    // crafting, choosing a speciality, giving. The text is drawn with OnGUI, for display
+    // only; keys are read from the keyboard, as everywhere else.
     public class InventoryHud : MonoBehaviour
     {
         private enum Panel
@@ -30,7 +30,7 @@ namespace Voxel.Client
         private Panel panel;
         private GUIStyle textStyle;
 
-        // L'objet que le joueur tient en main, ou Items.None.
+        // The item the player holds in hand, or Items.None.
         public int SelectedItem => heldItem;
 
         private bool InGame => networkManager.IsListening && worldSync.World != null;
@@ -99,15 +99,15 @@ namespace Voxel.Client
             float height = textStyle.CalcHeight(new GUIContent(content), width);
             var area = new Rect(20f, Screen.height - height - 20f, width, height);
 
-            // Texte doublé d'une ombre pour rester lisible sur le terrain.
+            // Text doubled with a shadow to stay readable on the terrain.
             textStyle.normal.textColor = Color.black;
             GUI.Label(new Rect(area.x + 1f, area.y + 1f, area.width, area.height), content, textStyle);
             textStyle.normal.textColor = Color.white;
             GUI.Label(area, content, textStyle);
         }
 
-        // Recopie l'inventaire dans une liste numérotée. L'objet tenu reste le même tant que le joueur en
-        // possède ; sinon il tient le premier objet de la liste.
+        // Copies the inventory into a numbered list. The held item stays the same as long as the player
+        // owns some; otherwise they hold the first item of the list.
         private void RefreshEntries()
         {
             entries.Clear();
@@ -134,36 +134,36 @@ namespace Voxel.Client
             if (panel == Panel.Crafting) AppendRecipes(speciality);
             else if (panel == Panel.Speciality) AppendSpecialities(speciality);
 
-            text.Append("Spécialité : ").Append(Specialities.NameOf(speciality));
-            if (speciality == Speciality.None) text.Append(" (K pour en choisir une)");
+            text.Append("Speciality: ").Append(Specialities.NameOf(speciality));
+            if (speciality == Speciality.None) text.Append(" (K to choose one)");
             text.Append('\n');
 
-            if (entries.Count == 0) text.Append("Inventaire vide : cassez un bloc ou abattez un arbre.\n");
+            if (entries.Count == 0) text.Append("Empty inventory: break a block or fell a tree.\n");
             for (int i = 0; i < entries.Count; i++)
             {
                 text.Append(entries[i].Key == heldItem ? "> " : "   ");
                 text.Append(i + 1).Append(". ").Append(NameOf(entries[i].Key)).Append(" ×").Append(entries[i].Value).Append('\n');
             }
 
-            text.Append("Molette ou 1-9 : objet tenu   Clic droit : poser ou planter   C : fabriquer   K : spécialité   G : donner (Maj : tout)");
+            text.Append("Wheel or 1-9: held item   Right click: place or plant   C: craft   K: speciality   G: give (Shift: all)");
             return text.ToString();
         }
 
         private void AppendRecipes(Speciality speciality)
         {
-            text.Append("Fabrication (chiffre pour fabriquer, C pour fermer)\n");
+            text.Append("Crafting (digit to craft, C to close)\n");
             for (int i = 0; i < Recipes.All.Count; i++)
             {
                 Recipe recipe = Recipes.All[i];
-                text.Append("  ").Append(i + 1).Append(". ").Append(NameOf(recipe.Output)).Append(" ×").Append(recipe.OutputCount).Append("  avec  ");
+                text.Append("  ").Append(i + 1).Append(". ").Append(NameOf(recipe.Output)).Append(" ×").Append(recipe.OutputCount).Append("  from  ");
                 for (int input = 0; input < recipe.Inputs.Count; input++)
                 {
                     if (input > 0) text.Append(" + ");
                     text.Append(NameOf(recipe.Inputs[input].Item)).Append(" ×").Append(recipe.Inputs[input].Count);
                 }
 
-                if (!Recipes.HasSkill(recipe, speciality)) text.Append("   (réservé : ").Append(Specialities.NameOf(recipe.Requires)).Append(')');
-                else if (!Recipes.HasInputs(recipe, inventorySync.Inventory)) text.Append("   (il manque des ingrédients)");
+                if (!Recipes.HasSkill(recipe, speciality)) text.Append("   (reserved: ").Append(Specialities.NameOf(recipe.Requires)).Append(')');
+                else if (!Recipes.HasInputs(recipe, inventorySync.Inventory)) text.Append("   (missing ingredients)");
                 text.Append('\n');
             }
 
@@ -174,16 +174,16 @@ namespace Voxel.Client
         {
             if (speciality != Speciality.None)
             {
-                text.Append("Votre spécialité est définitive : ").Append(Specialities.NameOf(speciality)).Append(", qui ")
+                text.Append("Your speciality is permanent: ").Append(Specialities.NameOf(speciality)).Append(", who ")
                     .Append(Specialities.DescriptionOf(speciality)).Append(".\n\n");
                 return;
             }
 
-            text.Append("Choisissez votre spécialité (chiffre, choix définitif ; K pour fermer)\n");
+            text.Append("Choose your speciality (digit, permanent choice; K to close)\n");
             for (int i = 0; i < Specialities.Choices.Count; i++)
             {
                 Speciality choice = Specialities.Choices[i];
-                text.Append("  ").Append(i + 1).Append(". ").Append(Specialities.NameOf(choice)).Append(" : ")
+                text.Append("  ").Append(i + 1).Append(". ").Append(Specialities.NameOf(choice)).Append(": ")
                     .Append(Specialities.DescriptionOf(choice)).Append('\n');
             }
 
@@ -193,12 +193,12 @@ namespace Voxel.Client
         private string NameOf(int item)
         {
             return Items.IsSeed(item)
-                ? $"Graine ({ecosystemSync.PlantName(Items.SeedSpecies(item))})"
+                ? $"Seed ({ecosystemSync.PlantName(Items.SeedSpecies(item))})"
                 : Items.NameOf(item);
         }
 
-        // Touche de chiffre enfoncée à cette image, de 1 à 9, ou 0. Les touches désignent une position
-        // physique : sur un clavier AZERTY, ce sont celles de la rangée du haut, sans Maj.
+        // Digit key pressed this frame, from 1 to 9, or 0. Keys designate a physical position:
+        // on an AZERTY keyboard, they are those of the top row, without Shift.
         private static int PressedDigit(Keyboard keyboard)
         {
             if (keyboard.digit1Key.wasPressedThisFrame) return 1;
