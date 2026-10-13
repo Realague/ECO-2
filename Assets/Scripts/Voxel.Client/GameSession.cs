@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Net;
+using System.Threading.Tasks;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine;
@@ -25,12 +26,19 @@ namespace Voxel.Client
     //   -timescale <factor>   simulation speed when the server starts, 1 by default
     //   -admin <id,id,...>    ids of the players allowed to set the simulation speed
     //   -worldsize <x,y,z>    server world size in chunks, instead of the one set in the scene
+    //   -noupnp               the server does not ask the router to forward its port
     public class GameSession : MonoBehaviour
     {
         private const string LocalAddress = "127.0.0.1";
         private const string AnyAddress = "0.0.0.0";
         private const int MaxAddressLength = 15;
         private const int MaxPasswordLength = 32;
+
+        // The router forgets a forwarded port after two hours: it is asked again every hour.
+        private const float ForwardingRenewalInterval = 3600f;
+
+        // Longest wait, when the game closes, for the router to remove the forwarded port.
+        private const int ForwardingCloseTimeout = 4000;
 
         // Simulation speeds cycled through by the F5 and F6 keys. Zero pauses time.
         private static readonly float[] TimeScales = { 0f, 1f, 10f, 100f, 1000f, 10000f };
@@ -42,6 +50,7 @@ namespace Voxel.Client
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private ushort port = 7777;
         [SerializeField] private float autosaveInterval = 60f;
+        [SerializeField] private bool openRouterPort = true;
 
         private string address = LocalAddress;
         private string password = "";
@@ -56,6 +65,14 @@ namespace Voxel.Client
         private bool leaving;
         private PlayerRegistry registry;
         private float nextAutosave;
+
+        // Port forwarding on the router (server role only): being asked for, then obtained or refused,
+        // then being removed. The router is only ever talked to from background threads.
+        private Task<PortForwarding> forwardingRequest;
+        private PortForwarding forwarding;
+        private Task forwardingRemoval;
+        private float nextForwardingRenewal;
+        private bool quitting;
         private Keyboard textInputKeyboard;
         private GUIStyle textStyle;
 
@@ -99,10 +116,16 @@ namespace Voxel.Client
             // Closing the game is a deliberate stop: the end of session that follows is not an error to report.
             leaving = true;
             SaveSession();
+
+            // Background work is cut short when the game closes: the router is given time to answer.
+            quitting = true;
+            CloseRouterPort();
         }
 
         private void Update()
         {
+            TrackRouterPort();
+
             if (registry != null)
             {
                 registry.TrackPlayers();
@@ -256,6 +279,62 @@ namespace Voxel.Client
             sessionActive = true;
             nextAutosave = Time.unscaledTime + autosaveInterval;
             Debug.Log($"Server started on port {port}. Saves in {dataDirectory}, every {autosaveInterval} s.");
+            OpenRouterPort();
+        }
+
+        // Asks the router to forward the server's port, so that players outside the local network can
+        // join without configuring it by hand. The answer takes a few seconds: TrackRouterPort reports it.
+        private void OpenRouterPort()
+        {
+            if (!openRouterPort) return;
+
+            int forwardedPort = port;
+            string description = Application.productName;
+
+            // A removal still under way from the previous session must not land after this request.
+            Task removal = forwardingRemoval;
+            forwardingRequest = Task.Run(() =>
+            {
+                removal?.Wait();
+                return PortForwarding.Open(forwardedPort, description);
+            });
+        }
+
+        private void TrackRouterPort()
+        {
+            if (forwardingRequest != null && forwardingRequest.IsCompleted)
+            {
+                forwarding = forwardingRequest.Result;
+                forwardingRequest = null;
+                nextForwardingRenewal = Time.unscaledTime + ForwardingRenewalInterval;
+
+                if (forwarding.IsReachable) Debug.Log(forwarding.Summary);
+                else Debug.LogWarning(forwarding.Summary);
+            }
+            else if (forwarding != null && forwarding.IsOpen && Time.unscaledTime >= nextForwardingRenewal)
+            {
+                nextForwardingRenewal = Time.unscaledTime + ForwardingRenewalInterval;
+                PortForwarding renewed = forwarding;
+                Task.Run(() => renewed.Renew());
+            }
+        }
+
+        // Removes the forwarded port from the router, without holding the game up unless it is closing.
+        private void CloseRouterPort()
+        {
+            Task<PortForwarding> request = forwardingRequest;
+            PortForwarding opened = forwarding;
+            forwardingRequest = null;
+            forwarding = null;
+
+            if (request != null) forwardingRemoval = request.ContinueWith(finished => finished.Result.Close());
+            else if (opened != null) forwardingRemoval = Task.Run(() => opened.Close());
+
+            if (quitting && forwardingRemoval != null)
+            {
+                forwardingRemoval.Wait(ForwardingCloseTimeout);
+                forwardingRemoval = null;
+            }
         }
 
         // Writes the world, the ecosystem and the players to disk. No effect outside the server role.
@@ -307,6 +386,7 @@ namespace Voxel.Client
             }
 
             voxelWorld.Unload();
+            CloseRouterPort();
             Cursor.lockState = CursorLockMode.None;
         }
 
@@ -375,6 +455,8 @@ namespace Voxel.Client
                 startTimeScale = scale;
             }
 
+            if (Array.IndexOf(arguments, "-noupnp") >= 0) openRouterPort = false;
+
             string admins = ArgumentValue(arguments, "-admin");
             if (admins != null) adminIds = admins.Split(',');
 
@@ -412,12 +494,20 @@ namespace Voxel.Client
             if (Cursor.lockState != CursorLockMode.Locked)
             {
                 string role = networkManager.IsHost ? $"Game hosted on port {port}" : $"Connected to {address}";
-                return ecosystemSync.ClockText + "\n" + role
+                return ecosystemSync.ClockText + "\n" + role + RouterPortText()
                     + "\nClick: take control\nF10: leave the game"
                     + "\nAdmins: F5 / F6 slow down or speed up time, F7 advance one day";
             }
 
             return ecosystemSync.ClockText;
+        }
+
+        // What the host needs to know to invite players from outside its network. Empty on a client.
+        private string RouterPortText()
+        {
+            if (forwardingRequest != null) return "\nInternet: asking the router to open the port…";
+
+            return forwarding != null ? "\n" + forwarding.Summary : "";
         }
 
         private void ListenToTextInput(Keyboard keyboard)
