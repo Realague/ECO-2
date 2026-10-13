@@ -95,6 +95,8 @@ namespace Voxel.Client
 
         private void OnApplicationQuit()
         {
+            // Fermer le jeu est un arrêt voulu : la fin de partie qui suit n'est pas une erreur à signaler.
+            leaving = true;
             SaveSession();
         }
 

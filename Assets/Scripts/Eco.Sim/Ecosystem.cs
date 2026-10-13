@@ -46,6 +46,11 @@ namespace Eco.Sim
         private int nextPlantId = 1;
 
         public Ecosystem(World world, IReadOnlyList<Species> species, int seed)
+            : this(world, species, Array.Empty<AnimalSpecies>(), seed)
+        {
+        }
+
+        public Ecosystem(World world, IReadOnlyList<Species> species, IReadOnlyList<AnimalSpecies> animalSpecies, int seed)
         {
             this.world = world;
             this.species = new Species[species.Count];
@@ -62,6 +67,7 @@ namespace Eco.Sim
             capacity = new float[cellsX * cellsZ];
             plantAtColumn = new int[world.SizeX * world.SizeZ];
 
+            InitializeAnimals(animalSpecies);
             FillCapacity();
             world.BlockChanged += OnBlockChanged;
         }
@@ -151,6 +157,7 @@ namespace Eco.Sim
             }
 
             RemoveDying();
+            StepAnimals();
         }
 
         // Fait vivre une plante pendant un pas. Renvoie faux si elle meurt.
@@ -194,7 +201,7 @@ namespace Eco.Sim
             if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) return false;
 
             Species kind = species[speciesIndex];
-            int y = world.GetSurfaceHeight(x, z);
+            int y = SurfaceAt(x, z);
             if (!HasGroundAndRoom(x, y, z)) return false;
             if (fertility[CellIndex(x, z)] < kind.MinFertility) return false;
             if (!IsSpaceFree(x, z, speciesIndex, kind.Spacing)) return false;
@@ -229,7 +236,10 @@ namespace Eco.Sim
         {
             if ((uint)pos.X >= (uint)world.SizeX || (uint)pos.Z >= (uint)world.SizeZ) return;
 
-            int plantId = plantAtColumn[ColumnIndex(pos.X, pos.Z)];
+            int column = ColumnIndex(pos.X, pos.Z);
+            surfaceCache[column] = 0;
+
+            int plantId = plantAtColumn[column];
             if (plantId != 0) disturbed.Add(plantId);
         }
 

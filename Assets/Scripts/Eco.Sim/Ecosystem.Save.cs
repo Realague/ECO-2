@@ -10,7 +10,10 @@ namespace Eco.Sim
     public sealed partial class Ecosystem
     {
         private const uint Magic = 0x454F4345; // « ECOE »
-        private const int FormatVersion = 2;
+        private const int FormatVersion = 3;
+
+        // Dernier format sans animaux. Il se lit encore : les animaux arrivent alors par les bords de la carte.
+        private const int FormatWithoutAnimals = 2;
 
         public void Write(Stream stream)
         {
@@ -54,12 +57,37 @@ namespace Eco.Sim
                     writer.Write(plant.Age);
                     writer.Write(plant.Growth);
                 }
+
+                writer.Write(animalSpecies.Length);
+                foreach (AnimalSpecies kind in animalSpecies)
+                {
+                    writer.Write(kind.Name);
+                }
+
+                writer.Write(nextAnimalId);
+                writer.Write(animalCount);
+                for (int i = 0; i < animalCount; i++)
+                {
+                    Animal animal = animals[i];
+                    writer.Write(animal.Id);
+                    writer.Write(animal.SpeciesIndex);
+                    writer.Write(animal.X);
+                    writer.Write(animal.Y);
+                    writer.Write(animal.Z);
+                    writer.Write(animal.Age);
+                    writer.Write(animal.Hunger);
+                }
             }
+        }
+
+        public static Ecosystem Read(Stream stream, World world, IReadOnlyList<Species> species)
+        {
+            return Read(stream, world, species, System.Array.Empty<AnimalSpecies>());
         }
 
         // Lève InvalidDataException si le fichier ne correspond pas à ce monde ou à ces espèces, et
         // EndOfStreamException s'il est tronqué.
-        public static Ecosystem Read(Stream stream, World world, IReadOnlyList<Species> species)
+        public static Ecosystem Read(Stream stream, World world, IReadOnlyList<Species> species, IReadOnlyList<AnimalSpecies> animalSpecies)
         {
             using (var reader = new BinaryReader(stream, Encoding.UTF8, true))
             {
@@ -69,7 +97,7 @@ namespace Eco.Sim
                 }
 
                 int formatVersion = reader.ReadInt32();
-                if (formatVersion != FormatVersion)
+                if (formatVersion != FormatVersion && formatVersion != FormatWithoutAnimals)
                 {
                     throw new InvalidDataException(
                         $"Format de sauvegarde d'écosystème {formatVersion} non pris en charge (attendu : {FormatVersion}).");
@@ -101,7 +129,7 @@ namespace Eco.Sim
                     throw new InvalidDataException("La sauvegarde d'écosystème a été faite sur un autre terrain que celui de ce monde.");
                 }
 
-                var ecosystem = new Ecosystem(world, species, 0);
+                var ecosystem = new Ecosystem(world, species, animalSpecies, 0);
                 ecosystem.StepCount = reader.ReadInt64();
                 ecosystem.random.State = reader.ReadUInt64();
                 ecosystem.nextPlantId = reader.ReadInt32();
@@ -141,6 +169,7 @@ namespace Eco.Sim
                     ecosystem.Append(plant);
                 }
 
+                if (formatVersion != FormatWithoutAnimals) ecosystem.ReadAnimals(reader);
                 return ecosystem;
             }
         }
@@ -150,11 +179,59 @@ namespace Eco.Sim
             AtomicFile.Write(path, Write);
         }
 
-        public static Ecosystem LoadFromFile(string path, World world, IReadOnlyList<Species> species)
+        public static Ecosystem LoadFromFile(
+            string path, World world, IReadOnlyList<Species> species, IReadOnlyList<AnimalSpecies> animalSpecies)
         {
             using (FileStream stream = File.OpenRead(path))
             {
-                return Read(stream, world, species);
+                return Read(stream, world, species, animalSpecies);
+            }
+        }
+
+        private void ReadAnimals(BinaryReader reader)
+        {
+            int speciesCount = reader.ReadInt32();
+            if (speciesCount != animalSpecies.Length)
+            {
+                throw new InvalidDataException("La liste des espèces animales a changé depuis cette sauvegarde.");
+            }
+
+            for (int i = 0; i < speciesCount; i++)
+            {
+                string name = reader.ReadString();
+                if (name != animalSpecies[i].Name)
+                {
+                    throw new InvalidDataException(
+                        $"La liste des espèces animales a changé depuis cette sauvegarde : « {name} » au lieu de « {animalSpecies[i].Name} ».");
+                }
+            }
+
+            nextAnimalId = reader.ReadInt32();
+            int savedCount = reader.ReadInt32();
+            int previousId = 0;
+            for (int i = 0; i < savedCount; i++)
+            {
+                int id = reader.ReadInt32();
+                int speciesIndex = reader.ReadInt32();
+                int x = reader.ReadInt32();
+                int y = reader.ReadInt32();
+                int z = reader.ReadInt32();
+                int age = reader.ReadInt32();
+                float hunger = reader.ReadSingle();
+
+                bool valid = (uint)speciesIndex < (uint)animalSpecies.Length
+                    && (uint)x < (uint)world.SizeX
+                    && (uint)z < (uint)world.SizeZ
+                    && id > previousId
+                    && age >= 0
+                    && animalAtColumn[ColumnIndex(x, z)] == 0;
+                if (!valid)
+                {
+                    throw new InvalidDataException($"Animal invalide dans la sauvegarde d'écosystème (numéro {id}).");
+                }
+
+                previousId = id;
+                AddAnimal(id, speciesIndex, x, y, z, age, hunger);
             }
         }
     }

@@ -18,6 +18,8 @@ namespace Voxel.Client
         private const string UpdateMessage = "Eco.Update";
         private const string FellMessage = "Eco.Fell";
         private const string CommandMessage = "Eco.Command";
+        private const string AnimalsMessage = "Eco.Animals";
+        private const string KillMessage = "Eco.Kill";
         private const string SaveFileName = "ecosystem.dat";
 
         private const byte SetMultiplierCommand = 0;
@@ -36,8 +38,17 @@ namespace Voxel.Client
         private const float ClockSendInterval = 0.5f;
         private const int ColumnsPerInitialPlant = 64;
 
+        // Chaque joueur reçoit, au plus deux fois par seconde, la liste complète des animaux qui
+        // l'entourent, un peu au-delà de ce qu'il voit. Le coût ne dépend donc pas de la taille du monde.
+        private const int AnimalEntrySize = 4 * sizeof(int) + sizeof(byte);
+        private const float AnimalFeedInterval = 0.5f;
+        private const float AnimalInterestMargin = 32f;
+        private const float AnimalFeedMoveThreshold = 8f;
+        private const float MinAnimalTravelSeconds = 0.25f;
+
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private SpeciesAsset[] speciesAssets;
+        [SerializeField] private AnimalSpeciesAsset[] animalAssets;
         [SerializeField] private float plantViewDistance = 128f;
 
         // Plantes connues de cette machine : elles servent à l'affichage et à la visée.
@@ -47,7 +58,9 @@ namespace Voxel.Client
         private readonly List<Plant> outgoing = new List<Plant>();
         private readonly System.Diagnostics.Stopwatch stepTimer = new System.Diagnostics.Stopwatch();
         private List<Species> species;
+        private List<AnimalSpecies> animalSpecies;
         private PlantRenderer plantRenderer;
+        private AnimalViews animalViews;
         private bool running;
 
         // Rôle de serveur uniquement.
@@ -61,6 +74,11 @@ namespace Voxel.Client
         // Pour chaque joueur en cours d'arrivée, l'identifiant de la dernière plante qui lui a été envoyée.
         private readonly Dictionary<ulong, int> snapshots = new Dictionary<ulong, int>();
         private readonly List<ulong> snapshotClients = new List<ulong>();
+
+        // Pour chaque joueur, ce que valait le monde des animaux lors de son dernier envoi.
+        private readonly Dictionary<ulong, AnimalFeed> animalFeeds = new Dictionary<ulong, AnimalFeed>();
+        private readonly List<Animal> nearbyAnimals = new List<Animal>();
+        private int animalRevision;
 
         // Horloge de la simulation telle que cette machine la connaît.
         private long stepCount;
@@ -90,8 +108,16 @@ namespace Voxel.Client
                 species.Add(asset.ToSpecies());
             }
 
-            // Un serveur sans affichage simule les plantes mais ne les dessine pas.
-            if (!Application.isBatchMode) plantRenderer = new PlantRenderer(speciesAssets);
+            animalSpecies = new List<AnimalSpecies>(animalAssets.Length);
+            foreach (AnimalSpeciesAsset asset in animalAssets)
+            {
+                animalSpecies.Add(asset.ToSpecies(speciesAssets, animalAssets));
+            }
+
+            // Un serveur sans affichage simule les plantes et les animaux mais ne les dessine pas.
+            bool rendering = !Application.isBatchMode;
+            if (rendering) plantRenderer = new PlantRenderer(speciesAssets);
+            animalViews = new AnimalViews(animalAssets, animalSpecies, rendering);
         }
 
         private void Update()
@@ -125,6 +151,7 @@ namespace Voxel.Client
 
             Camera viewer = Camera.main;
             if (viewer != null) plantRenderer.Render(viewer.transform.position, plantViewDistance);
+            animalViews.Render();
         }
 
         // À appeler juste après le démarrage du serveur ou de l'hôte, une fois son monde chargé.
@@ -145,7 +172,11 @@ namespace Voxel.Client
             ecosystem.PlantChanged += OnPlantUpserted;
             ecosystem.PlantRemoved += OnPlantRemoved;
 
+            // L'hôte est aussi un joueur : il reçoit les animaux alentour comme les autres, sans passer par le réseau.
+            if (networkManager.IsHost) animalFeeds[networkManager.LocalClientId] = new AnimalFeed();
+
             Messaging.RegisterNamedMessageHandler(FellMessage, OnFellRequest);
+            Messaging.RegisterNamedMessageHandler(KillMessage, OnKillRequest);
             Messaging.RegisterNamedMessageHandler(CommandMessage, OnCommand);
             networkManager.OnClientConnectedCallback += OnClientConnected;
             networkManager.OnClientDisconnectCallback += OnClientDisconnected;
@@ -157,6 +188,7 @@ namespace Voxel.Client
         {
             running = true;
             Messaging.RegisterNamedMessageHandler(UpdateMessage, OnUpdate);
+            Messaging.RegisterNamedMessageHandler(AnimalsMessage, OnAnimals);
         }
 
         public void Stop()
@@ -174,9 +206,11 @@ namespace Voxel.Client
             clock = null;
             plants.Clear();
             plantRenderer?.Clear();
+            animalViews.Clear();
             changedPlants.Clear();
             removedPlants.Clear();
             snapshots.Clear();
+            animalFeeds.Clear();
             running = false;
             stepCount = 0;
             multiplier = 1f;
@@ -198,11 +232,27 @@ namespace Voxel.Client
             }
         }
 
-        // Cherche la plante la plus proche le long du rayon. La direction doit être normalisée.
-        public bool TryPick(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance, out int plantId)
+        // Frappe ce que le joueur local vise, à au plus maxDistance : tue l'animal ou abat la plante le
+        // plus proche le long du rayon. Renvoie faux si le rayon ne touche ni l'un ni l'autre. La direction
+        // doit être normalisée.
+        public bool TryStrike(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance)
+        {
+            bool plantHit = TryPickPlant(origin, direction, maxDistance, out int plantId, out float plantDistance);
+            if (animalViews.TryPick(origin, direction, plantHit ? plantDistance : maxDistance, out int animalId, out _))
+            {
+                RequestKill(animalId);
+                return true;
+            }
+
+            if (plantHit) RequestFell(plantId);
+            return plantHit;
+        }
+
+        private bool TryPickPlant(
+            System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance, out int plantId, out float nearest)
         {
             plantId = 0;
-            float nearest = maxDistance;
+            nearest = maxDistance;
             bool found = false;
 
             foreach (KeyValuePair<int, PlantView> entry in plants)
@@ -244,6 +294,25 @@ namespace Voxel.Client
             }
         }
 
+        // Mise à mort demandée par le joueur local, sur le même principe que l'abattage.
+        public void RequestKill(int animalId)
+        {
+            if (!running) return;
+
+            if (ecosystem != null)
+            {
+                TryKill(networkManager.LocalClientId, animalId);
+                return;
+            }
+
+            animalViews.Remove(animalId);
+            using (var writer = new FastBufferWriter(sizeof(int), Allocator.Temp))
+            {
+                writer.WriteValueSafe(animalId);
+                Messaging.SendNamedMessage(KillMessage, NetworkManager.ServerClientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
+            }
+        }
+
         // Réservé aux administrateurs : le serveur ignore la demande des autres joueurs.
         public void RequestMultiplier(float value)
         {
@@ -279,7 +348,7 @@ namespace Voxel.Client
             {
                 try
                 {
-                    return Ecosystem.LoadFromFile(savePath, world, species);
+                    return Ecosystem.LoadFromFile(savePath, world, species, animalSpecies);
                 }
                 catch (Exception e) when (e is IOException || e is InvalidDataException)
                 {
@@ -288,8 +357,9 @@ namespace Voxel.Client
                 }
             }
 
-            var created = new Ecosystem(world, species, world.Seed);
+            var created = new Ecosystem(world, species, animalSpecies, world.Seed);
             created.Populate(world.SizeX * world.SizeZ / ColumnsPerInitialPlant);
+            created.PopulateAnimals();
             return created;
         }
 
@@ -378,11 +448,134 @@ namespace Voxel.Client
         private void OnClientConnected(ulong clientId)
         {
             if (clientId != networkManager.LocalClientId) snapshots[clientId] = 0;
+            if (!animalFeeds.ContainsKey(clientId)) animalFeeds[clientId] = new AnimalFeed();
         }
 
         private void OnClientDisconnected(ulong clientId)
         {
             snapshots.Remove(clientId);
+            animalFeeds.Remove(clientId);
+        }
+
+        private bool TryKill(ulong clientId, int animalId)
+        {
+            if (!ecosystem.TryGetAnimal(animalId, out Animal animal)) return false;
+            if (!networkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client)) return false;
+            if (client.PlayerObject == null) return false;
+
+            AnimalSpecies kind = animalSpecies[animal.SpeciesIndex];
+            Vector3 eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;
+            float half = kind.Width * 0.5f;
+            var min = new System.Numerics.Vector3(animal.X + 0.5f - half, animal.Y, animal.Z + 0.5f - half);
+            var max = new System.Numerics.Vector3(animal.X + 0.5f + half, animal.Y + kind.Height, animal.Z + 0.5f + half);
+
+            // L'animal a pu avancer d'un pas depuis ce que le joueur a vu.
+            float maxDistance = PlayerRules.Reach + BlockEditRules.ReachTolerance + kind.MoveRange;
+            if (PlantShape.DistanceSquared(eyes.ToNumerics(), min, max) > maxDistance * maxDistance) return false;
+
+            ecosystem.RemoveAnimal(animalId);
+            animalRevision++;
+            return true;
+        }
+
+        private void OnKillRequest(ulong senderId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out int animalId);
+            if (TryKill(senderId, animalId)) return;
+
+            // Refus : le prochain envoi d'animaux à ce joueur lui rendra celui qu'il avait retiré par anticipation.
+            if (animalFeeds.TryGetValue(senderId, out AnimalFeed feed)) feed.Revision = -1;
+        }
+
+        // Envoie à chaque joueur la liste des animaux qui l'entourent, quand elle a pu changer : un pas de
+        // simulation a eu lieu, un animal a été tué, ou le joueur s'est déplacé.
+        private void SendAnimalFeeds()
+        {
+            float now = Time.unscaledTime;
+            float radius = plantViewDistance + AnimalInterestMargin;
+
+            foreach (KeyValuePair<ulong, AnimalFeed> entry in animalFeeds)
+            {
+                AnimalFeed feed = entry.Value;
+                if (now < feed.NextTime) continue;
+                if (!networkManager.ConnectedClients.TryGetValue(entry.Key, out NetworkClient client)) continue;
+                if (client.PlayerObject == null) continue;
+
+                Vector3 position = client.PlayerObject.transform.position;
+                bool moved = (position - feed.Position).sqrMagnitude > AnimalFeedMoveThreshold * AnimalFeedMoveThreshold;
+                if (feed.Step == ecosystem.StepCount && feed.Revision == animalRevision && !moved) continue;
+
+                feed.Step = ecosystem.StepCount;
+                feed.Revision = animalRevision;
+                feed.Position = position;
+                feed.NextTime = now + AnimalFeedInterval;
+
+                nearbyAnimals.Clear();
+                foreach (Animal animal in ecosystem.Animals)
+                {
+                    float dx = animal.X + 0.5f - position.x;
+                    float dz = animal.Z + 0.5f - position.z;
+                    if (dx * dx + dz * dz <= radius * radius) nearbyAnimals.Add(animal);
+                }
+
+                if (entry.Key == networkManager.LocalClientId) ShowNearbyAnimals();
+                else SendNearbyAnimals(entry.Key);
+            }
+        }
+
+        private void ShowNearbyAnimals()
+        {
+            animalViews.BeginList();
+            foreach (Animal animal in nearbyAnimals)
+            {
+                animalViews.Add(animal.Id, animal.SpeciesIndex, new Vector3(animal.X + 0.5f, animal.Y, animal.Z + 0.5f), AnimalTravelSeconds());
+            }
+
+            animalViews.EndList();
+        }
+
+        private void SendNearbyAnimals(ulong clientId)
+        {
+            using (var writer = new FastBufferWriter(sizeof(int) + nearbyAnimals.Count * AnimalEntrySize, Allocator.Temp))
+            {
+                writer.WriteValueSafe(nearbyAnimals.Count);
+                foreach (Animal animal in nearbyAnimals)
+                {
+                    writer.WriteValueSafe(animal.Id);
+                    writer.WriteValueSafe((byte)animal.SpeciesIndex);
+                    writer.WriteValueSafe(animal.X);
+                    writer.WriteValueSafe(animal.Y);
+                    writer.WriteValueSafe(animal.Z);
+                }
+
+                Messaging.SendNamedMessage(AnimalsMessage, clientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
+            }
+        }
+
+        private void OnAnimals(ulong senderId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out int count);
+            float travelSeconds = AnimalTravelSeconds();
+
+            animalViews.BeginList();
+            for (int i = 0; i < count; i++)
+            {
+                reader.ReadValueSafe(out int animalId);
+                reader.ReadValueSafe(out byte speciesIndex);
+                reader.ReadValueSafe(out int x);
+                reader.ReadValueSafe(out int y);
+                reader.ReadValueSafe(out int z);
+                animalViews.Add(animalId, speciesIndex, new Vector3(x + 0.5f, y, z + 0.5f), travelSeconds);
+            }
+
+            animalViews.EndList();
+        }
+
+        // Durée du trajet affiché entre deux positions : celle d'un pas de simulation à la vitesse actuelle.
+        private float AnimalTravelSeconds()
+        {
+            float stepSeconds = SimClock.RealSecondsPerStep / Mathf.Max(multiplier, 0.01f);
+            return Mathf.Clamp(stepSeconds, MinAnimalTravelSeconds, SimClock.RealSecondsPerStep);
         }
 
         // Une fois par tick réseau : seul l'état final de chaque plante modifiée part, même si la
@@ -390,6 +583,7 @@ namespace Voxel.Client
         private void SendChanges()
         {
             SendSnapshots();
+            SendAnimalFeeds();
 
             bool clockDue = clockChanged && Time.unscaledTime >= nextClockSend;
             if (changedPlants.Count == 0 && removedPlants.Count == 0 && !clockDue) return;
@@ -522,6 +716,14 @@ namespace Voxel.Client
         private static PlantView ViewOf(Plant plant)
         {
             return new PlantView { SpeciesIndex = plant.SpeciesIndex, X = plant.X, Y = plant.Y, Z = plant.Z, Stage = plant.Stage };
+        }
+
+        private sealed class AnimalFeed
+        {
+            public long Step = -1;
+            public int Revision = -1;
+            public Vector3 Position;
+            public float NextTime;
         }
     }
 }

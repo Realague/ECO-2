@@ -135,15 +135,11 @@ namespace Voxel.Client
             System.Numerics.Vector3 direction = cameraTransform.forward.ToNumerics();
             bool blockHit = VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, out VoxelHit hit);
 
-            // Le clic gauche abat la plante visée si elle se trouve avant le bloc visé.
+            // Le clic gauche frappe l'animal ou la plante visés s'ils se trouvent avant le bloc visé.
             if (breakBlock)
             {
                 float blockDistance = blockHit ? hit.Distance : PlayerRules.Reach;
-                if (ecosystemSync.TryPick(origin, direction, blockDistance, out int plantId))
-                {
-                    ecosystemSync.RequestFell(plantId);
-                    return;
-                }
+                if (ecosystemSync.TryStrike(origin, direction, blockDistance)) return;
             }
 
             if (!blockHit) return;
