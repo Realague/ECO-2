@@ -42,6 +42,10 @@ namespace Voxel.Core
         public int Seed { get; private set; }
         public int GeneratorVersion { get; private set; }
 
+        // Empreinte du terrain tel que généré, avant toute modification. Un client la compare à celle
+        // du serveur pour s'assurer qu'il a généré le même monde.
+        public ulong TerrainFingerprint { get; private set; }
+
         public int SizeX => ChunksX * Chunk.Size;
         public int SizeY => ChunksY * Chunk.Size;
         public int SizeZ => ChunksZ * Chunk.Size;
@@ -57,6 +61,31 @@ namespace Voxel.Core
             {
                 generator.Generate(chunk, seed);
             }
+
+            TerrainFingerprint = ComputeFingerprint();
+        }
+
+        // Résume le relief par la hauteur et le bloc de surface d'un échantillon régulier de colonnes.
+        private ulong ComputeFingerprint()
+        {
+            const int samplesPerAxis = 32;
+            const ulong offsetBasis = 14695981039346656037UL;
+            const ulong prime = 1099511628211UL;
+
+            ulong hash = offsetBasis;
+            int stepX = Math.Max(1, SizeX / samplesPerAxis);
+            int stepZ = Math.Max(1, SizeZ / samplesPerAxis);
+            for (int z = 0; z < SizeZ; z += stepZ)
+            {
+                for (int x = 0; x < SizeX; x += stepX)
+                {
+                    int height = GetSurfaceHeight(x, z);
+                    hash = unchecked((hash ^ (uint)height) * prime);
+                    hash = unchecked((hash ^ GetBlock(x, height - 1, z)) * prime);
+                }
+            }
+
+            return hash;
         }
 
         public bool InBounds(int x, int y, int z) =>

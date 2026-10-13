@@ -74,10 +74,13 @@ namespace Voxel.Client
                 $"Monde de {World.SizeX} × {World.SizeY} × {World.SizeZ} blocs ({World.Chunks.Count} chunks) prêt en {timer.Elapsed.TotalSeconds:0.0} s.");
         }
 
-        // Monde d'un client : vide au départ, rempli par les chunks que le serveur envoie, jamais sauvegardé.
-        public void CreateRemote(int chunksX, int chunksY, int chunksZ)
+        // Monde d'un client : généré ici à partir de la graine du serveur, puis complété par les chunks
+        // modifiés que le serveur envoie. Il n'est jamais sauvegardé.
+        public void CreateRemote(int chunksX, int chunksY, int chunksZ, int serverSeed)
         {
-            Show(new World(chunksX, chunksY, chunksZ), null);
+            var world = new World(chunksX, chunksY, chunksZ);
+            world.Generate(new TerrainGenerator(), serverSeed);
+            Show(world, null);
         }
 
         // Écrit le monde sur le disque s'il est persistant. Un échec est signalé sans interrompre la partie.
@@ -95,16 +98,20 @@ namespace Voxel.Client
             }
         }
 
-        // À appeler quand les blocs du monde ont été remplacés en masse, sans passer par World.SetBlock :
-        // un client le fait une fois tous les chunks reçus. Mailler chunk par chunk pendant la réception
-        // referait plusieurs fois chaque maillage, voisins compris, et le client ne suivrait plus le flux.
-        public void RemeshAll()
+        // À appeler quand les blocs d'un chunk ont été remplacés en bloc, sans passer par World.SetBlock :
+        // un client le fait pour chaque chunk modifié reçu du serveur.
+        public void RefreshChunk(Chunk chunk)
         {
             if (!rendering) return;
 
-            foreach (Chunk chunk in World.Chunks)
+            dirtyChunks.Add(chunk);
+
+            // Les faces des chunks voisins tournées vers celui-ci changent aussi.
+            foreach (BlockPos offset in NeighbourOffsets)
             {
-                dirtyChunks.Add(chunk);
+                var coord = new ChunkCoord(chunk.Coord.X + offset.X, chunk.Coord.Y + offset.Y, chunk.Coord.Z + offset.Z);
+                Chunk neighbour = World.GetChunk(coord);
+                if (neighbour != null) dirtyChunks.Add(neighbour);
             }
         }
 
@@ -154,7 +161,7 @@ namespace Voxel.Client
             {
                 try
                 {
-                    World saved = WorldSave.LoadFromFile(path, new ProvisionalHillsGenerator());
+                    World saved = WorldSave.LoadFromFile(path, new TerrainGenerator());
                     if (MatchesSettings(saved)) return saved;
 
                     Debug.LogWarning(
@@ -174,7 +181,7 @@ namespace Voxel.Client
         private World CreateWorld()
         {
             var world = new World(sizeInChunks.x, sizeInChunks.y, sizeInChunks.z);
-            world.Generate(new ProvisionalHillsGenerator(), seed);
+            world.Generate(new TerrainGenerator(), seed);
             return world;
         }
 

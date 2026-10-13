@@ -10,7 +10,7 @@ namespace Voxel.Core.Tests
         public void WritingAllChunksInSmallBatches_ThenReading_RebuildsTheWorld()
         {
             World source = CreateHills();
-            source.SetBlock(20, 50, 30, Blocks.Stone);
+            source.SetBlock(20, 62, 30, Blocks.Stone);
             var target = new World(source.ChunksX, source.ChunksY, source.ChunksZ);
             var received = new List<Chunk>();
 
@@ -92,7 +92,7 @@ namespace Voxel.Core.Tests
         private static World CreateHills()
         {
             var world = new World(2, 4, 2);
-            world.Generate(new ProvisionalHillsGenerator(), 7);
+            world.Generate(new TerrainGenerator(), 7);
             return world;
         }
 

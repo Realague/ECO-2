@@ -23,15 +23,24 @@ namespace Voxel.Core.Tests
         }
 
         [Test]
-        public void Generate_Hills_HasGrassSurfaceInsideWorld()
+        public void TerrainFingerprint_IsTheSameForTheSameTerrain_AndDiffersForAnother()
+        {
+            Assert.AreEqual(CreateHills(seed: 42).TerrainFingerprint, CreateHills(seed: 42).TerrainFingerprint);
+            Assert.AreNotEqual(CreateHills(seed: 42).TerrainFingerprint, CreateHills(seed: 43).TerrainFingerprint);
+        }
+
+        [Test]
+        public void TerrainFingerprint_DescribesTheGeneratedTerrain_NotLaterEdits()
         {
             World world = CreateHills(seed: 42);
+            ulong generated = world.TerrainFingerprint;
 
-            int surface = world.GetSurfaceHeight(5, 9);
+            for (int x = 0; x < world.SizeX; x++)
+            {
+                world.SetBlock(x, world.GetSurfaceHeight(x, 0), 0, Blocks.Stone);
+            }
 
-            Assert.That(surface, Is.GreaterThan(0).And.LessThan(world.SizeY));
-            Assert.AreEqual(Blocks.Grass, world.GetBlock(5, surface - 1, 9));
-            Assert.AreEqual(Blocks.Air, world.GetBlock(5, surface, 9));
+            Assert.AreEqual(generated, world.TerrainFingerprint);
         }
 
         [Test]
@@ -92,7 +101,7 @@ namespace Voxel.Core.Tests
         private static World CreateHills(int seed)
         {
             var world = new World(2, 4, 2);
-            world.Generate(new ProvisionalHillsGenerator(), seed);
+            world.Generate(new TerrainGenerator(), seed);
             return world;
         }
     }

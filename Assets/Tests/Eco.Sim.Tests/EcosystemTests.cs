@@ -299,6 +299,9 @@ namespace Eco.Sim.Tests
             Assert.Throws<InvalidDataException>(() => Ecosystem.Read(new MemoryStream(data), world, TestSpecies.TreeOnly()));
             Assert.Throws<InvalidDataException>(
                 () => Ecosystem.Read(new MemoryStream(data), MeadowGenerator.CreateWorld(4), TestSpecies.TreeAndBush()));
+            Assert.Throws<InvalidDataException>(
+                () => Ecosystem.Read(new MemoryStream(data), MeadowGenerator.CreateWorld(2, seed: 5), TestSpecies.TreeAndBush()),
+                "même taille, mais un terrain issu d'une autre graine");
             Assert.Throws<InvalidDataException>(() => Ecosystem.Read(new MemoryStream(new byte[64]), world, TestSpecies.TreeAndBush()));
             Assert.Throws<EndOfStreamException>(
                 () => Ecosystem.Read(new MemoryStream(data, 0, data.Length / 2), world, TestSpecies.TreeAndBush()));

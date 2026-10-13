@@ -28,7 +28,7 @@ namespace Voxel.Core.Tests
         {
             World original = CreateHills(seed: 7);
             original.SetBlock(3, original.GetSurfaceHeight(3, 4) - 1, 4, Blocks.Air);
-            original.SetBlock(20, 50, 30, Blocks.WithOrientation(Blocks.Stone, 5));
+            original.SetBlock(20, 62, 30, Blocks.WithOrientation(Blocks.Stone, 5));
             original.SetBlock(16, 40, 0, Blocks.Dirt);
 
             World loaded = RoundTrip(original);
@@ -45,7 +45,7 @@ namespace Voxel.Core.Tests
         public void WriteThenRead_KeepsTrackOfWhichChunksWereModified()
         {
             World original = CreateHills(seed: 7);
-            original.SetBlock(20, 50, 30, Blocks.Stone);
+            original.SetBlock(20, 62, 30, Blocks.Stone);
 
             World loaded = RoundTrip(original);
 
@@ -54,7 +54,7 @@ namespace Voxel.Core.Tests
                 Assert.AreEqual(original.Chunks[i].IsModified, loaded.Chunks[i].IsModified, $"Chunk {original.Chunks[i].Coord}");
             }
 
-            Assert.IsTrue(loaded.GetChunk(ChunkCoord.FromBlock(new BlockPos(20, 50, 30))).IsModified);
+            Assert.IsTrue(loaded.GetChunk(ChunkCoord.FromBlock(new BlockPos(20, 62, 30))).IsModified);
         }
 
         [Test]
@@ -106,10 +106,10 @@ namespace Voxel.Core.Tests
         {
             string path = Path.Combine(temporaryDirectory, "world.dat");
             World original = CreateHills(seed: 7);
-            original.SetBlock(20, 50, 30, Blocks.Stone);
+            original.SetBlock(20, 62, 30, Blocks.Stone);
 
             WorldSave.SaveToFile(path, original);
-            World loaded = WorldSave.LoadFromFile(path, new ProvisionalHillsGenerator());
+            World loaded = WorldSave.LoadFromFile(path, new TerrainGenerator());
 
             AssertSameBlocks(original, loaded);
         }
@@ -120,19 +120,19 @@ namespace Voxel.Core.Tests
             string path = Path.Combine(temporaryDirectory, "world.dat");
             World world = CreateHills(seed: 7);
             WorldSave.SaveToFile(path, world);
-            world.SetBlock(20, 50, 30, Blocks.Stone);
+            world.SetBlock(20, 62, 30, Blocks.Stone);
 
             WorldSave.SaveToFile(path, world);
-            World loaded = WorldSave.LoadFromFile(path, new ProvisionalHillsGenerator());
+            World loaded = WorldSave.LoadFromFile(path, new TerrainGenerator());
 
-            Assert.AreEqual(Blocks.Stone, loaded.GetBlock(20, 50, 30));
+            Assert.AreEqual(Blocks.Stone, loaded.GetBlock(20, 62, 30));
             Assert.AreEqual(new[] { path }, Directory.GetFiles(temporaryDirectory));
         }
 
         private static World CreateHills(int seed)
         {
             var world = new World(2, 4, 2);
-            world.Generate(new ProvisionalHillsGenerator(), seed);
+            world.Generate(new TerrainGenerator(), seed);
             return world;
         }
 
@@ -141,7 +141,7 @@ namespace Voxel.Core.Tests
             var stream = new MemoryStream();
             WorldSave.Write(stream, world);
             stream.Position = 0;
-            return WorldSave.Read(stream, new ProvisionalHillsGenerator());
+            return WorldSave.Read(stream, new TerrainGenerator());
         }
 
         private static void AssertSameBlocks(World expected, World actual)

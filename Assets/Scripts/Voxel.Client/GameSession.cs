@@ -317,7 +317,8 @@ namespace Voxel.Client
             if (!leaving)
             {
                 string reason = networkManager.DisconnectReason;
-                if (ConnectionRefusal.IsKnown(reason)) message = reason;
+                if (!string.IsNullOrEmpty(worldSync.Failure)) message = worldSync.Failure;
+                else if (ConnectionRefusal.IsKnown(reason)) message = reason;
                 else message = wasServer ? "Le serveur s'est arrêté." : "Connexion au serveur perdue ou impossible.";
 
                 if (wasServer) Debug.LogError(message);

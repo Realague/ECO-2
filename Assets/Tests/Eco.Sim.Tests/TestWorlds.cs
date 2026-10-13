@@ -11,10 +11,10 @@ namespace Eco.Sim.Tests
 
         public int Version => 1;
 
-        public static World CreateWorld(int chunksPerSide)
+        public static World CreateWorld(int chunksPerSide, int seed = 0)
         {
             var world = new World(chunksPerSide, 1, chunksPerSide);
-            world.Generate(new MeadowGenerator(), 0);
+            world.Generate(new MeadowGenerator(), seed);
             return world;
         }
 

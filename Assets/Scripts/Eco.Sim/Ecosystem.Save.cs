@@ -10,7 +10,7 @@ namespace Eco.Sim
     public sealed partial class Ecosystem
     {
         private const uint Magic = 0x454F4345; // « ECOE »
-        private const int FormatVersion = 1;
+        private const int FormatVersion = 2;
 
         public void Write(Stream stream)
         {
@@ -26,8 +26,12 @@ namespace Eco.Sim
                     writer.Write(kind.Name);
                 }
 
+                // Les plantes sont posées sur un terrain précis : celui de ce monde, de cette graine et de
+                // cette version du générateur.
                 writer.Write(world.SizeX);
                 writer.Write(world.SizeZ);
+                writer.Write(world.Seed);
+                writer.Write(world.GeneratorVersion);
                 writer.Write(StepCount);
                 writer.Write(random.State);
                 writer.Write(nextPlantId);
@@ -90,6 +94,11 @@ namespace Eco.Sim
                 if (reader.ReadInt32() != world.SizeX || reader.ReadInt32() != world.SizeZ)
                 {
                     throw new InvalidDataException("La sauvegarde d'écosystème ne correspond pas aux dimensions du monde.");
+                }
+
+                if (reader.ReadInt32() != world.Seed || reader.ReadInt32() != world.GeneratorVersion)
+                {
+                    throw new InvalidDataException("La sauvegarde d'écosystème a été faite sur un autre terrain que celui de ce monde.");
                 }
 
                 var ecosystem = new Ecosystem(world, species, 0);

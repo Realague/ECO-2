@@ -6,7 +6,8 @@ namespace Voxel.Core
         // chunks modifiés, elles deviennent donc invalides si le reste du monde n'est plus le même.
         int Version { get; }
 
-        // Remplit le chunk à partir de ses coordonnées et de la graine, sans autre état.
+        // Remplit le chunk. Le résultat ne doit dépendre que de ses coordonnées et de la graine, jamais
+        // de l'ordre des appels ni de la machine : un client régénère ainsi le même monde que le serveur.
         void Generate(Chunk chunk, int seed);
     }
 }

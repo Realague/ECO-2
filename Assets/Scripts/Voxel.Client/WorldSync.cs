@@ -21,6 +21,7 @@ namespace Voxel.Client
         // Un lot de chunks par client et par tick réseau, pour ne pas saturer la connexion.
         private const int MaxBatchBytes = 16 * 1024;
         private const int BlockMessageSize = 3 * sizeof(int) + sizeof(ushort);
+        private const int WorldInfoSize = 6 * sizeof(int) + sizeof(ulong);
 
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private VoxelWorld voxelWorld;
@@ -39,11 +40,16 @@ namespace Voxel.Client
 
         public float LoadingProgress => expectedChunkCount > 0 ? (float)receivedChunkCount / expectedChunkCount : 0f;
 
+        // Raison pour laquelle ce client a quitté le serveur de lui-même, ou null. Conservée après
+        // l'arrêt pour pouvoir être affichée, effacée au prochain démarrage.
+        public string Failure { get; private set; }
+
         private CustomMessagingManager Messaging => networkManager.CustomMessagingManager;
 
         // À appeler juste après le démarrage du serveur ou de l'hôte, une fois son monde chargé.
         public void StartServer()
         {
+            Failure = null;
             running = true;
             ready = true;
             serverWorld = voxelWorld.World;
@@ -58,6 +64,7 @@ namespace Voxel.Client
         // À appeler juste après le lancement de la connexion d'un client.
         public void StartClient()
         {
+            Failure = null;
             running = true;
             Messaging.RegisterNamedMessageHandler(WorldInfoMessage, OnWorldInfo);
             Messaging.RegisterNamedMessageHandler(ChunksMessage, OnChunks);
@@ -158,16 +165,24 @@ namespace Voxel.Client
         {
             if (clientId == networkManager.LocalClientId) return;
 
-            using (var writer = new FastBufferWriter(3 * sizeof(int), Allocator.Temp))
+            // Le client génère lui-même le terrain à partir de la graine : seuls les chunks modifiés
+            // depuis la génération lui sont envoyés.
+            Vector3 playerPosition = networkManager.ConnectedClients[clientId].PlayerObject.transform.position;
+            var stream = new ChunkStream(serverWorld, playerPosition);
+
+            using (var writer = new FastBufferWriter(WorldInfoSize, Allocator.Temp))
             {
                 writer.WriteValueSafe(serverWorld.ChunksX);
                 writer.WriteValueSafe(serverWorld.ChunksY);
                 writer.WriteValueSafe(serverWorld.ChunksZ);
+                writer.WriteValueSafe(serverWorld.Seed);
+                writer.WriteValueSafe(serverWorld.GeneratorVersion);
+                writer.WriteValueSafe(serverWorld.TerrainFingerprint);
+                writer.WriteValueSafe(stream.ChunkCount);
                 Messaging.SendNamedMessage(WorldInfoMessage, clientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
             }
 
-            Vector3 playerPosition = networkManager.ConnectedClients[clientId].PlayerObject.transform.position;
-            streams[clientId] = new ChunkStream(serverWorld, playerPosition);
+            if (stream.ChunkCount > 0) streams[clientId] = stream;
         }
 
         private void OnClientDisconnected(ulong clientId)
@@ -208,10 +223,27 @@ namespace Voxel.Client
             reader.ReadValueSafe(out int chunksX);
             reader.ReadValueSafe(out int chunksY);
             reader.ReadValueSafe(out int chunksZ);
+            reader.ReadValueSafe(out int seed);
+            reader.ReadValueSafe(out int generatorVersion);
+            reader.ReadValueSafe(out ulong fingerprint);
+            reader.ReadValueSafe(out int modifiedChunkCount);
 
-            voxelWorld.CreateRemote(chunksX, chunksY, chunksZ);
-            expectedChunkCount = voxelWorld.World.Chunks.Count;
+            voxelWorld.CreateRemote(chunksX, chunksY, chunksZ, seed);
+
+            // Un terrain différent de celui du serveur donnerait des murs invisibles et des trous : mieux
+            // vaut ne pas jouer. Cela n'arrive que si les deux n'ont pas la même version du jeu.
+            World generated = voxelWorld.World;
+            if (generated.GeneratorVersion != generatorVersion || generated.TerrainFingerprint != fingerprint)
+            {
+                Failure = "Ce serveur n'utilise pas la même version du jeu : le monde généré ne correspond pas au sien.";
+                Debug.LogError(Failure);
+                networkManager.Shutdown();
+                return;
+            }
+
+            expectedChunkCount = modifiedChunkCount;
             receivedChunkCount = 0;
+            ready = modifiedChunkCount == 0;
         }
 
         private void OnChunks(ulong senderId, FastBufferReader reader)
@@ -226,12 +258,13 @@ namespace Voxel.Client
                 ChunkBatch.Read(batchReader, voxelWorld.World, receivedChunks);
             }
 
-            receivedChunkCount += receivedChunks.Count;
-            if (receivedChunkCount >= expectedChunkCount && !ready)
+            foreach (Chunk chunk in receivedChunks)
             {
-                voxelWorld.RemeshAll();
-                ready = true;
+                voxelWorld.RefreshChunk(chunk);
             }
+
+            receivedChunkCount += receivedChunks.Count;
+            if (receivedChunkCount >= expectedChunkCount) ready = true;
         }
 
         private void OnBlockChanged(ulong senderId, FastBufferReader reader)
@@ -269,10 +302,17 @@ namespace Voxel.Client
 
             public ChunkStream(World world, Vector3 playerPosition)
             {
-                chunks = new List<Chunk>(world.Chunks);
+                chunks = new List<Chunk>();
+                foreach (Chunk chunk in world.Chunks)
+                {
+                    if (chunk.IsModified) chunks.Add(chunk);
+                }
+
                 chunks.Sort((a, b) => DistanceSquared(a, playerPosition).CompareTo(DistanceSquared(b, playerPosition)));
                 StartedAt = Time.unscaledTime;
             }
+
+            public int ChunkCount => chunks.Count;
 
             public bool IsFinished => next >= chunks.Count;
 
