@@ -22,12 +22,13 @@ namespace Voxel.Client
 
         private WorldSync worldSync;
         private EcosystemSync ecosystemSync;
+        private InventorySync inventorySync;
+        private InventoryHud inventoryHud;
         private World world;
         private Transform cameraTransform;
         private Vector3 velocity;
         private bool grounded;
         private float pitch;
-        private ushort selectedBlock = Blocks.Dirt;
 
         private void Awake()
         {
@@ -41,6 +42,8 @@ namespace Voxel.Client
 
             worldSync = FindAnyObjectByType<WorldSync>();
             ecosystemSync = FindAnyObjectByType<EcosystemSync>();
+            inventorySync = FindAnyObjectByType<InventorySync>();
+            inventoryHud = FindAnyObjectByType<InventoryHud>();
             cameraTransform = Camera.main.transform;
             body.SetActive(false);
             enabled = true;
@@ -81,7 +84,6 @@ namespace Voxel.Client
 
             if (hasControl)
             {
-                SelectBlock(keyboard);
                 Interact(mouse);
             }
             else if (hasDevices && mouse.leftButton.wasPressedThisFrame)
@@ -118,13 +120,6 @@ namespace Voxel.Client
                 Quaternion.Euler(pitch, transform.eulerAngles.y, 0f));
         }
 
-        private void SelectBlock(Keyboard keyboard)
-        {
-            if (keyboard.digit1Key.wasPressedThisFrame) selectedBlock = Blocks.Stone;
-            if (keyboard.digit2Key.wasPressedThisFrame) selectedBlock = Blocks.Dirt;
-            if (keyboard.digit3Key.wasPressedThisFrame) selectedBlock = Blocks.Grass;
-        }
-
         private void Interact(Mouse mouse)
         {
             bool breakBlock = mouse.leftButton.wasPressedThisFrame;
@@ -151,12 +146,22 @@ namespace Voxel.Client
                 return;
             }
 
+            // Le clic droit utilise l'objet tenu : une graine se plante dans la colonne visée, un bloc se pose.
+            int held = inventoryHud.SelectedItem;
+            if (Items.IsSeed(held))
+            {
+                inventorySync.RequestPlant(held, hit.Block.X, hit.Block.Z);
+                return;
+            }
+
+            if (!Items.IsBlock(held) || !inventorySync.Inventory.Has(held)) return;
+
             BlockPos target = hit.Block + hit.Normal;
             bool insidePlayer = VoxelCollision.IntersectsBlock(
                 transform.position.ToNumerics(), PlayerRules.HalfWidth, PlayerRules.Height, target);
             if (target != hit.Block && !insidePlayer)
             {
-                worldSync.RequestSetBlock(target, selectedBlock);
+                worldSync.RequestSetBlock(target, Items.BlockOf(held));
             }
         }
 

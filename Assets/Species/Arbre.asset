@@ -19,6 +19,7 @@ MonoBehaviour:
   spacing: 4
   minFertility: 0.6
   fertilityUsePerDay: 0.2
+  woodYield: 4
   height: 5.5
   width: 1
   parts:

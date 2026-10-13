@@ -11,7 +11,12 @@ namespace Voxel.Core
         public const ushort Dirt = 2;
         public const ushort Grass = 3;
 
-        private const ushort LastType = Grass;
+        // Blocs de construction : ils n'existent pas dans le terrain, les joueurs les fabriquent.
+        public const ushort Planks = 4;
+        public const ushort Bricks = 5;
+        public const ushort Timbered = 6;
+
+        public const ushort LastType = Timbered;
 
         public static ushort TypeOf(ushort block) => (ushort)(block & TypeMask);
 

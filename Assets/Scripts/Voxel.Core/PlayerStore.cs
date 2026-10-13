@@ -5,19 +5,27 @@ using System.Text;
 
 namespace Voxel.Core
 {
-    public struct PlayerState
+    // Ce que le serveur retient d'un joueur d'une partie à l'autre.
+    public sealed class PlayerState
     {
         public Vector3 Position;
 
         // Direction du regard autour de l'axe vertical, en degrés.
         public float Yaw;
+
+        public Speciality Speciality;
+
+        public Inventory Inventory { get; } = new Inventory();
     }
 
-    // Ce que le serveur retient de chaque joueur d'une partie à l'autre, par identifiant de joueur.
+    // L'état de chaque joueur connu du serveur, par identifiant de joueur.
     public sealed class PlayerStore
     {
         private const uint Magic = 0x504F4345; // « ECOP »
-        private const int FormatVersion = 1;
+        private const int FormatVersion = 2;
+
+        // Dernier format sans spécialité ni inventaire. Il se lit encore : le joueur garde sa position.
+        private const int FormatWithoutInventory = 1;
 
         private readonly Dictionary<string, PlayerState> players = new Dictionary<string, PlayerState>();
 
@@ -26,6 +34,18 @@ namespace Voxel.Core
         public bool TryGet(string playerId, out PlayerState state) => players.TryGetValue(playerId, out state);
 
         public void Set(string playerId, PlayerState state) => players[playerId] = state;
+
+        // L'état du joueur, créé vide s'il n'était pas encore connu.
+        public PlayerState GetOrAdd(string playerId)
+        {
+            if (!players.TryGetValue(playerId, out PlayerState state))
+            {
+                state = new PlayerState();
+                players.Add(playerId, state);
+            }
+
+            return state;
+        }
 
         public void Write(Stream stream)
         {
@@ -36,11 +56,14 @@ namespace Voxel.Core
                 writer.Write(players.Count);
                 foreach (KeyValuePair<string, PlayerState> player in players)
                 {
+                    PlayerState state = player.Value;
                     writer.Write(player.Key);
-                    writer.Write(player.Value.Position.X);
-                    writer.Write(player.Value.Position.Y);
-                    writer.Write(player.Value.Position.Z);
-                    writer.Write(player.Value.Yaw);
+                    writer.Write(state.Position.X);
+                    writer.Write(state.Position.Y);
+                    writer.Write(state.Position.Z);
+                    writer.Write(state.Yaw);
+                    writer.Write((byte)state.Speciality);
+                    state.Inventory.Write(writer);
                 }
             }
         }
@@ -56,7 +79,7 @@ namespace Voxel.Core
                 }
 
                 int formatVersion = reader.ReadInt32();
-                if (formatVersion != FormatVersion)
+                if (formatVersion != FormatVersion && formatVersion != FormatWithoutInventory)
                 {
                     throw new InvalidDataException(
                         $"Format de sauvegarde des joueurs {formatVersion} non pris en charge (attendu : {FormatVersion}).");
@@ -72,6 +95,19 @@ namespace Voxel.Core
                         Position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle()),
                         Yaw = reader.ReadSingle()
                     };
+
+                    if (formatVersion != FormatWithoutInventory)
+                    {
+                        var speciality = (Speciality)reader.ReadByte();
+                        if (speciality != Speciality.None && !Specialities.IsChoice(speciality))
+                        {
+                            throw new InvalidDataException($"Spécialité inconnue pour le joueur {playerId}.");
+                        }
+
+                        state.Speciality = speciality;
+                        state.Inventory.Read(reader);
+                    }
+
                     store.Set(playerId, state);
                 }
 

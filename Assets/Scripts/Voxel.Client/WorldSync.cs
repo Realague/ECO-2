@@ -25,6 +25,7 @@ namespace Voxel.Client
 
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private VoxelWorld voxelWorld;
+        [SerializeField] private InventorySync inventorySync;
 
         private readonly Dictionary<ulong, ChunkStream> streams = new Dictionary<ulong, ChunkStream>();
         private readonly List<ulong> finishedStreams = new List<ulong>();
@@ -111,7 +112,13 @@ namespace Voxel.Client
         {
             if (!IsEditAllowed(clientId, pos, block)) return false;
 
+            // Poser un bloc le prend dans l'inventaire du joueur ; en casser un le lui donne.
+            bool placing = Blocks.IsSolid(block);
+            if (placing && !inventorySync.TryConsume(clientId, Items.OfBlock(block))) return false;
+
+            ushort previous = serverWorld.GetBlock(pos);
             serverWorld.SetBlock(pos, block);
+            if (!placing) inventorySync.Give(clientId, Items.DropOf(previous), 1);
             return true;
         }
 

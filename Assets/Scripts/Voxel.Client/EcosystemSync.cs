@@ -47,6 +47,7 @@ namespace Voxel.Client
         private const float MinAnimalTravelSeconds = 0.25f;
 
         [SerializeField] private NetworkManager networkManager;
+        [SerializeField] private InventorySync inventorySync;
         [SerializeField] private SpeciesAsset[] speciesAssets;
         [SerializeField] private AnimalSpeciesAsset[] animalAssets;
         [SerializeField] private float plantViewDistance = 128f;
@@ -403,8 +404,36 @@ namespace Voxel.Client
 
             float maxDistance = PlayerRules.Reach + BlockEditRules.ReachTolerance;
             if (PlantShape.DistanceSquared(eyes.ToNumerics(), min, max) > maxDistance * maxDistance) return false;
+            if (!ecosystem.Remove(plantId)) return false;
 
-            return ecosystem.Remove(plantId);
+            // Abattre rapporte du bois selon la taille de la plante, et une graine si elle était adulte.
+            int wood = Mathf.RoundToInt(speciesAssets[plant.SpeciesIndex].WoodYield * PlantShape.Scale(plant.Stage));
+            inventorySync.Give(clientId, Items.Wood, wood);
+            if (plant.Growth >= 1f) inventorySync.Give(clientId, Items.Seed(plant.SpeciesIndex), 1);
+            return true;
+        }
+
+        // Côté serveur : fait germer une graine dans la colonne visée par un joueur, si elle est à sa
+        // portée et que le sol, la place et la fertilité le permettent.
+        public bool TryPlantSeed(ulong clientId, int speciesIndex, int x, int z)
+        {
+            if (ecosystem == null || speciesIndex < 0 || speciesIndex >= species.Count) return false;
+            if (!networkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client)) return false;
+            if (client.PlayerObject == null) return false;
+
+            Vector3 position = client.PlayerObject.transform.position;
+            float dx = x + 0.5f - position.x;
+            float dz = z + 0.5f - position.z;
+            float maxDistance = PlayerRules.Reach + BlockEditRules.ReachTolerance;
+            if (dx * dx + dz * dz > maxDistance * maxDistance) return false;
+
+            return ecosystem.TryPlant(speciesIndex, x, z);
+        }
+
+        // Nom d'une espèce de plante, pour l'affichage (par exemple celui d'une graine).
+        public string PlantName(int speciesIndex)
+        {
+            return speciesIndex >= 0 && speciesIndex < speciesAssets.Length ? speciesAssets[speciesIndex].name : "?";
         }
 
         private void OnFellRequest(ulong senderId, FastBufferReader reader)

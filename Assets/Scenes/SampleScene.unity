@@ -395,6 +395,8 @@ GameObject:
   - component: {fileID: 490447445}
   - component: {fileID: 490447447}
   - component: {fileID: 490447448}
+  - component: {fileID: 490447450}
+  - component: {fileID: 490447449}
   m_Layer: 0
   m_Name: GameSession
   m_TagString: Untagged
@@ -418,6 +420,7 @@ MonoBehaviour:
   voxelWorld: {fileID: 1566503039}
   worldSync: {fileID: 490447447}
   ecosystemSync: {fileID: 490447448}
+  inventorySync: {fileID: 490447450}
   port: 50000
   autosaveInterval: 60
 --- !u!4 &490447446
@@ -449,6 +452,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.WorldSync
   networkManager: {fileID: 947039382}
   voxelWorld: {fileID: 1566503039}
+  inventorySync: {fileID: 490447450}
 --- !u!114 &490447448
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -462,6 +466,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.EcosystemSync
   networkManager: {fileID: 947039382}
+  inventorySync: {fileID: 490447450}
   speciesAssets:
   - {fileID: 11400000, guid: 6ea61faa421995f4a9a4b6f892bf2dd4, type: 2}
   - {fileID: 11400000, guid: cc9f79da0d803bf40932a87b727b2553, type: 2}
@@ -469,6 +474,36 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 6574d881bcfa74945b4cf99af2886576, type: 2}
   - {fileID: 11400000, guid: 86ee08040998fa64898d08a9f9aff1ba, type: 2}
   plantViewDistance: 128
+--- !u!114 &490447449
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 490447444}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f77fa772b81bda642a92cb983e47e56e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.InventoryHud
+  networkManager: {fileID: 947039382}
+  worldSync: {fileID: 490447447}
+  inventorySync: {fileID: 490447450}
+  ecosystemSync: {fileID: 490447448}
+--- !u!114 &490447450
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 490447444}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 25e876f8cd3fde542aca360610d7c140, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.InventorySync
+  networkManager: {fileID: 947039382}
+  ecosystemSync: {fileID: 490447448}
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0

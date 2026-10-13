@@ -29,12 +29,18 @@ namespace Voxel.Client
         [SerializeField, Range(0f, 1f)] private float minFertility = 0.2f;
         [SerializeField] private float fertilityUsePerDay = 0.2f;
 
+        [Header("Récolte")]
+        [Tooltip("Bois obtenu en abattant une plante adulte ; une plante plus jeune en donne moins.")]
+        [SerializeField] private int woodYield;
+
         [Header("Apparence et visée")]
         [SerializeField] private float height = 5.5f;
         [SerializeField] private float width = 1f;
         [SerializeField] private Part[] parts;
 
         public IReadOnlyList<Part> Parts => parts;
+
+        public int WoodYield => woodYield;
 
         public Species ToSpecies()
         {

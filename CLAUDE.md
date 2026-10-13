@@ -46,6 +46,16 @@ Ecosystem simulation (`Eco.Sim`, run by the server only):
 - Plant materials must have **GPU instancing enabled in the asset** (`PlantRenderer` draws with `Graphics.RenderMeshInstanced`); enabling it only at runtime would let the build strip the shader variant.
 - `PlantRenderer` groups plants into 32-block regions and only prepares and draws regions within `EcosystemSync.plantViewDistance` (128 blocks) of the main camera. Drawing every plant in the world each frame dropped a final-size world to 19 fps.
 
+Inventory, crafting and specialities (rules in `Voxel.Core`, networking in `InventorySync`):
+
+- An item is an `int` (`Items`): block types keep their number, other items use reserved ranges above (`Items.Wood`, one seed per plant species at `Items.Seed(speciesIndex)`). Like plants, **seeds reference their species by index**, so reordering species also breaks saved inventories.
+- Each player has an `Inventory` (a count per item, no capacity limit) and one `Speciality`, both inside `PlayerState`, which `PlayerStore` saves in `players.dat` (format 2; format 1, positions only, still loads). `PlayerState` is a class and `PlayerRegistry` hands out the stored instance (`TryGetState`): mutate it in place, never replace it.
+- **The server owns every inventory.** Breaking a block gives `Items.DropOf` (grass gives dirt), placing one consumes it (`WorldSync.TryApplyEdit` refuses a placement the player cannot pay for), felling gives wood by plant size (`SpeciesAsset.WoodYield`) and one seed if the plant was mature. Server code changes an inventory only through `InventorySync.TryConsume` / `Give`, which also send the new state to its owner; a client knows only its own inventory (whole state resent on each change, `Inv.State`), and the host reads the server's copy directly.
+- A speciality is chosen once and never changed. `Recipes.All` is the whole crafting table: Carpenter turns wood into planks, Mason stone into bricks, Gardener is the only one who can plant seeds (`InventorySync.RequestPlant`), and timbered blocks need planks **and** bricks, so no single player can make them. That dependency is the point of the system: keep it when adding recipes. Players hand items to the nearest player within reach (`RequestGive`).
+- A recipe is addressed by its index in `Recipes.All` in the `Inv.Craft` message, so server and clients must run the same build.
+- `InventoryHud` draws the inventory and reads its keys (wheel or 1-9: held item, C: crafting, K: speciality, G: give). `PlayerController` right-click uses `InventoryHud.SelectedItem`: a block is placed, a seed is planted in the targeted column.
+- New block types need a tile in `BlockAtlas`, a name in `Items.NameOf`, and `Blocks.LastType` updated (it bounds what the server accepts from clients and what a save may contain).
+
 Scale (measured in the Editor at the planned final size, 64 × 8 × 64 chunks = 1024 × 128 × 1024 blocks, `-worldsize 64,8,64`): the host starts in about 4.5 s and uses about 1.5 GB; a dedicated server starts in under 1 s and uses about 600 MB; sending the whole world to a joining player is 2.6 MB in under 6 s, and that player is in game after about 8 s; a mature forest is about 85,000 plants. Those figures predate client-side generation: a joining player now receives only modified chunks. Still not done at that size: per-player chunk subscriptions (every client holds the whole world), skipping GameObjects for empty chunks, and off-thread meshing.
 
 Networking (Netcode for GameObjects 2.x, Unity Transport, direct IP; the UDP port is set on `GameSession` in the scene, currently 50000):
@@ -76,6 +86,7 @@ The Editor is driven through the **MCP for Unity** package (`com.coplaydev.unity
 - After creating or editing a script, Unity recompiles and reloads the domain. Tool calls made during that window fail or return stale results, so confirm compilation finished and check `read_console` for errors before using the new type.
 - `manage_components(action="add")` has failed to resolve a freshly compiled project script by name even after compilation succeeded. Fallback: `execute_code` with `Undo.AddComponent(go, type)`.
 - Scene edits made through MCP are not persisted until `manage_scene(action="save")`.
+- World sizes (`VoxelWorld.sizeInChunks`, `GameSession.worldSize`, `-worldsize`) are in **chunks**, not blocks. Passing a block count (128 per axis is two million chunks) freezes the Editor until it is killed.
 - In the Editor, private fields of scene objects survive script reloads and entering Play mode, and **a `null` string comes back as an empty string**. Test unset strings with `string.IsNullOrEmpty`, not `== null` (this once made the host send an empty player id and start without a player).
 - The console regularly shows a `NoSubscription` error from `generators.ai.unity.com` (Unity AI generators without a subscription). It is unrelated to project code.
 

@@ -39,6 +39,16 @@ namespace Voxel.Client
 
         public bool TryGetPlayerId(ulong clientId, out string playerId) => connectedPlayers.TryGetValue(clientId, out playerId);
 
+        // L'état sauvegardé d'un joueur connecté : position, spécialité et inventaire.
+        public bool TryGetState(ulong clientId, out PlayerState state)
+        {
+            state = null;
+            if (!connectedPlayers.TryGetValue(clientId, out string playerId)) return false;
+
+            state = store.GetOrAdd(playerId);
+            return true;
+        }
+
         public void Close()
         {
             networkManager.ConnectionApprovalCallback = null;
@@ -55,11 +65,9 @@ namespace Voxel.Client
                 if (client.PlayerObject == null) continue;
 
                 Transform transform = client.PlayerObject.transform;
-                store.Set(player.Value, new PlayerState
-                {
-                    Position = transform.position.ToNumerics(),
-                    Yaw = transform.eulerAngles.y
-                });
+                PlayerState state = store.GetOrAdd(player.Value);
+                state.Position = transform.position.ToNumerics();
+                state.Yaw = transform.eulerAngles.y;
             }
         }
 
@@ -141,12 +149,14 @@ namespace Voxel.Client
                 }
             }
 
+            // Nouveau joueur, ou position sauvegardée hors du monde : il apparaît au centre, et son état
+            // (inventaire compris) est conservé à partir de maintenant.
             int x = world.SizeX / 2 + (int)(clientId % SpawnSlots) * SpawnSpacing;
             int z = world.SizeZ / 2;
-            return new PlayerState
-            {
-                Position = new System.Numerics.Vector3(x + 0.5f, world.GetSurfaceHeight(x, z), z + 0.5f)
-            };
+            PlayerState state = store.GetOrAdd(playerId);
+            state.Position = new System.Numerics.Vector3(x + 0.5f, world.GetSurfaceHeight(x, z), z + 0.5f);
+            state.Yaw = 0f;
+            return state;
         }
 
         private void OnClientDisconnected(ulong clientId)

@@ -39,6 +39,7 @@ namespace Voxel.Client
         [SerializeField] private VoxelWorld voxelWorld;
         [SerializeField] private WorldSync worldSync;
         [SerializeField] private EcosystemSync ecosystemSync;
+        [SerializeField] private InventorySync inventorySync;
         [SerializeField] private ushort port = 7777;
         [SerializeField] private float autosaveInterval = 60f;
 
@@ -211,6 +212,7 @@ namespace Voxel.Client
             // Le monde du client est créé par WorldSync à partir de ce que le serveur envoie.
             worldSync.StartClient();
             ecosystemSync.StartClient();
+            inventorySync.StartClient();
             sessionActive = true;
         }
 
@@ -250,6 +252,7 @@ namespace Voxel.Client
 
             worldSync.StartServer();
             ecosystemSync.StartServer(voxelWorld.World, dataDirectory, startTimeScale, IsAdmin);
+            inventorySync.StartServer(registry);
             sessionActive = true;
             nextAutosave = Time.unscaledTime + autosaveInterval;
             Debug.Log($"Serveur démarré sur le port {port}. Sauvegardes dans {dataDirectory}, toutes les {autosaveInterval} s.");
@@ -294,6 +297,7 @@ namespace Voxel.Client
             // s'arrêter avant que SaveSession ait été appelé : on enregistre donc ici aussi.
             ecosystemSync.Save();
             ecosystemSync.Stop();
+            inventorySync.Stop();
             worldSync.Stop();
             if (registry != null)
             {
