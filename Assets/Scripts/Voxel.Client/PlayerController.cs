@@ -21,6 +21,7 @@ namespace Voxel.Client
         [SerializeField] private float mouseSensitivity = 0.1f;
 
         private WorldSync worldSync;
+        private EcosystemSync ecosystemSync;
         private World world;
         private Transform cameraTransform;
         private Vector3 velocity;
@@ -39,6 +40,7 @@ namespace Voxel.Client
             if (!IsOwner) return;
 
             worldSync = FindAnyObjectByType<WorldSync>();
+            ecosystemSync = FindAnyObjectByType<EcosystemSync>();
             cameraTransform = Camera.main.transform;
             body.SetActive(false);
             enabled = true;
@@ -131,7 +133,20 @@ namespace Voxel.Client
 
             System.Numerics.Vector3 origin = cameraTransform.position.ToNumerics();
             System.Numerics.Vector3 direction = cameraTransform.forward.ToNumerics();
-            if (!VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, out VoxelHit hit)) return;
+            bool blockHit = VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, out VoxelHit hit);
+
+            // Le clic gauche abat la plante visée si elle se trouve avant le bloc visé.
+            if (breakBlock)
+            {
+                float blockDistance = blockHit ? hit.Distance : PlayerRules.Reach;
+                if (ecosystemSync.TryPick(origin, direction, blockDistance, out int plantId))
+                {
+                    ecosystemSync.RequestFell(plantId);
+                    return;
+                }
+            }
+
+            if (!blockHit) return;
 
             // Le serveur a le dernier mot : la demande passe par WorldSync, jamais par World.SetBlock.
             if (breakBlock)

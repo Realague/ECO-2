@@ -3,6 +3,7 @@
     "rootNamespace": "Voxel.Client",
     "references": [
         "Voxel.Core",
+        "Eco.Sim",
         "Unity.InputSystem",
         "Unity.Netcode.Runtime",
         "Unity.Networking.Transport",

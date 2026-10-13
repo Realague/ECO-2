@@ -1,0 +1,16 @@
+{
+    "name": "Eco.Sim",
+    "rootNamespace": "Eco.Sim",
+    "references": [
+        "Voxel.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

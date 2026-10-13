@@ -4,15 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Unity **6000.6.5f1** project (URP 3D template): a multiplayer block-world game in the spirit of *Eco* (server-simulated ecosystem), currently at the single-player voxel foundation stage. One scene (`Assets/Scenes/SampleScene.unity`, the only scene in the build settings). `Assets/TutorialInfo/` and `Assets/Readme.asset` are leftovers from the Unity template, not project code.
+Unity **6000.6.5f1** project (URP 3D template): a multiplayer block-world game in the spirit of *Eco*: the server simulates an ecosystem (plants that grow, spread and die) that players affect. Current state: voxel world, dedicated-server multiplayer, and a first plant simulation. One scene (`Assets/Scenes/SampleScene.unity`, the only scene in the build settings). `Assets/TutorialInfo/` and `Assets/Readme.asset` are leftovers from the Unity template, not project code.
 
 ## Architecture
 
 Code is split into assemblies so that a future dedicated server can run the world without rendering:
 
 - `Assets/Scripts/Voxel.Core` — blocks, chunks, world, generation, collision, raycast. **Pure C#: the asmdef sets `noEngineReferences`, so `UnityEngine` is unavailable here.** Vectors are `System.Numerics.Vector3`; positions are `BlockPos` / `ChunkCoord`.
+- `Assets/Scripts/Eco.Sim` — the ecosystem simulation: soil fertility, plants, species rules, simulation clock, save format. **Pure C# as well (`noEngineReferences`), depends only on `Voxel.Core`.**
 - `Assets/Scripts/Voxel.Client` — meshing, rendering, input, player, and for now the session/network code. Converts vectors at the boundary with `ToNumerics()` / `ToUnity()`.
-- `Assets/Tests/Voxel.Core.Tests` — EditMode tests for `Voxel.Core`.
+- `Assets/Tests/Voxel.Core.Tests`, `Assets/Tests/Eco.Sim.Tests` — EditMode tests for the two pure assemblies.
 
 Key rules:
 
@@ -27,7 +28,19 @@ Key rules:
 - **Gameplay code reads the world through `WorldSync.World`**, which stays `null` until the world is fully available on this machine (on a client, until every chunk has arrived). The local player does not simulate before that.
 - **Players never call `World.SetBlock` directly: they call `WorldSync.RequestSetBlock`.** The server validates every request (`BlockEditRules` in `Voxel.Core`, plus "not inside a player") and broadcasts accepted changes; a client applies its own request immediately and the server sends back the real block if it refuses.
 
-Networking (Netcode for GameObjects 2.x, Unity Transport, direct IP on UDP 7777):
+Ecosystem simulation (`Eco.Sim`, run by the server only):
+
+- **`Ecosystem.Step()` is the only thing that advances the simulation, and it must stay deterministic**: no real time, no `UnityEngine`, no `System.Random` (use the ecosystem's `SimRandom`, whose state is saved), and plants are processed in list order. Tests rely on "same seed + same calls = same forest", including across a save and reload.
+- Time acceleration never changes what a step does: `SimClock` only decides *how many* steps to run (one step = 10 game minutes; at speed 1 that is 10 real seconds). Do not scale step effects by a delta time, and never use `Time.timeScale`. `EcosystemSync.Update` runs the due steps within an 8 ms budget per frame; steps queued by "advance N days" always run, backlog caused by the multiplier is dropped.
+- Soil fertility lives on a coarse grid (`Ecosystem.CellSize` = 4×4 block columns per cell). Each cell regenerates toward its own capacity, laid out in smooth rich and poor patches. Plants draw it down; below a species' `MinFertility` seeds do not germinate and plants starve.
+- A block column holds at most one plant. `Species.Spacing` only applies between plants of the same species. A plant dies if the block under it is no longer dirt or grass, or if a block is placed where it stands; this is checked in `Step`, there is no hook on `World.BlockChanged`.
+- Plants are records, not GameObjects and not `NetworkObject`s. They have no collision: players walk through them.
+- Species are data: `SpeciesAsset` (ScriptableObject in `Assets/Species`, durations in game days, plus the meshes and materials to draw) converted to `Eco.Sim.Species`. **Plants reference their species by index in `EcosystemSync.speciesAssets`**, so reordering or renaming species makes `ecosystem.dat` fail to load (a fresh ecosystem then replaces it). Balance lives in these assets: with the current values trees need rich soil (forests and clearings) and bushes tolerate poor soil.
+- `EcosystemSync` mirrors `WorldSync`: named messages, server-authoritative. A full plant snapshot is sent on connection, then once per network tick only the final state of plants that changed (a plant's growth is sent as one of `Plant.StageCount` stages, not continuously). Felling is requested with `EcosystemSync.RequestFell` and validated for reach by the server; clients predict it and get the plant back if refused.
+- Simulation speed commands (F5/F6/F7, `EcosystemSync.RequestMultiplier` / `RequestAdvanceDays`) are only honoured for admins: the host of a hosted game, or players listed in the server's `-admin <id,id>` argument. `-timescale <x>` sets the starting speed.
+- Plant materials must have **GPU instancing enabled in the asset** (`PlantRenderer` draws with `Graphics.RenderMeshInstanced`); enabling it only at runtime would let the build strip the shader variant.
+
+Networking (Netcode for GameObjects 2.x, Unity Transport, direct IP; the UDP port is set on `GameSession` in the scene, currently 50000):
 
 - `GameSession` owns starting and stopping, in three roles: host (F1 or `-host`), client (Enter or `-connect <address>`), and dedicated server (`-server`, implied by `-batchmode`). F10 leaves. Other arguments: `-port`, `-password`, `-data <dir>` (server save folder, default `Application.persistentDataPath`), `-autosave <seconds>`, `-playerid <id>`.
 - **Dedicated server**: the Dedicated Server build module is not installed, so the server is the normal player run headless. `VoxelWorld` skips all meshing and rendering when `Application.isBatchMode` is true, the frame rate is capped to the network tick rate, and the process quits if the server stops.
@@ -38,7 +51,7 @@ Networking (Netcode for GameObjects 2.x, Unity Transport, direct IP on UDP 7777)
 
 - **Server role teardown differs from client teardown**: a dedicated server never raises `OnClientStopped`, so `GameSession` ends a session on both `OnServerStopped` and `OnClientStopped` (a host gets both; `sessionActive` makes it idempotent).
 - `PlayerRegistry` (server only, plain class created by `GameSession`) is the connection approval callback. It checks the password (empty = open server), refuses a player id that is already connected, and spawns the player at the position saved in `players.dat`, raised out of any block built there since. A client's id comes from `PlayerIdentity` (a GUID file in `persistentDataPath`; **the Editor uses a separate file from builds** so both can join the same server from one machine). The id and password travel in the NGO connection payload (`ConnectionRequest`), unencrypted.
-- **Saving happens on the server only**: every `autosaveInterval` (60 s), when a player disconnects (players only), on F10 and on quit. **A player's object is already unreadable when NGO reports the disconnection or the end of the session**, so `PlayerRegistry.TrackPlayers` records every connected player's position each frame, and `SaveSession` runs before `NetworkManager.Shutdown` and in `OnApplicationQuit`. A killed server loses at most one autosave interval.
+- **Saving happens on the server only** (`world.dat`, `players.dat`, `ecosystem.dat` in the data folder): every `autosaveInterval` (60 s), when a player disconnects (players only), on F10 and on quit. **A player's object is already unreadable when NGO reports the disconnection or the end of the session**, so `PlayerRegistry.TrackPlayers` records every connected player's position each frame, and `SaveSession` runs before `NetworkManager.Shutdown` and in `OnApplicationQuit`. A killed server loses at most one autosave interval.
 - The client shows the server's refusal reason only when it is one of the texts in `ConnectionRefusal` (`Voxel.Core`); any other `NetworkManager.DisconnectReason` is NGO's internal wording and is replaced by a generic message.
 - The server's world is persistent (loaded from and saved to `world.dat`). **A client never generates, reads or writes a world**: `WorldSync` receives it from the server.
 - `WorldSync` uses NGO named messages, not RPCs or `NetworkVariable`s, so it needs no `NetworkObject`: world info then every chunk on connection (`ChunkBatch`, one batch of at most 16 KB per client per network tick, nearest chunks first), then one message per block change. Chunks are serialized when sent, and all these messages share one reliable ordered channel, so a block changed during the transfer is never lost. Every client currently receives the whole world and every change; per-player chunk subscriptions are left for the load test.

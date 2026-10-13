@@ -394,6 +394,7 @@ GameObject:
   - component: {fileID: 490447446}
   - component: {fileID: 490447445}
   - component: {fileID: 490447447}
+  - component: {fileID: 490447448}
   m_Layer: 0
   m_Name: GameSession
   m_TagString: Untagged
@@ -416,7 +417,9 @@ MonoBehaviour:
   networkManager: {fileID: 947039382}
   voxelWorld: {fileID: 1566503039}
   worldSync: {fileID: 490447447}
+  ecosystemSync: {fileID: 490447448}
   port: 50000
+  autosaveInterval: 60
 --- !u!4 &490447446
 Transform:
   m_ObjectHideFlags: 0
@@ -446,6 +449,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.WorldSync
   networkManager: {fileID: 947039382}
   voxelWorld: {fileID: 1566503039}
+--- !u!114 &490447448
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 490447444}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42d5b9014c1f40246be5fe3442b2d16e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.EcosystemSync
+  networkManager: {fileID: 947039382}
+  speciesAssets:
+  - {fileID: 11400000, guid: 6ea61faa421995f4a9a4b6f892bf2dd4, type: 2}
+  - {fileID: 11400000, guid: cc9f79da0d803bf40932a87b727b2553, type: 2}
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -570,7 +589,7 @@ MonoBehaviour:
   m_ProtocolType: 0
   m_UseWebSockets: 0
   m_UseEncryption: 0
-  m_MaxPacketQueueSize: 128
+  m_MaxPacketQueueSize: 512
   m_MaxPayloadSize: 6144
   m_HeartbeatTimeoutMS: 500
   m_ConnectTimeoutMS: 1000

@@ -37,6 +37,8 @@ namespace Voxel.Client
 
         public int ConnectedCount => connectedPlayers.Count;
 
+        public bool TryGetPlayerId(ulong clientId, out string playerId) => connectedPlayers.TryGetValue(clientId, out playerId);
+
         public void Close()
         {
             networkManager.ConnectionApprovalCallback = null;

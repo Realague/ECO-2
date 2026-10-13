@@ -22,6 +22,8 @@ namespace Voxel.Client
     //   -data <dossier>       dossier des sauvegardes du serveur
     //   -autosave <secondes>  intervalle de sauvegarde automatique du serveur
     //   -playerid <id>        identifiant de joueur, à la place de celui enregistré sur la machine
+    //   -timescale <facteur>  vitesse de la simulation au démarrage du serveur, 1 par défaut
+    //   -admin <id,id,...>    identifiants des joueurs autorisés à régler la vitesse de la simulation
     public class GameSession : MonoBehaviour
     {
         private const string LocalAddress = "127.0.0.1";
@@ -29,9 +31,13 @@ namespace Voxel.Client
         private const int MaxAddressLength = 15;
         private const int MaxPasswordLength = 32;
 
+        // Vitesses de simulation parcourues par les touches F5 et F6. Zéro met le temps en pause.
+        private static readonly float[] TimeScales = { 0f, 1f, 10f, 100f, 1000f, 10000f };
+
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private VoxelWorld voxelWorld;
         [SerializeField] private WorldSync worldSync;
+        [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private ushort port = 7777;
         [SerializeField] private float autosaveInterval = 60f;
 
@@ -39,6 +45,8 @@ namespace Voxel.Client
         private string password = "";
         private string playerId;
         private string dataDirectory;
+        private float startTimeScale = 1f;
+        private string[] adminIds = Array.Empty<string>();
         private string message = "";
         private bool editingPassword;
         private bool sessionActive;
@@ -113,6 +121,18 @@ namespace Voxel.Client
                     leaving = true;
                     networkManager.Shutdown();
                 }
+                else if (keyboard.f5Key.wasPressedThisFrame)
+                {
+                    ecosystemSync.RequestMultiplier(NextTimeScale(-1));
+                }
+                else if (keyboard.f6Key.wasPressedThisFrame)
+                {
+                    ecosystemSync.RequestMultiplier(NextTimeScale(1));
+                }
+                else if (keyboard.f7Key.wasPressedThisFrame)
+                {
+                    ecosystemSync.RequestAdvanceDays(1);
+                }
 
                 return;
             }
@@ -186,6 +206,7 @@ namespace Voxel.Client
 
             // Le monde du client est créé par WorldSync à partir de ce que le serveur envoie.
             worldSync.StartClient();
+            ecosystemSync.StartClient();
             sessionActive = true;
         }
 
@@ -224,22 +245,48 @@ namespace Voxel.Client
             }
 
             worldSync.StartServer();
+            ecosystemSync.StartServer(voxelWorld.World, dataDirectory, startTimeScale, IsAdmin);
             sessionActive = true;
             nextAutosave = Time.unscaledTime + autosaveInterval;
             Debug.Log($"Serveur démarré sur le port {port}. Sauvegardes dans {dataDirectory}, toutes les {autosaveInterval} s.");
         }
 
-        // Écrit le monde et les joueurs sur le disque. Sans effet hors du rôle de serveur.
+        // Écrit le monde, l'écosystème et les joueurs sur le disque. Sans effet hors du rôle de serveur.
         private void SaveSession()
         {
             if (registry == null) return;
 
             registry.Save();
             voxelWorld.Save();
+            ecosystemSync.Save();
+        }
+
+        // L'hôte est administrateur de sa propre partie ; sur un serveur dédié, ce sont les joueurs
+        // désignés par l'argument -admin.
+        private bool IsAdmin(ulong clientId)
+        {
+            if (networkManager.IsHost && clientId == networkManager.LocalClientId) return true;
+
+            return registry != null
+                && registry.TryGetPlayerId(clientId, out string id)
+                && Array.IndexOf(adminIds, id) >= 0;
+        }
+
+        // Vitesse suivante ou précédente dans la liste, à partir de la vitesse actuelle.
+        private float NextTimeScale(int direction)
+        {
+            int current = 0;
+            for (int i = 0; i < TimeScales.Length; i++)
+            {
+                if (TimeScales[i] <= ecosystemSync.Multiplier) current = i;
+            }
+
+            return TimeScales[Mathf.Clamp(current + direction, 0, TimeScales.Length - 1)];
         }
 
         private void EndSession()
         {
+            ecosystemSync.Stop();
             worldSync.Stop();
             if (registry != null)
             {
@@ -305,6 +352,16 @@ namespace Voxel.Client
 
             string requestedId = ArgumentValue(arguments, "-playerid");
             if (ConnectionRequest.IsValidPlayerId(requestedId)) playerId = requestedId;
+
+            bool validScale = float.TryParse(
+                ArgumentValue(arguments, "-timescale"), NumberStyles.Float, CultureInfo.InvariantCulture, out float scale);
+            if (validScale && scale >= 0f)
+            {
+                startTimeScale = scale;
+            }
+
+            string admins = ArgumentValue(arguments, "-admin");
+            if (admins != null) adminIds = admins.Split(',');
         }
 
         private string ScreenText()
@@ -332,10 +389,12 @@ namespace Voxel.Client
             if (Cursor.lockState != CursorLockMode.Locked)
             {
                 string role = networkManager.IsHost ? $"Partie hébergée sur le port {port}" : $"Connecté à {address}";
-                return role + "\nClic : prendre le contrôle\nF10 : quitter la partie";
+                return ecosystemSync.ClockText + "\n" + role
+                    + "\nClic : prendre le contrôle\nF10 : quitter la partie"
+                    + "\nAdministrateurs : F5 / F6 ralentir ou accélérer le temps, F7 avancer d'un jour";
             }
 
-            return "";
+            return ecosystemSync.ClockText;
         }
 
         private void ListenToTextInput(Keyboard keyboard)
