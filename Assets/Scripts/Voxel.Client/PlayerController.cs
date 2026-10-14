@@ -14,7 +14,6 @@ namespace Voxel.Client
         private const float MaxPitch = 89f;
         private const float CrosshairSize = 6f;
 
-        [SerializeField] private GameObject body;
         [SerializeField] private float moveSpeed = 5f;
         [SerializeField] private float jumpHeight = 1.25f;
         [SerializeField] private float gravity = 25f;
@@ -24,6 +23,7 @@ namespace Voxel.Client
         private EcosystemSync ecosystemSync;
         private InventorySync inventorySync;
         private InventoryHud inventoryHud;
+        private PlayerModel model;
         private World world;
         private Transform cameraTransform;
         private Vector3 velocity;
@@ -44,8 +44,8 @@ namespace Voxel.Client
             ecosystemSync = FindAnyObjectByType<EcosystemSync>();
             inventorySync = FindAnyObjectByType<InventorySync>();
             inventoryHud = FindAnyObjectByType<InventoryHud>();
+            model = GetComponent<PlayerModel>();
             cameraTransform = Camera.main.transform;
-            body.SetActive(false);
             enabled = true;
         }
 
@@ -110,13 +110,18 @@ namespace Voxel.Client
             Vector2 delta = mouse.delta.ReadValue() * mouseSensitivity;
             transform.Rotate(0f, delta.x, 0f);
             pitch = Mathf.Clamp(pitch - delta.y, -MaxPitch, MaxPitch);
+
+            // The other players see the head follow the gaze.
+            model.SetLookPitch(pitch);
         }
 
         // The scene camera follows the local player without being parented to it: it survives the player's despawn.
+        // It sits at the eyes of the player's head, which move forward when looking down, so that the
+        // player sees its own body from the front.
         private void PlaceCamera()
         {
             cameraTransform.SetPositionAndRotation(
-                transform.position + Vector3.up * PlayerRules.EyeHeight,
+                transform.position + transform.rotation * PlayerModel.EyeOffset(pitch),
                 Quaternion.Euler(pitch, transform.eulerAngles.y, 0f));
         }
 
