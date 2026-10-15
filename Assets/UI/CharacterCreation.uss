@@ -1,0 +1,238 @@
+/* Character creation: a panel on the left, the player's model on the right. Sizes are for the
+   1920 x 1080 reference resolution of PanelSettings. */
+
+#screen {
+    justify-content: center;
+    padding-left: 42px;
+}
+
+/* Wide enough for the longest palette: label (176) + 7 swatches (7 x 48) + colour name (84) + row padding. */
+#panel {
+    width: 700px;
+    padding-left: 32px;
+    padding-right: 32px;
+}
+
+.subtitle {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 26px;
+}
+
+.subtitle > .icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+    -unity-background-image-tint-color: var(--text-muted);
+}
+
+.subtitle-text {
+    font-size: 21px;
+    color: var(--text-muted);
+    white-space: normal;
+    margin: 0;
+    padding: 0;
+}
+
+/* One option per row. The selected row is tinted, with a green bar on its left. */
+.option {
+    flex-direction: row;
+    align-items: center;
+    height: 86px;
+    padding: 0 16px 0 14px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    border-left-width: 4px;
+    border-color: rgba(0, 0, 0, 0);
+    transition-duration: 0.12s;
+}
+
+.option:hover {
+    background-color: rgba(0, 0, 0, 0.025);
+}
+
+.option--selected,
+.option--selected:hover {
+    background-color: var(--selected);
+    border-left-color: var(--green);
+}
+
+.option-label {
+    width: 176px;
+    font-size: 23px;
+    color: var(--text-body);
+    margin: 0;
+    padding: 0;
+}
+
+.option--selected .option-label {
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text);
+}
+
+.arrow {
+    width: 54px;
+    height: 54px;
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--control);
+    border-width: 1px;
+    border-color: var(--control-border);
+    border-radius: 10px;
+    transition-duration: 0.12s;
+}
+
+.arrow:hover {
+    background-color: var(--control-hover);
+}
+
+.arrow:active {
+    background-color: var(--selected);
+}
+
+.option-value {
+    flex-grow: 1;
+    font-size: 23px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text);
+    -unity-text-align: middle-center;
+    margin: 0;
+    padding: 0;
+}
+
+/* Colour choices: a frame around each colour; the chosen one gets a dark frame and a white ring. */
+.swatches {
+    flex-direction: row;
+    flex-grow: 1;
+}
+
+.swatch {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    margin-right: 6px;
+    padding: 0;
+    border-radius: 9px;
+    border-width: 1px;
+    border-color: rgba(0, 0, 0, 0.18);
+    transition-duration: 0.12s;
+}
+
+.swatch:hover {
+    border-color: rgba(0, 0, 0, 0.5);
+}
+
+.swatch-colour {
+    flex-grow: 1;
+    border-radius: 8px;
+}
+
+.swatch--selected,
+.swatch--selected:hover {
+    padding: 3px;
+    border-width: 3px;
+    border-color: var(--text-body);
+    background-color: #ffffff;
+}
+
+.swatch--selected > .swatch-colour {
+    border-radius: 4px;
+}
+
+.colour-name {
+    width: 84px;
+    flex-shrink: 0;
+    font-size: 20px;
+    color: #4a4d52;
+    -unity-text-align: middle-right;
+    margin: 0;
+    padding: 0;
+}
+
+.separator {
+    height: 1px;
+    margin: 18px 0 24px 0;
+    background-color: var(--line);
+}
+
+.footer {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Keyboard hints, each key drawn as a keycap. */
+.keys {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 1;
+}
+
+.key {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    min-width: 46px;
+    padding: 0 9px;
+    margin-right: 8px;
+    background-color: var(--control);
+    border-width: 1px;
+    border-bottom-width: 3px;
+    border-color: #cfcbc0;
+    border-radius: 6px;
+}
+
+.key > .icon {
+    width: 18px;
+    height: 18px;
+}
+
+.key-text {
+    font-size: 16px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text-body);
+    margin: 0;
+    padding: 0;
+}
+
+.key-label {
+    font-size: 18px;
+    color: var(--text-muted);
+    margin: 0 18px 0 0;
+    padding: 0;
+}
+
+.confirm-button {
+    height: 72px;
+    padding: 0 36px;
+    font-size: 24px;
+}
+
+/* Under the character: dragging there turns it. */
+.turn-hint {
+    position: absolute;
+    bottom: 38px;
+    left: 70%;
+    translate: -50% 0;
+    flex-direction: row;
+    align-items: center;
+    padding: 12px 26px;
+    background-color: rgba(255, 255, 255, 0.92);
+    border-radius: 30px;
+}
+
+.turn-hint > .icon {
+    margin-right: 10px;
+}
+
+.turn-hint-text {
+    font-size: 20px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text-body);
+    margin: 0;
+    padding: 0;
+}

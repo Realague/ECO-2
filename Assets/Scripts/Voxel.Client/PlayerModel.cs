@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Voxel.Core;
 using Tile = Voxel.Client.PlayerSkin.Tile;
 
 namespace Voxel.Client
@@ -13,6 +14,10 @@ namespace Voxel.Client
     // pitch of the gaze (the NetworkTransform already carries the yaw), which the head follows.
     // The owner's camera sits at the eyes of this head (EyeOffset), so the owner sees its own body
     // when looking down; only its head is hidden, keeping its shadow.
+    //
+    // The body is rebuilt from the player's Appearance (skin tone, sex, hair style), which the server
+    // sets from the player's saved state and sends to everyone. Until the player has chosen one, the
+    // default appearance is shown, and the owner can preview choices locally.
     public class PlayerModel : NetworkBehaviour
     {
         // Heights in blocks: feet at 0, eyes near PlayerRules.EyeHeight (1.62), top of the hair at 1.82.
@@ -21,8 +26,6 @@ namespace Voxel.Client
         private const float ShinLength = 0.36f;
         private const float PelvisHeight = 0.12f;
         private const float ChestHeight = 0.46f;
-        private const float ChestWidth = 0.44f;
-        private const float ChestDepth = 0.24f;
         private const float HeadSize = 0.30f;
         private const float UpperArmLength = 0.28f;
 
@@ -58,6 +61,10 @@ namespace Voxel.Client
         private readonly NetworkVariable<sbyte> lookPitch = new NetworkVariable<sbyte>(
             0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
+        // The player's chosen appearance as Appearance.Encode(), or Appearance.NotChosen. Only the server writes it.
+        private readonly NetworkVariable<ushort> appearanceCode = new NetworkVariable<ushort>(
+            Appearance.NotChosen, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
         private readonly List<MeshRenderer> renderers = new List<MeshRenderer>();
         private readonly List<Mesh> meshes = new List<Mesh>();
         private Transform model;
@@ -74,6 +81,10 @@ namespace Voxel.Client
         private Transform rightShin;
         private Material skinMaterial;
         private Texture2D skinTexture;
+        private Appearance shown;
+        private Color shirt;
+        private bool headHidden;
+        private float previewYaw;
 
         private Vector3 lastPosition;
         private float speed;
@@ -100,32 +111,105 @@ namespace Voxel.Client
             if (IsSpawned && IsOwner && lookPitch.Value != whole) lookPitch.Value = whole;
         }
 
+        // True once the player has chosen an appearance (it is then the same on every machine).
+        public bool HasChosenAppearance => IsSpawned && appearanceCode.Value != Appearance.NotChosen;
+
+        // The appearance currently displayed: the chosen one, a preview, or the default.
+        public Appearance Appearance => shown;
+
+        // Shows an appearance on this machine only, while the owner is choosing.
+        public void Preview(Appearance appearance)
+        {
+            if (appearance.IsValid) Show(appearance);
+        }
+
+        // Server side: the appearance kept in the player's saved state, sent to every machine.
+        internal void SetAppearanceCode(ushort code)
+        {
+            if (IsServer && appearanceCode.Value != code) appearanceCode.Value = code;
+        }
+
+        // The owner's camera is inside the head, which is hidden then; the character menu shows it.
+        public void SetHeadVisible(bool visible)
+        {
+            headHidden = !visible;
+            head.GetComponent<MeshRenderer>().shadowCastingMode = visible ? ShadowCastingMode.On : ShadowCastingMode.ShadowsOnly;
+        }
+
+        // Turns the body on this machine only, about its vertical axis, so that the character menu can
+        // show it from every side. The player object itself, and what others see, do not turn.
+        public void SetPreviewYaw(float degrees)
+        {
+            previewYaw = degrees;
+            if (model != null) model.localRotation = Quaternion.Euler(0f, previewYaw, 0f);
+        }
+
         private void Awake()
         {
-            Build();
-            Skin(PlayerSkin.ShirtFor(0));
+            shirt = PlayerSkin.ShirtFor(0);
+            Show(Appearance.Default);
             lastPosition = transform.position;
         }
 
         public override void OnNetworkSpawn()
         {
-            Skin(PlayerSkin.ShirtFor(OwnerClientId));
+            // Set before the object reaches the clients, so that they never see the default first.
+            if (IsServer)
+            {
+                AppearanceSync appearanceSync = FindAnyObjectByType<AppearanceSync>();
+                if (appearanceSync != null) appearanceCode.Value = appearanceSync.StoredCode(OwnerClientId);
+            }
 
-            // The owner's camera is inside the head: the head would fill the view.
-            if (IsOwner) head.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.ShadowsOnly;
+            appearanceCode.OnValueChanged += OnAppearanceChanged;
+            shirt = PlayerSkin.ShirtFor(OwnerClientId);
+            ShowCode(appearanceCode.Value, true);
+            if (IsOwner) SetHeadVisible(false);
             lastPosition = transform.position;
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            appearanceCode.OnValueChanged -= OnAppearanceChanged;
         }
 
         public override void OnDestroy()
         {
             base.OnDestroy();
+            DestroyBody();
+            if (skinMaterial != null) Destroy(skinMaterial);
+            if (skinTexture != null) Destroy(skinTexture);
+        }
+
+        private void OnAppearanceChanged(ushort previous, ushort current) => ShowCode(current, false);
+
+        private void ShowCode(ushort code, bool force)
+        {
+            Show(Appearance.TryDecode(code, out Appearance appearance) ? appearance : Appearance.Default, force);
+        }
+
+        // Rebuilds the body and its texture for an appearance; the joints keep no state worth saving.
+        private void Show(Appearance appearance, bool force = false)
+        {
+            if (!force && model != null && appearance.Equals(shown)) return;
+
+            shown = appearance;
+            DestroyBody();
+            Build(appearance);
+            Skin(appearance);
+            if (headHidden) SetHeadVisible(false);
+        }
+
+        private void DestroyBody()
+        {
             foreach (Mesh mesh in meshes)
             {
                 Destroy(mesh);
             }
 
-            if (skinMaterial != null) Destroy(skinMaterial);
-            if (skinTexture != null) Destroy(skinTexture);
+            meshes.Clear();
+            renderers.Clear();
+            if (model != null) Destroy(model.gameObject);
+            model = null;
         }
 
         private void LateUpdate()
@@ -186,98 +270,180 @@ namespace Voxel.Client
             rightForearm.localRotation = Quaternion.Euler(-(10f + Mathf.Max(0f, -swing) * ElbowBend + airborne * 25f), 0f, 0f);
         }
 
-        private void Skin(Color shirt)
+        private void Skin(Appearance appearance)
         {
             if (skinTexture != null) Destroy(skinTexture);
-            skinTexture = PlayerSkin.CreateTexture(shirt);
-            if (skinMaterial == null)
-            {
-                skinMaterial = new Material(material) { name = "PlayerSkin" };
-                foreach (MeshRenderer part in renderers)
-                {
-                    part.sharedMaterial = skinMaterial;
-                }
-            }
-
+            skinTexture = PlayerSkin.CreateTexture(shirt, appearance);
+            if (skinMaterial == null) skinMaterial = new Material(material) { name = "PlayerSkin" };
             skinMaterial.mainTexture = skinTexture;
+            foreach (MeshRenderer part in renderers)
+            {
+                part.sharedMaterial = skinMaterial;
+            }
         }
 
         // Positions are relative to the joint that carries each box. +X is the player's right, +Z its front.
-        private void Build()
+        // A woman's body is a little narrower at the shoulders and has slimmer limbs.
+        private void Build(Appearance appearance)
         {
+            bool female = appearance.Sex == Sex.Female;
+            var body = new BodySize(female);
+
             model = new GameObject("Model").transform;
             model.SetParent(transform, false);
+            model.localRotation = Quaternion.Euler(0f, previewYaw, 0f);
 
             hips = Joint("Hips", model, new Vector3(0f, HipHeight, 0f), new BoxBuilder()
-                .Add(new Vector3(0f, PelvisHeight / 2f, 0f), new Vector3(0.40f, PelvisHeight, ChestDepth),
+                .Add(new Vector3(0f, PelvisHeight / 2f, 0f), new Vector3(body.PelvisWidth, PelvisHeight, body.ChestDepth),
                     new Faces(Tile.BeltFront, Tile.Belt, Tile.Belt, Tile.Trousers, Tile.Trousers)));
 
-            leftThigh = Thigh("LeftThigh", -0.1f);
-            rightThigh = Thigh("RightThigh", 0.1f);
-            leftShin = Shin("LeftShin", leftThigh);
-            rightShin = Shin("RightShin", rightThigh);
+            leftThigh = Thigh("LeftThigh", -body.LegX, body);
+            rightThigh = Thigh("RightThigh", body.LegX, body);
+            leftShin = Shin("LeftShin", leftThigh, body);
+            rightShin = Shin("RightShin", rightThigh, body);
 
             float chestTop = ChestHeight;
-            float strapX = 0.15f;
+            float strapX = body.ChestWidth / 2f - 0.07f;
+            float chestFront = body.ChestDepth / 2f;
             spine = Joint("Spine", hips, new Vector3(0f, PelvisHeight, 0f), new BoxBuilder()
-                .Add(new Vector3(0f, ChestHeight / 2f, 0f), new Vector3(ChestWidth, ChestHeight, ChestDepth),
+                .Add(new Vector3(0f, ChestHeight / 2f, 0f), new Vector3(body.ChestWidth, ChestHeight, body.ChestDepth),
                     new Faces(Tile.ChestFront, Tile.ChestBack, Tile.ChestSide, Tile.Shirt, Tile.Shirt))
-                .Add(new Vector3(-strapX, 0.25f, ChestDepth / 2f + 0.006f), new Vector3(0.045f, 0.40f, 0.012f), Faces.All(Tile.Strap))
-                .Add(new Vector3(strapX, 0.25f, ChestDepth / 2f + 0.006f), new Vector3(0.045f, 0.40f, 0.012f), Faces.All(Tile.Strap))
-                .Add(new Vector3(-strapX, chestTop + 0.006f, 0f), new Vector3(0.045f, 0.012f, ChestDepth + 0.024f), Faces.All(Tile.Strap))
-                .Add(new Vector3(strapX, chestTop + 0.006f, 0f), new Vector3(0.045f, 0.012f, ChestDepth + 0.024f), Faces.All(Tile.Strap))
-                .Add(new Vector3(0f, 0.22f, -ChestDepth / 2f - 0.07f), new Vector3(0.32f, 0.36f, 0.14f),
+                .Add(new Vector3(-strapX, 0.25f, chestFront + 0.006f), new Vector3(0.045f, 0.40f, 0.012f), Faces.All(Tile.Strap))
+                .Add(new Vector3(strapX, 0.25f, chestFront + 0.006f), new Vector3(0.045f, 0.40f, 0.012f), Faces.All(Tile.Strap))
+                .Add(new Vector3(-strapX, chestTop + 0.006f, 0f), new Vector3(0.045f, 0.012f, body.ChestDepth + 0.024f), Faces.All(Tile.Strap))
+                .Add(new Vector3(strapX, chestTop + 0.006f, 0f), new Vector3(0.045f, 0.012f, body.ChestDepth + 0.024f), Faces.All(Tile.Strap))
+                .Add(new Vector3(0f, 0.22f, -chestFront - 0.07f), new Vector3(0.32f, 0.36f, 0.14f),
                     new Faces(Tile.Canvas, Tile.PackBack, Tile.PackSide, Tile.PackTop, Tile.Canvas)));
 
             // The neck belongs to the head, which the owner does not see: it would sit right under its eyes.
-            head = Joint("Head", spine, new Vector3(0f, chestTop, 0f), new BoxBuilder()
+            var headBoxes = new BoxBuilder()
                 .Add(new Vector3(0f, 0.02f, 0f), new Vector3(0.13f, 0.06f, 0.13f), Faces.All(Tile.SkinShadow))
                 .Add(new Vector3(0f, 0.03f + HeadSize / 2f, 0f), Vector3.one * HeadSize,
                     new Faces(Tile.Face, Tile.HeadBack, Tile.HeadSide, Tile.Hair, Tile.SkinShadow))
-                .Add(new Vector3(0f, 0.3575f, -0.005f), new Vector3(0.32f, 0.055f, 0.32f), new Faces(Tile.HairEdge, Tile.HairEdge, Tile.HairEdge, Tile.Hair, Tile.Hair))
-                .Add(new Vector3(0f, 0.24f, -0.16f), new Vector3(0.32f, 0.2f, 0.03f), Faces.All(Tile.HairEdge))
-                .Add(new Vector3(0f, 0.305f, 0.155f), new Vector3(0.3f, 0.05f, 0.02f), Faces.All(Tile.HairEdge))
                 .Add(new Vector3(0f, 0.166f, 0.165f), new Vector3(0.045f, 0.04f, 0.03f), Faces.All(Tile.Skin))
                 .Add(new Vector3(-0.16f, 0.17f, -0.01f), new Vector3(0.025f, 0.07f, 0.05f), Faces.All(Tile.Skin))
-                .Add(new Vector3(0.16f, 0.17f, -0.01f), new Vector3(0.025f, 0.07f, 0.05f), Faces.All(Tile.Skin)));
+                .Add(new Vector3(0.16f, 0.17f, -0.01f), new Vector3(0.025f, 0.07f, 0.05f), Faces.All(Tile.Skin));
+            AddHair(headBoxes, appearance.Hair);
+            AddFacialHair(headBoxes, appearance.FacialHair);
+            head = Joint("Head", spine, new Vector3(0f, chestTop, 0f), headBoxes);
 
-            float shoulderX = ChestWidth / 2f + 0.065f;
-            leftUpperArm = UpperArm("LeftUpperArm", -shoulderX);
-            rightUpperArm = UpperArm("RightUpperArm", shoulderX);
-            leftForearm = Forearm("LeftForearm", leftUpperArm);
-            rightForearm = Forearm("RightForearm", rightUpperArm);
+            float shoulderX = body.ChestWidth / 2f + body.ArmWidth / 2f;
+            leftUpperArm = UpperArm("LeftUpperArm", -shoulderX, body);
+            rightUpperArm = UpperArm("RightUpperArm", shoulderX, body);
+            leftForearm = Forearm("LeftForearm", leftUpperArm, body);
+            rightForearm = Forearm("RightForearm", rightUpperArm, body);
         }
 
-        private Transform Thigh(string jointName, float x)
+        // Hair volumes on top of the head, relative to the neck joint (the head spans 0.03 to 0.33).
+        // A buzz cut is mostly painted on; a bald head has none.
+        private static void AddHair(BoxBuilder boxes, HairStyle style)
+        {
+            var cap = new Faces(Tile.HairEdge, Tile.HairEdge, Tile.HairEdge, Tile.Hair, Tile.Hair);
+            var hair = Faces.All(Tile.HairEdge);
+            switch (style)
+            {
+                case HairStyle.Bald:
+                    return;
+                case HairStyle.Buzz:
+                    boxes.Add(new Vector3(0f, 0.34f, 0f), new Vector3(0.31f, 0.02f, 0.31f), cap);
+                    return;
+            }
+
+            boxes.Add(new Vector3(0f, 0.3575f, -0.005f), new Vector3(0.32f, 0.055f, 0.32f), cap);
+            boxes.Add(new Vector3(0f, 0.305f, 0.155f), new Vector3(0.3f, 0.05f, 0.02f), hair);
+            switch (style)
+            {
+                case HairStyle.Long:
+                    // Down past the neck over the back, with locks over the ears.
+                    boxes.Add(new Vector3(0f, 0.15f, -0.165f), new Vector3(0.33f, 0.40f, 0.04f), hair);
+                    boxes.Add(new Vector3(-0.165f, 0.2f, -0.05f), new Vector3(0.03f, 0.24f, 0.2f), hair);
+                    boxes.Add(new Vector3(0.165f, 0.2f, -0.05f), new Vector3(0.03f, 0.24f, 0.2f), hair);
+                    break;
+                case HairStyle.Ponytail:
+                    boxes.Add(new Vector3(0f, 0.24f, -0.16f), new Vector3(0.32f, 0.2f, 0.03f), hair);
+                    boxes.Add(new Vector3(0f, 0.27f, -0.19f), new Vector3(0.07f, 0.05f, 0.05f), Faces.All(Tile.Strap));
+                    boxes.Add(new Vector3(0f, 0.12f, -0.205f), new Vector3(0.08f, 0.26f, 0.07f), hair);
+                    break;
+                case HairStyle.Bun:
+                    boxes.Add(new Vector3(0f, 0.24f, -0.16f), new Vector3(0.32f, 0.2f, 0.03f), hair);
+                    boxes.Add(new Vector3(0f, 0.33f, -0.17f), new Vector3(0.15f, 0.13f, 0.13f), cap);
+                    break;
+                default:
+                    boxes.Add(new Vector3(0f, 0.24f, -0.16f), new Vector3(0.32f, 0.2f, 0.03f), hair);
+                    break;
+            }
+        }
+
+        // Facial hair volumes in front of the face, relative to the neck joint: the mouth spans 0.096 to
+        // 0.111 and the nose starts at 0.146. Stubble is only painted on.
+        private static void AddFacialHair(BoxBuilder boxes, FacialHair facialHair)
+        {
+            if (facialHair != FacialHair.Moustache && facialHair != FacialHair.Beard) return;
+
+            var hair = Faces.All(Tile.HairEdge);
+            boxes.Add(new Vector3(0f, 0.121f, 0.156f), new Vector3(0.13f, 0.022f, 0.012f), hair);
+
+            // Under the mouth to below the chin, across the whole jaw.
+            if (facialHair == FacialHair.Beard) boxes.Add(new Vector3(0f, 0.045f, 0.16f), new Vector3(0.3f, 0.09f, 0.03f), hair);
+        }
+
+        // Proportions that depend on the body type.
+        private readonly struct BodySize
+        {
+            public readonly float ChestWidth;
+            public readonly float ChestDepth;
+            public readonly float PelvisWidth;
+            public readonly float LegX;
+            public readonly float LegWidth;
+            public readonly float ArmWidth;
+            public readonly float ForearmWidth;
+            public readonly float HandWidth;
+
+            public BodySize(bool female)
+            {
+                ChestWidth = female ? 0.4f : 0.44f;
+                ChestDepth = female ? 0.22f : 0.24f;
+                PelvisWidth = female ? 0.38f : 0.4f;
+                LegX = female ? 0.095f : 0.1f;
+                LegWidth = female ? 0.16f : 0.17f;
+                ArmWidth = female ? 0.12f : 0.13f;
+                ForearmWidth = female ? 0.1f : 0.11f;
+                HandWidth = female ? 0.11f : 0.12f;
+            }
+        }
+
+        private Transform Thigh(string jointName, float x, BodySize body)
         {
             return Joint(jointName, hips, new Vector3(x, 0f, 0f), new BoxBuilder()
-                .Add(new Vector3(0f, -ThighLength / 2f, 0f), new Vector3(0.17f, ThighLength, 0.18f),
+                .Add(new Vector3(0f, -ThighLength / 2f, 0f), new Vector3(body.LegWidth, ThighLength, 0.18f),
                     new Faces(Tile.TrouserFront, Tile.Trousers, Tile.TrouserSide, Tile.Trousers, Tile.Trousers)));
         }
 
         // The shin carries the shoe, which sticks out forward.
-        private Transform Shin(string jointName, Transform thigh)
+        private Transform Shin(string jointName, Transform thigh, BodySize body)
         {
             return Joint(jointName, thigh, new Vector3(0f, -ThighLength, 0f), new BoxBuilder()
-                .Add(new Vector3(0f, -ShinLength / 2f, 0f), new Vector3(0.15f, ShinLength, 0.16f),
+                .Add(new Vector3(0f, -ShinLength / 2f, 0f), new Vector3(body.LegWidth - 0.02f, ShinLength, 0.16f),
                     new Faces(Tile.ShinFront, Tile.ShinFront, Tile.ShinSide, Tile.Trousers, Tile.Trousers))
                 .Add(new Vector3(0f, -ShinLength - 0.04f, 0.035f), new Vector3(0.16f, 0.08f, 0.27f),
                     new Faces(Tile.ShoeFront, Tile.ShoeFront, Tile.ShoeSide, Tile.ShoeTop, Tile.Sole)));
         }
 
-        private Transform UpperArm(string jointName, float x)
+        private Transform UpperArm(string jointName, float x, BodySize body)
         {
             return Joint(jointName, spine, new Vector3(x, ChestHeight - 0.04f, 0f), new BoxBuilder()
-                .Add(new Vector3(0f, -0.13f, 0f), new Vector3(0.13f, 0.32f, 0.13f),
+                .Add(new Vector3(0f, -0.13f, 0f), new Vector3(body.ArmWidth, 0.32f, body.ArmWidth),
                     new Faces(Tile.Sleeve, Tile.Sleeve, Tile.Sleeve, Tile.Shirt, Tile.Skin)));
         }
 
         // The forearm carries the hand.
-        private Transform Forearm(string jointName, Transform upperArm)
+        private Transform Forearm(string jointName, Transform upperArm, BodySize body)
         {
             return Joint(jointName, upperArm, new Vector3(0f, -UpperArmLength, 0f), new BoxBuilder()
-                .Add(new Vector3(0f, -0.12f, 0f), new Vector3(0.11f, 0.25f, 0.11f), new Faces(Tile.Forearm, Tile.Forearm, Tile.Forearm, Tile.Skin, Tile.Skin))
-                .Add(new Vector3(0f, -0.3f, 0.005f), new Vector3(0.12f, 0.11f, 0.085f), new Faces(Tile.Hand, Tile.Hand, Tile.Hand, Tile.Hand, Tile.Fingers)));
+                .Add(new Vector3(0f, -0.12f, 0f), new Vector3(body.ForearmWidth, 0.25f, body.ForearmWidth),
+                    new Faces(Tile.Forearm, Tile.Forearm, Tile.Forearm, Tile.Skin, Tile.Skin))
+                .Add(new Vector3(0f, -0.3f, 0.005f), new Vector3(body.HandWidth, 0.11f, 0.085f),
+                    new Faces(Tile.Hand, Tile.Hand, Tile.Hand, Tile.Hand, Tile.Fingers)));
         }
 
         private Transform Joint(string jointName, Transform parent, Vector3 position, BoxBuilder boxes)

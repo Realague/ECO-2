@@ -1,0 +1,93 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="Common.uss" />
+    <Style src="CharacterCreation.uss" />
+
+    <!-- AppearanceMenu fills in the values and the colour swatches. Rows with arrows step through
+         named options; rows with swatches pick a colour. -->
+    <ui:VisualElement name="screen" class="screen">
+        <ui:VisualElement name="panel" class="panel">
+            <ui:Label text="Create your character" class="title" />
+            <ui:VisualElement class="subtitle">
+                <ui:VisualElement class="icon icon--lock" />
+                <ui:Label text="This is how other players will see you. The choice is final." class="subtitle-text" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="row-sex" class="option">
+                <ui:Label text="Sex" class="option-label" />
+                <ui:Button name="previous" class="arrow"><ui:VisualElement class="icon icon--caret-left" /></ui:Button>
+                <ui:Label name="value" class="option-value" />
+                <ui:Button name="next" class="arrow"><ui:VisualElement class="icon icon--caret-right" /></ui:Button>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="row-skin-tone" class="option">
+                <ui:Label text="Skin tone" class="option-label" />
+                <ui:VisualElement name="swatches" class="swatches" />
+                <ui:Label name="value" class="colour-name" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="row-eye-color" class="option">
+                <ui:Label text="Eyes" class="option-label" />
+                <ui:VisualElement name="swatches" class="swatches" />
+                <ui:Label name="value" class="colour-name" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="row-hair" class="option">
+                <ui:Label text="Hair" class="option-label" />
+                <ui:Button name="previous" class="arrow"><ui:VisualElement class="icon icon--caret-left" /></ui:Button>
+                <ui:Label name="value" class="option-value" />
+                <ui:Button name="next" class="arrow"><ui:VisualElement class="icon icon--caret-right" /></ui:Button>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="row-hair-color" class="option">
+                <ui:Label text="Hair colour" class="option-label" />
+                <ui:VisualElement name="swatches" class="swatches" />
+                <ui:Label name="value" class="colour-name" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="row-facial-hair" class="option">
+                <ui:Label text="Facial hair" class="option-label" />
+                <ui:Button name="previous" class="arrow"><ui:VisualElement class="icon icon--caret-left" /></ui:Button>
+                <ui:Label name="value" class="option-value" />
+                <ui:Button name="next" class="arrow"><ui:VisualElement class="icon icon--caret-right" /></ui:Button>
+            </ui:VisualElement>
+
+            <ui:VisualElement class="separator" />
+
+            <ui:VisualElement class="footer">
+                <ui:VisualElement class="keys">
+                    <ui:VisualElement class="key"><ui:VisualElement class="icon icon--up-down" /></ui:VisualElement>
+                    <ui:Label text="line" class="key-label" />
+                    <ui:VisualElement class="key"><ui:VisualElement class="icon icon--left-right" /></ui:VisualElement>
+                    <ui:Label text="choose" class="key-label" />
+                    <ui:VisualElement class="key"><ui:Label text="Enter" class="key-text" /></ui:VisualElement>
+                    <ui:Label text="confirm" class="key-label" />
+                </ui:VisualElement>
+                <ui:Button name="confirm" class="button button--primary confirm-button">
+                    <ui:VisualElement class="icon icon--check" />
+                    <ui:Label text="Confirm" class="button-text" />
+                </ui:Button>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Clicks pass through to the screen, where a drag turns the character. -->
+        <ui:VisualElement name="turn-hint" class="turn-hint" picking-mode="Ignore">
+            <ui:VisualElement class="icon icon--rotate" picking-mode="Ignore" />
+            <ui:Label text="Drag to turn around" class="turn-hint-text" picking-mode="Ignore" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="confirm-dialog" class="dialog-backdrop hidden">
+            <ui:VisualElement class="dialog">
+                <ui:Label text="Keep this appearance? It cannot be changed later." class="dialog-text" />
+                <ui:VisualElement class="dialog-buttons">
+                    <ui:Button name="dialog-back" class="button button--secondary">
+                        <ui:Label text="Back" class="button-text" />
+                    </ui:Button>
+                    <ui:Button name="dialog-confirm" class="button button--primary">
+                        <ui:VisualElement class="icon icon--check" />
+                        <ui:Label text="Confirm" class="button-text" />
+                    </ui:Button>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

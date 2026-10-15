@@ -1,0 +1,8 @@
+Inter font (Inter-Regular.ttf, Inter-SemiBold.ttf)
+Copyright (c) 2016 The Inter Project Authors (https://github.com/rsms/inter)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+The license text, with a FAQ, is available at https://openfontlicense.org
+
+Copied from the Unity App UI package (com.unity.dt.app-ui), whose "Third Party Notices.md" lists it
+under the same license.

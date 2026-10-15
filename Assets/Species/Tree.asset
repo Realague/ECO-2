@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c90fb7040ab281a4dabfdc0c96f5baf2, type: 3}
-  m_Name: Arbre
+  m_Name: Tree
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.SpeciesAsset
   maturityDays: 3
   lifespanDays: 30

@@ -90,6 +90,70 @@ namespace Voxel.Core.Tests
         }
 
         [Test]
+        public void WriteThenRead_RestoresTheAppearance_AndKeepsAnUnchosenOneUnchosen()
+        {
+            var original = new PlayerStore();
+            original.GetOrAdd("alice").Appearance = new Appearance(4, Sex.Female, HairStyle.Ponytail);
+            original.GetOrAdd("bob");
+            var stream = new MemoryStream();
+            original.Write(stream);
+            stream.Position = 0;
+
+            PlayerStore loaded = PlayerStore.Read(stream);
+
+            Assert.IsTrue(loaded.TryGet("alice", out PlayerState alice));
+            Assert.AreEqual(new Appearance(4, Sex.Female, HairStyle.Ponytail), alice.Appearance);
+            Assert.IsTrue(loaded.TryGet("bob", out PlayerState bob));
+            Assert.IsNull(bob.Appearance);
+        }
+
+        // A save from before appearances: the player keeps everything else and chooses one at the next connection.
+        [Test]
+        public void Read_SaveWithoutAppearance_KeepsTheRestAndLeavesTheAppearanceUnchosen()
+        {
+            var stream = new MemoryStream();
+            using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, true))
+            {
+                writer.Write(0x504F4345u);
+                writer.Write(2);
+                writer.Write(1);
+                writer.Write("alice");
+                writer.Write(1f);
+                writer.Write(2f);
+                writer.Write(3f);
+                writer.Write(90f);
+                writer.Write((byte)Speciality.Mason);
+                writer.Write(1);
+                writer.Write((int)Blocks.Stone);
+                writer.Write(5);
+            }
+
+            stream.Position = 0;
+            PlayerStore loaded = PlayerStore.Read(stream);
+
+            Assert.IsTrue(loaded.TryGet("alice", out PlayerState state));
+            Assert.AreEqual(Speciality.Mason, state.Speciality);
+            Assert.AreEqual(5, state.Inventory.Count(Blocks.Stone));
+            Assert.IsNull(state.Appearance);
+        }
+
+        [Test]
+        public void Read_InvalidAppearance_Throws()
+        {
+            var store = new PlayerStore();
+            store.GetOrAdd("alice");
+            var stream = new MemoryStream();
+            store.Write(stream);
+            byte[] data = stream.ToArray();
+
+            // The appearance code is the last two bytes, low byte first: a chosen code with hair style 7, which does not exist.
+            data[data.Length - 2] = 0x70;
+            data[data.Length - 1] = 0x80;
+
+            Assert.Throws<InvalidDataException>(() => PlayerStore.Read(new MemoryStream(data)));
+        }
+
+        [Test]
         public void GetOrAdd_ReturnsTheSameStateEveryTime()
         {
             var store = new PlayerStore();

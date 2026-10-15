@@ -48,6 +48,8 @@ namespace Voxel.Client
         [SerializeField] private WorldSync worldSync;
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private InventorySync inventorySync;
+        [SerializeField] private AppearanceSync appearanceSync;
+        [SerializeField] private AppearanceMenu appearanceMenu;
         [SerializeField] private ushort port = 7777;
         [SerializeField] private float autosaveInterval = 60f;
         [SerializeField] private bool openRouterPort = true;
@@ -236,6 +238,7 @@ namespace Voxel.Client
             worldSync.StartClient();
             ecosystemSync.StartClient();
             inventorySync.StartClient();
+            appearanceSync.StartClient();
             sessionActive = true;
         }
 
@@ -276,6 +279,7 @@ namespace Voxel.Client
             worldSync.StartServer();
             ecosystemSync.StartServer(voxelWorld.World, dataDirectory, startTimeScale, IsAdmin);
             inventorySync.StartServer(registry);
+            appearanceSync.StartServer(registry);
             sessionActive = true;
             nextAutosave = Time.unscaledTime + autosaveInterval;
             Debug.Log($"Server started on port {port}. Saves in {dataDirectory}, every {autosaveInterval} s.");
@@ -377,6 +381,7 @@ namespace Voxel.Client
             ecosystemSync.Save();
             ecosystemSync.Stop();
             inventorySync.Stop();
+            appearanceSync.Stop();
             worldSync.Stop();
             if (registry != null)
             {
@@ -471,6 +476,9 @@ namespace Voxel.Client
 
         private string ScreenText()
         {
+            // The character creation screen has the whole screen to itself.
+            if (appearanceMenu.IsOpen) return "";
+
             if (!networkManager.IsListening)
             {
                 return "F1: host a game\n"

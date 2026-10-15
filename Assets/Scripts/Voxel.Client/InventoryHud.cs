@@ -23,6 +23,7 @@ namespace Voxel.Client
         [SerializeField] private WorldSync worldSync;
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private EcosystemSync ecosystemSync;
+        [SerializeField] private AppearanceMenu appearanceMenu;
 
         private readonly List<KeyValuePair<int, int>> entries = new List<KeyValuePair<int, int>>();
         private readonly StringBuilder text = new StringBuilder();
@@ -33,7 +34,8 @@ namespace Voxel.Client
         // The item the player holds in hand, or Items.None.
         public int SelectedItem => heldItem;
 
-        private bool InGame => networkManager.IsListening && worldSync.World != null;
+        // Hidden while the character is being created.
+        private bool InGame => networkManager.IsListening && worldSync.World != null && !appearanceMenu.IsOpen;
 
         private void Update()
         {

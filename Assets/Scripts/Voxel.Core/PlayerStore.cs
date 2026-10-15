@@ -15,6 +15,9 @@ namespace Voxel.Core
 
         public Speciality Speciality;
 
+        // Null until the player has chosen it.
+        public Appearance? Appearance;
+
         public Inventory Inventory { get; } = new Inventory();
     }
 
@@ -22,10 +25,12 @@ namespace Voxel.Core
     public sealed class PlayerStore
     {
         private const uint Magic = 0x504F4345; // "ECOP"
-        private const int FormatVersion = 2;
+        private const int FormatVersion = 3;
 
-        // Last format without speciality or inventory. It still loads: the player keeps their position.
+        // Older formats still load. Without inventory, the player keeps their position; without
+        // appearance, they choose one at their next connection.
         private const int FormatWithoutInventory = 1;
+        private const int FormatWithoutAppearance = 2;
 
         private readonly Dictionary<string, PlayerState> players = new Dictionary<string, PlayerState>();
 
@@ -64,6 +69,7 @@ namespace Voxel.Core
                     writer.Write(state.Yaw);
                     writer.Write((byte)state.Speciality);
                     state.Inventory.Write(writer);
+                    writer.Write(state.Appearance?.Encode() ?? Appearance.NotChosen);
                 }
             }
         }
@@ -79,7 +85,7 @@ namespace Voxel.Core
                 }
 
                 int formatVersion = reader.ReadInt32();
-                if (formatVersion != FormatVersion && formatVersion != FormatWithoutInventory)
+                if (formatVersion != FormatVersion && formatVersion != FormatWithoutInventory && formatVersion != FormatWithoutAppearance)
                 {
                     throw new InvalidDataException(
                         $"Unsupported player save format {formatVersion} (expected: {FormatVersion}).");
@@ -106,6 +112,20 @@ namespace Voxel.Core
 
                         state.Speciality = speciality;
                         state.Inventory.Read(reader);
+                    }
+
+                    if (formatVersion == FormatVersion)
+                    {
+                        ushort code = reader.ReadUInt16();
+                        if (code != Appearance.NotChosen)
+                        {
+                            if (!Appearance.TryDecode(code, out Appearance appearance))
+                            {
+                                throw new InvalidDataException($"Unknown appearance for player {playerId}.");
+                            }
+
+                            state.Appearance = appearance;
+                        }
                     }
 
                     store.Set(playerId, state);

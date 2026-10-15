@@ -14,6 +14,15 @@ namespace Voxel.Client
         private const float MaxPitch = 89f;
         private const float CrosshairSize = 6f;
 
+        // Where the camera stands, in the player's frame, while the character menu shows the player's model.
+        // Off to the player's right, so that the model stands clear of the menu on the left of the screen.
+        // Close to the face for the eye colour; the camera glides between the two in a quarter of a second.
+        private static readonly Vector3 MenuCameraOffset = new Vector3(0.75f, 1.3f, 2.1f);
+        private static readonly Vector3 MenuCameraTarget = new Vector3(0.75f, 1.0f, 0f);
+        private static readonly Vector3 FaceCameraOffset = new Vector3(0.12f, 1.66f, 0.75f);
+        private static readonly Vector3 FaceCameraTarget = new Vector3(0.12f, 1.63f, 0f);
+        private const float FaceZoomSpeed = 4f;
+
         [SerializeField] private float moveSpeed = 5f;
         [SerializeField] private float jumpHeight = 1.25f;
         [SerializeField] private float gravity = 25f;
@@ -24,11 +33,13 @@ namespace Voxel.Client
         private InventorySync inventorySync;
         private InventoryHud inventoryHud;
         private PlayerModel model;
+        private AppearanceMenu appearanceMenu;
         private World world;
         private Transform cameraTransform;
         private Vector3 velocity;
         private bool grounded;
         private float pitch;
+        private float faceZoom;
 
         private void Awake()
         {
@@ -45,6 +56,7 @@ namespace Voxel.Client
             inventorySync = FindAnyObjectByType<InventorySync>();
             inventoryHud = FindAnyObjectByType<InventoryHud>();
             model = GetComponent<PlayerModel>();
+            appearanceMenu = FindAnyObjectByType<AppearanceMenu>();
             cameraTransform = Camera.main.transform;
             enabled = true;
         }
@@ -66,6 +78,16 @@ namespace Voxel.Client
             Keyboard keyboard = Keyboard.current;
             Mouse mouse = Mouse.current;
             bool hasDevices = keyboard != null && mouse != null;
+
+            // While the character is being created, the player stands still facing the camera.
+            if (appearanceMenu != null && appearanceMenu.IsOpen)
+            {
+                pitch = 0f;
+                model.SetLookPitch(pitch);
+                Move(keyboard, false);
+                PlaceMenuCamera();
+                return;
+            }
 
             if (hasDevices && keyboard.escapeKey.wasPressedThisFrame)
             {
@@ -95,7 +117,7 @@ namespace Voxel.Client
 
         private void OnGUI()
         {
-            if (world == null) return;
+            if (world == null || (appearanceMenu != null && appearanceMenu.IsOpen)) return;
 
             var crosshair = new Rect(
                 (Screen.width - CrosshairSize) / 2f,
@@ -123,6 +145,15 @@ namespace Voxel.Client
             cameraTransform.SetPositionAndRotation(
                 transform.position + transform.rotation * PlayerModel.EyeOffset(pitch),
                 Quaternion.Euler(pitch, transform.eulerAngles.y, 0f));
+        }
+
+        private void PlaceMenuCamera()
+        {
+            faceZoom = Mathf.MoveTowards(faceZoom, appearanceMenu.ShowsFace ? 1f : 0f, FaceZoomSpeed * Time.deltaTime);
+            float blend = Mathf.SmoothStep(0f, 1f, faceZoom);
+            Vector3 position = transform.TransformPoint(Vector3.Lerp(MenuCameraOffset, FaceCameraOffset, blend));
+            Vector3 target = transform.TransformPoint(Vector3.Lerp(MenuCameraTarget, FaceCameraTarget, blend));
+            cameraTransform.SetPositionAndRotation(position, Quaternion.LookRotation(target - position));
         }
 
         private void Interact(Mouse mouse)

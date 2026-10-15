@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f6e6cb2aa9f766b4db88dea4bfe01bba, type: 3}
-  m_Name: Renard
+  m_Name: Fox
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.AnimalSpeciesAsset
   eatsPlants: []
   eatsAnimals:
