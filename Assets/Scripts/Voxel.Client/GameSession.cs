@@ -31,8 +31,6 @@ namespace Voxel.Client
     {
         private const string LocalAddress = "127.0.0.1";
         private const string AnyAddress = "0.0.0.0";
-        private const int MaxAddressLength = 15;
-        private const int MaxPasswordLength = 32;
 
         // The router forgets a forwarded port after two hours: it is asked again every hour.
         private const float ForwardingRenewalInterval = 3600f;
@@ -62,7 +60,6 @@ namespace Voxel.Client
         private string[] adminIds = Array.Empty<string>();
         private Vector3Int? worldSize;
         private string message = "";
-        private bool editingPassword;
         private bool sessionActive;
         private bool leaving;
         private PlayerRegistry registry;
@@ -75,10 +72,30 @@ namespace Voxel.Client
         private Task forwardingRemoval;
         private float nextForwardingRenewal;
         private bool quitting;
-        private Keyboard textInputKeyboard;
         private GUIStyle textStyle;
 
         private UnityTransport Transport => (UnityTransport)networkManager.NetworkConfig.NetworkTransport;
+
+        // What the main menu shows. The address and password are those of the last game started or joined.
+        public string Address => address;
+
+        public string Password => password;
+
+        public ushort Port => port;
+
+        // Why the last game could not start or ended, or empty. Cleared when another one starts.
+        public string Message => message;
+
+        // No game: the main menu is showing.
+        public bool InMenu => !networkManager.IsListening;
+
+        // Joining a server that has not accepted this player yet.
+        public bool IsConnecting => networkManager.IsListening && !networkManager.IsServer && !networkManager.IsConnectedClient;
+
+        // In a game whose world is not fully on this machine yet.
+        public bool IsLoading => networkManager.IsListening && !IsConnecting && worldSync.World == null;
+
+        public float LoadingProgress => worldSync.LoadingProgress;
 
         private void Start()
         {
@@ -105,7 +122,6 @@ namespace Voxel.Client
 
         private void OnDestroy()
         {
-            ListenToTextInput(null);
             if (networkManager != null)
             {
                 networkManager.OnClientStopped -= OnSessionStopped;
@@ -138,54 +154,60 @@ namespace Voxel.Client
                 }
             }
 
+            // The main menu (MainMenu) starts and joins games; in a game, these keys remain.
             Keyboard keyboard = Keyboard.current;
-            ListenToTextInput(keyboard);
-            if (keyboard == null || networkManager.ShutdownInProgress) return;
+            if (keyboard == null || networkManager.ShutdownInProgress || !networkManager.IsListening) return;
 
-            if (networkManager.IsListening)
+            if (keyboard.f10Key.wasPressedThisFrame)
             {
-                if (keyboard.f10Key.wasPressedThisFrame)
-                {
-                    // Players disappear during shutdown: their position is recorded before.
-                    SaveSession();
-                    leaving = true;
-                    networkManager.Shutdown();
-                }
-                else if (keyboard.f5Key.wasPressedThisFrame)
-                {
-                    ecosystemSync.RequestMultiplier(NextTimeScale(-1));
-                }
-                else if (keyboard.f6Key.wasPressedThisFrame)
-                {
-                    ecosystemSync.RequestMultiplier(NextTimeScale(1));
-                }
-                else if (keyboard.f7Key.wasPressedThisFrame)
-                {
-                    ecosystemSync.RequestAdvanceDays(1);
-                }
+                Leave();
+            }
+            else if (keyboard.f5Key.wasPressedThisFrame)
+            {
+                ecosystemSync.RequestMultiplier(NextTimeScale(-1));
+            }
+            else if (keyboard.f6Key.wasPressedThisFrame)
+            {
+                ecosystemSync.RequestMultiplier(NextTimeScale(1));
+            }
+            else if (keyboard.f7Key.wasPressedThisFrame)
+            {
+                ecosystemSync.RequestAdvanceDays(1);
+            }
+        }
 
-                return;
-            }
+        // Hosts a game; players who join it must give this password, unless it is empty.
+        public void Host(string gamePassword)
+        {
+            password = gamePassword ?? "";
+            StartHost();
+        }
 
-            if (keyboard.tabKey.wasPressedThisFrame)
-            {
-                editingPassword = !editingPassword;
-            }
+        public void Join(string serverAddress, string serverPassword)
+        {
+            address = (serverAddress ?? "").Trim();
+            password = serverPassword ?? "";
+            StartClient();
+        }
 
-            if (keyboard.backspaceKey.wasPressedThisFrame)
-            {
-                if (editingPassword) password = WithoutLastCharacter(password);
-                else address = WithoutLastCharacter(address);
-            }
+        // Leaves the game, or gives up joining one, back to the main menu.
+        public void Leave()
+        {
+            if (!networkManager.IsListening || networkManager.ShutdownInProgress) return;
 
-            if (keyboard.f1Key.wasPressedThisFrame)
-            {
-                StartHost();
-            }
-            else if (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame)
-            {
-                StartClient();
-            }
+            // Players disappear during shutdown: their position is recorded before.
+            SaveSession();
+            leaving = true;
+            networkManager.Shutdown();
+        }
+
+        public void Quit()
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
         }
 
         private void OnGUI()
@@ -476,28 +498,9 @@ namespace Voxel.Client
 
         private string ScreenText()
         {
-            // The character creation screen has the whole screen to itself.
-            if (appearanceMenu.IsOpen) return "";
-
-            if (!networkManager.IsListening)
-            {
-                return "F1: host a game\n"
-                    + "Enter: join a game\n\n"
-                    + $"Address: {address}{(editingPassword ? "" : "_")}\n"
-                    + $"Password: {new string('*', password.Length)}{(editingPassword ? "_" : "")}\n"
-                    + "Tab: switch field   Backspace: delete\n\n"
-                    + message;
-            }
-
-            if (!networkManager.IsServer && !networkManager.IsConnectedClient)
-            {
-                return $"Connecting to {address}…\nF10: cancel";
-            }
-
-            if (worldSync.World == null)
-            {
-                return $"Loading the world… {Mathf.RoundToInt(worldSync.LoadingProgress * 100f)}%\nF10: cancel";
-            }
+            // The main menu (with the connection and loading screens) and the character creation
+            // screen have the whole screen to themselves.
+            if (appearanceMenu.IsOpen || InMenu || IsConnecting || IsLoading) return "";
 
             if (Cursor.lockState != CursorLockMode.Locked)
             {
@@ -517,33 +520,6 @@ namespace Voxel.Client
 
             return forwarding != null ? "\n" + forwarding.Summary : "";
         }
-
-        private void ListenToTextInput(Keyboard keyboard)
-        {
-            if (keyboard == textInputKeyboard) return;
-
-            if (textInputKeyboard != null) textInputKeyboard.onTextInput -= OnTextInput;
-            textInputKeyboard = keyboard;
-            if (textInputKeyboard != null) textInputKeyboard.onTextInput += OnTextInput;
-        }
-
-        private void OnTextInput(char character)
-        {
-            if (networkManager.IsListening) return;
-
-            if (editingPassword)
-            {
-                bool printable = character > ' ' && character < 127;
-                if (printable && password.Length < MaxPasswordLength) password += character;
-            }
-            else if ((char.IsDigit(character) || character == '.') && address.Length < MaxAddressLength)
-            {
-                address += character;
-            }
-        }
-
-        private static string WithoutLastCharacter(string text) =>
-            text.Length > 0 ? text.Substring(0, text.Length - 1) : text;
 
         private static string ArgumentValue(string[] arguments, string name)
         {

@@ -62,6 +62,14 @@
 .icon--rotate { background-image: url("Icons/ArrowsClockwise.png"); }
 .icon--up-down { background-image: url("Icons/ArrowsDownUp.png"); }
 .icon--left-right { background-image: url("Icons/ArrowsLeftRight.png"); }
+.icon--arrow-left { background-image: url("Icons/ArrowLeft.png"); }
+.icon--gear { background-image: url("Icons/GearSix.png"); }
+.icon--globe { background-image: url("Icons/Globe.png"); }
+.icon--house { background-image: url("Icons/HouseSimple.png"); }
+.icon--plant { background-image: url("Icons/Plant.png"); }
+.icon--play { background-image: url("Icons/Play.png"); }
+.icon--sign-out { background-image: url("Icons/SignOut.png"); }
+.icon--warning { background-image: url("Icons/WarningCircle.png"); }
 
 .button {
     flex-direction: row;

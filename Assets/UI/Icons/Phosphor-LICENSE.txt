@@ -1,5 +1,6 @@
 Icons from Phosphor Icons (https://phosphoricons.com):
-ArrowsClockwise, ArrowsDownUp, ArrowsLeftRight, CaretLeft, CaretRight, Lock (regular weight) and Check (bold weight).
+ArrowLeft, ArrowsClockwise, ArrowsDownUp, ArrowsLeftRight, CaretLeft, CaretRight, GearSix, Globe, HouseSimple, Lock,
+Plant, Play, SignOut, WarningCircle (regular weight) and Check (bold weight).
 Copied from the Unity App UI package (com.unity.dt.app-ui), whose "Third Party Notices.md" lists them.
 
 MIT License
