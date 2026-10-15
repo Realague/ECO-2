@@ -31,9 +31,159 @@ MonoBehaviour:
   parts:
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 8e4325a8018fdf64790511a3f7cb2d08, type: 2}
-    offset: {x: 0, y: 0.4, z: 0}
-    scale: {x: 0.35, y: 0.4, z: 0.9}
+    offset: {x: 0, y: 0.37, z: -0.02}
+    scale: {x: 0.26, y: 0.22, z: 0.56}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: e85b1b4e6c5ae2942b244dd20868f27d, type: 2}
+    offset: {x: 0, y: 0.31, z: 0.21}
+    scale: {x: 0.2, y: 0.16, z: 0.12}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: e85b1b4e6c5ae2942b244dd20868f27d, type: 2}
+    offset: {x: 0, y: 0.255, z: -0.02}
+    scale: {x: 0.18, y: 0.02, z: 0.44}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 8e4325a8018fdf64790511a3f7cb2d08, type: 2}
-    offset: {x: 0, y: 0.6, z: 0.55}
-    scale: {x: 0.3, y: 0.3, z: 0.3}
+    offset: {x: 0, y: 0.47, z: 0.25}
+    scale: {x: 0.18, y: 0.18, z: 0.14}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 8e4325a8018fdf64790511a3f7cb2d08, type: 2}
+    offset: {x: 0, y: 0.56, z: 0.36}
+    scale: {x: 0.24, y: 0.19, z: 0.2}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: e85b1b4e6c5ae2942b244dd20868f27d, type: 2}
+    offset: {x: 0, y: 0.495, z: 0.37}
+    scale: {x: 0.26, y: 0.07, z: 0.17}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 8e4325a8018fdf64790511a3f7cb2d08, type: 2}
+    offset: {x: 0, y: 0.52, z: 0.51}
+    scale: {x: 0.11, y: 0.08, z: 0.12}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: e85b1b4e6c5ae2942b244dd20868f27d, type: 2}
+    offset: {x: 0, y: 0.49, z: 0.51}
+    scale: {x: 0.1, y: 0.03, z: 0.11}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 80253a3f13cd4a74b95183c4ea025805, type: 2}
+    offset: {x: 0, y: 0.54, z: 0.575}
+    scale: {x: 0.045, y: 0.035, z: 0.02}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 80253a3f13cd4a74b95183c4ea025805, type: 2}
+    offset: {x: 0.065, y: 0.585, z: 0.461}
+    scale: {x: 0.035, y: 0.03, z: 0.006}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 80253a3f13cd4a74b95183c4ea025805, type: 2}
+    offset: {x: -0.065, y: 0.585, z: 0.461}
+    scale: {x: 0.035, y: 0.03, z: 0.006}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 8e4325a8018fdf64790511a3f7cb2d08, type: 2}
+    offset: {x: 0.075, y: 0.69, z: 0.35}
+    scale: {x: 0.07, y: 0.12, z: 0.03}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 8e4325a8018fdf64790511a3f7cb2d08, type: 2}
+    offset: {x: -0.075, y: 0.69, z: 0.35}
+    scale: {x: 0.07, y: 0.12, z: 0.03}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 80253a3f13cd4a74b95183c4ea025805, type: 2}
+    offset: {x: 0.075, y: 0.765, z: 0.35}
+    scale: {x: 0.072, y: 0.04, z: 0.032}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 80253a3f13cd4a74b95183c4ea025805, type: 2}
+    offset: {x: -0.075, y: 0.765, z: 0.35}
+    scale: {x: 0.072, y: 0.04, z: 0.032}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: e85b1b4e6c5ae2942b244dd20868f27d, type: 2}
+    offset: {x: 0.075, y: 0.68, z: 0.367}
+    scale: {x: 0.04, y: 0.08, z: 0.005}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: e85b1b4e6c5ae2942b244dd20868f27d, type: 2}
+    offset: {x: -0.075, y: 0.68, z: 0.367}
+    scale: {x: 0.04, y: 0.08, z: 0.005}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 80253a3f13cd4a74b95183c4ea025805, type: 2}
+    offset: {x: 0.08, y: 0.14, z: 0.17}
+    scale: {x: 0.07, y: 0.28, z: 0.07}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 80253a3f13cd4a74b95183c4ea025805, type: 2}
+    offset: {x: -0.08, y: 0.14, z: 0.17}
+    scale: {x: 0.07, y: 0.28, z: 0.07}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 8e4325a8018fdf64790511a3f7cb2d08, type: 2}
+    offset: {x: 0.095, y: 0.29, z: -0.2}
+    scale: {x: 0.08, y: 0.16, z: 0.15}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 8e4325a8018fdf64790511a3f7cb2d08, type: 2}
+    offset: {x: -0.095, y: 0.29, z: -0.2}
+    scale: {x: 0.08, y: 0.16, z: 0.15}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 80253a3f13cd4a74b95183c4ea025805, type: 2}
+    offset: {x: 0.095, y: 0.12, z: -0.2}
+    scale: {x: 0.065, y: 0.24, z: 0.065}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 80253a3f13cd4a74b95183c4ea025805, type: 2}
+    offset: {x: -0.095, y: 0.12, z: -0.2}
+    scale: {x: 0.065, y: 0.24, z: 0.065}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 8e4325a8018fdf64790511a3f7cb2d08, type: 2}
+    offset: {x: 0, y: 0.35, z: -0.46}
+    scale: {x: 0.14, y: 0.14, z: 0.34}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: e85b1b4e6c5ae2942b244dd20868f27d, type: 2}
+    offset: {x: 0, y: 0.35, z: -0.67}
+    scale: {x: 0.12, y: 0.12, z: 0.09}
+  gait: 2
+  hopLength: 0.6
+  hopDuration: 0.3
+  hopHeight: 0.2
+  walkSpeed: 2.5
+  strideLength: 0.7
+  bodyPivot: {x: 0, y: 0.37, z: 0}
+  rig:
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 1
+    pivot: {x: 0.075, y: 0.645, z: 0.35}
+  - motion: 1
+    pivot: {x: -0.075, y: 0.645, z: 0.35}
+  - motion: 1
+    pivot: {x: 0.075, y: 0.645, z: 0.35}
+  - motion: 1
+    pivot: {x: -0.075, y: 0.645, z: 0.35}
+  - motion: 1
+    pivot: {x: 0.075, y: 0.645, z: 0.35}
+  - motion: 1
+    pivot: {x: -0.075, y: 0.645, z: 0.35}
+  - motion: 2
+    pivot: {x: 0.08, y: 0.28, z: 0.17}
+  - motion: 2
+    pivot: {x: -0.08, y: 0.28, z: 0.17}
+  - motion: 3
+    pivot: {x: 0.095, y: 0.32, z: -0.2}
+  - motion: 3
+    pivot: {x: -0.095, y: 0.32, z: -0.2}
+  - motion: 3
+    pivot: {x: 0.095, y: 0.32, z: -0.2}
+  - motion: 3
+    pivot: {x: -0.095, y: 0.32, z: -0.2}
+  - motion: 4
+    pivot: {x: 0, y: 0.37, z: -0.29}
+  - motion: 4
+    pivot: {x: 0, y: 0.37, z: -0.29}

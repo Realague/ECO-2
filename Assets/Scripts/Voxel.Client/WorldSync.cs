@@ -26,6 +26,7 @@ namespace Voxel.Client
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private VoxelWorld voxelWorld;
         [SerializeField] private InventorySync inventorySync;
+        [SerializeField] private EcosystemSync ecosystemSync;
 
         private readonly Dictionary<ulong, ChunkStream> streams = new Dictionary<ulong, ChunkStream>();
         private readonly List<ulong> finishedStreams = new List<ulong>();
@@ -130,7 +131,8 @@ namespace Voxel.Client
             Vector3 eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;
             if (!BlockEditRules.IsAllowed(serverWorld, eyes.ToNumerics(), pos, block)) return false;
 
-            return !Blocks.IsSolid(block) || !IsInsideAnyPlayer(pos);
+            // A block is never placed inside a player or an animal.
+            return !Blocks.IsSolid(block) || (!IsInsideAnyPlayer(pos) && !ecosystemSync.IsAnimalInside(pos));
         }
 
         private bool IsInsideAnyPlayer(BlockPos pos)

@@ -26,7 +26,7 @@ namespace Eco.Sim.Tests
             Run(ecosystem, 2);
 
             Animal rabbit = ecosystem.Animals[0];
-            Assert.AreEqual((10, 10), (rabbit.X, rabbit.Z));
+            Assert.AreEqual((11, 10), (rabbit.X, rabbit.Z), "it eats from beside the bush");
             Assert.AreEqual(0f, rabbit.Hunger);
             Assert.AreEqual(1, ecosystem.Plants.Count);
             Assert.AreEqual(0.5f, ecosystem.Plants[0].Growth, 0.001f);
@@ -174,6 +174,79 @@ namespace Eco.Sim.Tests
             }
 
             Assert.AreEqual(40, ecosystem.Animals.Count);
+        }
+
+        [Test]
+        public void HungryHerbivore_ClimbsAOneBlockStep_ToReachFood()
+        {
+            World world = MeadowGenerator.CreateWorld(2);
+            RaiseGround(world, 16, 1);
+            Ecosystem ecosystem = CreateEcosystem(Rabbit(hungerPerStep: 0.11f, moveRange: 3), Fox(), world);
+            Assert.IsTrue(ecosystem.TryPlant(BushIndex, 18, 16));
+            Run(ecosystem, 3 * SimClock.StepsPerDay);
+            ecosystem.TryPlaceAnimal(RabbitIndex, 13, 16);
+
+            // Three columns on the first step, the last one up the step; next to the bush on the second.
+            Run(ecosystem, 2);
+
+            Animal rabbit = ecosystem.Animals[0];
+            Assert.That(rabbit.X, Is.GreaterThanOrEqualTo(16), "it went up onto the step");
+            Assert.AreEqual(MeadowGenerator.Surface + 1, rabbit.Y);
+            Assert.AreEqual(0.5f, ecosystem.Plants[0].Growth, 0.001f, "it grazed the bush");
+        }
+
+        [Test]
+        public void HungryHerbivore_CannotClimbATwoBlockWall_ToReachFood()
+        {
+            World world = MeadowGenerator.CreateWorld(2);
+            RaiseGround(world, 16, 2);
+            Ecosystem ecosystem = CreateEcosystem(Rabbit(hungerPerStep: 0.11f, moveRange: 3), Fox(), world);
+            Assert.IsTrue(ecosystem.TryPlant(BushIndex, 18, 16));
+            Run(ecosystem, 3 * SimClock.StepsPerDay);
+            ecosystem.TryPlaceAnimal(RabbitIndex, 13, 16);
+
+            Run(ecosystem, 5);
+
+            Assert.That(ecosystem.Animals[0].X, Is.LessThan(16));
+            Assert.AreEqual(1f, ecosystem.Plants[0].Growth, "the bush is out of reach");
+        }
+
+        [Test]
+        public void WanderingAnimals_NeverCrossAWallTwoBlocksHigh()
+        {
+            World world = MeadowGenerator.CreateWorld(2);
+            for (int z = 0; z < world.SizeZ; z++)
+            {
+                world.SetBlock(16, MeadowGenerator.Surface, z, Blocks.Stone);
+                world.SetBlock(16, MeadowGenerator.Surface + 1, z, Blocks.Stone);
+            }
+
+            Ecosystem ecosystem = CreateEcosystem(Rabbit(moveRange: 3), Fox(), world);
+            for (int z = 2; z < 30; z += 4)
+            {
+                ecosystem.TryPlaceAnimal(RabbitIndex, 14, z);
+            }
+
+            for (int step = 0; step < 300; step++)
+            {
+                ecosystem.Step();
+                foreach (Animal animal in ecosystem.Animals)
+                {
+                    Assert.That(animal.X, Is.LessThan(16), $"step {step}: animal {animal.Id} crossed the wall");
+                }
+            }
+        }
+
+        [Test]
+        public void IsAnimalInside_TellsTheBlockItsBodyTakesUp()
+        {
+            Ecosystem ecosystem = CreateEcosystem(Rabbit(moveRange: 0), Fox());
+            ecosystem.TryPlaceAnimal(RabbitIndex, 10, 10);
+
+            Assert.IsTrue(ecosystem.IsAnimalInside(10, MeadowGenerator.Surface, 10));
+            Assert.IsFalse(ecosystem.IsAnimalInside(10, MeadowGenerator.Surface + 1, 10), "a rabbit is less than one block high");
+            Assert.IsFalse(ecosystem.IsAnimalInside(11, MeadowGenerator.Surface, 10));
+            Assert.IsFalse(ecosystem.IsAnimalInside(-1, MeadowGenerator.Surface, 10));
         }
 
         [Test]
@@ -350,14 +423,29 @@ namespace Eco.Sim.Tests
         }
 
         // A world without seeds: tests place the plants they need themselves.
-        private static Ecosystem CreateEcosystem(AnimalSpecies rabbit, AnimalSpecies fox)
+        private static Ecosystem CreateEcosystem(AnimalSpecies rabbit, AnimalSpecies fox, World world = null)
         {
             Species tree = TestSpecies.Tree();
             tree.SeedChance = 0f;
             Species bush = TestSpecies.Bush();
             bush.SeedChance = 0f;
             bush.MinFertility = 0.2f;
-            return new Ecosystem(MeadowGenerator.CreateWorld(2), new[] { tree, bush }, new[] { rabbit, fox }, Seed);
+            return new Ecosystem(world ?? MeadowGenerator.CreateWorld(2), new[] { tree, bush }, new[] { rabbit, fox }, Seed);
+        }
+
+        // Fills every column from x = fromX to the world's edge with dirt, `blocks` blocks above the meadow.
+        private static void RaiseGround(World world, int fromX, int blocks)
+        {
+            for (int x = fromX; x < world.SizeX; x++)
+            {
+                for (int z = 0; z < world.SizeZ; z++)
+                {
+                    for (int y = MeadowGenerator.Surface; y < MeadowGenerator.Surface + blocks; y++)
+                    {
+                        world.SetBlock(x, y, z, Blocks.Dirt);
+                    }
+                }
+            }
         }
 
         private static void Run(Ecosystem ecosystem, int steps)

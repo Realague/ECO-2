@@ -4,8 +4,9 @@ using Voxel.Core;
 
 namespace Eco.Sim
 {
-    // Animals: at each step they move from one block column to another, look for food when hungry,
-    // breed when well fed, and die of hunger or old age.
+    // Animals: at each step they walk a few block columns (one column at a time, following
+    // AnimalMoves, so they never go through blocks), look for food when hungry, breed when well fed,
+    // and die of hunger or old age.
     // As with plants, everything goes through Step and the ecosystem's random generator.
     public sealed partial class Ecosystem
     {
@@ -17,15 +18,10 @@ namespace Eco.Sim
         // Grazing removes this share of growth from the plant, which must have at least that much.
         private const float GrazedGrowth = 0.5f;
 
-        // Height difference an animal can cross in one move.
-        private const int MaxClimb = 3;
         private const float ImmigrationChancePerStep = 0.05f;
         private const float ColumnsPerDensityUnit = 10000f;
         private const int InitialPopulationFactor = 3;
         private const int DeadAge = -1;
-
-        private static readonly int[] NeighbourX = { 1, 1, 0, -1, -1, -1, 0, 1 };
-        private static readonly int[] NeighbourZ = { 0, 1, 1, 1, 0, -1, -1, -1 };
 
         private AnimalSpecies[] animalSpecies;
 
@@ -49,6 +45,19 @@ namespace Eco.Sim
         public IReadOnlyList<AnimalSpecies> AllAnimalSpecies => animalSpecies;
 
         public int CountAnimals(int speciesIndex) => animalPopulation[speciesIndex];
+
+        // Whether an animal's body takes up this block: the server refuses to place a block there.
+        public bool IsAnimalInside(int x, int y, int z)
+        {
+            if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) return false;
+
+            int animalId = animalAtColumn[ColumnIndex(x, z)];
+            if (animalId == 0) return false;
+
+            Animal animal = animals[AnimalIndexOf(animalId)];
+            int height = Math.Max(1, (int)Math.Ceiling(animalSpecies[animal.SpeciesIndex].Height));
+            return y >= animal.Y && y < animal.Y + height;
+        }
 
         public bool TryGetAnimal(int animalId, out Animal animal)
         {
@@ -159,7 +168,7 @@ namespace Eco.Sim
                 int reach = 2 * kind.MoveRange + 1;
                 int x = animal.X + random.NextInt(reach) - kind.MoveRange;
                 int z = animal.Z + random.NextInt(reach) - kind.MoveRange;
-                TryMoveTo(ref animal, x, z);
+                WalkToward(ref animal, x, z, kind.MoveRange, false);
             }
 
             bool breeds = animal.Age >= kind.MaturitySteps && animal.Hunger < BreedsBelow && random.NextFloat() < kind.BirthChance;
@@ -191,27 +200,15 @@ namespace Eco.Sim
             return true;
         }
 
-        // Moves toward the nearest food and eats it if within reach. Returns false if none is in
+        // Walks toward the nearest food and eats it once next to it. Returns false if none is in
         // sight or if the way is blocked: the animal then wanders at random.
         private bool SeekFood(ref Animal animal, AnimalSpecies kind)
         {
             if (!FindFood(animal, kind, out int foodX, out int foodZ, out bool isPrey)) return false;
 
-            int stepX = Math.Min(Math.Max(foodX - animal.X, -kind.MoveRange), kind.MoveRange);
-            int stepZ = Math.Min(Math.Max(foodZ - animal.Z, -kind.MoveRange), kind.MoveRange);
-            int x = animal.X + stepX;
-            int z = animal.Z + stepZ;
-
-            // A prey occupies its column: the predator stops just before it.
-            if (isPrey && x == foodX && z == foodZ)
-            {
-                x -= Math.Sign(stepX);
-                z -= Math.Sign(stepZ);
-            }
-
-            if (!TryMoveTo(ref animal, x, z)) return false;
-
-            if (Math.Max(Math.Abs(foodX - animal.X), Math.Abs(foodZ - animal.Z)) > 1) return true;
+            // It stops next to the food: a prey occupies its column, and a plant is eaten from beside it.
+            bool walked = WalkToward(ref animal, foodX, foodZ, kind.MoveRange, true);
+            if (AnimalMoves.Steps(animal.X, animal.Z, foodX, foodZ) > 1) return walked;
 
             if (isPrey)
             {
@@ -296,30 +293,42 @@ namespace Eco.Sim
             if (plant.Stage != previousStage) PlantChanged?.Invoke(plant);
         }
 
-        private bool TryMoveTo(ref Animal animal, int x, int z)
+        // Walks at most maxSteps columns toward the target, one column at a time, stopping on it or,
+        // if asked, next to it. Returns false if the animal could not move at all.
+        private bool WalkToward(ref Animal animal, int targetX, int targetZ, int maxSteps, bool stopNextToIt)
         {
-            if (x == animal.X && z == animal.Z) return true;
-            if (!CanStandAt(x, z, out int y) || Math.Abs(y - animal.Y) > MaxClimb) return false;
+            var ground = new SimGround(this);
+            bool moved = false;
+            for (int step = 0; step < maxSteps; step++)
+            {
+                int distance = AnimalMoves.Steps(animal.X, animal.Z, targetX, targetZ);
+                if (distance == 0 || (stopNextToIt && distance <= 1)) break;
+                if (!AnimalMoves.TryNextStep(ground, animal.X, animal.Y, animal.Z, targetX, targetZ, out int x, out int y, out int z)) break;
 
-            animalAtColumn[ColumnIndex(animal.X, animal.Z)] = 0;
-            animalAtColumn[ColumnIndex(x, z)] = animal.Id;
-            animal.X = x;
-            animal.Y = y;
-            animal.Z = z;
-            return true;
+                animalAtColumn[ColumnIndex(animal.X, animal.Z)] = 0;
+                animalAtColumn[ColumnIndex(x, z)] = animal.Id;
+                animal.X = x;
+                animal.Y = y;
+                animal.Z = z;
+                moved = true;
+            }
+
+            return moved;
         }
 
+        // The young appears in a neighbouring column the parent could step onto.
         private void GiveBirth(ref Animal parent)
         {
-            int first = random.NextInt(NeighbourX.Length);
-            for (int i = 0; i < NeighbourX.Length; i++)
+            var ground = new SimGround(this);
+            int first = random.NextInt(AnimalMoves.DirectionCount);
+            for (int i = 0; i < AnimalMoves.DirectionCount; i++)
             {
-                int direction = (first + i) % NeighbourX.Length;
-                int x = parent.X + NeighbourX[direction];
-                int z = parent.Z + NeighbourZ[direction];
-                if (!CanStandAt(x, z, out int y) || Math.Abs(y - parent.Y) > MaxClimb) continue;
+                int direction = (first + i) % AnimalMoves.DirectionCount;
+                int dx = AnimalMoves.OffsetX(direction);
+                int dz = AnimalMoves.OffsetZ(direction);
+                if (!AnimalMoves.CanEnter(ground, parent.X, parent.Y, parent.Z, dx, dz, out int y)) continue;
 
-                AddAnimal(nextAnimalId++, parent.SpeciesIndex, x, y, z, 0, NewbornHunger);
+                AddAnimal(nextAnimalId++, parent.SpeciesIndex, parent.X + dx, y, parent.Z + dz, 0, NewbornHunger);
                 parent.Hunger += BirthCost;
                 return;
             }
@@ -342,12 +351,32 @@ namespace Eco.Sim
 
         private bool CanStandAt(int x, int z, out int y)
         {
+            return TryGetAnimalGround(x, z, out y) && animalAtColumn[ColumnIndex(x, z)] == 0;
+        }
+
+        // The air block above the column's ground, if the column is inside the world and not built up to the top.
+        private bool TryGetAnimalGround(int x, int z, out int y)
+        {
             y = 0;
             if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) return false;
-            if (animalAtColumn[ColumnIndex(x, z)] != 0) return false;
 
             y = SurfaceAt(x, z);
             return y > 0 && y < world.SizeY;
+        }
+
+        // The ground as AnimalMoves sees it during the simulation: a column with an animal in it is taken.
+        private readonly struct SimGround : IAnimalGround
+        {
+            private readonly Ecosystem ecosystem;
+
+            public SimGround(Ecosystem ecosystem)
+            {
+                this.ecosystem = ecosystem;
+            }
+
+            public bool TryGetGround(int x, int z, out int y) => ecosystem.TryGetAnimalGround(x, z, out y);
+
+            public bool IsFree(int x, int z) => ecosystem.animalAtColumn[ecosystem.ColumnIndex(x, z)] == 0;
         }
 
         private int SurfaceAt(int x, int z)

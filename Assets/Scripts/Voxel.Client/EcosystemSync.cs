@@ -48,6 +48,9 @@ namespace Voxel.Client
 
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private InventorySync inventorySync;
+
+        // The world of this machine, on which the display works out the way each animal walks.
+        [SerializeField] private WorldSync worldSync;
         [SerializeField] private SpeciesAsset[] speciesAssets;
         [SerializeField] private AnimalSpeciesAsset[] animalAssets;
         [SerializeField] private float plantViewDistance = 128f;
@@ -430,6 +433,12 @@ namespace Voxel.Client
             return ecosystem.TryPlant(speciesIndex, x, z);
         }
 
+        // Server side: whether an animal's body takes up this block, which then cannot be built on.
+        public bool IsAnimalInside(BlockPos pos)
+        {
+            return ecosystem != null && ecosystem.IsAnimalInside(pos.X, pos.Y, pos.Z);
+        }
+
         // Name of a plant species, for display (for instance that of a seed).
         public string PlantName(int speciesIndex)
         {
@@ -557,7 +566,7 @@ namespace Voxel.Client
             animalViews.BeginList();
             foreach (Animal animal in nearbyAnimals)
             {
-                animalViews.Add(animal.Id, animal.SpeciesIndex, new Vector3(animal.X + 0.5f, animal.Y, animal.Z + 0.5f), AnimalTravelSeconds());
+                animalViews.Add(animal.Id, animal.SpeciesIndex, new Vector3(animal.X + 0.5f, animal.Y, animal.Z + 0.5f), worldSync.World, AnimalTravelSeconds());
             }
 
             animalViews.EndList();
@@ -594,13 +603,15 @@ namespace Voxel.Client
                 reader.ReadValueSafe(out int x);
                 reader.ReadValueSafe(out int y);
                 reader.ReadValueSafe(out int z);
-                animalViews.Add(animalId, speciesIndex, new Vector3(x + 0.5f, y, z + 0.5f), travelSeconds);
+                animalViews.Add(animalId, speciesIndex, new Vector3(x + 0.5f, y, z + 0.5f), worldSync.World, travelSeconds);
             }
 
             animalViews.EndList();
         }
 
-        // Duration of the displayed move between two positions: that of one simulation step at the current speed.
+        // Longest a displayed move between two positions may last: one simulation step at the current
+        // speed, so that an animal always arrives before its next move. AnimalViews plays shorter
+        // moves at the species' own pace.
         private float AnimalTravelSeconds()
         {
             float stepSeconds = SimClock.RealSecondsPerStep / Mathf.Max(multiplier, 0.01f);

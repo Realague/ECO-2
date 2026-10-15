@@ -109,3 +109,48 @@ MonoBehaviour:
     material: {fileID: 2100000, guid: 864637f18cad53143bacf9e93669da1d, type: 2}
     offset: {x: -0.12, y: 0.03, z: -0.125}
     scale: {x: 0.08, y: 0.06, z: 0.22999999}
+  gait: 1
+  hopLength: 0.6
+  hopHeight: 0.2
+  bodyPivot: {x: 0, y: 0.2, z: 0}
+  rig:
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 1
+    pivot: {x: 0.065, y: 0.47, z: 0.22}
+  - motion: 1
+    pivot: {x: -0.065, y: 0.47, z: 0.22}
+  - motion: 1
+    pivot: {x: 0.065, y: 0.47, z: 0.22}
+  - motion: 1
+    pivot: {x: -0.065, y: 0.47, z: 0.22}
+  - motion: 4
+    pivot: {x: 0, y: 0.27, z: -0.24}
+  - motion: 2
+    pivot: {x: 0.08, y: 0.12, z: 0.135}
+  - motion: 2
+    pivot: {x: -0.08, y: 0.12, z: 0.135}
+  - motion: 2
+    pivot: {x: 0.08, y: 0.12, z: 0.135}
+  - motion: 2
+    pivot: {x: -0.08, y: 0.12, z: 0.135}
+  - motion: 3
+    pivot: {x: 0.12, y: 0.2, z: -0.1}
+  - motion: 3
+    pivot: {x: -0.12, y: 0.2, z: -0.1}
+  - motion: 3
+    pivot: {x: 0.12, y: 0.2, z: -0.1}
+  - motion: 3
+    pivot: {x: -0.12, y: 0.2, z: -0.1}
