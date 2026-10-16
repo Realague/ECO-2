@@ -91,6 +91,20 @@ namespace Voxel.Client
 
         public float Multiplier => multiplier;
 
+        // The plants this machine knows, for the minimap: one added or grown, one gone, all gone.
+        internal event Action<int, PlantView> PlantShown;
+        internal event Action<int, PlantView> PlantHidden;
+        internal event Action PlantsCleared;
+
+        internal IReadOnlyList<SpeciesAsset> PlantAssets => speciesAssets;
+        internal IReadOnlyList<AnimalSpeciesAsset> AnimalAssets => animalAssets;
+
+        // The displayed animals: species index and current position of each.
+        internal void GetAnimalPositions(List<KeyValuePair<int, Vector3>> into)
+        {
+            animalViews.GetPositions(into);
+        }
+
         public string ClockText
         {
             get
@@ -210,6 +224,7 @@ namespace Voxel.Client
             clock = null;
             plants.Clear();
             plantRenderer?.Clear();
+            PlantsCleared?.Invoke();
             animalViews.Clear();
             changedPlants.Clear();
             removedPlants.Clear();
@@ -371,6 +386,7 @@ namespace Voxel.Client
         {
             plants[plantId] = view;
             plantRenderer?.Set(plantId, view);
+            PlantShown?.Invoke(plantId, view);
         }
 
         private void RemoveView(int plantId)
@@ -379,6 +395,7 @@ namespace Voxel.Client
 
             plants.Remove(plantId);
             plantRenderer?.Remove(plantId, view);
+            PlantHidden?.Invoke(plantId, view);
         }
 
         private void OnPlantUpserted(Plant plant)

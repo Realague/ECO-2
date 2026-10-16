@@ -1,0 +1,53 @@
+/* What both maps draw: the world's picture and the markers over it. Markers are placed by their
+   top left corner with a translation; the negative margins centre them on their point. */
+
+.map-image {
+    position: absolute;
+    left: 0;
+    top: 0;
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.map-layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.map-animal {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 8px;
+    height: 8px;
+    margin: -4px 0 0 -4px;
+    border-width: 1px;
+    border-color: rgba(20, 22, 26, 0.75);
+    border-radius: 4px;
+}
+
+.map-player {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 14px;
+    height: 14px;
+    margin: -7px 0 0 -7px;
+    background-color: #ffffff;
+    border-width: 3px;
+    border-color: #2f6fd6;
+    border-radius: 7px;
+}
+
+.map-arrow {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 22px;
+    height: 26px;
+    margin: -13px 0 0 -11px;
+    --arrow-fill: #ffffff;
+    --arrow-outline: #1f2124;
+}

@@ -33,12 +33,35 @@ namespace Voxel.Client
         [Tooltip("Wood obtained by felling an adult plant; a younger plant gives less.")]
         [SerializeField] private int woodYield;
 
+        // One look of the species. Each plant shows one of the models, picked from its column.
+        [Serializable]
+        public struct Model
+        {
+            public Part[] parts;
+        }
+
         [Header("Appearance and aiming")]
+        [Tooltip("Aiming box at adult size: as high as the tallest model, as wide as the trunk.")]
         [SerializeField] private float height = 5.5f;
         [SerializeField] private float width = 1f;
-        [SerializeField] private Part[] parts;
+        [SerializeField] private Model[] models = Array.Empty<Model>();
 
-        public IReadOnlyList<Part> Parts => parts;
+        public int ModelCount => models.Length;
+
+        public IReadOnlyList<Part> PartsOf(int model) => models[model].parts ?? Array.Empty<Part>();
+
+        // The model shown for a plant standing in this column: the same on every machine, and
+        // never sent, since it only changes the look.
+        public int ModelAt(int x, int z)
+        {
+            if (models.Length <= 1) return 0;
+
+            uint hash = (uint)(x * 1640531513) ^ (uint)(z * 2654435761u);
+            hash ^= hash >> 15;
+            hash *= 2246822519u;
+            hash ^= hash >> 13;
+            return (int)(hash % (uint)models.Length);
+        }
 
         public int WoodYield => woodYield;
 

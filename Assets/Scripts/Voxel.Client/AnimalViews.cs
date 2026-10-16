@@ -139,6 +139,17 @@ namespace Voxel.Client
             views.Clear();
         }
 
+        // Where each animal is now, with its species index.
+        public void GetPositions(List<KeyValuePair<int, Vector3>> into)
+        {
+            into.Clear();
+            float now = Time.time;
+            foreach (View view in views.Values)
+            {
+                into.Add(new KeyValuePair<int, Vector3>(view.SpeciesIndex, view.PositionAt(now)));
+            }
+        }
+
         // Finds the nearest animal along the ray, at most maxDistance away. The direction must be normalized.
         public bool TryPick(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance, out int animalId, out float distance)
         {

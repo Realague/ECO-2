@@ -24,6 +24,7 @@ namespace Voxel.Client
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private AppearanceMenu appearanceMenu;
+        [SerializeField] private MapScreen mapScreen;
 
         private readonly List<KeyValuePair<int, int>> entries = new List<KeyValuePair<int, int>>();
         private readonly StringBuilder text = new StringBuilder();
@@ -34,8 +35,8 @@ namespace Voxel.Client
         // The item the player holds in hand, or Items.None.
         public int SelectedItem => heldItem;
 
-        // Hidden while the character is being created.
-        private bool InGame => networkManager.IsListening && worldSync.World != null && !appearanceMenu.IsOpen;
+        // Hidden while the character is being created and while the full-screen map is open.
+        private bool InGame => networkManager.IsListening && worldSync.World != null && !appearanceMenu.IsOpen && !mapScreen.IsOpen;
 
         private void Update()
         {
@@ -147,7 +148,7 @@ namespace Voxel.Client
                 text.Append(i + 1).Append(". ").Append(NameOf(entries[i].Key)).Append(" ×").Append(entries[i].Value).Append('\n');
             }
 
-            text.Append("Wheel or 1-9: held item   Right click: place or plant   C: craft   K: speciality   G: give (Shift: all)");
+            text.Append("Wheel or 1-9: held item   Right click: place or plant   C: craft   K: speciality   G: give (Shift: all)   M: map");
             return text.ToString();
         }
 

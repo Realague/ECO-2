@@ -1,0 +1,49 @@
+/* Minimap: a round map in the top right corner. Sizes are for the 1920 x 1080 reference resolution. */
+
+.minimap-screen {
+    align-items: flex-end;
+    padding: 28px 28px 0 0;
+}
+
+.minimap {
+    width: 300px;
+    align-items: center;
+}
+
+/* The round window; the picture slides inside it and is cut to the circle. */
+.minimap-frame {
+    width: 300px;
+    height: 300px;
+    overflow: hidden;
+    background-color: #2b3138;
+    border-width: 6px;
+    border-color: var(--panel);
+    border-radius: 150px;
+}
+
+/* North, on the rim. */
+.minimap-north {
+    position: absolute;
+    top: -10px;
+    left: 135px;
+    width: 30px;
+    height: 30px;
+    margin: 0;
+    padding: 0;
+    -unity-text-align: middle-center;
+    font-size: 16px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text);
+    background-color: var(--panel);
+    border-radius: 15px;
+}
+
+.minimap-position {
+    margin: 10px 0 0 0;
+    padding: 5px 14px;
+    font-size: 16px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text-body);
+    background-color: var(--panel);
+    border-radius: 13px;
+}

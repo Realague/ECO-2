@@ -34,6 +34,7 @@ namespace Voxel.Client
         private InventoryHud inventoryHud;
         private PlayerModel model;
         private AppearanceMenu appearanceMenu;
+        private MapScreen mapScreen;
         private World world;
         private Transform cameraTransform;
         private Vector3 velocity;
@@ -57,6 +58,7 @@ namespace Voxel.Client
             inventoryHud = FindAnyObjectByType<InventoryHud>();
             model = GetComponent<PlayerModel>();
             appearanceMenu = FindAnyObjectByType<AppearanceMenu>();
+            mapScreen = FindAnyObjectByType<MapScreen>();
             cameraTransform = Camera.main.transform;
             enabled = true;
         }
@@ -89,6 +91,14 @@ namespace Voxel.Client
                 return;
             }
 
+            // The full-screen map has the mouse and the keyboard: the player stands where they are.
+            if (mapScreen != null && mapScreen.HoldsInput)
+            {
+                Move(keyboard, false);
+                PlaceCamera();
+                return;
+            }
+
             if (hasDevices && keyboard.escapeKey.wasPressedThisFrame)
             {
                 Cursor.lockState = CursorLockMode.None;
@@ -117,7 +127,7 @@ namespace Voxel.Client
 
         private void OnGUI()
         {
-            if (world == null || (appearanceMenu != null && appearanceMenu.IsOpen)) return;
+            if (world == null || (appearanceMenu != null && appearanceMenu.IsOpen) || (mapScreen != null && mapScreen.IsOpen)) return;
 
             var crosshair = new Rect(
                 (Screen.width - CrosshairSize) / 2f,

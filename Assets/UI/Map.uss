@@ -1,0 +1,85 @@
+/* Full-screen map. Sizes are for the 1920 x 1080 reference resolution. */
+
+.map-screen {
+    padding: 40px 48px;
+    background-color: rgba(20, 30, 40, 0.55);
+}
+
+.map-panel {
+    flex-grow: 1;
+    padding: 22px 26px 20px 26px;
+}
+
+.map-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.map-title {
+    font-size: 34px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text);
+    margin: 0;
+    padding: 0;
+}
+
+.legend {
+    flex-direction: row;
+    align-items: center;
+}
+
+.legend-item {
+    flex-direction: row;
+    align-items: center;
+    margin-left: 26px;
+}
+
+.legend-text {
+    font-size: 18px;
+    color: var(--text-body);
+    margin: 0;
+    padding: 0;
+}
+
+/* Markers in the legend sit in the line instead of on the map. */
+.legend-dot {
+    position: relative;
+    margin: 0 9px 0 0;
+}
+
+.legend-arrow {
+    position: relative;
+    width: 17px;
+    height: 20px;
+    margin: 0 9px 0 0;
+}
+
+/* The window on the world: dragging and the wheel act on it. */
+.map-view {
+    flex-grow: 1;
+    overflow: hidden;
+    background-color: #2b3138;
+    border-radius: 14px;
+}
+
+.map-footer {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    min-height: 32px;
+}
+
+.map-pointer {
+    font-size: 18px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text-body);
+    margin: 0;
+    padding: 0;
+}
+
+.map-last-key {
+    margin-right: 0;
+}

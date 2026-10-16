@@ -1,0 +1,46 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:vc="Voxel.Client">
+    <Style src="Common.uss" />
+    <Style src="MapMarkers.uss" />
+    <Style src="Map.uss" />
+
+    <!-- MapScreen places the picture, the dots and the arrow, adds the animals to the legend and
+         fills in the coordinates under the pointer. -->
+    <ui:VisualElement name="screen" class="screen map-screen">
+        <ui:VisualElement class="panel map-panel">
+            <ui:VisualElement class="map-header">
+                <ui:Label text="Map" class="map-title" />
+                <ui:VisualElement name="legend" class="legend">
+                    <ui:VisualElement class="legend-item">
+                        <vc:MapArrow class="map-arrow legend-arrow" />
+                        <ui:Label text="You" class="legend-text" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="legend-item">
+                        <ui:VisualElement class="map-player legend-dot" />
+                        <ui:Label text="Players" class="legend-text" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="map-view" class="map-view">
+                <ui:VisualElement name="map-image" class="map-image" picking-mode="Ignore" />
+                <ui:VisualElement name="map-animals" class="map-layer" picking-mode="Ignore" />
+                <ui:VisualElement name="map-players" class="map-layer" picking-mode="Ignore" />
+                <vc:MapArrow name="map-arrow" class="map-arrow" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="map-footer">
+                <ui:Label name="pointer-position" class="map-pointer" />
+                <ui:VisualElement class="keys">
+                    <ui:VisualElement class="key"><ui:Label text="Wheel" class="key-text" /></ui:VisualElement>
+                    <ui:Label text="zoom" class="key-label" />
+                    <ui:VisualElement class="key"><ui:Label text="Drag" class="key-text" /></ui:VisualElement>
+                    <ui:Label text="move" class="key-label" />
+                    <ui:VisualElement class="key"><ui:Label text="Space" class="key-text" /></ui:VisualElement>
+                    <ui:Label text="centre on you" class="key-label" />
+                    <ui:VisualElement class="key"><ui:Label text="M" class="key-text" /></ui:VisualElement>
+                    <ui:Label text="close" class="key-label map-last-key" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

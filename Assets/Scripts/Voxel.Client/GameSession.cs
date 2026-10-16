@@ -48,6 +48,7 @@ namespace Voxel.Client
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private AppearanceSync appearanceSync;
         [SerializeField] private AppearanceMenu appearanceMenu;
+        [SerializeField] private MapScreen mapScreen;
         [SerializeField] private ushort port = 7777;
         [SerializeField] private float autosaveInterval = 60f;
         [SerializeField] private bool openRouterPort = true;
@@ -498,15 +499,15 @@ namespace Voxel.Client
 
         private string ScreenText()
         {
-            // The main menu (with the connection and loading screens) and the character creation
-            // screen have the whole screen to themselves.
-            if (appearanceMenu.IsOpen || InMenu || IsConnecting || IsLoading) return "";
+            // The main menu (with the connection and loading screens), the character creation
+            // screen and the full-screen map have the whole screen to themselves.
+            if (appearanceMenu.IsOpen || mapScreen.IsOpen || InMenu || IsConnecting || IsLoading) return "";
 
             if (Cursor.lockState != CursorLockMode.Locked)
             {
                 string role = networkManager.IsHost ? $"Game hosted on port {port}" : $"Connected to {address}";
                 return ecosystemSync.ClockText + "\n" + role + RouterPortText()
-                    + "\nClick: take control\nF10: leave the game"
+                    + "\nClick: take control\nM: map\nF10: leave the game"
                     + "\nAdmins: F5 / F6 slow down or speed up time, F7 advance one day";
             }
 

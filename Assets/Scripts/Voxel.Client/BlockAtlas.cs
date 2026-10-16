@@ -52,6 +52,26 @@ namespace Voxel.Client
             }
         }
 
+        // Colour of a block seen from far above, for the minimap.
+        public static Color MapColour(ushort block)
+        {
+            switch (Blocks.TypeOf(block))
+            {
+                case Blocks.Dirt:
+                    return Dirt;
+                case Blocks.Grass:
+                    return Grass;
+                case Blocks.Planks:
+                    return Plank;
+                case Blocks.Bricks:
+                    return Brick;
+                case Blocks.Timbered:
+                    return Color.Lerp(Plaster, Beam, 0.3f);
+                default:
+                    return Stone;
+            }
+        }
+
         public static Texture2D CreateTexture()
         {
             var texture = new Texture2D(TileCount * TileSize, TileSize, TextureFormat.RGBA32, false)

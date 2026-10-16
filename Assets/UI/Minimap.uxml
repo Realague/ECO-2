@@ -1,0 +1,19 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:vc="Voxel.Client">
+    <Style src="Common.uss" />
+    <Style src="MapMarkers.uss" />
+    <Style src="Minimap.uss" />
+
+    <!-- Minimap places the picture, the dots and the arrow, and fills in the position. -->
+    <ui:VisualElement name="screen" class="screen minimap-screen" picking-mode="Ignore">
+        <ui:VisualElement class="minimap" picking-mode="Ignore">
+            <ui:VisualElement name="map-frame" class="minimap-frame" picking-mode="Ignore">
+                <ui:VisualElement name="map-image" class="map-image" picking-mode="Ignore" />
+                <ui:VisualElement name="map-animals" class="map-layer" picking-mode="Ignore" />
+                <ui:VisualElement name="map-players" class="map-layer" picking-mode="Ignore" />
+                <vc:MapArrow name="map-arrow" class="map-arrow" />
+            </ui:VisualElement>
+            <ui:Label text="N" class="minimap-north" picking-mode="Ignore" />
+            <ui:Label name="map-position" class="minimap-position" picking-mode="Ignore" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

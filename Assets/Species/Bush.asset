@@ -19,10 +19,34 @@ MonoBehaviour:
   spacing: 3
   minFertility: 0.15
   fertilityUsePerDay: 0.05
-  height: 0.9
+  woodYield: 0
+  height: 1.25
   width: 0.9
-  parts:
-  - mesh: {fileID: 10200, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 22013bf578bba4940aced4a4c8fb79f7, type: 2}
-    offset: {x: 0, y: 0.4, z: 0}
-    scale: {x: 0.9, y: 0.8, z: 0.9}
+  models:
+  - parts:
+    - mesh: {fileID: 4300000, guid: dc696a6da8b584c48b577f299a0cba71, type: 2}
+      material: {fileID: 2100000, guid: 22013bf578bba4940aced4a4c8fb79f7, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+    - mesh: {fileID: 4300000, guid: 316c77ebabcabba40b221fa2e722e24e, type: 2}
+      material: {fileID: 2100000, guid: 0a6159239a6b99640a81c8926632d6c1, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+  - parts:
+    - mesh: {fileID: 4300000, guid: c60e23421e56f684f924f8f6bed4d24b, type: 2}
+      material: {fileID: 2100000, guid: 22013bf578bba4940aced4a4c8fb79f7, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+    - mesh: {fileID: 4300000, guid: bcabfef352946304e95165aad004e960, type: 2}
+      material: {fileID: 2100000, guid: 0a6159239a6b99640a81c8926632d6c1, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+  - parts:
+    - mesh: {fileID: 4300000, guid: 832a52e82f4e4d14ba1c921b14be093c, type: 2}
+      material: {fileID: 2100000, guid: 22013bf578bba4940aced4a4c8fb79f7, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+    - mesh: {fileID: 4300000, guid: 9415f5f1985dbdf4f9b1a1006072ebae, type: 2}
+      material: {fileID: 2100000, guid: 5013780dd769f64469a29ecb12225239, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
