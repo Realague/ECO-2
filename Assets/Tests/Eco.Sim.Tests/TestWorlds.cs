@@ -18,6 +18,10 @@ namespace Eco.Sim.Tests
             return world;
         }
 
+        public void Prepare(int seed, int sizeX, int sizeZ)
+        {
+        }
+
         public void Generate(Chunk chunk, int seed)
         {
             for (int y = 0; y < Chunk.Size; y++)

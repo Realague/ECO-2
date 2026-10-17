@@ -7,6 +7,7 @@ namespace Voxel.Core
     public sealed class World
     {
         private readonly Chunk[] chunks;
+        private Geography geography;
 
         public World(int chunksX, int chunksY, int chunksZ)
         {
@@ -52,10 +53,16 @@ namespace Voxel.Core
 
         public IReadOnlyList<Chunk> Chunks => chunks;
 
+        // The climate laid out by generation, worked out from the seed and size the first time it is
+        // asked for. Changing blocks never changes it.
+        public Geography Geography => geography ?? (geography = Geography.Create(Seed, SizeX, SizeZ));
+
         public void Generate(IChunkGenerator generator, int seed)
         {
             Seed = seed;
             GeneratorVersion = generator.Version;
+            geography = null;
+            generator.Prepare(seed, SizeX, SizeZ);
 
             foreach (Chunk chunk in chunks)
             {
@@ -114,6 +121,16 @@ namespace Voxel.Core
             return Blocks.IsSolid(GetBlock(x, y, z));
         }
 
+        // Whether the block hides what is behind it, for drawing; outside the world as IsSolid.
+        public bool IsOpaque(int x, int y, int z)
+        {
+            if (y >= SizeY) return false;
+            if (!InBounds(x, y, z)) return true;
+            return Blocks.IsOpaque(GetBlock(x, y, z));
+        }
+
+        public bool IsWater(int x, int y, int z) => Blocks.IsWater(GetBlock(x, y, z));
+
         public bool SetBlock(BlockPos pos, ushort block) => SetBlock(pos.X, pos.Y, pos.Z, block);
 
         // Only entry point to change a block in game. Returns false if nothing changed.
@@ -135,12 +152,25 @@ namespace Voxel.Core
             return true;
         }
 
-        // Height of the first air block above the topmost solid block of the column.
+        // Height of the first block above the topmost solid block of the column: air, or water when
+        // the column is under water (the ground there is a lake's bed).
         public int GetSurfaceHeight(int x, int z)
         {
             for (int y = SizeY - 1; y >= 0; y--)
             {
                 if (Blocks.IsSolid(GetBlock(x, y, z))) return y + 1;
+            }
+
+            return 0;
+        }
+
+        // Height of the first air block above the topmost block of the column, water included: what
+        // one sees from above.
+        public int GetTopHeight(int x, int z)
+        {
+            for (int y = SizeY - 1; y >= 0; y--)
+            {
+                if (Blocks.TypeOf(GetBlock(x, y, z)) != Blocks.Air) return y + 1;
             }
 
             return 0;

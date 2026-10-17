@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Linq;
 using System.Text;
 using NUnit.Framework;
@@ -85,13 +85,13 @@ namespace Voxel.Core.Tests
         {
             var giver = new Inventory();
             var receiver = new Inventory();
-            giver.Add(Blocks.Planks, 5);
-            receiver.Add(Blocks.Planks, 1);
+            giver.Add(Blocks.Granite, 5);
+            receiver.Add(Blocks.Granite, 1);
 
-            Assert.IsTrue(Inventory.Transfer(giver, receiver, Blocks.Planks, 3));
+            Assert.IsTrue(Inventory.Transfer(giver, receiver, Blocks.Granite, 3));
 
-            Assert.AreEqual(2, giver.Count(Blocks.Planks));
-            Assert.AreEqual(4, receiver.Count(Blocks.Planks));
+            Assert.AreEqual(2, giver.Count(Blocks.Granite));
+            Assert.AreEqual(4, receiver.Count(Blocks.Granite));
         }
 
         [Test]
@@ -99,11 +99,11 @@ namespace Voxel.Core.Tests
         {
             var giver = new Inventory();
             var receiver = new Inventory();
-            giver.Add(Blocks.Planks, 2);
+            giver.Add(Blocks.Granite, 2);
 
-            Assert.IsFalse(Inventory.Transfer(giver, receiver, Blocks.Planks, 3));
+            Assert.IsFalse(Inventory.Transfer(giver, receiver, Blocks.Granite, 3));
 
-            Assert.AreEqual(2, giver.Count(Blocks.Planks));
+            Assert.AreEqual(2, giver.Count(Blocks.Granite));
             Assert.AreEqual(0, receiver.DistinctCount);
         }
 
@@ -129,7 +129,7 @@ namespace Voxel.Core.Tests
             var original = new Inventory();
             original.Add(Items.Wood, 1);
             var target = new Inventory();
-            target.Add(Blocks.Bricks, 9);
+            target.Add(Blocks.Sand, 9);
 
             using (var reader = new BinaryReader(new MemoryStream(Write(original)), Encoding.UTF8))
             {

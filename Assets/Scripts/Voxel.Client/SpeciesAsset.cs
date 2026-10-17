@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using Eco.Sim;
 using UnityEngine;
+using Voxel.Core;
 
 namespace Voxel.Client
 {
     // A plant species described by data: its simulation rules and its appearance.
-    // Adding a species means creating one of these files and adding it to EcosystemSync's list.
+    // Adding a species means creating one of these files (Eco > Rebuild plant models creates it
+    // with its models, from PlantModelBuilder's table) and adding it at the end of EcosystemSync's list.
     [CreateAssetMenu(menuName = "Eco/Plant species", fileName = "Species")]
     public class SpeciesAsset : ScriptableObject
     {
@@ -18,6 +20,11 @@ namespace Voxel.Client
             public Material material;
             public Vector3 offset;
             public Vector3 scale;
+
+            // Animals only, optional: the same shape with smooth normals, which casts the shadow
+            // instead of the mesh. A flat-shaded mesh's facets each move along their own normal in
+            // the shadow pass (the light's normal bias) and the light leaks between them.
+            public Mesh shadowMesh;
         }
 
         [Header("Simulation (durations in game days)")]
@@ -28,6 +35,29 @@ namespace Voxel.Client
         [SerializeField] private int spacing = 2;
         [SerializeField, Range(0f, 1f)] private float minFertility = 0.2f;
         [SerializeField] private float fertilityUsePerDay = 0.2f;
+
+        // The blocks a plant can stand on.
+        [Flags]
+        public enum Ground
+        {
+            Grass = 1,
+            Dirt = 2,
+            Sand = 4,
+            Snow = 8,
+            Clay = 16,
+            Gravel = 32
+        }
+
+        [Header("Climate and ground")]
+        [Tooltip("Warmth it thrives in, from 0 (the coldest) to 1 (the hottest): the climate's temperature.")]
+        [SerializeField] private Vector2 idealWarmth = new Vector2(0f, 1f);
+        [Tooltip("Wetness it thrives in, from 0 (the driest) to 1 (the wettest): the climate's humidity.")]
+        [SerializeField] private Vector2 idealWetness = new Vector2(0f, 1f);
+        [Tooltip("How far past those ranges it still grows, less and less well.")]
+        [SerializeField] private float climateTolerance = 0.1f;
+        [SerializeField] private Ground grounds = Ground.Grass | Ground.Dirt;
+        [Tooltip("Only grows at the water's edge.")]
+        [SerializeField] private bool needsWater;
 
         [Header("Harvest")]
         [Tooltip("Wood obtained by felling an adult plant; a younger plant gives less.")]
@@ -78,8 +108,27 @@ namespace Voxel.Client
                 MinFertility = minFertility,
                 FertilityUse = fertilityUsePerDay / SimClock.StepsPerDay,
                 Height = height,
-                Width = width
+                Width = width,
+                WarmthMin = idealWarmth.x,
+                WarmthMax = idealWarmth.y,
+                WetnessMin = idealWetness.x,
+                WetnessMax = idealWetness.y,
+                ClimateTolerance = climateTolerance,
+                Grounds = GroundBlocks(),
+                NeedsWater = needsWater
             };
+        }
+
+        private ushort[] GroundBlocks()
+        {
+            var blocks = new List<ushort>();
+            if ((grounds & Ground.Grass) != 0) blocks.Add(Blocks.Grass);
+            if ((grounds & Ground.Dirt) != 0) blocks.Add(Blocks.Dirt);
+            if ((grounds & Ground.Sand) != 0) blocks.Add(Blocks.Sand);
+            if ((grounds & Ground.Snow) != 0) blocks.Add(Blocks.Snow);
+            if ((grounds & Ground.Clay) != 0) blocks.Add(Blocks.Clay);
+            if ((grounds & Ground.Gravel) != 0) blocks.Add(Blocks.Gravel);
+            return blocks.ToArray();
         }
     }
 }

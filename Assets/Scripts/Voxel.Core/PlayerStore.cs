@@ -104,7 +104,9 @@ namespace Voxel.Core
 
                     if (formatVersion != FormatWithoutInventory)
                     {
+                        // A speciality that no longer exists is dropped: the player chooses again.
                         var speciality = (Speciality)reader.ReadByte();
+                        if (Specialities.IsRetired(speciality)) speciality = Speciality.None;
                         if (speciality != Speciality.None && !Specialities.IsChoice(speciality))
                         {
                             throw new InvalidDataException($"Unknown speciality for player {playerId}.");

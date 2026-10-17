@@ -6,12 +6,11 @@ using Voxel.Core;
 namespace Voxel.Client
 {
     // Players' inventory and speciality. The server holds them (in each player's saved state) and
-    // decides everything: crafting, choosing a speciality, giving, planting. Each client only
+    // decides everything: choosing a speciality, giving, planting. Each client only
     // knows its own inventory, which the server sends back at every change.
     public class InventorySync : MonoBehaviour
     {
         private const string StateMessage = "Inv.State";
-        private const string CraftMessage = "Inv.Craft";
         private const string SpecialityMessage = "Inv.Speciality";
         private const string GiveMessage = "Inv.Give";
         private const string PlantMessage = "Inv.Plant";
@@ -37,7 +36,6 @@ namespace Voxel.Client
         {
             running = true;
             registry = playerRegistry;
-            Messaging.RegisterNamedMessageHandler(CraftMessage, OnCraft);
             Messaging.RegisterNamedMessageHandler(SpecialityMessage, OnSpeciality);
             Messaging.RegisterNamedMessageHandler(GiveMessage, OnGive);
             Messaging.RegisterNamedMessageHandler(PlantMessage, OnPlant);
@@ -83,14 +81,6 @@ namespace Voxel.Client
             Publish(clientId);
         }
 
-        public void RequestCraft(int recipeIndex)
-        {
-            if (!running) return;
-
-            if (registry != null) Craft(networkManager.LocalClientId, recipeIndex);
-            else Send(CraftMessage, recipeIndex);
-        }
-
         public void RequestSpeciality(Speciality speciality)
         {
             if (!running) return;
@@ -121,13 +111,6 @@ namespace Voxel.Client
         {
             state = null;
             return registry != null && networkManager.IsHost && registry.TryGetState(networkManager.LocalClientId, out state);
-        }
-
-        private void Craft(ulong clientId, int recipeIndex)
-        {
-            if (!registry.TryGetState(clientId, out PlayerState state)) return;
-
-            if (Recipes.TryCraft(state.Inventory, state.Speciality, recipeIndex)) Publish(clientId);
         }
 
         // A speciality is chosen only once.
@@ -177,12 +160,6 @@ namespace Voxel.Client
 
             // The seed is only spent if it actually sprouted.
             if (ecosystemSync.TryPlantSeed(clientId, Items.SeedSpecies(seed), x, z)) TryConsume(clientId, seed);
-        }
-
-        private void OnCraft(ulong senderId, FastBufferReader reader)
-        {
-            reader.ReadValueSafe(out int recipeIndex);
-            Craft(senderId, recipeIndex);
         }
 
         private void OnSpeciality(ulong senderId, FastBufferReader reader)

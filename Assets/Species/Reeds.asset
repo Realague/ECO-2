@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c90fb7040ab281a4dabfdc0c96f5baf2, type: 3}
+  m_Name: Reeds
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.SpeciesAsset
+  maturityDays: 1
+  lifespanDays: 15
+  seedAttemptsPerDay: 2
+  seedRange: 2
+  spacing: 1
+  minFertility: 0.1
+  fertilityUsePerDay: 0.02
+  idealWarmth: {x: 0.2, y: 0.9}
+  idealWetness: {x: 0.3, y: 1}
+  climateTolerance: 0.2
+  grounds: 55
+  needsWater: 1
+  woodYield: 0
+  height: 1.45
+  width: 0.4
+  models:
+  - parts:
+    - mesh: {fileID: 4300000, guid: a5c14af47d516f34c93712db850f980c, type: 2}
+      material: {fileID: 2100000, guid: cd41427733b7ab948b80d43e93052154, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+    - mesh: {fileID: 4300000, guid: 9e7a3651507f18b4baf1255a770dc2af, type: 2}
+      material: {fileID: 2100000, guid: 7fb450d50bbcea94198fbd9ea494108b, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+  - parts:
+    - mesh: {fileID: 4300000, guid: 68b173401add6704faa6dc582cbfe334, type: 2}
+      material: {fileID: 2100000, guid: cd41427733b7ab948b80d43e93052154, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+    - mesh: {fileID: 4300000, guid: cd1ce4a32c509034e94fa5c55cc9ce80, type: 2}
+      material: {fileID: 2100000, guid: 7fb450d50bbcea94198fbd9ea494108b, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}

@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c90fb7040ab281a4dabfdc0c96f5baf2, type: 3}
+  m_Name: DryGrass
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.SpeciesAsset
+  maturityDays: 0.7
+  lifespanDays: 10
+  seedAttemptsPerDay: 2
+  seedRange: 3
+  spacing: 3
+  minFertility: 0.03
+  fertilityUsePerDay: 0.01
+  idealWarmth: {x: 0.45, y: 1}
+  idealWetness: {x: 0, y: 0.38}
+  climateTolerance: 0.12
+  grounds: 7
+  needsWater: 0
+  woodYield: 0
+  height: 0.7
+  width: 0.5
+  models:
+  - parts:
+    - mesh: {fileID: 4300000, guid: a060a4a4bf1faa04a8ad9e00a1a753ab, type: 2}
+      material: {fileID: 2100000, guid: 9fc13ef9cb5b1444588994d7f9482d7c, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+  - parts:
+    - mesh: {fileID: 4300000, guid: bf32ec8d7b6a240428a44d1db543f817, type: 2}
+      material: {fileID: 2100000, guid: 9fc13ef9cb5b1444588994d7f9482d7c, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}

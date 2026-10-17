@@ -13,7 +13,11 @@ namespace Voxel.Core
 
         public static int OfBlock(ushort block) => Blocks.TypeOf(block);
 
-        public static bool IsBlock(int item) => item > Blocks.Air && item <= Blocks.LastType;
+        public static bool IsBlock(int item) => item > Blocks.Air && item <= Blocks.LastType && !Blocks.IsRetired((ushort)item);
+
+        // An item of an earlier version that no longer exists (the crafted blocks): saved
+        // inventories lose it instead of being refused.
+        public static bool IsRetired(int item) => item > Blocks.Air && item < Wood && Blocks.IsRetired((ushort)item);
 
         public static ushort BlockOf(int item) => (ushort)item;
 
@@ -37,12 +41,28 @@ namespace Voxel.Core
         {
             switch (item)
             {
-                case Blocks.Stone: return "Stone";
+                case Blocks.Granite: return "Granite";
                 case Blocks.Dirt: return "Dirt";
                 case Blocks.Grass: return "Grass";
-                case Blocks.Planks: return "Planks";
-                case Blocks.Bricks: return "Bricks";
-                case Blocks.Timbered: return "Timber frame";
+                case Blocks.Water: return "Water";
+                case Blocks.Ice: return "Ice";
+                case Blocks.Basalt: return "Basalt";
+                case Blocks.Limestone: return "Limestone";
+                case Blocks.Marble: return "Marble";
+                case Blocks.Sandstone: return "Sandstone";
+                case Blocks.Slate: return "Slate";
+                case Blocks.Sand: return "Sand";
+                case Blocks.Snow: return "Snow";
+                case Blocks.Gravel: return "Gravel";
+                case Blocks.Clay: return "Clay";
+                case Blocks.CoalOre: return "Coal ore";
+                case Blocks.IronOre: return "Iron ore";
+                case Blocks.CopperOre: return "Copper ore";
+                case Blocks.TinOre: return "Tin ore";
+                case Blocks.GoldOre: return "Gold ore";
+                case Blocks.RockSalt: return "Rock salt";
+                case Blocks.Flint: return "Flint";
+                case Blocks.Bedrock: return "Bedrock";
                 case Wood: return "Wood";
                 default: return IsSeed(item) ? "Seed" : "Unknown item";
             }

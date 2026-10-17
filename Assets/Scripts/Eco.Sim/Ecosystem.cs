@@ -19,6 +19,12 @@ namespace Eco.Sim
         // Width, in fertility cells, of the patches of rich or poor soil.
         private const int CapacityPatchCells = 4;
 
+        // Share of the climate in the maximum fertility; the rest comes from the patches. Within the
+        // climate, share of wetness (the rest is mildness), and the warmth soil likes best.
+        private const float ClimateShare = 0.6f;
+        private const float WetnessShare = 0.7f;
+        private const float IdealWarmth = 0.55f;
+
         private readonly World world;
         private readonly Species[] species;
         private readonly SimRandom random;
@@ -28,6 +34,9 @@ namespace Eco.Sim
         // Current fertility of each cell, and the maximum it regenerates toward.
         private readonly float[] fertility;
         private readonly float[] capacity;
+
+        // For each species, how well the climate of each cell suits it (Species.Suitability).
+        private readonly float[][] suitability;
 
         // Plants in order of appearance, hence by increasing id: the iteration order is part of the
         // result. An array rather than a list, because Step walks all of it at every step and its
@@ -65,9 +74,11 @@ namespace Eco.Sim
             cellsZ = (world.SizeZ + CellSize - 1) / CellSize;
             fertility = new float[cellsX * cellsZ];
             capacity = new float[cellsX * cellsZ];
+            suitability = new float[species.Count][];
             plantAtColumn = new int[world.SizeX * world.SizeZ];
 
             InitializeAnimals(animalSpecies);
+            InitializeCarrion();
             FillCapacity();
             world.BlockChanged += OnBlockChanged;
         }
@@ -137,11 +148,7 @@ namespace Eco.Sim
         {
             StepCount++;
             RemoveUprooted();
-
-            for (int i = 0; i < fertility.Length; i++)
-            {
-                fertility[i] = Math.Min(capacity[i], fertility[i] + FertilityRegenPerStep);
-            }
+            RegenerateSoil();
 
             // Plants born during this step only act from the next one.
             int count = plantCount;
@@ -158,6 +165,7 @@ namespace Eco.Sim
 
             RemoveDying();
             StepAnimals();
+            StepCarrion();
         }
 
         // Runs one step of a plant's life. Returns false if it dies.
@@ -178,7 +186,7 @@ namespace Eco.Sim
             else if (plant.Growth < 1f)
             {
                 int previousStage = plant.Stage;
-                plant.Growth = Math.Min(1f, plant.Growth + soil / kind.MaturitySteps);
+                plant.Growth = Math.Min(1f, plant.Growth + soil * plant.Vigour / kind.MaturitySteps);
                 if (plant.Stage != previousStage) PlantChanged?.Invoke(plant);
             }
 
@@ -201,10 +209,18 @@ namespace Eco.Sim
             if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) return false;
 
             Species kind = species[speciesIndex];
+            int cell = CellIndex(x, z);
+            float vigour = suitability[speciesIndex][cell];
+            if (vigour <= 0f) return false;
+
             int y = SurfaceAt(x, z);
-            if (!HasGroundAndRoom(x, y, z)) return false;
-            if (fertility[CellIndex(x, z)] < kind.MinFertility) return false;
+            if (!HasGroundAndRoom(kind, x, y, z)) return false;
+            if (kind.NeedsWater && !IsBesideWater(x, y, z)) return false;
+            if (fertility[cell] < kind.MinFertility) return false;
             if (!IsSpaceFree(x, z, speciesIndex, kind.Spacing)) return false;
+
+            // Where the climate does not quite suit the species, fewer of its seeds take.
+            if (vigour < 1f && random.NextFloat() >= vigour) return false;
 
             var plant = new Plant
             {
@@ -214,7 +230,8 @@ namespace Eco.Sim
                 Y = y,
                 Z = z,
                 Age = age,
-                Growth = growth
+                Growth = growth,
+                Vigour = vigour
             };
 
             Append(plant);
@@ -237,7 +254,7 @@ namespace Eco.Sim
             if ((uint)pos.X >= (uint)world.SizeX || (uint)pos.Z >= (uint)world.SizeZ) return;
 
             int column = ColumnIndex(pos.X, pos.Z);
-            surfaceCache[column] = 0;
+            columnTop[column] = 0;
 
             int plantId = plantAtColumn[column];
             if (plantId != 0) disturbed.Add(plantId);
@@ -250,16 +267,18 @@ namespace Eco.Sim
 
             foreach (int plantId in disturbed)
             {
-                if (TryGet(plantId, out Plant plant) && !HasGroundAndRoom(plant.X, plant.Y, plant.Z)) Remove(plantId);
+                if (TryGet(plantId, out Plant plant) && !HasGroundAndRoom(species[plant.SpeciesIndex], plant.X, plant.Y, plant.Z)) Remove(plantId);
             }
 
             disturbed.Clear();
         }
 
-        // Lays out the maximum fertility in wide smooth patches, rich or poor: values drawn at random
-        // on a coarse grid, then interpolated between its points.
+        // Lays out the maximum fertility: mostly from the climate (rich where it is mild and wet, poor
+        // where it is dry or cold), varied locally by wide smooth patches, rich or poor (values drawn
+        // at random on a coarse grid, then interpolated between its points).
         private void FillCapacity()
         {
+            Geography geography = world.Geography;
             int latticeX = cellsX / CapacityPatchCells + 2;
             int latticeZ = cellsZ / CapacityPatchCells + 2;
             var lattice = new float[latticeX * latticeZ];
@@ -280,24 +299,89 @@ namespace Eco.Sim
                     float near = Lerp(lattice[x0 + latticeX * z0], lattice[x0 + 1 + latticeX * z0], tx);
                     float far = Lerp(lattice[x0 + latticeX * (z0 + 1)], lattice[x0 + 1 + latticeX * (z0 + 1)], tx);
 
+                    int x = cx * CellSize + CellSize / 2;
+                    int z = cz * CellSize + CellSize / 2;
+                    float climate = ClimateRichness(geography.TemperatureAt(x, z), geography.HumidityAt(x, z));
+                    float patches = Lerp(near, far, tz);
+
                     int cell = cx + cellsX * cz;
-                    capacity[cell] = MinCapacity + (1f - MinCapacity) * Lerp(near, far, tz);
+                    capacity[cell] = MinCapacity + (1f - MinCapacity) * (ClimateShare * climate + (1f - ClimateShare) * patches);
                     fertility[cell] = capacity[cell];
                 }
             }
+
+            FillSuitability(geography);
+        }
+
+        // How well each plant and animal species does in each cell's climate, worked out once: the
+        // climate does not change.
+        private void FillSuitability(Geography geography)
+        {
+            var warmth = new float[cellsX * cellsZ];
+            var wetness = new float[cellsX * cellsZ];
+            for (int cz = 0; cz < cellsZ; cz++)
+            {
+                for (int cx = 0; cx < cellsX; cx++)
+                {
+                    int x = Math.Min(world.SizeX - 1, cx * CellSize + CellSize / 2);
+                    int z = Math.Min(world.SizeZ - 1, cz * CellSize + CellSize / 2);
+                    warmth[cx + cellsX * cz] = (float)geography.TemperatureAt(x, z) / IntNoise.One;
+                    wetness[cx + cellsX * cz] = (float)geography.HumidityAt(x, z) / IntNoise.One;
+                }
+            }
+
+            for (int s = 0; s < species.Length; s++)
+            {
+                var fit = new float[warmth.Length];
+                for (int cell = 0; cell < fit.Length; cell++)
+                {
+                    fit[cell] = species[s].Suitability(warmth[cell], wetness[cell]);
+                }
+
+                suitability[s] = fit;
+            }
+
+            FillAnimalSuitability(warmth, wetness);
+        }
+
+        // How well a species does in the climate of this column (Species.Suitability).
+        public float VigourAt(int speciesIndex, int x, int z) => suitability[speciesIndex][CellIndex(x, z)];
+
+        // How rich a climate makes the soil, from 0 to 1: wetness counts most, and soil is best where
+        // it is mild to warm. Temperature and humidity are in fixed point (IntNoise.One is 1).
+        public static float ClimateRichness(int temperature, int humidity)
+        {
+            float warmth = (float)temperature / IntNoise.One;
+            float wetness = (float)humidity / IntNoise.One;
+            float mildness = Math.Max(0f, 1f - Math.Abs(warmth - IdealWarmth) / IdealWarmth);
+            return Math.Min(1f, WetnessShare * wetness + (1f - WetnessShare) * mildness);
         }
 
         private static float Lerp(float from, float to, float t) => from + (to - from) * t;
 
-        // A plant needs dirt or grass under it, and air at its base.
-        private bool HasGroundAndRoom(int x, int y, int z)
+        // A plant needs a ground its species grows on (Species.Grounds) under it, and air at its
+        // base: not under water.
+        private bool HasGroundAndRoom(Species kind, int x, int y, int z)
         {
             if (y <= 0 || y >= world.SizeY) return false;
+            if (!kind.GrowsOn(world.GetBlock(x, y - 1, z))) return false;
 
-            ushort ground = Blocks.TypeOf(world.GetBlock(x, y - 1, z));
-            if (ground != Blocks.Grass && ground != Blocks.Dirt) return false;
+            return Blocks.TypeOf(world.GetBlock(x, y, z)) == Blocks.Air;
+        }
 
-            return !Blocks.IsSolid(world.GetBlock(x, y, z));
+        // Water in one of the eight columns around, beside the plant's ground or its base.
+        private bool IsBesideWater(int x, int y, int z)
+        {
+            for (int dz = -1; dz <= 1; dz++)
+            {
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    if (dx == 0 && dz == 0) continue;
+                    if (world.IsWater(x + dx, y - 1, z + dz) || world.IsWater(x + dx, y, z + dz)) return true;
+                }
+            }
+
+            return false;
         }
 
         // A column holds a single plant. Spacing only applies between plants of the same species:

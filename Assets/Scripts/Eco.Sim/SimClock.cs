@@ -9,6 +9,14 @@ namespace Eco.Sim
     {
         public const int MinutesPerStep = 10;
         public const int StepsPerDay = 24 * 60 / MinutesPerStep;
+        public const int MinutesPerDay = 24 * 60;
+
+        // A new simulation starts on day 1 at 8 in the morning, not at midnight.
+        public const int StartMinute = 8 * 60;
+
+        // Game time after this many steps, in minutes since midnight of day 1. Display only: what a
+        // step does never depends on the time of day.
+        public static double MinutesAt(double steps) => StartMinute + steps * MinutesPerStep;
 
         // At speed 1, one game minute lasts one real second.
         public const float RealSecondsPerStep = 10f;

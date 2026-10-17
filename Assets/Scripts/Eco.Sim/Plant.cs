@@ -21,6 +21,10 @@ namespace Eco.Sim
         // From 0 (seed) to 1 (adult).
         public float Growth;
 
+        // How well the climate where it stands suits its species (Species.Suitability), 0 to 1: it
+        // grows that fast. Worked out when the plant appears or is loaded, never saved or sent.
+        public float Vigour;
+
         public int Stage => StageOf(Growth);
 
         public static int StageOf(float growth) => Math.Min(StageCount - 1, (int)(growth * StageCount));

@@ -17,16 +17,24 @@ namespace Voxel.Client
             new BlockPos(0, 0, 1), new BlockPos(0, 0, -1)
         };
 
-        [SerializeField] private Vector3Int sizeInChunks = new Vector3Int(8, 4, 8);
+        // In chunks: 32 × 8 × 32 is 512 × 128 × 512 blocks.
+        [SerializeField] private Vector3Int sizeInChunks = new Vector3Int(32, 8, 32);
         [SerializeField] private int seed = 1;
         [SerializeField] private Material blockMaterial;
+
+        // Transparent, drawn on each chunk's second submesh (ChunkMesher.WaterSubmesh).
+        [SerializeField] private Material waterMaterial;
         [SerializeField] private string saveFileName = "world.dat";
+
+        [Tooltip("Brightness kept where no sky light reaches, deep underground (1 is open sky).")]
+        [SerializeField, Range(0f, 0.2f)] private float darkestSkyLight = 0.02f;
 
         private readonly Dictionary<Chunk, Mesh> meshes = new Dictionary<Chunk, Mesh>();
         private readonly List<GameObject> chunkObjects = new List<GameObject>();
         private readonly HashSet<Chunk> dirtyChunks = new HashSet<Chunk>();
         private Material materialInstance;
         private Texture2D atlas;
+        private SkyLight skyLight;
         private string savePath;
         private bool rendering;
 
@@ -40,6 +48,19 @@ namespace Voxel.Client
 
             atlas = BlockAtlas.CreateTexture();
             materialInstance = new Material(blockMaterial) { mainTexture = atlas };
+            Shader.SetGlobalFloat("_DarkestSkyLight", darkestSkyLight);
+        }
+
+        // How bright the blocks are drawn at this position for the sky they see, 0 to 1: the curve of
+        // the blocks' shader (SkyBrightness), for what is drawn with other shaders. 1 without a world.
+        public float SkyBrightnessAt(Vector3 position)
+        {
+            if (skyLight == null) return 1f;
+
+            float level = skyLight.Get(Mathf.FloorToInt(position.x), Mathf.FloorToInt(position.y), Mathf.FloorToInt(position.z))
+                / (float)SkyLight.Max;
+            float curve = level / (3f * (1f - level) + 1f);
+            return Mathf.Lerp(darkestSkyLight, 1f, curve);
         }
 
         private void LateUpdate()
@@ -48,7 +69,7 @@ namespace Voxel.Client
 
             foreach (Chunk chunk in dirtyChunks)
             {
-                ChunkMesher.Build(World, chunk, meshes[chunk]);
+                ChunkMesher.Build(World, skyLight, chunk, meshes[chunk]);
             }
 
             dirtyChunks.Clear();
@@ -105,6 +126,7 @@ namespace Voxel.Client
             if (!rendering) return;
 
             dirtyChunks.Add(chunk);
+            skyLight.UpdateChunk(chunk, dirtyChunks);
 
             // The faces of neighbouring chunks turned toward this one change too.
             foreach (BlockPos offset in NeighbourOffsets)
@@ -135,6 +157,7 @@ namespace Voxel.Client
             chunkObjects.Clear();
             meshes.Clear();
             dirtyChunks.Clear();
+            skyLight = null;
             World = null;
             savePath = null;
         }
@@ -148,11 +171,17 @@ namespace Voxel.Client
             World = world;
             if (!rendering) return;
 
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+            skyLight = new SkyLight(World);
+            double lightSeconds = timer.Elapsed.TotalSeconds;
+
             World.BlockChanged += OnBlockChanged;
             foreach (Chunk chunk in World.Chunks)
             {
                 CreateChunkObject(chunk);
             }
+
+            Debug.Log($"Sky light worked out in {lightSeconds * 1000:0} ms, chunks meshed in {(timer.Elapsed.TotalSeconds - lightSeconds) * 1000:0} ms.");
         }
 
         private World LoadOrCreateWorld(string path)
@@ -196,20 +225,21 @@ namespace Voxel.Client
         private void CreateChunkObject(Chunk chunk)
         {
             var mesh = new Mesh { name = $"Chunk {chunk.Coord}" };
-            ChunkMesher.Build(World, chunk, mesh);
+            ChunkMesher.Build(World, skyLight, chunk, mesh);
             meshes.Add(chunk, mesh);
 
             var chunkObject = new GameObject(mesh.name);
             chunkObject.transform.SetParent(transform, false);
             chunkObject.transform.localPosition = new Vector3(chunk.Coord.X, chunk.Coord.Y, chunk.Coord.Z) * Chunk.Size;
             chunkObject.AddComponent<MeshFilter>().sharedMesh = mesh;
-            chunkObject.AddComponent<MeshRenderer>().sharedMaterial = materialInstance;
+            chunkObject.AddComponent<MeshRenderer>().sharedMaterials = new[] { materialInstance, waterMaterial };
             chunkObjects.Add(chunkObject);
         }
 
         private void OnBlockChanged(BlockPos pos, ushort previous, ushort current)
         {
             MarkDirty(pos);
+            skyLight.Update(pos, dirtyChunks);
 
             // A block on a chunk edge also changes the visible faces of the neighbouring chunk.
             foreach (BlockPos offset in NeighbourOffsets)

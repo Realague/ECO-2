@@ -548,9 +548,32 @@ MonoBehaviour:
   speciesAssets:
   - {fileID: 11400000, guid: 6ea61faa421995f4a9a4b6f892bf2dd4, type: 2}
   - {fileID: 11400000, guid: cc9f79da0d803bf40932a87b727b2553, type: 2}
+  - {fileID: 11400000, guid: f6cc545a06067f2458d66bbcf3de7115, type: 2}
+  - {fileID: 11400000, guid: d28ffec3086bca5478a6b850a7f320c4, type: 2}
+  - {fileID: 11400000, guid: fdc178505919ab14a86f32ca23eafae7, type: 2}
+  - {fileID: 11400000, guid: 5d49a670394205d42a4ea502da1680df, type: 2}
+  - {fileID: 11400000, guid: 3cea0d69dde6c7c4aa80c412ed149f05, type: 2}
+  - {fileID: 11400000, guid: 5da8a1fa28d16f5478ad6efb03ed3f7f, type: 2}
+  - {fileID: 11400000, guid: d00ed81b9f142a24c8a330692a41513b, type: 2}
+  - {fileID: 11400000, guid: d9ffd36495cfdee41abeed1a2301f162, type: 2}
   animalAssets:
   - {fileID: 11400000, guid: 6574d881bcfa74945b4cf99af2886576, type: 2}
   - {fileID: 11400000, guid: 86ee08040998fa64898d08a9f9aff1ba, type: 2}
+  - {fileID: 11400000, guid: a95fe305ecd5dbe48bbff3615f55209f, type: 2}
+  - {fileID: 11400000, guid: f5ba65b09713b264fbe2f09df0073ba9, type: 2}
+  - {fileID: 11400000, guid: 352e43864e093c741a7a2dc2d4350877, type: 2}
+  - {fileID: 11400000, guid: af4d5c321d5ad87438a4c80cbb74fe9c, type: 2}
+  - {fileID: 11400000, guid: 3e09c427e02b9ab46a0c51c06f5faf24, type: 2}
+  - {fileID: 11400000, guid: 7ac70b94efa599146b224ed73c628551, type: 2}
+  - {fileID: 11400000, guid: dfcae1fb9eafaf3418dbc52a5fd7cf4c, type: 2}
+  - {fileID: 11400000, guid: 403a0d3c7759579468565e2d341811fa, type: 2}
+  - {fileID: 11400000, guid: fcfad689243ba614c8b4bf87ee2b58d8, type: 2}
+  - {fileID: 11400000, guid: b66696b8c37a58f47b00af147a8a0c4b, type: 2}
+  - {fileID: 11400000, guid: a96151f292defb64a98f1e8390db5a24, type: 2}
+  - {fileID: 11400000, guid: 3a422edc0b3d0204ab0785bf4ca92727, type: 2}
+  - {fileID: 11400000, guid: 0670f214234fcab49af9f6346bed2fc8, type: 2}
+  - {fileID: 11400000, guid: bb3074f42f54d354b892de2502d8df50, type: 2}
+  - {fileID: 11400000, guid: 921f954e1d75e7f49a4db76caa63830c, type: 2}
   plantViewDistance: 128
 --- !u!114 &490447449
 MonoBehaviour:
@@ -917,10 +940,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 145a9ce74d72eaa4d868c9bcfb973e94, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.VoxelWorld
-  sizeInChunks: {x: 8, y: 4, z: 8}
+  sizeInChunks: {x: 32, y: 8, z: 32}
   seed: 1
   blockMaterial: {fileID: 2100000, guid: 94b05fea58d6f8246bd6ef44fd341669, type: 2}
+  waterMaterial: {fileID: 2100000, guid: 5bd02ebd5f8fc8d44a82e5211d374a64, type: 2}
   saveFileName: world.dat
+  darkestSkyLight: 0.02
 --- !u!4 &1566503040
 Transform:
   m_ObjectHideFlags: 0
@@ -928,6 +953,63 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1566503038}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1575086294
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1575086296}
+  - component: {fileID: 1575086295}
+  m_Layer: 0
+  m_Name: DayNight
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1575086295
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1575086294}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4fe4d2990295fdc4cb3db3cf758361c6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.DayNight
+  ecosystemSync: {fileID: 490447448}
+  worldSync: {fileID: 490447447}
+  sun: {fileID: 410087040}
+  sunriseHour: 6
+  sunsetHour: 20
+  middayElevation: 60
+  middayTemperature: 5500
+  horizonTemperature: 2200
+  moonIntensity: 0.12
+  moonColour: {r: 0.55, g: 0.65, b: 1, a: 1}
+  nightAmbient: {r: 0.015, g: 0.02, b: 0.04, a: 1}
+  nightSkyboxExposure: 0.03
+  nightReflections: 0.05
+--- !u!4 &1575086296
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1575086294}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -1065,6 +1147,51 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1864166457
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1864166459}
+  - component: {fileID: 1864166458}
+  m_Layer: 0
+  m_Name: ClimateTint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1864166458
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1864166457}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c9eef200b77956442898a5d55c03ea33, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.ClimateTint
+  worldSync: {fileID: 490447447}
+--- !u!4 &1864166459
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1864166457}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1940571013
 GameObject:
   m_ObjectHideFlags: 0
@@ -1160,3 +1287,5 @@ SceneRoots:
   - {fileID: 1765294192}
   - {fileID: 1201000723}
   - {fileID: 822296574}
+  - {fileID: 1864166459}
+  - {fileID: 1575086296}

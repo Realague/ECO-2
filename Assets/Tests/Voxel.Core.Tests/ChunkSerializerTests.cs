@@ -5,6 +5,24 @@ namespace Voxel.Core.Tests
 {
     public class ChunkSerializerTests
     {
+        private static readonly ushort[] Types = { Blocks.Stone, Blocks.Dirt, Blocks.Grass, Blocks.Water, Blocks.Basalt };
+
+        // Planks (4) and the other crafted blocks no longer exist: a save holding them reads them as air.
+        [Test]
+        public void Read_TurnsRemovedBlocksIntoAir()
+        {
+            var original = new Chunk(new ChunkCoord(0, 0, 0));
+            original.Set(1, 2, 3, 4);
+            original.Set(4, 5, 6, 31);
+            original.Set(7, 8, 9, Blocks.Stone);
+
+            Chunk copy = RoundTrip(original);
+
+            Assert.AreEqual(Blocks.Air, copy.Get(1, 2, 3));
+            Assert.AreEqual(Blocks.Air, copy.Get(4, 5, 6));
+            Assert.AreEqual(Blocks.Stone, copy.Get(7, 8, 9));
+        }
+
         [Test]
         public void WriteThenRead_PreservesEveryBlockAndOrientation()
         {
@@ -15,7 +33,7 @@ namespace Voxel.Core.Tests
                 {
                     for (int x = 0; x < Chunk.Size; x++)
                     {
-                        var type = (ushort)(1 + (x * 7 + y * 13 + z / 3) % 5);
+                        ushort type = Types[(x * 7 + y * 13 + z / 3) % Types.Length];
                         original.Set(x, y, z, Blocks.WithOrientation(type, (x + z) % 16));
                     }
                 }

@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.AnimalSpeciesAsset
   eatsPlants:
   - {fileID: 11400000, guid: cc9f79da0d803bf40932a87b727b2553, type: 2}
+  - {fileID: 11400000, guid: 3cea0d69dde6c7c4aa80c412ed149f05, type: 2}
   eatsAnimals: []
   moveRange: 3
   senseRange: 5
@@ -26,6 +27,11 @@ MonoBehaviour:
   maxNeighbours: 2
   catchChance: 0
   minPerTenThousandColumns: 2
+  reachHeight: 1.5
+  herd: 0
+  idealWarmth: {x: 0.3, y: 0.75}
+  idealWetness: {x: 0.25, y: 1}
+  climateTolerance: 0.15
   height: 0.5
   width: 0.6
   parts:
@@ -111,7 +117,10 @@ MonoBehaviour:
     scale: {x: 0.08, y: 0.06, z: 0.22999999}
   gait: 1
   hopLength: 0.6
+  hopDuration: 0.3
   hopHeight: 0.2
+  walkSpeed: 2.5
+  strideLength: 0.7
   bodyPivot: {x: 0, y: 0.2, z: 0}
   rig:
   - motion: 0

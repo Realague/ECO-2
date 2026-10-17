@@ -55,6 +55,10 @@ namespace Voxel.Client
         private const float NeckHeight = HipHeight + PelvisHeight + ChestHeight;
         private static readonly Vector3 EyesInHead = new Vector3(0f, 0.19f, 0.1f);
 
+        // Where the body reads the sky light, above the feet, and how fast its shade follows.
+        private const float ChestLightHeight = 1.2f;
+        private const float ShadeSmoothing = 6f;
+
         [SerializeField] private Material material;
 
         // Pitch of the owner's gaze in whole degrees, positive downwards: one byte, sent only when it changes.
@@ -92,6 +96,9 @@ namespace Voxel.Client
         private float phase;
         private float pitch;
         private float ownPitch;
+        private float skyShade = 1f;
+
+        private static VoxelWorld voxelWorld;
 
         // Position of the eyes relative to the player's feet, in the player's own frame, for a gaze
         // pitch: the head turns about the neck, so the eyes move forward and down when looking down.
@@ -218,6 +225,7 @@ namespace Voxel.Client
             if (deltaTime <= 0f) return;
 
             Vector3 position = transform.position;
+            ShadeForTheSky(position, deltaTime);
             Vector3 moved = position - lastPosition;
             lastPosition = position;
             if (moved.sqrMagnitude > TeleportDistance * TeleportDistance)
@@ -268,6 +276,21 @@ namespace Voxel.Client
             rightUpperArm.localRotation = Quaternion.Euler(swing * ArmSwing - airborne * 35f, 0f, sway + airborne * 40f);
             leftForearm.localRotation = Quaternion.Euler(-(10f + Mathf.Max(0f, swing) * ElbowBend + airborne * 25f), 0f, 0f);
             rightForearm.localRotation = Quaternion.Euler(-(10f + Mathf.Max(0f, -swing) * ElbowBend + airborne * 25f), 0f, 0f);
+        }
+
+        // Out of the sky's reach (in a tunnel, under a roof) the body darkens like the blocks around
+        // it, by the sky light at its chest, eased so that crossing from one block to the next does not show.
+        private void ShadeForTheSky(Vector3 feet, float deltaTime)
+        {
+            if (skinMaterial == null) return;
+
+            if (voxelWorld == null) voxelWorld = FindAnyObjectByType<VoxelWorld>();
+            float target = voxelWorld != null ? voxelWorld.SkyBrightnessAt(feet + Vector3.up * ChestLightHeight) : 1f;
+            skyShade = Mathf.Lerp(skyShade, target, 1f - Mathf.Exp(-ShadeSmoothing * deltaTime));
+
+            Color colour = material.color * skyShade;
+            colour.a = material.color.a;
+            skinMaterial.color = colour;
         }
 
         private void Skin(Appearance appearance)

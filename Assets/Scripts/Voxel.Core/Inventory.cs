@@ -75,6 +75,8 @@ namespace Voxel.Core
             {
                 int item = reader.ReadInt32();
                 int count = reader.ReadInt32();
+                if (Items.IsRetired(item)) continue;
+
                 if (!Items.IsValid(item) || count <= 0 || counts.ContainsKey(item))
                 {
                     throw new InvalidDataException($"Invalid inventory: item {item}, count {count}.");

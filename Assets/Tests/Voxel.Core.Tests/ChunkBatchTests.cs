@@ -48,7 +48,9 @@ namespace Voxel.Core.Tests
         {
             World source = CreateHills();
 
-            byte[] batch = WriteBatch(source.Chunks, 0, 64, out int written);
+            // From the first chunk of sky (the third layer of chunks): empty chunks are small, so several fit.
+            int firstSky = 2 * source.ChunksX * source.ChunksZ;
+            byte[] batch = WriteBatch(source.Chunks, firstSky, 64, out int written);
 
             Assert.That(written, Is.GreaterThan(1));
             Assert.That(batch.Length, Is.LessThanOrEqualTo(64));

@@ -45,6 +45,19 @@ namespace Voxel.Core
             return (int)((sum << 16) / total);
         }
 
+        // Fractal noise without straight lines: value noise has its hollows and crests along its grid
+        // lines, which water and the eye pick out. This blends a layer on the usual grid with one on
+        // a grid turned by about 53 degrees (a 3-4-5 triangle, exact in integers). The mean of two
+        // layers varies less than one: it is stretched back by √2 around the middle. Result in [0, One).
+        public static int TurnedFractal(int x, int z, int firstCellShift, int octaves, uint seed)
+        {
+            long straight = Fractal(x, z, firstCellShift, octaves, seed);
+            long turned = Fractal((3 * x - 4 * z) / 5, (4 * x + 3 * z) / 5, firstCellShift, octaves, ~seed);
+            long half = One / 2;
+            long stretched = half + ((straight + turned) / 2 - half) * 1414 / 1000;
+            return (int)System.Math.Min(System.Math.Max(stretched, 0), One - 1);
+        }
+
         // Pseudo-random value of a grid point, in [0, One).
         private static long Lattice(int x, int z, uint seed)
         {

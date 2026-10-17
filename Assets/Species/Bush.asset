@@ -19,6 +19,11 @@ MonoBehaviour:
   spacing: 3
   minFertility: 0.15
   fertilityUsePerDay: 0.05
+  idealWarmth: {x: 0.22, y: 0.8}
+  idealWetness: {x: 0.25, y: 1}
+  climateTolerance: 0.15
+  grounds: 3
+  needsWater: 0
   woodYield: 0
   height: 1.25
   width: 0.9

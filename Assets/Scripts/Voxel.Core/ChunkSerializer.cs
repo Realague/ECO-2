@@ -40,6 +40,9 @@ namespace Voxel.Core
                     throw new InvalidDataException($"Corrupted data for chunk {chunk.Coord}.");
                 }
 
+                // Blocks of earlier versions that no longer exist (crafted blocks) are gone.
+                if (Blocks.IsRetired(block)) block = Blocks.Air;
+
                 Array.Fill(blocks, block, index, run);
                 index += run;
             }

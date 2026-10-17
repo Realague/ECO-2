@@ -10,9 +10,15 @@ namespace Eco.Sim
     public sealed partial class Ecosystem
     {
         private const uint Magic = 0x454F4345; // "ECOE"
-        private const int FormatVersion = 3;
+        private const int FormatVersion = 5;
 
-        // Last format without animals. It still loads: animals then arrive from the map edges.
+        // Last format without the seeds animals carry. It still loads, with none.
+        private const int FormatWithoutCarriedSeeds = 4;
+
+        // Last format without carcasses. It still loads, with none.
+        private const int FormatWithoutCarrion = 3;
+
+        // Last format without animals. It still loads: animals then arrive where their climate suits them.
         private const int FormatWithoutAnimals = 2;
 
         public void Write(Stream stream)
@@ -76,7 +82,10 @@ namespace Eco.Sim
                     writer.Write(animal.Z);
                     writer.Write(animal.Age);
                     writer.Write(animal.Hunger);
+                    writer.Write(animal.CarriedSeed);
                 }
+
+                WriteCarrion(writer);
             }
         }
 
@@ -97,7 +106,7 @@ namespace Eco.Sim
                 }
 
                 int formatVersion = reader.ReadInt32();
-                if (formatVersion != FormatVersion && formatVersion != FormatWithoutAnimals)
+                if (formatVersion != FormatVersion && formatVersion != FormatWithoutCarriedSeeds && formatVersion != FormatWithoutCarrion && formatVersion != FormatWithoutAnimals)
                 {
                     throw new InvalidDataException(
                         $"Unsupported ecosystem save format {formatVersion} (expected: {FormatVersion}).");
@@ -166,10 +175,12 @@ namespace Eco.Sim
                     }
 
                     previousId = plant.Id;
+                    plant.Vigour = ecosystem.VigourAt(plant.SpeciesIndex, plant.X, plant.Z);
                     ecosystem.Append(plant);
                 }
 
-                if (formatVersion != FormatWithoutAnimals) ecosystem.ReadAnimals(reader);
+                if (formatVersion != FormatWithoutAnimals) ecosystem.ReadAnimals(reader, formatVersion >= FormatVersion);
+                if (formatVersion >= FormatWithoutCarriedSeeds) ecosystem.ReadCarrion(reader);
                 return ecosystem;
             }
         }
@@ -188,7 +199,7 @@ namespace Eco.Sim
             }
         }
 
-        private void ReadAnimals(BinaryReader reader)
+        private void ReadAnimals(BinaryReader reader, bool withCarriedSeeds)
         {
             int speciesCount = reader.ReadInt32();
             if (speciesCount != animalSpecies.Length)
@@ -218,13 +229,15 @@ namespace Eco.Sim
                 int z = reader.ReadInt32();
                 int age = reader.ReadInt32();
                 float hunger = reader.ReadSingle();
+                int carriedSeed = withCarriedSeeds ? reader.ReadInt32() : 0;
 
                 bool valid = (uint)speciesIndex < (uint)animalSpecies.Length
                     && (uint)x < (uint)world.SizeX
                     && (uint)z < (uint)world.SizeZ
                     && id > previousId
                     && age >= 0
-                    && animalAtColumn[ColumnIndex(x, z)] == 0;
+                    && animalAtColumn[ColumnIndex(x, z)] == 0
+                    && carriedSeed >= 0 && carriedSeed <= species.Length;
                 if (!valid)
                 {
                     throw new InvalidDataException($"Invalid animal in the ecosystem save (id {id}).");
@@ -232,6 +245,7 @@ namespace Eco.Sim
 
                 previousId = id;
                 AddAnimal(id, speciesIndex, x, y, z, age, hunger);
+                animals[animalCount - 1].CarriedSeed = carriedSeed;
             }
         }
     }

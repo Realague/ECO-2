@@ -8,14 +8,13 @@ using Voxel.Core;
 namespace Voxel.Client
 {
     // Shows the local player's inventory and reads the related keys: choosing the held item,
-    // crafting, choosing a speciality, giving. The text is drawn with OnGUI, for display
-    // only; keys are read from the keyboard, as everywhere else.
+    // choosing a speciality, giving. The text is drawn with OnGUI, for display only; keys are
+    // read from the keyboard, as everywhere else.
     public class InventoryHud : MonoBehaviour
     {
         private enum Panel
         {
             None,
-            Crafting,
             Speciality
         }
 
@@ -53,15 +52,10 @@ namespace Voxel.Client
             Mouse mouse = Mouse.current;
             if (keyboard == null || mouse == null || Cursor.lockState != CursorLockMode.Locked) return;
 
-            if (keyboard.cKey.wasPressedThisFrame) panel = panel == Panel.Crafting ? Panel.None : Panel.Crafting;
             if (keyboard.kKey.wasPressedThisFrame) panel = panel == Panel.Speciality ? Panel.None : Panel.Speciality;
 
             int digit = PressedDigit(keyboard);
-            if (panel == Panel.Crafting)
-            {
-                if (digit > 0) inventorySync.RequestCraft(digit - 1);
-            }
-            else if (panel == Panel.Speciality)
+            if (panel == Panel.Speciality)
             {
                 if (digit > 0 && digit <= Specialities.Choices.Count && inventorySync.Speciality == Speciality.None)
                 {
@@ -134,8 +128,7 @@ namespace Voxel.Client
             text.Clear();
             Speciality speciality = inventorySync.Speciality;
 
-            if (panel == Panel.Crafting) AppendRecipes(speciality);
-            else if (panel == Panel.Speciality) AppendSpecialities(speciality);
+            if (panel == Panel.Speciality) AppendSpecialities(speciality);
 
             text.Append("Speciality: ").Append(Specialities.NameOf(speciality));
             if (speciality == Speciality.None) text.Append(" (K to choose one)");
@@ -148,29 +141,8 @@ namespace Voxel.Client
                 text.Append(i + 1).Append(". ").Append(NameOf(entries[i].Key)).Append(" ×").Append(entries[i].Value).Append('\n');
             }
 
-            text.Append("Wheel or 1-9: held item   Right click: place or plant   C: craft   K: speciality   G: give (Shift: all)   M: map");
+            text.Append("Wheel or 1-9: held item   Right click: place or plant   K: speciality   G: give (Shift: all)   M: map");
             return text.ToString();
-        }
-
-        private void AppendRecipes(Speciality speciality)
-        {
-            text.Append("Crafting (digit to craft, C to close)\n");
-            for (int i = 0; i < Recipes.All.Count; i++)
-            {
-                Recipe recipe = Recipes.All[i];
-                text.Append("  ").Append(i + 1).Append(". ").Append(NameOf(recipe.Output)).Append(" ×").Append(recipe.OutputCount).Append("  from  ");
-                for (int input = 0; input < recipe.Inputs.Count; input++)
-                {
-                    if (input > 0) text.Append(" + ");
-                    text.Append(NameOf(recipe.Inputs[input].Item)).Append(" ×").Append(recipe.Inputs[input].Count);
-                }
-
-                if (!Recipes.HasSkill(recipe, speciality)) text.Append("   (reserved: ").Append(Specialities.NameOf(recipe.Requires)).Append(')');
-                else if (!Recipes.HasInputs(recipe, inventorySync.Inventory)) text.Append("   (missing ingredients)");
-                text.Append('\n');
-            }
-
-            text.Append('\n');
         }
 
         private void AppendSpecialities(Speciality speciality)

@@ -1,0 +1,56 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c90fb7040ab281a4dabfdc0c96f5baf2, type: 3}
+  m_Name: Birch
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.SpeciesAsset
+  maturityDays: 2
+  lifespanDays: 20
+  seedAttemptsPerDay: 2
+  seedRange: 8
+  spacing: 3
+  minFertility: 0.45
+  fertilityUsePerDay: 0.15
+  idealWarmth: {x: 0.16, y: 0.42}
+  idealWetness: {x: 0.35, y: 1}
+  climateTolerance: 0.12
+  grounds: 3
+  needsWater: 0
+  woodYield: 3
+  height: 7.2
+  width: 0.8
+  models:
+  - parts:
+    - mesh: {fileID: 4300000, guid: 7ea40e65f178bbe4b84675d6c59a5854, type: 2}
+      material: {fileID: 2100000, guid: b9cda3a6d10b70b47ad3be9c556c64da, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+    - mesh: {fileID: 4300000, guid: a627642106518d34e9761931002b5479, type: 2}
+      material: {fileID: 2100000, guid: 0a6159239a6b99640a81c8926632d6c1, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+    - mesh: {fileID: 4300000, guid: c09516cbfa2907f44ac22dd72efb8410, type: 2}
+      material: {fileID: 2100000, guid: fa81fe0d9af6b7c4da8177d24c5b5801, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+  - parts:
+    - mesh: {fileID: 4300000, guid: 47dfb697c53f9ba47b0139c84201f3a5, type: 2}
+      material: {fileID: 2100000, guid: b9cda3a6d10b70b47ad3be9c556c64da, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+    - mesh: {fileID: 4300000, guid: 1322c5e921525a440b864aa134ad4641, type: 2}
+      material: {fileID: 2100000, guid: 0a6159239a6b99640a81c8926632d6c1, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+    - mesh: {fileID: 4300000, guid: 67f757ac0328947499877dc953a086a5, type: 2}
+      material: {fileID: 2100000, guid: fa81fe0d9af6b7c4da8177d24c5b5801, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}

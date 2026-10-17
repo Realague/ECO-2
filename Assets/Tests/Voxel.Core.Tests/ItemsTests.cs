@@ -9,6 +9,8 @@ namespace Voxel.Core.Tests
         {
             for (ushort type = Blocks.Stone; type <= Blocks.LastType; type++)
             {
+                if (Blocks.IsRetired(type)) continue;
+
                 int item = Items.OfBlock(type);
 
                 Assert.IsTrue(Items.IsBlock(item));
@@ -52,12 +54,35 @@ namespace Voxel.Core.Tests
 
         [TestCase(Blocks.Stone)]
         [TestCase(Blocks.Dirt)]
-        [TestCase(Blocks.Planks)]
-        [TestCase(Blocks.Bricks)]
-        [TestCase(Blocks.Timbered)]
+        [TestCase(Blocks.Sand)]
+        [TestCase(Blocks.IronOre)]
         public void DropOf_OtherBlocks_IsTheBlockItself(ushort block)
         {
             Assert.AreEqual((int)block, Items.DropOf(block));
+        }
+
+        // Planks, bricks, timber frame (4-6) and the cut rocks (26-31) were removed with crafting.
+        [TestCase(4)]
+        [TestCase(6)]
+        [TestCase(26)]
+        [TestCase(31)]
+        public void RemovedCraftedBlocks_AreNeitherBlocksNorItems(int type)
+        {
+            Assert.IsTrue(Blocks.IsRetired((ushort)type));
+            Assert.IsFalse(Blocks.IsValid((ushort)type));
+            Assert.IsFalse(Items.IsBlock(type));
+            Assert.IsFalse(Items.IsValid(type));
+            Assert.IsTrue(Items.IsRetired(type));
+        }
+
+        [Test]
+        public void ExistingBlocks_AreNotRetired()
+        {
+            for (ushort type = Blocks.Air; type <= Blocks.LastType; type++)
+            {
+                if (type >= 4 && type <= 6) continue;
+                Assert.IsFalse(Blocks.IsRetired(type), Items.NameOf(type));
+            }
         }
 
         [Test]

@@ -69,7 +69,7 @@ namespace Voxel.Core.Tests
         {
             var original = new PlayerStore();
             PlayerState alice = original.GetOrAdd("alice");
-            alice.Speciality = Speciality.Mason;
+            alice.Speciality = Speciality.Gardener;
             alice.Inventory.Add(Blocks.Stone, 12);
             alice.Inventory.Add(Items.Seed(1), 2);
             original.GetOrAdd("bob");
@@ -80,7 +80,7 @@ namespace Voxel.Core.Tests
             PlayerStore loaded = PlayerStore.Read(stream);
 
             Assert.IsTrue(loaded.TryGet("alice", out PlayerState loadedAlice));
-            Assert.AreEqual(Speciality.Mason, loadedAlice.Speciality);
+            Assert.AreEqual(Speciality.Gardener, loadedAlice.Speciality);
             Assert.AreEqual(2, loadedAlice.Inventory.DistinctCount);
             Assert.AreEqual(12, loadedAlice.Inventory.Count(Blocks.Stone));
             Assert.AreEqual(2, loadedAlice.Inventory.Count(Items.Seed(1)));
@@ -122,7 +122,7 @@ namespace Voxel.Core.Tests
                 writer.Write(2f);
                 writer.Write(3f);
                 writer.Write(90f);
-                writer.Write((byte)Speciality.Mason);
+                writer.Write((byte)Speciality.Gardener);
                 writer.Write(1);
                 writer.Write((int)Blocks.Stone);
                 writer.Write(5);
@@ -132,9 +132,41 @@ namespace Voxel.Core.Tests
             PlayerStore loaded = PlayerStore.Read(stream);
 
             Assert.IsTrue(loaded.TryGet("alice", out PlayerState state));
-            Assert.AreEqual(Speciality.Mason, state.Speciality);
+            Assert.AreEqual(Speciality.Gardener, state.Speciality);
             Assert.AreEqual(5, state.Inventory.Count(Blocks.Stone));
             Assert.IsNull(state.Appearance);
+        }
+
+        // A save from when crafting existed: the Mason chooses again, and the planks are gone, the rest is kept.
+        [Test]
+        public void Read_SaveFromTheCraftingDays_DropsTheRemovedSpecialityAndItems()
+        {
+            var stream = new MemoryStream();
+            using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, true))
+            {
+                writer.Write(0x504F4345u);
+                writer.Write(2);
+                writer.Write(1);
+                writer.Write("alice");
+                writer.Write(1f);
+                writer.Write(2f);
+                writer.Write(3f);
+                writer.Write(90f);
+                writer.Write((byte)Speciality.Mason);
+                writer.Write(2);
+                writer.Write(4);
+                writer.Write(7);
+                writer.Write((int)Blocks.Stone);
+                writer.Write(5);
+            }
+
+            stream.Position = 0;
+            PlayerStore loaded = PlayerStore.Read(stream);
+
+            Assert.IsTrue(loaded.TryGet("alice", out PlayerState state));
+            Assert.AreEqual(Speciality.None, state.Speciality);
+            Assert.AreEqual(1, state.Inventory.DistinctCount);
+            Assert.AreEqual(5, state.Inventory.Count(Blocks.Stone));
         }
 
         [Test]

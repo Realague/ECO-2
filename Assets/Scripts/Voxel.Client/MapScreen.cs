@@ -11,13 +11,23 @@ namespace Voxel.Client
     // The full-screen map, opened and closed with M (Escape also closes it): the world's picture
     // (WorldMap) with the same markers as the minimap. The mouse is freed while it is open: the
     // wheel zooms around the pointer, dragging moves the map, Space centres it on the player
-    // again, and the coordinates under the pointer are shown below. Meanwhile the player stands
+    // again, and the coordinates under the pointer are shown below. Tab lays the climate over the
+    // terrain: temperature, then humidity, from the world's geography. Meanwhile the player stands
     // still and the other on-screen texts are hidden. The screen is Assets/UI/Map.uxml.
     public class MapScreen : MonoBehaviour
     {
         private const float StartPixelsPerBlock = 3f;
         private const float MaxPixelsPerBlock = 12f;
         private const float ZoomStep = 1.25f;
+
+        private enum Layer
+        {
+            Terrain,
+            Temperature,
+            Humidity
+        }
+
+        private static readonly string[] LayerNames = { "Terrain", "Temperature: blue cold, red hot", "Humidity: ochre dry, blue wet" };
 
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private EcosystemSync ecosystemSync;
@@ -28,6 +38,8 @@ namespace Voxel.Client
         private VisualElement screen;
         private VisualElement view;
         private VisualElement image;
+        private VisualElement climate;
+        private Label layerName;
         private Label pointerText;
         private MapMarkers markers;
         private MapMarkers.Projection projection;
@@ -46,6 +58,13 @@ namespace Voxel.Client
         private Vector2 dragCentre;
         private int closedFrame = -1;
 
+        // The climate layer shown, and its pictures for the current world (one pixel per geography cell).
+        private Layer layer;
+        private Voxel.Core.World layerWorld;
+        private Texture2D temperatureLayer;
+        private Texture2D humidityLayer;
+        private Texture2D shownLayerTexture;
+
         public bool IsOpen { get; private set; }
 
         // Also true on the frame the map closes, so that the key that closed it does nothing else.
@@ -58,6 +77,8 @@ namespace Voxel.Client
             screen = root.Q("screen");
             view = root.Q("map-view");
             image = root.Q("map-image");
+            climate = root.Q("map-climate");
+            layerName = root.Q<Label>("layer-name");
             pointerText = root.Q<Label>("pointer-position");
             markers = new MapMarkers(root.Q("map-animals"), root.Q("map-players"), root.Q("map-arrow"));
             projection = Project;
@@ -69,9 +90,15 @@ namespace Voxel.Client
             view.RegisterCallback<PointerUpEvent>(OnPointerUp);
             view.RegisterCallback<PointerLeaveEvent>(_ => pointerText.text = "");
             screen.style.display = DisplayStyle.None;
+            ShowLayer(Layer.Terrain);
 
             // A dedicated server has no one to show a map to.
             if (Application.isBatchMode) enabled = false;
+        }
+
+        private void OnDestroy()
+        {
+            DropLayers();
         }
 
         private void Update()
@@ -100,6 +127,10 @@ namespace Voxel.Client
                 else if (IsOpen && keyboard.spaceKey.wasPressedThisFrame)
                 {
                     following = true;
+                }
+                else if (IsOpen && keyboard.tabKey.wasPressedThisFrame)
+                {
+                    ShowLayer((Layer)(((int)layer + 1) % LayerNames.Length));
                 }
             }
 
@@ -156,11 +187,86 @@ namespace Voxel.Client
             texture.filterMode = pixelsPerBlock < 1f ? FilterMode.Bilinear : FilterMode.Point;
             image.style.width = texture.width * pixelsPerBlock;
             image.style.height = texture.height * pixelsPerBlock;
-            image.style.translate = new Translate(
+            var translate = new Translate(
                 viewSize.x * 0.5f - centre.x * pixelsPerBlock,
                 viewSize.y * 0.5f - (texture.height - centre.y) * pixelsPerBlock);
+            image.style.translate = translate;
+
+            // The climate layer covers the world exactly like the picture: one pixel per cell of 8 columns.
+            if (layer != Layer.Terrain)
+            {
+                Texture2D layerTexture = LayerTexture(worldMap.World);
+                if (layerTexture != shownLayerTexture)
+                {
+                    shownLayerTexture = layerTexture;
+                    climate.style.backgroundImage = new StyleBackground(layerTexture);
+                }
+
+                climate.style.width = image.style.width;
+                climate.style.height = image.style.height;
+                climate.style.translate = translate;
+            }
 
             markers.Place(networkManager, ecosystemSync, worldMap, player, projection);
+        }
+
+        private void ShowLayer(Layer shown)
+        {
+            layer = shown;
+            layerName.text = LayerNames[(int)shown];
+            climate.style.display = shown == Layer.Terrain ? DisplayStyle.None : DisplayStyle.Flex;
+        }
+
+        // The picture of the shown climate layer, worked out once per world.
+        private Texture2D LayerTexture(Voxel.Core.World world)
+        {
+            if (world != layerWorld)
+            {
+                DropLayers();
+                layerWorld = world;
+            }
+
+            Voxel.Core.Geography geography = world.Geography;
+            if (layer == Layer.Temperature)
+            {
+                if (temperatureLayer == null) temperatureLayer = BuildLayer(geography, (cellX, cellZ) => ClimateColours.TemperatureLayer(geography.Temperature(cellX, cellZ)));
+                return temperatureLayer;
+            }
+
+            if (humidityLayer == null) humidityLayer = BuildLayer(geography, (cellX, cellZ) => ClimateColours.HumidityLayer(geography.Humidity(cellX, cellZ)));
+            return humidityLayer;
+        }
+
+        private static Texture2D BuildLayer(Voxel.Core.Geography geography, System.Func<int, int, Color> colourOf)
+        {
+            var texture = new Texture2D(geography.CellsX, geography.CellsZ, TextureFormat.RGBA32, false)
+            {
+                name = "ClimateLayer",
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp
+            };
+
+            var pixels = new Color32[geography.CellsX * geography.CellsZ];
+            for (int cellZ = 0; cellZ < geography.CellsZ; cellZ++)
+            {
+                for (int cellX = 0; cellX < geography.CellsX; cellX++)
+                {
+                    pixels[cellX + geography.CellsX * cellZ] = colourOf(cellX, cellZ);
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+            return texture;
+        }
+
+        private void DropLayers()
+        {
+            if (temperatureLayer != null) Destroy(temperatureLayer);
+            if (humidityLayer != null) Destroy(humidityLayer);
+            temperatureLayer = null;
+            humidityLayer = null;
+            layerWorld = null;
         }
 
         private bool Project(Vector3 world, out Vector2 point)
@@ -224,16 +330,23 @@ namespace Voxel.Client
             view.ReleasePointer(e.pointerId);
         }
 
-        // The coordinates of the column under the pointer, and the height of its ground.
+        // The coordinates of the column under the pointer, the height of its ground, and its climate.
         private void ShowPointer(Vector2 local)
         {
             Voxel.Core.World world = worldMap.World;
             Vector2 column = Unproject(local);
             int x = Mathf.FloorToInt(column.x);
             int z = Mathf.FloorToInt(column.y);
-            pointerText.text = world != null && world.InBounds(x, 0, z)
-                ? $"X {x}   Y {world.GetSurfaceHeight(x, z)}   Z {z}"
-                : "";
+            if (world == null || !world.InBounds(x, 0, z))
+            {
+                pointerText.text = "";
+                return;
+            }
+
+            Voxel.Core.Geography geography = world.Geography;
+            int celsius = ClimateColours.Celsius(geography.TemperatureAt(x, z));
+            int humidity = ClimateColours.Percent(geography.HumidityAt(x, z));
+            pointerText.text = $"X {x}   Y {world.GetSurfaceHeight(x, z)}   Z {z}      {celsius} °C   {humidity} % humidity";
         }
 
         // One legend entry per animal species, with its colour on the map and its name.

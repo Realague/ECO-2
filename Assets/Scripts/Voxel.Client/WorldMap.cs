@@ -113,6 +113,7 @@ namespace Voxel.Client
             {
                 tile.Heights = null;
                 tile.Tops = null;
+                tile.Depths = null;
                 tile.Dirty = false;
             }
 
@@ -270,6 +271,7 @@ namespace Voxel.Client
         {
             tile.Heights = new short[TileSize * TileSize];
             tile.Tops = new ushort[TileSize * TileSize];
+            tile.Depths = new byte[TileSize * TileSize];
             for (int z = 0; z < TileSize; z++)
             {
                 for (int x = 0; x < TileSize; x++)
@@ -279,12 +281,15 @@ namespace Voxel.Client
             }
         }
 
+        // The top of the column as seen from above, water included, and how deep the water is there.
         private void ReadColumn(Tile tile, int x, int z)
         {
             int column = ColumnOf(x, z);
-            int height = world.GetSurfaceHeight(x, z);
+            int height = world.GetTopHeight(x, z);
+            ushort top = height > 0 ? Blocks.TypeOf(world.GetBlock(x, height - 1, z)) : Blocks.Air;
             tile.Heights[column] = (short)height;
-            tile.Tops[column] = height > 0 ? Blocks.TypeOf(world.GetBlock(x, height - 1, z)) : Blocks.Air;
+            tile.Tops[column] = top;
+            tile.Depths[column] = top == Blocks.Water ? (byte)Mathf.Min(255, height - world.GetSurfaceHeight(x, z)) : (byte)0;
         }
 
         private void DrawTiles()
@@ -310,6 +315,7 @@ namespace Voxel.Client
             int minX = tileX * TileSize;
             int minZ = tileZ * TileSize;
             float heightScale = 1f / world.SizeY;
+            Geography geography = world.Geography;
 
             for (int z = minZ; z < minZ + TileSize; z++)
             {
@@ -324,7 +330,22 @@ namespace Voxel.Client
                         int northWest = HeightAt(tile, tileX, tileZ, x - 1, z + 1);
                         int slope = northWest > 0 ? Mathf.Clamp(height - northWest, -3, 3) : 0;
                         float light = 0.72f + 0.45f * height * heightScale + 0.07f * slope;
-                        Color shaded = BlockAtlas.MapColour(tile.Tops[column]) * light;
+                        // Grass has the colour of its climate, as in the world; water is flat and darker when deep.
+                        ushort top = tile.Tops[column];
+                        Color ground;
+                        if (top == Blocks.Water)
+                        {
+                            ground = BlockAtlas.WaterColour(tile.Depths[column]);
+                            light = 1f;
+                        }
+                        else
+                        {
+                            ground = top == Blocks.Grass
+                                ? ClimateColours.Grass(geography.TemperatureAt(x, z), geography.HumidityAt(x, z))
+                                : BlockAtlas.MapColour(top);
+                        }
+
+                        Color shaded = ground * light;
                         shaded.a = 1f;
                         colour = shaded;
                     }
@@ -502,6 +523,7 @@ namespace Voxel.Client
             public readonly Dictionary<int, PlantView> Plants = new Dictionary<int, PlantView>();
             public short[] Heights;
             public ushort[] Tops;
+            public byte[] Depths;
             public bool Dirty;
         }
     }

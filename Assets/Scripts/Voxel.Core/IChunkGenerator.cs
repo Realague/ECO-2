@@ -6,8 +6,13 @@ namespace Voxel.Core
         // chunks, so they become invalid if the rest of the world is no longer the same.
         int Version { get; }
 
-        // Fills the chunk. The result must only depend on its coordinates and the seed, never on
-        // the order of calls or on the machine: a client thus regenerates the same world as the server.
+        // Called once by World.Generate before any chunk, with the world's size in blocks: what
+        // depends on the whole world (rivers, lakes) is worked out here.
+        void Prepare(int seed, int sizeX, int sizeZ);
+
+        // Fills the chunk. The result must only depend on its coordinates, the seed and the world's
+        // size, never on the order of calls or on the machine: a client thus regenerates the same
+        // world as the server.
         void Generate(Chunk chunk, int seed);
     }
 }

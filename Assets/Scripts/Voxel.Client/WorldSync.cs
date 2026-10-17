@@ -22,6 +22,7 @@ namespace Voxel.Client
         private const int MaxBatchBytes = 16 * 1024;
         private const int BlockMessageSize = 3 * sizeof(int) + sizeof(ushort);
         private const int WorldInfoSize = 6 * sizeof(int) + sizeof(ulong);
+        private const int WaterBlocksPerFrame = 64;
 
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private VoxelWorld voxelWorld;
@@ -31,6 +32,11 @@ namespace Voxel.Client
         private readonly Dictionary<ulong, ChunkStream> streams = new Dictionary<ulong, ChunkStream>();
         private readonly List<ulong> finishedStreams = new List<ulong>();
         private readonly List<Chunk> receivedChunks = new List<Chunk>();
+
+        // Server side: blocks water is pouring into (WaterFill), taken a few at a time so that a
+        // hole fills up visibly and the changes do not all go out on the same tick.
+        private readonly Queue<BlockPos> pendingWater = new Queue<BlockPos>();
+        private readonly List<BlockPos> fill = new List<BlockPos>();
         private World serverWorld;
         private bool running;
         private bool ready;
@@ -86,6 +92,7 @@ namespace Voxel.Client
             }
 
             streams.Clear();
+            pendingWater.Clear();
             serverWorld = null;
             running = false;
             ready = false;
@@ -119,8 +126,33 @@ namespace Voxel.Client
 
             ushort previous = serverWorld.GetBlock(pos);
             serverWorld.SetBlock(pos, block);
-            if (!placing) inventorySync.Give(clientId, Items.DropOf(previous), 1);
+            if (!placing)
+            {
+                inventorySync.Give(clientId, Items.DropOf(previous), 1);
+
+                // Next to water, the hole fills up to the water's level.
+                if (WaterFill.Find(serverWorld, pos, fill))
+                {
+                    foreach (BlockPos wet in fill)
+                    {
+                        pendingWater.Enqueue(wet);
+                    }
+                }
+            }
+
             return true;
+        }
+
+        private void Update()
+        {
+            if (serverWorld == null) return;
+
+            for (int i = 0; i < WaterBlocksPerFrame && pendingWater.Count > 0; i++)
+            {
+                // A block placed meanwhile keeps its place.
+                BlockPos pos = pendingWater.Dequeue();
+                if (Blocks.TypeOf(serverWorld.GetBlock(pos)) == Blocks.Air) serverWorld.SetBlock(pos, Blocks.Water);
+            }
         }
 
         private bool IsEditAllowed(ulong clientId, BlockPos pos, ushort block)

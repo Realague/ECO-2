@@ -1,11 +1,13 @@
 using System;
-using System.Collections.Generic;
 
 namespace Voxel.Core
 {
-    // Procedural relief: plains, hills and rocky massifs. The terrain only depends on the
-    // coordinates and the seed, and all the math is in integers (see IntNoise): the server and
-    // every client therefore get exactly the same world. The relief fits within 64 blocks of height.
+    // Procedural terrain: plains, hills and rocky massifs (ReliefHeight), with lakes, rivers and a
+    // sea along the west edge, the rocks under them and the caves in those rocks, laid out for the
+    // whole world by Landscape; ores are scattered here, block by block. The terrain only depends
+    // on the coordinates, the seed and the world's size, and all the math is in integers (see
+    // IntNoise): the server and every client therefore get exactly the same world. The relief fits
+    // within 64 blocks of height.
     public sealed class TerrainGenerator : IChunkGenerator
     {
         private const int BaseHeight = 20;
@@ -28,26 +30,24 @@ namespace Voxel.Core
         private const int HillsOctaves = 4;
         private const uint MassifSeedMask = 0xA5A5A5A5u;
 
-        // Rock is bare at altitude and on steep slopes; elsewhere, dirt under grass.
-        private const int RockAltitude = 46;
-        private const int RockSlope = 3;
         private const int DirtDepth = 3;
+        private const int MarbleThickness = 2;
+        private const uint BedrockSeedMask = 0x2545F491u;
+        private const uint OreSeedMask = 0x7FEB352Du;
+        private const uint OreBlockSeedMask = 0x846CA68Bu;
 
-        private const int Patch = Chunk.Size + 2;
+        private Landscape landscape;
 
-        // Relief already computed, per column of chunks: stacked chunks share the same one.
-        private readonly Dictionary<long, ColumnData> cache = new Dictionary<long, ColumnData>();
-        private int cachedSeed;
+        public int Version => 5;
 
-        public int Version => 2;
-
-        // Height of the topmost block of the column.
-        public static int SurfaceHeight(int x, int z, int seed)
+        // Height of the topmost block of the relief, before Landscape digs the lakes, the sea and
+        // the rivers: plains at BaseHeight, hills, massifs.
+        public static int ReliefHeight(int x, int z, int seed)
         {
             uint noiseSeed = unchecked((uint)seed);
 
-            long massif = Stretch(IntNoise.Sample(x, z, MassifCellShift, noiseSeed ^ MassifSeedMask), MassifFloor, MassifGainTenths);
-            long hills = Stretch(IntNoise.Fractal(x, z, HillsCellShift, HillsOctaves, noiseSeed), HillsFloor, HillsGainTenths);
+            long massif = Stretch(IntNoise.TurnedFractal(x, z, MassifCellShift, 1, noiseSeed ^ MassifSeedMask), MassifFloor, MassifGainTenths);
+            long hills = Stretch(IntNoise.TurnedFractal(x, z, HillsCellShift, HillsOctaves, noiseSeed), HillsFloor, HillsGainTenths);
             long relief = (long)PlainsRelief * IntNoise.One + massif * MountainRelief;
             return BaseHeight + (int)((hills * relief) >> 32);
         }
@@ -58,87 +58,146 @@ namespace Voxel.Core
             return Math.Min(Math.Max(stretched, 0), IntNoise.One - 1);
         }
 
+        public void Prepare(int seed, int sizeX, int sizeZ)
+        {
+            landscape = Landscape.For(seed, sizeX, sizeZ);
+        }
+
         public void Generate(Chunk chunk, int seed)
         {
-            ColumnData columns = ColumnsOf(chunk.Coord.X, chunk.Coord.Z, seed);
+            if (landscape == null) throw new InvalidOperationException("Prepare must be called before Generate.");
+
+            int originX = chunk.Coord.X * Chunk.Size;
             int originY = chunk.Coord.Y * Chunk.Size;
+            int originZ = chunk.Coord.Z * Chunk.Size;
+            uint noiseSeed = unchecked((uint)seed);
 
             for (int z = 0; z < Chunk.Size; z++)
             {
                 for (int x = 0; x < Chunk.Size; x++)
                 {
-                    int column = x + Chunk.Size * z;
-                    int surface = columns.Surface[column];
-                    bool rock = columns.Rock[column];
+                    int worldX = originX + x;
+                    int worldZ = originZ + z;
+                    var column = new ColumnPlan
+                    {
+                        X = worldX,
+                        Z = worldZ,
+                        Ground = landscape.Ground(worldX, worldZ),
+                        Water = landscape.WaterTop(worldX, worldZ),
+                        Rock = landscape.IsRock(worldX, worldZ),
+                        Ice = landscape.IsIce(worldX, worldZ),
+                        Geology = landscape.Column(worldX, worldZ),
+                        Seed = noiseSeed
+                    };
+
                     for (int y = 0; y < Chunk.Size; y++)
                     {
-                        chunk.Set(x, y, z, BlockAt(originY + y, surface, rock));
+                        chunk.Set(x, y, z, BlockAt(originY + y, column));
                     }
                 }
             }
+
+            landscape.Caves.Carve(chunk);
         }
 
-        private static ushort BlockAt(int y, int surface, bool rock)
+        private struct ColumnPlan
         {
-            if (y > surface) return Blocks.Air;
-            if (rock) return Blocks.Stone;
-            if (y == surface) return Blocks.Grass;
-            if (y >= surface - DirtDepth) return Blocks.Dirt;
-            return Blocks.Stone;
+            public int X;
+            public int Z;
+            public int Ground;
+            public int Water;
+            public bool Rock;
+            public bool Ice;
+            public Landscape.ColumnGeology Geology;
+            public uint Seed;
         }
 
-        private ColumnData ColumnsOf(int chunkX, int chunkZ, int seed)
+        // From the top down: air, water (ice on top where it is cold), the top block and the three
+        // under it (grass on dirt, sand, snow; under water the bed), then rock: the cover rock, its
+        // marble, the granite basement and the bedrock, with ores in it. Bare rock has rock up to
+        // its top, or snow on it.
+        private static ushort BlockAt(int y, in ColumnPlan column)
         {
-            if (seed != cachedSeed)
+            int ground = column.Ground;
+            if (y > ground)
             {
-                cache.Clear();
-                cachedSeed = seed;
+                if (y > column.Water) return Blocks.Air;
+                return column.Ice && y == column.Water ? Blocks.Ice : Blocks.Water;
             }
 
-            long key = ((long)chunkX << 32) | (uint)chunkZ;
-            if (cache.TryGetValue(key, out ColumnData columns)) return columns;
-
-            columns = ComputeColumns(chunkX * Chunk.Size, chunkZ * Chunk.Size, seed);
-            cache.Add(key, columns);
-            return columns;
-        }
-
-        private static ColumnData ComputeColumns(int originX, int originZ, int seed)
-        {
-            // Heights of the chunk and of one column around it, to know the slope at its edges.
-            var heights = new int[Patch * Patch];
-            for (int z = 0; z < Patch; z++)
+            bool underWater = column.Water > ground;
+            if (column.Rock && !underWater)
             {
-                for (int x = 0; x < Patch; x++)
-                {
-                    heights[x + Patch * z] = SurfaceHeight(originX + x - 1, originZ + z - 1, seed);
-                }
+                if (y == ground && column.Geology.Top == Blocks.Snow) return Blocks.Snow;
+                return RockAt(y, column);
             }
 
-            var columns = new ColumnData();
-            for (int z = 0; z < Chunk.Size; z++)
-            {
-                for (int x = 0; x < Chunk.Size; x++)
-                {
-                    int centre = x + 1 + Patch * (z + 1);
-                    int height = heights[centre];
-                    int slope = Math.Max(
-                        Math.Max(Math.Abs(heights[centre - 1] - height), Math.Abs(heights[centre + 1] - height)),
-                        Math.Max(Math.Abs(heights[centre - Patch] - height), Math.Abs(heights[centre + Patch] - height)));
-
-                    int column = x + Chunk.Size * z;
-                    columns.Surface[column] = height;
-                    columns.Rock[column] = height >= RockAltitude || slope >= RockSlope;
-                }
-            }
-
-            return columns;
+            if (y == ground) return column.Geology.Top;
+            if (y >= ground - DirtDepth) return column.Geology.Under;
+            return RockAt(y, column);
         }
 
-        private sealed class ColumnData
+        // The bottom of the world is bedrock, ragged on its top two blocks.
+        private static ushort RockAt(int y, in ColumnPlan column)
         {
-            public readonly int[] Surface = new int[Chunk.Size * Chunk.Size];
-            public readonly bool[] Rock = new bool[Chunk.Size * Chunk.Size];
+            uint hash = Hash(column.X, y, column.Z, column.Seed ^ BedrockSeedMask);
+            if (y == 0 || (y == 1 && (hash & 1) == 0) || (y == 2 && (hash & 3) == 0)) return Blocks.Bedrock;
+
+            Landscape.ColumnGeology geology = column.Geology;
+            ushort host;
+            if (y < geology.CoverBottom) host = Blocks.Granite;
+            else if (geology.Marble && y < geology.CoverBottom + MarbleThickness) return Blocks.Marble;
+            else host = geology.Cover;
+
+            return OreAt(column.X, y, column.Z, column.Ground - y, host, geology.Cold, column.Seed);
+        }
+
+        // Ores lie in clumps: the rock is cut into cells of 4 × 4 × 4 blocks, and a cell holds ore
+        // with a chance that depends on its host rock and depth; then three blocks in four of the
+        // cell are ore. Sedimentary rocks hold coal, limestone flint near the surface, sandstone
+        // rock salt; granite copper, tin in cold regions and gold deep down; basalt iron; and iron
+        // is found a little everywhere. Chances are in 1/1024 per cell.
+        private static ushort OreAt(int x, int y, int z, int depth, ushort host, bool cold, uint seed)
+        {
+            uint cell = Hash(x >> 2, y >> 2, z >> 2, seed ^ OreSeedMask);
+            if ((Hash(x, y, z, seed ^ OreBlockSeedMask) & 3) == 0) return host;
+
+            int roll = (int)(cell & 1023);
+            int kindRoll = (int)((cell >> 10) & 1023);
+            switch (host)
+            {
+                case Blocks.Limestone:
+                case Blocks.Sandstone:
+                case Blocks.Slate:
+                    if (host == Blocks.Limestone && depth < 10 && roll < 20) return Blocks.Flint;
+                    if (host == Blocks.Sandstone && depth >= 6 && roll < 18) return Blocks.RockSalt;
+                    if (depth >= 5 && roll >= 20 && roll < 50) return Blocks.CoalOre;
+                    if (roll >= 50 && roll < 60) return Blocks.IronOre;
+                    return host;
+                case Blocks.Granite:
+                    if (depth >= 25 && roll < 5) return Blocks.GoldOre;
+                    if (cold && roll >= 5 && roll < 17) return Blocks.TinOre;
+                    if (depth < 40 && roll >= 17 && roll < 37) return Blocks.CopperOre;
+                    if (roll >= 37 && roll < 47 + (kindRoll & 3)) return Blocks.IronOre;
+                    return host;
+                case Blocks.Basalt:
+                    return roll < 40 ? Blocks.IronOre : host;
+                default:
+                    return host;
+            }
+        }
+
+        private static uint Hash(int x, int y, int z, uint seed)
+        {
+            unchecked
+            {
+                uint hash = seed ^ 0x9E3779B9u;
+                hash = (hash ^ (uint)x) * 0x85EBCA6Bu;
+                hash = (hash ^ (hash >> 13) ^ (uint)y) * 0xC2B2AE35u;
+                hash = (hash ^ (hash >> 16) ^ (uint)z) * 0x27D4EB2Fu;
+                hash ^= hash >> 15;
+                return hash;
+            }
         }
     }
 }

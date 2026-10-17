@@ -286,7 +286,88 @@ namespace Eco.Sim.Tests
         }
 
         [Test]
-        public void SpeciesBelowItsMinimum_ComesBackFromTheEdgesOfTheMap()
+        public void Herbivore_OnlyEatsPlantsWithinItsReach()
+        {
+            AnimalSpecies shortRabbit = Rabbit(hungerPerStep: 0.11f);
+            shortRabbit.ReachHeight = 0.5f;
+            Ecosystem ecosystem = CreateEcosystem(shortRabbit, Fox());
+            ecosystem.TryPlant(BushIndex, 10, 10);
+            Run(ecosystem, 3 * SimClock.StepsPerDay);
+            ecosystem.TryPlaceAnimal(RabbitIndex, 12, 10);
+
+            Run(ecosystem, 3);
+
+            Assert.That(ecosystem.Animals[0].Hunger, Is.GreaterThan(0.3f), "the grown bush, 0.9 high, is out of its reach");
+            Assert.AreEqual(1f, ecosystem.Plants[0].Growth);
+        }
+
+        [Test]
+        public void GrazingAPlantThatCannotSpareIt_KillsIt()
+        {
+            Ecosystem ecosystem = CreateEcosystem(Rabbit(hungerPerStep: 0.3f), Fox());
+            ecosystem.TryPlant(BushIndex, 10, 10);
+            Run(ecosystem, 3 * SimClock.StepsPerDay);
+            ecosystem.TryPlaceAnimal(RabbitIndex, 11, 10);
+
+            Run(ecosystem, 4);
+
+            Assert.AreEqual(0, ecosystem.Plants.Count, "grazed twice, the bush had nothing left to lose");
+        }
+
+        [Test]
+        public void HerdAnimals_GatherNearOneAnother()
+        {
+            AnimalSpecies deer = Rabbit();
+            deer.Herd = true;
+            deer.SenseRange = 10;
+            Ecosystem ecosystem = CreateEcosystem(deer, Fox());
+            ecosystem.TryPlaceAnimal(RabbitIndex, 5, 10);
+            ecosystem.TryPlaceAnimal(RabbitIndex, 13, 10);
+
+            Run(ecosystem, 10);
+
+            Animal first = ecosystem.Animals[0];
+            Animal second = ecosystem.Animals[1];
+            Assert.That(Math.Max(Math.Abs(first.X - second.X), Math.Abs(first.Z - second.Z)), Is.LessThanOrEqualTo(3));
+        }
+
+        // The first animals and the newcomers only appear where the climate suits their species.
+        [Test]
+        public void Animals_OnlySettleWhereTheClimateSuitsThem()
+        {
+            World world = MeadowGenerator.CreateWorld(4);
+            var warmths = new List<float>();
+            for (int z = 0; z < world.SizeZ; z += 4)
+            {
+                for (int x = 0; x < world.SizeX; x += 4)
+                {
+                    warmths.Add((float)world.Geography.TemperatureAt(x, z) / IntNoise.One);
+                }
+            }
+
+            warmths.Sort();
+            AnimalSpecies cold = Rabbit();
+            cold.MinDensity = 100f;
+            cold.WarmthMax = warmths[warmths.Count / 2];
+            cold.ClimateTolerance = 0.001f;
+            var ecosystem = new Ecosystem(world, TestSpecies.TreeAndBush(), new[] { cold }, Seed);
+
+            ecosystem.PopulateAnimals();
+
+            Assert.That(ecosystem.Animals.Count, Is.GreaterThan(5));
+            foreach (Animal animal in ecosystem.Animals)
+            {
+                Assert.That(ecosystem.AnimalVigourAt(RabbitIndex, animal.X, animal.Z), Is.GreaterThanOrEqualTo(0.5f), $"Animal at ({animal.X}, {animal.Z})");
+            }
+
+            // Wandering, they keep mostly to their climate.
+            Run(ecosystem, 200);
+            int suited = ecosystem.Animals.Count(animal => ecosystem.AnimalVigourAt(RabbitIndex, animal.X, animal.Z) > 0f);
+            Assert.That(suited, Is.GreaterThanOrEqualTo(ecosystem.Animals.Count * 8 / 10));
+        }
+
+        [Test]
+        public void SpeciesBelowItsMinimum_ComesBack()
         {
             AnimalSpecies returning = Rabbit();
             returning.MinDensity = 100f;
@@ -340,10 +421,10 @@ namespace Eco.Sim.Tests
             var stream = new MemoryStream();
             withoutAnimals.Write(stream);
 
-            // The old format stopped after the plants: the animal section is removed (three
-            // integers for an ecosystem without animal species) and the old format number is put back.
+            // The old format stopped after the plants: the animal and carcass sections are removed
+            // (four integers for an ecosystem without animal species) and the old format number is put back.
             byte[] data = stream.ToArray();
-            var oldFormat = new byte[data.Length - 3 * sizeof(int)];
+            var oldFormat = new byte[data.Length - 4 * sizeof(int)];
             Array.Copy(data, oldFormat, oldFormat.Length);
             BitConverter.GetBytes(2).CopyTo(oldFormat, sizeof(uint));
 

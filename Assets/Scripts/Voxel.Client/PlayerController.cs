@@ -23,6 +23,18 @@ namespace Voxel.Client
         private static readonly Vector3 FaceCameraTarget = new Vector3(0.12f, 1.63f, 0f);
         private const float FaceZoomSpeed = 4f;
 
+        // Swimming: the body counts as in water when the block at this height above the feet is
+        // water. There, gravity is weaker, sinking is slow, Space swims up, and moving is slower.
+        private const float SwimDepth = 0.4f;
+        private const float WaterGravityShare = 0.3f;
+        private const float MaxSinkSpeed = 2f;
+        private const float SwimUpSpeed = 3f;
+        private const float SwimUpAcceleration = 12f;
+        private const float SwimSpeedShare = 0.6f;
+        private const float UnderwaterFogDensity = 0.09f;
+        private static readonly Color UnderwaterFog = new Color(0.10f, 0.28f, 0.42f);
+        private const float NightUnderwaterShare = 0.08f;
+
         [SerializeField] private float moveSpeed = 5f;
         [SerializeField] private float jumpHeight = 1.25f;
         [SerializeField] private float gravity = 25f;
@@ -41,6 +53,11 @@ namespace Voxel.Client
         private bool grounded;
         private float pitch;
         private float faceZoom;
+        private bool showsUnderwater;
+
+        // The last move was stopped by a block on the side.
+        private bool againstWall;
+        private (bool enabled, Color colour, FogMode mode, float density) airFog;
 
         private void Awake()
         {
@@ -69,6 +86,12 @@ namespace Voxel.Client
 
             enabled = false;
             Cursor.lockState = CursorLockMode.None;
+        }
+
+        // Whatever stops the player (leaving the game, despawning), the scene gets its own fog back.
+        private void OnDisable()
+        {
+            ShowUnderwater(false);
         }
 
         private void Update()
@@ -155,6 +178,35 @@ namespace Voxel.Client
             cameraTransform.SetPositionAndRotation(
                 transform.position + transform.rotation * PlayerModel.EyeOffset(pitch),
                 Quaternion.Euler(pitch, transform.eulerAngles.y, 0f));
+            ShowUnderwater(IsWaterAt(cameraTransform.position));
+        }
+
+        // Under water the view turns blue and short: the scene's fog is swapped for a watery one,
+        // and given back when the eyes come out. The water darkens with the day, to a faint glow at night.
+        private void ShowUnderwater(bool underwater)
+        {
+            if (underwater != showsUnderwater)
+            {
+                showsUnderwater = underwater;
+                if (underwater)
+                {
+                    airFog = (RenderSettings.fog, RenderSettings.fogColor, RenderSettings.fogMode, RenderSettings.fogDensity);
+                    RenderSettings.fog = true;
+                    RenderSettings.fogMode = FogMode.ExponentialSquared;
+                    RenderSettings.fogDensity = UnderwaterFogDensity;
+                }
+                else
+                {
+                    (RenderSettings.fog, RenderSettings.fogColor, RenderSettings.fogMode, RenderSettings.fogDensity) = airFog;
+                }
+            }
+
+            if (underwater) RenderSettings.fogColor = UnderwaterFog * Mathf.Lerp(NightUnderwaterShare, 1f, DayNight.Daylight);
+        }
+
+        private bool IsWaterAt(Vector3 position)
+        {
+            return world.IsWater(Mathf.FloorToInt(position.x), Mathf.FloorToInt(position.y), Mathf.FloorToInt(position.z));
         }
 
         private void PlaceMenuCamera()
@@ -226,18 +278,30 @@ namespace Voxel.Client
                 if (keyboard.aKey.isPressed) direction -= transform.right;
             }
 
-            Vector3 horizontal = direction.normalized * moveSpeed;
+            bool swimming = IsWaterAt(transform.position + Vector3.up * SwimDepth);
+            bool spacePressed = hasControl && keyboard.spaceKey.isPressed;
+
+            Vector3 horizontal = direction.normalized * (swimming ? moveSpeed * SwimSpeedShare : moveSpeed);
             velocity.x = horizontal.x;
             velocity.z = horizontal.z;
 
-            if (grounded && hasControl && keyboard.spaceKey.isPressed)
+            if (!swimming && grounded && spacePressed)
             {
                 velocity.y = Mathf.Sqrt(2f * gravity * jumpHeight);
             }
 
+            // Swimming against a bank, Space gives the push of a jump: enough to climb onto ground
+            // as high as the water's surface, which swimming up alone never reaches.
+            bool climbingOut = swimming && spacePressed && againstWall && direction != Vector3.zero;
+            if (climbingOut) velocity.y = Mathf.Max(velocity.y, Mathf.Sqrt(2f * gravity * jumpHeight));
+
             // Vertical move with the average of the speeds before and after gravity: exact for a
             // constant acceleration, so jump height does not depend on the frame rate.
-            float nextVerticalSpeed = Mathf.Max(velocity.y - gravity * deltaTime, -MaxFallSpeed);
+            float nextVerticalSpeed;
+            if (!swimming || climbingOut) nextVerticalSpeed = Mathf.Max(velocity.y - gravity * deltaTime, -MaxFallSpeed);
+            else if (spacePressed) nextVerticalSpeed = Mathf.MoveTowards(velocity.y, SwimUpSpeed, SwimUpAcceleration * deltaTime);
+            else nextVerticalSpeed = Mathf.Max(velocity.y - gravity * WaterGravityShare * deltaTime, -MaxSinkSpeed);
+
             Vector3 displacement = velocity * deltaTime;
             displacement.y = (velocity.y + nextVerticalSpeed) * 0.5f * deltaTime;
             velocity.y = nextVerticalSpeed;
@@ -251,6 +315,7 @@ namespace Voxel.Client
 
             transform.position = result.Position.ToUnity();
             grounded = result.Grounded;
+            againstWall = result.HitWall;
 
             if ((grounded && velocity.y < 0f) || (result.HitCeiling && velocity.y > 0f))
             {

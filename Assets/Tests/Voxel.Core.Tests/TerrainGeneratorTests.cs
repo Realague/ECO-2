@@ -6,26 +6,27 @@ namespace Voxel.Core.Tests
     {
         private const int Seed = 1;
 
-        // Values recorded with version 2 of the generator. If this test fails, the produced terrain has
-        // changed: existing saves no longer match and clients on another version
-        // would generate another world. Bump TerrainGenerator.Version, then update these values.
-        [TestCase(0, 0, 1, 25)]
-        [TestCase(64, 64, 1, 39)]
+        // Relief recorded with version 3 of the generator, the whole world with version 5. If this
+        // test fails, the produced terrain has changed: existing saves no longer match and clients on
+        // another version would generate another world. Bump TerrainGenerator.Version, then update
+        // these values.
+        [TestCase(0, 0, 1, 35)]
+        [TestCase(64, 64, 1, 41)]
         [TestCase(500, -300, 1, 25)]
         [TestCase(-1000, 777, 1, 28)]
-        [TestCase(12345, 6789, 1, 25)]
-        [TestCase(100, 900, 1, 40)]
-        [TestCase(64, 64, 42, 35)]
-        public void SurfaceHeight_IsUnchangedSinceThisGeneratorVersion(int x, int z, int seed, int expected)
+        [TestCase(12345, 6789, 1, 44)]
+        [TestCase(100, 900, 1, 42)]
+        [TestCase(64, 64, 42, 23)]
+        public void ReliefHeight_IsUnchanged(int x, int z, int seed, int expected)
         {
-            Assert.AreEqual(2, new TerrainGenerator().Version, "reference values to update for the new version");
-            Assert.AreEqual(expected, TerrainGenerator.SurfaceHeight(x, z, seed));
+            Assert.AreEqual(expected, TerrainGenerator.ReliefHeight(x, z, seed));
         }
 
         [Test]
         public void GeneratedWorld_IsUnchangedSinceThisGeneratorVersion()
         {
-            Assert.AreEqual(16141247128516064775UL, CreateWorld().TerrainFingerprint);
+            Assert.AreEqual(5, new TerrainGenerator().Version, "reference value to update for the new version");
+            Assert.AreEqual(8051785332826314626UL, CreateWorld().TerrainFingerprint);
         }
 
         [Test]
@@ -34,14 +35,14 @@ namespace Voxel.Core.Tests
             int differences = 0;
             for (int x = 0; x < 256; x += 4)
             {
-                if (TerrainGenerator.SurfaceHeight(x, 100, 1) != TerrainGenerator.SurfaceHeight(x, 100, 2)) differences++;
+                if (TerrainGenerator.ReliefHeight(x, 100, 1) != TerrainGenerator.ReliefHeight(x, 100, 2)) differences++;
             }
 
             Assert.That(differences, Is.GreaterThan(16));
         }
 
         [Test]
-        public void Terrain_HasFlatLandAndHighGround_AndFitsInASixtyFourBlockHighWorld()
+        public void Relief_HasFlatLandAndHighGround_AndFitsInASixtyFourBlockHighWorld()
         {
             int lowest = int.MaxValue;
             int highest = int.MinValue;
@@ -49,45 +50,90 @@ namespace Voxel.Core.Tests
             {
                 for (int x = -512; x < 512; x += 3)
                 {
-                    int height = TerrainGenerator.SurfaceHeight(x, z, Seed);
+                    int height = TerrainGenerator.ReliefHeight(x, z, Seed);
                     if (height < lowest) lowest = height;
                     if (height > highest) highest = height;
                 }
             }
 
-            Assert.That(lowest, Is.GreaterThanOrEqualTo(20), "the stone base stays intact under the relief");
+            Assert.That(lowest, Is.GreaterThanOrEqualTo(20), "the plains' ground is at sea level");
             Assert.That(highest, Is.LessThan(62), "the relief fits under the world's ceiling");
             Assert.That(highest - lowest, Is.GreaterThan(20), "there are plains and massifs");
         }
 
+        // Each column: bedrock at the bottom, solid up to the landscape's ground (except in caves: air,
+        // or water in cave lakes), then water up to its water top (ice on top where it is cold), then
+        // air. The top block and the three under it are those the landscape chose (grass on dirt,
+        // sand, snow; the bed under water); bare rock has rock up to its top, or snow on it.
         [Test]
-        public void EveryColumn_IsSolidUpToItsSurface_WithGrassOnDirtOrBareRock()
+        public void EveryColumn_IsGroundThenWaterThenAir()
         {
             World world = CreateWorld();
+            Landscape landscape = Landscape.For(Seed, world.SizeX, world.SizeZ);
 
             for (int z = 0; z < world.SizeZ; z++)
             {
                 for (int x = 0; x < world.SizeX; x++)
                 {
-                    int top = TerrainGenerator.SurfaceHeight(x, z, Seed);
-                    Assert.AreEqual(top + 1, world.GetSurfaceHeight(x, z), $"Column ({x}, {z})");
+                    int ground = landscape.Ground(x, z);
+                    int water = landscape.WaterTop(x, z);
+                    Landscape.ColumnGeology geology = landscape.Column(x, z);
+                    Assert.AreEqual(Blocks.Bedrock, world.GetBlock(x, 0, z), $"Bottom of ({x}, {z})");
 
-                    for (int y = 0; y <= top; y++)
+                    for (int y = 0; y <= ground; y++)
                     {
-                        Assert.AreNotEqual(Blocks.Air, world.GetBlock(x, y, z), $"Hole at ({x}, {y}, {z})");
+                        ushort block = world.GetBlock(x, y, z);
+                        if (landscape.Caves.IsHollow(x, y, z))
+                        {
+                            ushort hollow = landscape.Caves.IsLake(x, y, z) ? Blocks.Water : Blocks.Air;
+                            Assert.AreEqual(hollow, block, $"Cave at ({x}, {y}, {z})");
+                        }
+                        else
+                        {
+                            Assert.IsTrue(Blocks.IsSolid(block), $"Hole at ({x}, {y}, {z})");
+                        }
                     }
 
-                    ushort surface = world.GetBlock(x, top, z);
-                    if (surface == Blocks.Grass) Assert.AreEqual(Blocks.Dirt, world.GetBlock(x, top - 1, z), $"Under the grass at ({x}, {z})");
-                    else Assert.AreEqual(Blocks.Stone, surface, $"Surface at ({x}, {z})");
+                    // Where a cave opens at the surface, the top blocks are gone.
+                    if (landscape.Caves.IsHollow(x, ground, z) || landscape.Caves.IsHollow(x, ground - 1, z)) continue;
+
+                    // Ice is solid: on a frozen lake, it is the surface.
+                    int surfaceHeight = landscape.IsIce(x, z) ? water + 1 : ground + 1;
+                    Assert.AreEqual(surfaceHeight, world.GetSurfaceHeight(x, z), $"Column ({x}, {z})");
+
+                    for (int y = ground + 1; y <= water; y++)
+                    {
+                        ushort expected = y == water && landscape.IsIce(x, z) ? Blocks.Ice : Blocks.Water;
+                        Assert.AreEqual(expected, world.GetBlock(x, y, z), $"Water at ({x}, {y}, {z})");
+                    }
+
+                    Assert.AreEqual(Blocks.Air, world.GetBlock(x, System.Math.Max(ground, water) + 1, z), $"Air above ({x}, {z})");
+
+                    ushort surface = world.GetBlock(x, ground, z);
+                    if (landscape.IsRock(x, z) && water <= ground)
+                    {
+                        Assert.IsTrue(surface == Blocks.Snow || IsRock(surface), $"Bare rock at ({x}, {z}): {surface}");
+                    }
+                    else
+                    {
+                        Assert.AreEqual(geology.Top, surface, $"Top of ({x}, {z})");
+                        Assert.AreEqual(geology.Under, world.GetBlock(x, ground - 1, z), $"Under the top of ({x}, {z})");
+                    }
                 }
             }
         }
 
+        private static bool IsRock(ushort block)
+        {
+            ushort type = Blocks.TypeOf(block);
+            return type == Blocks.Granite || (type >= Blocks.Basalt && type <= Blocks.Slate) || (type >= Blocks.CoalOre && type <= Blocks.Flint);
+        }
+
         [Test]
-        public void SteepSlopes_AreBareRock_AndGentleLowGround_IsGrass()
+        public void SteepDrySlopes_AreBareRock_AndGentleLowGround_IsMostlyGrass()
         {
             World world = CreateWorld();
+            Landscape landscape = Landscape.For(Seed, world.SizeX, world.SizeZ);
             int grass = 0;
             int rock = 0;
 
@@ -95,31 +141,37 @@ namespace Voxel.Core.Tests
             {
                 for (int x = 1; x < world.SizeX - 1; x++)
                 {
-                    int height = TerrainGenerator.SurfaceHeight(x, z, Seed);
-                    bool steep = System.Math.Abs(TerrainGenerator.SurfaceHeight(x + 1, z, Seed) - height) >= 3
-                        || System.Math.Abs(TerrainGenerator.SurfaceHeight(x - 1, z, Seed) - height) >= 3
-                        || System.Math.Abs(TerrainGenerator.SurfaceHeight(x, z + 1, Seed) - height) >= 3
-                        || System.Math.Abs(TerrainGenerator.SurfaceHeight(x, z - 1, Seed) - height) >= 3;
+                    if (landscape.WaterTop(x, z) >= 0) continue;
+
+                    int height = landscape.Ground(x, z);
+                    if (landscape.Caves.IsHollow(x, height, z)) continue;
+
+                    bool steep = System.Math.Abs(landscape.Ground(x + 1, z) - height) >= 3
+                        || System.Math.Abs(landscape.Ground(x - 1, z) - height) >= 3
+                        || System.Math.Abs(landscape.Ground(x, z + 1) - height) >= 3
+                        || System.Math.Abs(landscape.Ground(x, z - 1) - height) >= 3;
 
                     ushort surface = world.GetBlock(x, height, z);
-                    if (steep) Assert.AreEqual(Blocks.Stone, surface, $"Steep slope at ({x}, {z})");
+                    if (steep) Assert.IsTrue(surface == Blocks.Snow || IsRock(surface), $"Steep slope at ({x}, {z}): {surface}");
                     if (surface == Blocks.Grass) grass++;
-                    else rock++;
+                    else if (IsRock(surface)) rock++;
                 }
             }
 
-            Assert.That(grass, Is.GreaterThan(rock), "grass dominates: plants have room to grow");
+            Assert.That(grass, Is.GreaterThan(rock * 2), "grass dominates bare rock: plants have room to grow");
         }
 
         [Test]
         public void AChunkGeneratedAlone_MatchesTheSameChunkOfAWholeWorld()
         {
             World world = CreateWorld();
+            var generator = new TerrainGenerator();
+            generator.Prepare(Seed, world.SizeX, world.SizeZ);
 
             foreach (ChunkCoord coord in new[] { new ChunkCoord(0, 0, 0), new ChunkCoord(3, 1, 2), new ChunkCoord(7, 2, 7), new ChunkCoord(5, 3, 0) })
             {
                 var alone = new Chunk(coord);
-                new TerrainGenerator().Generate(alone, Seed);
+                generator.Generate(alone, Seed);
                 Chunk inWorld = world.GetChunk(coord);
 
                 for (int y = 0; y < Chunk.Size; y++)
@@ -143,8 +195,11 @@ namespace Voxel.Core.Tests
             var other = new Chunk(new ChunkCoord(2, 1, 2));
             var again = new Chunk(new ChunkCoord(2, 1, 2));
 
+            shared.Prepare(1, 128, 128);
             shared.Generate(first, 1);
+            shared.Prepare(2, 128, 128);
             shared.Generate(other, 2);
+            shared.Prepare(1, 128, 128);
             shared.Generate(again, 1);
 
             bool differs = false;

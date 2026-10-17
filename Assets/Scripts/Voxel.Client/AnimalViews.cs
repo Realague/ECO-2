@@ -29,7 +29,31 @@ namespace Voxel.Client
         private readonly Matrix4x4[][][] matrices;
         private readonly int[] counts;
         private readonly RenderParams[][] renderParams;
+
+        // For the parts with a shadow mesh: drawing it into shadows only.
+        private readonly RenderParams[][] shadowParams;
         private int stamp;
+
+        // How deep an animal afloat sits: the water's surface is drawn below the top of its block.
+        private const float FloatingDraft = 0.25f;
+
+        // This machine's world, as last given to Add; null without one.
+        private World world;
+
+        // Carcasses near the local player: drawn as their species lying on its side, still.
+        private readonly List<CarcassView> carcasses = new List<CarcassView>();
+
+        // For each species, the height of its body's centre and half the body's width: a carcass
+        // is turned over about that centre and laid on the ground. The body is the largest part.
+        private readonly float[] bodyHeights;
+        private readonly float[] bodyHalfWidths;
+
+        private struct CarcassView
+        {
+            public int SpeciesIndex;
+            public Vector3 Position;
+            public Quaternion Facing;
+        }
 
         // Animals are not drawn without a display: assets is then null.
         public AnimalViews(AnimalSpeciesAsset[] assets, IReadOnlyList<AnimalSpecies> species, bool rendering)
@@ -42,18 +66,42 @@ namespace Voxel.Client
             matrices = new Matrix4x4[assets.Length][][];
             counts = new int[assets.Length];
             renderParams = new RenderParams[assets.Length][];
+            shadowParams = new RenderParams[assets.Length][];
+            bodyHeights = new float[assets.Length];
+            bodyHalfWidths = new float[assets.Length];
             for (int s = 0; s < assets.Length; s++)
             {
                 IReadOnlyList<SpeciesAsset.Part> parts = assets[s].Parts;
+                float largest = 0f;
+                foreach (SpeciesAsset.Part part in parts)
+                {
+                    // Boxes are unit cubes scaled; a modelled part is a mesh of its own size.
+                    Bounds bounds = part.mesh.bounds;
+                    Vector3 size = Vector3.Scale(bounds.size, part.scale);
+                    float volume = size.x * size.y * size.z;
+                    if (volume <= largest) continue;
+
+                    largest = volume;
+                    bodyHeights[s] = part.offset.y + bounds.center.y * part.scale.y;
+                    bodyHalfWidths[s] = size.x * 0.5f;
+                }
+
                 matrices[s] = new Matrix4x4[parts.Count][];
                 renderParams[s] = new RenderParams[parts.Count];
+                shadowParams[s] = new RenderParams[parts.Count];
                 for (int p = 0; p < parts.Count; p++)
                 {
+                    bool ownShadow = parts[p].shadowMesh != null;
                     matrices[s][p] = new Matrix4x4[0];
                     renderParams[s][p] = new RenderParams(parts[p].material)
                     {
-                        shadowCastingMode = ShadowCastingMode.On,
+                        shadowCastingMode = ownShadow ? ShadowCastingMode.Off : ShadowCastingMode.On,
                         receiveShadows = true,
+                        worldBounds = everywhere
+                    };
+                    shadowParams[s][p] = new RenderParams(parts[p].material)
+                    {
+                        shadowCastingMode = ShadowCastingMode.ShadowsOnly,
                         worldBounds = everywhere
                     };
                 }
@@ -74,10 +122,11 @@ namespace Voxel.Client
         {
             if (speciesIndex >= species.Count) return;
 
+            this.world = world;
             float now = Time.time;
             if (views.TryGetValue(animalId, out View view))
             {
-                if (position != view.To) view.SetTrip(Route(world, view.PositionAt(now), position), now, assets?[speciesIndex], maxTravelSeconds);
+                if (position != view.To) view.SetTrip(Route(world, species[speciesIndex].Habitat, view.PositionAt(now), position), now, assets?[speciesIndex], maxTravelSeconds);
             }
             else
             {
@@ -91,7 +140,7 @@ namespace Voxel.Client
 
         // The columns crossed from one position to another, as the simulation would walk them: the
         // start, then the centre of each column on the way, ending at the destination.
-        private static Vector3[] Route(World world, Vector3 from, Vector3 to)
+        private static Vector3[] Route(World world, AnimalHabitat habitat, Vector3 from, Vector3 to)
         {
             var points = new List<Vector3> { from };
             int x = Mathf.FloorToInt(from.x);
@@ -101,11 +150,11 @@ namespace Voxel.Client
 
             if (world != null)
             {
-                var ground = new WorldGround(world);
+                var ground = new WorldGround(world, habitat);
                 int y = ground.TryGetGround(x, z, out int startY) ? startY : Mathf.RoundToInt(from.y);
                 for (int step = 0; step < MaxRouteSteps; step++)
                 {
-                    if (!AnimalMoves.TryNextStep(ground, x, y, z, targetX, targetZ, out x, out y, out z)) break;
+                    if (!AnimalMoves.TryNextStep(ground, x, y, z, targetX, targetZ, out x, out y, out z, habitat == AnimalHabitat.Air)) break;
 
                     points.Add(new Vector3(x + 0.5f, y, z + 0.5f));
                 }
@@ -137,6 +186,22 @@ namespace Voxel.Client
         public void Clear()
         {
             views.Clear();
+            carcasses.Clear();
+        }
+
+        // The carcasses near the local player, replacing the previous list. Each lies facing its own
+        // way, picked from its column, the same on every machine.
+        public void BeginCarcasses()
+        {
+            carcasses.Clear();
+        }
+
+        public void AddCarcass(int speciesIndex, Vector3 position)
+        {
+            if (speciesIndex >= species.Count) return;
+
+            int yaw = (Mathf.FloorToInt(position.x) * 73 + Mathf.FloorToInt(position.z) * 151) % 360;
+            carcasses.Add(new CarcassView { SpeciesIndex = speciesIndex, Position = position, Facing = Quaternion.Euler(0f, yaw, 0f) });
         }
 
         // Where each animal is now, with its species index.
@@ -162,6 +227,10 @@ namespace Voxel.Client
                 AnimalSpecies kind = species[entry.Value.SpeciesIndex];
                 Vector3 position = entry.Value.PositionAt(Time.time);
                 if (entry.Value.TryHopPhase(Time.time, out float hop)) position.y += HopLift(entry.Value.SpeciesIndex, hop);
+                if (assets != null && assets[entry.Value.SpeciesIndex].MoveGait == AnimalSpeciesAsset.Gait.Fly && entry.Value.TryTripProgress(Time.time, out float trip))
+                {
+                    position.y += FlightLift(assets[entry.Value.SpeciesIndex], trip);
+                }
                 float half = kind.Width * 0.5f;
                 var min = new System.Numerics.Vector3(position.x - half, position.y, position.z - half);
                 var max = new System.Numerics.Vector3(position.x + half, position.y + kind.Height, position.z + half);
@@ -181,7 +250,7 @@ namespace Voxel.Client
         // To call every frame.
         public void Render()
         {
-            if (assets == null || views.Count == 0) return;
+            if (assets == null || (views.Count == 0 && carcasses.Count == 0)) return;
 
             for (int s = 0; s < counts.Length; s++)
             {
@@ -191,6 +260,11 @@ namespace Voxel.Client
             foreach (View view in views.Values)
             {
                 counts[view.SpeciesIndex]++;
+            }
+
+            foreach (CarcassView carcass in carcasses)
+            {
+                counts[carcass.SpeciesIndex]++;
             }
 
             for (int s = 0; s < counts.Length; s++)
@@ -207,7 +281,7 @@ namespace Voxel.Client
             foreach (View view in views.Values)
             {
                 int s = view.SpeciesIndex;
-                Vector3 position = view.PositionAt(now);
+                Vector3 position = Afloat(s, view.PositionAt(now));
                 Quaternion rotation = Quaternion.Euler(0f, view.FacingAt(now), 0f);
                 AnimalSpeciesAsset asset = assets[s];
                 IReadOnlyList<SpeciesAsset.Part> parts = asset.Parts;
@@ -220,12 +294,33 @@ namespace Voxel.Client
                     bool moving = view.TryGetDistance(now, out float travelled);
                     WriteTrotMatrices(asset, parts, s, counts[s], position, rotation, moving, travelled, now);
                 }
+                else if (asset.MoveGait == AnimalSpeciesAsset.Gait.Fly)
+                {
+                    bool flying = view.TryTripProgress(now, out float trip);
+                    if (flying) position.y += FlightLift(asset, trip);
+                    WriteFlyMatrices(asset, parts, s, counts[s], position, rotation, flying, now);
+                }
                 else
                 {
                     for (int p = 0; p < parts.Count; p++)
                     {
                         matrices[s][p][counts[s]] = Matrix4x4.TRS(position + rotation * parts[p].offset, rotation, parts[p].scale);
                     }
+                }
+
+                counts[s]++;
+            }
+
+            // A carcass: the animal rolled onto its side about its body's centre, resting on the ground.
+            foreach (CarcassView carcass in carcasses)
+            {
+                int s = carcass.SpeciesIndex;
+                IReadOnlyList<SpeciesAsset.Part> parts = assets[s].Parts;
+                Matrix4x4 lying = Matrix4x4.TRS(carcass.Position + Vector3.up * bodyHalfWidths[s], carcass.Facing, Vector3.one)
+                    * Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, 90f)) * Matrix4x4.Translate(new Vector3(0f, -bodyHeights[s], 0f));
+                for (int p = 0; p < parts.Count; p++)
+                {
+                    matrices[s][p][counts[s]] = lying * Matrix4x4.TRS(parts[p].offset, Quaternion.identity, parts[p].scale);
                 }
 
                 counts[s]++;
@@ -240,9 +335,25 @@ namespace Voxel.Client
                     {
                         int count = Mathf.Min(MaxInstancesPerCall, counts[s] - start);
                         Graphics.RenderMeshInstanced(renderParams[s][p], parts[p].mesh, 0, matrices[s][p], count, start);
+                        if (parts[p].shadowMesh != null)
+                        {
+                            Graphics.RenderMeshInstanced(shadowParams[s][p], parts[p].shadowMesh, 0, matrices[s][p], count, start);
+                        }
                     }
                 }
             }
+        }
+
+        // A shore animal above water floats in it, a little below the top of the block under it.
+        private Vector3 Afloat(int speciesIndex, Vector3 position)
+        {
+            if (world == null || species[speciesIndex].Habitat != AnimalHabitat.Shore) return position;
+
+            int x = Mathf.FloorToInt(position.x);
+            int y = Mathf.FloorToInt(position.y + 0.01f);
+            int z = Mathf.FloorToInt(position.z);
+            if (world.IsWater(x, y - 1, z)) position.y -= FloatingDraft;
+            return position;
         }
 
         // One hop: the body rises and tilts (nose up on take-off, down on landing), the hind legs
@@ -315,6 +426,51 @@ namespace Voxel.Client
             }
         }
 
+        // A flight rises in an arc over the way and comes down to perch at its end.
+        private static float FlightLift(AnimalSpeciesAsset asset, float trip) => asset.FlightHeight * Mathf.Sin(trip * Mathf.PI);
+
+        // A bird. Its wings are plates hanging from a hinge on the body's sides: in flight they are
+        // raised out sideways and beat about that position (the right one mirroring the left); at rest
+        // they hang folded, shortened to the asset's WingFold. The tail sways a little either way.
+        private void WriteFlyMatrices(AnimalSpeciesAsset asset, IReadOnlyList<SpeciesAsset.Part> parts, int s, int index,
+            Vector3 position, Quaternion rotation, bool flying, float time)
+        {
+            const float wingRaise = 75f;
+            const float wingSwing = 40f;
+            float beat = Mathf.Sin(time * asset.WingbeatsPerSecond * 2f * Mathf.PI);
+            float tailSway = 6f * Mathf.Sin(time * 1.3f);
+            Matrix4x4 body = Matrix4x4.TRS(position, rotation, Vector3.one);
+
+            for (int p = 0; p < parts.Count; p++)
+            {
+                AnimalSpeciesAsset.PartRig rig = asset.RigOf(p);
+                Matrix4x4 local = Matrix4x4.TRS(parts[p].offset, Quaternion.identity, parts[p].scale);
+                float side = rig.pivot.x < 0f ? -1f : 1f;
+                Matrix4x4 move;
+                switch (rig.motion)
+                {
+                    case AnimalSpeciesAsset.PartMotion.Wing:
+                        move = flying
+                            ? Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, (wingRaise + wingSwing * beat) * side))
+                            : Matrix4x4.Scale(new Vector3(1f, asset.WingFold, 1f));
+                        break;
+                    case AnimalSpeciesAsset.PartMotion.Tail:
+                        move = Matrix4x4.Rotate(Quaternion.Euler(0f, tailSway, 0f));
+                        break;
+                    default:
+                        move = Matrix4x4.identity;
+                        break;
+                }
+
+                if (move != Matrix4x4.identity)
+                {
+                    local = Matrix4x4.Translate(rig.pivot) * move * Matrix4x4.Translate(-rig.pivot) * local;
+                }
+
+                matrices[s][p][index] = body * local;
+            }
+        }
+
         // How high above the ground a hopping animal is at this point of its hop; zero for one that walks.
         private float HopLift(int speciesIndex, float hop)
         {
@@ -337,14 +493,17 @@ namespace Voxel.Client
             }
         }
 
-        // The blocks as the display sees them: only the ground counts, other animals never block the way.
+        // The blocks as the display sees them, for one habitat: only the ground (or the water) counts,
+        // other animals never block the way.
         private readonly struct WorldGround : IAnimalGround
         {
             private readonly World world;
+            private readonly AnimalHabitat habitat;
 
-            public WorldGround(World world)
+            public WorldGround(World world, AnimalHabitat habitat)
             {
                 this.world = world;
+                this.habitat = habitat;
             }
 
             public bool TryGetGround(int x, int z, out int y)
@@ -352,8 +511,7 @@ namespace Voxel.Client
                 y = 0;
                 if (!world.InBounds(x, 0, z)) return false;
 
-                y = world.GetSurfaceHeight(x, z);
-                return y > 0 && y < world.SizeY;
+                return AnimalMoves.TryGetGround(world, habitat, x, z, out y) && y < world.SizeY;
             }
 
             public bool IsFree(int x, int z) => true;
@@ -433,6 +591,17 @@ namespace Voxel.Client
 
                 float done = progress * hops[leg];
                 phase = done - Mathf.Floor(done);
+                return true;
+            }
+
+            // While travelling, how far along the whole trip, from 0 to 1.
+            public bool TryTripProgress(float time, out float progress)
+            {
+                progress = 0f;
+                if (!TryGetLeg(time, out _, out _)) return false;
+
+                float total = arrivals[arrivals.Length - 1];
+                progress = total > 0f ? Mathf.Clamp01((time - start) / total) : 1f;
                 return true;
             }
 

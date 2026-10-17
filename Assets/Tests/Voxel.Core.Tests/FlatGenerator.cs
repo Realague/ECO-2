@@ -14,6 +14,10 @@ namespace Voxel.Core.Tests
             return world;
         }
 
+        public void Prepare(int seed, int sizeX, int sizeZ)
+        {
+        }
+
         public void Generate(Chunk chunk, int seed)
         {
             int originY = chunk.Coord.Y * Chunk.Size;

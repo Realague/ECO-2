@@ -13,6 +13,13 @@ namespace Voxel.Client
         [Header("Diet")]
         [SerializeField] private SpeciesAsset[] eatsPlants = Array.Empty<SpeciesAsset>();
         [SerializeField] private AnimalSpeciesAsset[] eatsAnimals = Array.Empty<AnimalSpeciesAsset>();
+        [Tooltip("A scavenger: also eats carcasses.")]
+        [SerializeField] private bool eatsCarrion;
+        [Tooltip("Keeps a seed of each plant it eats and lets it fall later, wherever it has gone.")]
+        [SerializeField] private bool spreadsSeeds;
+
+        [Tooltip("Land; Water (fish); Shore: land and floating on water (ducks, otters); Wader: land and shallow water (herons).")]
+        [SerializeField] private AnimalHabitat habitat = AnimalHabitat.Land;
 
         [Header("Simulation (durations in game days, distances in blocks)")]
         [SerializeField] private int moveRange = 3;
@@ -29,6 +36,19 @@ namespace Voxel.Client
         [SerializeField, Range(0f, 1f)] private float catchChance = 0.5f;
         [SerializeField] private float minPerTenThousandColumns = 10f;
 
+        [Tooltip("Tallest plant it reaches, in blocks: taller plants (grown trees) are out of its reach.")]
+        [SerializeField] private float reachHeight = 1.5f;
+        [Tooltip("Keeps near others of its kind instead of wandering off.")]
+        [SerializeField] private bool herd;
+
+        [Header("Climate")]
+        [Tooltip("Warmth it thrives in, from 0 (the coldest) to 1 (the hottest): the climate's temperature.")]
+        [SerializeField] private Vector2 idealWarmth = new Vector2(0f, 1f);
+        [Tooltip("Wetness it thrives in, from 0 (the driest) to 1 (the wettest): the climate's humidity.")]
+        [SerializeField] private Vector2 idealWetness = new Vector2(0f, 1f);
+        [Tooltip("How far past those ranges it still lives, less and less well.")]
+        [SerializeField] private float climateTolerance = 0.1f;
+
         [Header("Appearance and aiming")]
         [SerializeField] private float height = 0.6f;
         [SerializeField] private float width = 0.6f;
@@ -36,9 +56,9 @@ namespace Voxel.Client
 
         public IReadOnlyList<SpeciesAsset.Part> Parts => parts;
 
-        public enum Gait { Glide, Hop, Trot }
+        public enum Gait { Glide, Hop, Trot, Fly }
 
-        public enum PartMotion { Body, Ear, FrontLeg, HindLeg, Tail }
+        public enum PartMotion { Body, Ear, FrontLeg, HindLeg, Tail, Wing }
 
         [Serializable]
         public struct PartRig
@@ -50,7 +70,8 @@ namespace Voxel.Client
 
         [Header("Movement animation")]
         [Tooltip("Glide: slides without moving its parts. Hop: hops, legs, ears and tail follow. " +
-                 "Trot: walks at walkSpeed, legs swinging in diagonal pairs, the tail swaying.")]
+                 "Trot: walks at walkSpeed, legs swinging in diagonal pairs, the tail swaying. " +
+                 "Fly: flies at walkSpeed in an arc up to flightHeight, beating its wings, and perches at rest.")]
         [SerializeField] private Gait gait = Gait.Glide;
         [Tooltip("Distance covered by one hop, in blocks.")]
         [SerializeField] private float hopLength = 0.6f;
@@ -61,17 +82,26 @@ namespace Voxel.Client
         [SerializeField] private float walkSpeed = 2.5f;
         [Tooltip("Distance covered by one full trot cycle (each leg forward once), in blocks.")]
         [SerializeField] private float strideLength = 0.7f;
+        [Tooltip("Fly: how high above the ground the middle of a flight goes, in blocks, and how many wingbeats a second.")]
+        [SerializeField] private float flightHeight = 4f;
+        [SerializeField] private float wingbeatsPerSecond = 4f;
+        [Tooltip("Fly: the share of their length the wings keep when folded at rest.")]
+        [SerializeField, Range(0.1f, 1f)] private float wingFold = 0.45f;
         [Tooltip("Point the body tilts around during a hop.")]
         [SerializeField] private Vector3 bodyPivot = new Vector3(0f, 0.2f, 0f);
         [Tooltip("One entry per part, in the same order as Parts. Parts without an entry move with the body.")]
         [SerializeField] private PartRig[] rig = Array.Empty<PartRig>();
 
         public Gait MoveGait => gait;
+        public AnimalHabitat Habitat => habitat;
         public float HopLength => Mathf.Max(0.05f, hopLength);
         public float HopDuration => Mathf.Max(0.05f, hopDuration);
         public float HopHeight => hopHeight;
         public float WalkSpeed => Mathf.Max(0.1f, walkSpeed);
         public float StrideLength => Mathf.Max(0.05f, strideLength);
+        public float FlightHeight => flightHeight;
+        public float WingbeatsPerSecond => wingbeatsPerSecond;
+        public float WingFold => wingFold;
 
         // How long a move over this horizontal distance takes at the species' own pace: whole hops
         // for a hopping animal, a steady walk otherwise.
@@ -93,6 +123,9 @@ namespace Voxel.Client
                 Name = name,
                 EatsPlants = IndicesOf(eatsPlants, allPlants),
                 EatsAnimals = IndicesOf(eatsAnimals, allAnimals),
+                EatsCarrion = eatsCarrion,
+                SpreadsSeeds = spreadsSeeds,
+                Habitat = habitat,
                 MoveRange = Mathf.Max(1, moveRange),
                 SenseRange = Mathf.Max(1, senseRange),
                 LifespanSteps = Mathf.Max(1, Mathf.RoundToInt(lifespanDays * SimClock.StepsPerDay)),
@@ -105,7 +138,14 @@ namespace Voxel.Client
                 CatchChance = catchChance,
                 MinDensity = minPerTenThousandColumns,
                 Height = height,
-                Width = width
+                Width = width,
+                ReachHeight = reachHeight,
+                Herd = herd,
+                WarmthMin = idealWarmth.x,
+                WarmthMax = idealWarmth.y,
+                WetnessMin = idealWetness.x,
+                WetnessMax = idealWetness.y,
+                ClimateTolerance = climateTolerance
             };
         }
 

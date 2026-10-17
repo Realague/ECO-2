@@ -41,6 +41,7 @@ namespace Voxel.Client
         // Each player receives, at most twice a second, the full list of the animals around them,
         // a little beyond what they see. The cost therefore does not depend on the size of the world.
         private const int AnimalEntrySize = 4 * sizeof(int) + sizeof(byte);
+        private const int CarcassEntrySize = 3 * sizeof(int) + sizeof(byte);
         private const float AnimalFeedInterval = 0.5f;
         private const float AnimalInterestMargin = 32f;
         private const float AnimalFeedMoveThreshold = 8f;
@@ -82,14 +83,29 @@ namespace Voxel.Client
         // For each player, the version of the animal world at the time of their last send.
         private readonly Dictionary<ulong, AnimalFeed> animalFeeds = new Dictionary<ulong, AnimalFeed>();
         private readonly List<Animal> nearbyAnimals = new List<Animal>();
+        private readonly List<Carcass> nearbyCarcasses = new List<Carcass>();
         private int animalRevision;
 
         // Simulation clock as this machine knows it.
         private long stepCount;
         private float multiplier = 1f;
         private bool behind;
+        private float clockKnownAt;
 
         public float Multiplier => multiplier;
+
+        // The simulation's time, in steps, as this machine sees it now: the last count it knows,
+        // carried on at the current speed until the next one arrives, by at most what the clock's
+        // messages are apart. Smooth enough to turn the sun; display only.
+        public double StepTime
+        {
+            get
+            {
+                double ahead = (Time.unscaledTime - clockKnownAt) * multiplier / SimClock.RealSecondsPerStep;
+                double mostAhead = Math.Max(1.0, 2.0 * ClockSendInterval * multiplier / SimClock.RealSecondsPerStep);
+                return stepCount + Math.Min(ahead, mostAhead);
+            }
+        }
 
         // The plants this machine knows, for the minimap: one added or grown, one gone, all gone.
         internal event Action<int, PlantView> PlantShown;
@@ -109,8 +125,9 @@ namespace Voxel.Client
         {
             get
             {
-                long day = stepCount / SimClock.StepsPerDay + 1;
-                int minutes = (int)(stepCount % SimClock.StepsPerDay) * SimClock.MinutesPerStep;
+                long total = (long)SimClock.MinutesAt(stepCount);
+                long day = total / SimClock.MinutesPerDay + 1;
+                int minutes = (int)(total % SimClock.MinutesPerDay);
                 string speed = multiplier > 0f ? $"speed ×{multiplier:0.##}" : "time paused";
                 return $"Day {day}, {minutes / 60:00}:{minutes % 60:00}   {speed}{(behind ? " (the machine cannot keep up)" : "")}";
             }
@@ -156,6 +173,7 @@ namespace Voxel.Client
 
             if (stepCount != ecosystem.StepCount || multiplier != clock.Multiplier || behind != clock.IsBehind)
             {
+                if (stepCount != ecosystem.StepCount || multiplier != clock.Multiplier) clockKnownAt = Time.unscaledTime;
                 stepCount = ecosystem.StepCount;
                 multiplier = clock.Multiplier;
                 behind = clock.IsBehind;
@@ -573,6 +591,14 @@ namespace Voxel.Client
                     if (dx * dx + dz * dz <= radius * radius) nearbyAnimals.Add(animal);
                 }
 
+                nearbyCarcasses.Clear();
+                foreach (Carcass carcass in ecosystem.Carcasses)
+                {
+                    float dx = carcass.X + 0.5f - position.x;
+                    float dz = carcass.Z + 0.5f - position.z;
+                    if (dx * dx + dz * dz <= radius * radius) nearbyCarcasses.Add(carcass);
+                }
+
                 if (entry.Key == networkManager.LocalClientId) ShowNearbyAnimals();
                 else SendNearbyAnimals(entry.Key);
             }
@@ -587,11 +613,17 @@ namespace Voxel.Client
             }
 
             animalViews.EndList();
+
+            animalViews.BeginCarcasses();
+            foreach (Carcass carcass in nearbyCarcasses)
+            {
+                animalViews.AddCarcass(carcass.SpeciesIndex, new Vector3(carcass.X + 0.5f, carcass.Y, carcass.Z + 0.5f));
+            }
         }
 
         private void SendNearbyAnimals(ulong clientId)
         {
-            using (var writer = new FastBufferWriter(sizeof(int) + nearbyAnimals.Count * AnimalEntrySize, Allocator.Temp))
+            using (var writer = new FastBufferWriter(2 * sizeof(int) + nearbyAnimals.Count * AnimalEntrySize + nearbyCarcasses.Count * CarcassEntrySize, Allocator.Temp))
             {
                 writer.WriteValueSafe(nearbyAnimals.Count);
                 foreach (Animal animal in nearbyAnimals)
@@ -601,6 +633,15 @@ namespace Voxel.Client
                     writer.WriteValueSafe(animal.X);
                     writer.WriteValueSafe(animal.Y);
                     writer.WriteValueSafe(animal.Z);
+                }
+
+                writer.WriteValueSafe(nearbyCarcasses.Count);
+                foreach (Carcass carcass in nearbyCarcasses)
+                {
+                    writer.WriteValueSafe((byte)carcass.SpeciesIndex);
+                    writer.WriteValueSafe(carcass.X);
+                    writer.WriteValueSafe(carcass.Y);
+                    writer.WriteValueSafe(carcass.Z);
                 }
 
                 Messaging.SendNamedMessage(AnimalsMessage, clientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
@@ -624,6 +665,17 @@ namespace Voxel.Client
             }
 
             animalViews.EndList();
+
+            reader.ReadValueSafe(out int carcassCount);
+            animalViews.BeginCarcasses();
+            for (int i = 0; i < carcassCount; i++)
+            {
+                reader.ReadValueSafe(out byte speciesIndex);
+                reader.ReadValueSafe(out int x);
+                reader.ReadValueSafe(out int y);
+                reader.ReadValueSafe(out int z);
+                animalViews.AddCarcass(speciesIndex, new Vector3(x + 0.5f, y, z + 0.5f));
+            }
         }
 
         // Longest a displayed move between two positions may last: one simulation step at the current
@@ -742,8 +794,11 @@ namespace Voxel.Client
 
         private void OnUpdate(ulong senderId, FastBufferReader reader)
         {
+            long previousCount = stepCount;
             reader.ReadValueSafe(out stepCount);
+            float previousMultiplier = multiplier;
             reader.ReadValueSafe(out multiplier);
+            if (stepCount != previousCount || multiplier != previousMultiplier) clockKnownAt = Time.unscaledTime;
             reader.ReadValueSafe(out behind);
 
             reader.ReadValueSafe(out int upsertedCount);

@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c90fb7040ab281a4dabfdc0c96f5baf2, type: 3}
+  m_Name: Cactus
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.SpeciesAsset
+  maturityDays: 6
+  lifespanDays: 60
+  seedAttemptsPerDay: 0.3
+  seedRange: 4
+  spacing: 4
+  minFertility: 0.01
+  fertilityUsePerDay: 0.005
+  idealWarmth: {x: 0.58, y: 1}
+  idealWetness: {x: 0, y: 0.26}
+  climateTolerance: 0.08
+  grounds: 4
+  needsWater: 0
+  woodYield: 1
+  height: 2.4
+  width: 0.6
+  models:
+  - parts:
+    - mesh: {fileID: 4300000, guid: 525a39ba61470c046a7cadf238cf82ec, type: 2}
+      material: {fileID: 2100000, guid: e631ce7b0b5fa724cb48c8a6f79e94a6, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+  - parts:
+    - mesh: {fileID: 4300000, guid: 930196629254fb845adbc962d150cefc, type: 2}
+      material: {fileID: 2100000, guid: e631ce7b0b5fa724cb48c8a6f79e94a6, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}

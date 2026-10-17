@@ -1,0 +1,85 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6e6cb2aa9f766b4db88dea4bfe01bba, type: 3}
+  m_Name: Fish
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.AnimalSpeciesAsset
+  eatsPlants: []
+  eatsAnimals: []
+  eatsCarrion: 0
+  spreadsSeeds: 0
+  habitat: 1
+  moveRange: 2
+  senseRange: 5
+  lifespanDays: 10
+  maturityDays: 1
+  daysWithoutFood: 10000
+  mealValue: 0
+  birthsPerDay: 0.4
+  territoryRange: 8
+  maxNeighbours: 12
+  catchChance: 0
+  minPerTenThousandColumns: 6
+  reachHeight: 0
+  herd: 1
+  idealWarmth: {x: 0, y: 1}
+  idealWetness: {x: 0, y: 1}
+  climateTolerance: 0.5
+  height: 0.54
+  width: 0.24
+  parts:
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 66ea9ae0e80c7c246a40d7baa66d3e11, type: 2}
+    offset: {x: 0, y: 0.42, z: 0}
+    scale: {x: 0.1, y: 0.13, z: 0.3}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 4ab02f98127d7fe46ae07d8e09539286, type: 2}
+    offset: {x: 0, y: 0.37449998, z: 0.01}
+    scale: {x: 0.089999996, y: 0.0455, z: 0.24000001}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 9f41b596b46b8284bb8b19c6bca2a3be, type: 2}
+    offset: {x: 0, y: 0.42, z: -0.19}
+    scale: {x: 0.02, y: 0.14299999, z: 0.1}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 9f41b596b46b8284bb8b19c6bca2a3be, type: 2}
+    offset: {x: 0, y: 0.51, z: -0.02}
+    scale: {x: 0.02, y: 0.06, z: 0.105000004}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 0005d8716b8435343a1c5956e01d4a2b, type: 2}
+    offset: {x: 0.053, y: 0.43949997, z: 0.105000004}
+    scale: {x: 0.008, y: 0.025, z: 0.025}
+  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+    material: {fileID: 2100000, guid: 0005d8716b8435343a1c5956e01d4a2b, type: 2}
+    offset: {x: -0.053, y: 0.43949997, z: 0.105000004}
+    scale: {x: 0.008, y: 0.025, z: 0.025}
+  gait: 2
+  hopLength: 0.6
+  hopDuration: 0.3
+  hopHeight: 0.2
+  walkSpeed: 1.8
+  strideLength: 0.4
+  flightHeight: 4
+  wingbeatsPerSecond: 4
+  wingFold: 0.45
+  bodyPivot: {x: 0, y: 0.065, z: 0}
+  rig:
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 4
+    pivot: {x: 0, y: 0.42, z: -0.15}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
