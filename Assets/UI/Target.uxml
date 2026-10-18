@@ -1,0 +1,9 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="Common.uss" />
+    <Style src="Target.uss" />
+
+    <!-- TargetLabel fills in the name and hides the screen when nothing is aimed at. -->
+    <ui:VisualElement name="screen" class="screen target-screen" picking-mode="Ignore">
+        <ui:Label name="target-name" class="target-name" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>

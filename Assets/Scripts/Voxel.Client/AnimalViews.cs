@@ -216,6 +216,9 @@ namespace Voxel.Client
         }
 
         // Finds the nearest animal along the ray, at most maxDistance away. The direction must be normalized.
+        // The species index of a displayed animal, or -1 if it is not displayed.
+        public int SpeciesOf(int animalId) => views.TryGetValue(animalId, out View view) ? view.SpeciesIndex : -1;
+
         public bool TryPick(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance, out int animalId, out float distance)
         {
             animalId = 0;

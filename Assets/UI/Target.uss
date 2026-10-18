@@ -1,0 +1,19 @@
+/* The name of what the player aims at, under the crosshair. Sizes are for the 1920 x 1080 reference resolution. */
+
+.target-screen {
+    align-items: center;
+    justify-content: center;
+}
+
+/* Below the crosshair, which sits at the centre of the screen: the margin pushes the label down. */
+.target-name {
+    margin: 64px 0 0 0;
+    padding: 5px 14px 6px 14px;
+    font-size: 20px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text);
+    background-color: rgba(246, 244, 239, 0.9);
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: var(--panel-border);
+}

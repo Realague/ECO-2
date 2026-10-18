@@ -58,6 +58,9 @@ namespace Voxel.Client
 
         // Plants known to this machine: used for display and aiming.
         private readonly Dictionary<int, PlantView> plants = new Dictionary<int, PlantView>();
+
+        // The plant standing in each column (at most one), so that aiming only looks at the columns a ray crosses.
+        private readonly Dictionary<long, int> plantAtColumn = new Dictionary<long, int>();
         private readonly HashSet<int> changedPlants = new HashSet<int>();
         private readonly HashSet<int> removedPlants = new HashSet<int>();
         private readonly List<Plant> outgoing = new List<Plant>();
@@ -241,6 +244,7 @@ namespace Voxel.Client
             ecosystem = null;
             clock = null;
             plants.Clear();
+            plantAtColumn.Clear();
             plantRenderer?.Clear();
             PlantsCleared?.Invoke();
             animalViews.Clear();
@@ -285,6 +289,42 @@ namespace Voxel.Client
             return plantHit;
         }
 
+        // What the local player is aiming at, at most maxDistance away: the name of the animal or plant
+        // nearest along the ray, the one a strike would hit. Returns false if there is neither. Cheap
+        // enough to run every frame.
+        internal bool TryAim(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance, out string name)
+        {
+            name = null;
+            if (animalNames == null)
+            {
+                animalNames = Array.ConvertAll(animalAssets, asset => DisplayName(asset.name));
+                plantNames = Array.ConvertAll(speciesAssets, asset => DisplayName(asset.name));
+                youngPlantNames = Array.ConvertAll(plantNames, plantName => "Young " + char.ToLowerInvariant(plantName[0]) + plantName.Substring(1));
+            }
+
+            bool plantHit = TryPickPlant(origin, direction, maxDistance, out int plantId, out float plantDistance);
+            if (animalViews != null && animalViews.TryPick(origin, direction, plantHit ? plantDistance : maxDistance, out int animalId, out _))
+            {
+                int kind = animalViews.SpeciesOf(animalId);
+                if (kind >= 0) name = animalNames[kind];
+                return name != null;
+            }
+
+            if (!plantHit) return false;
+
+            PlantView plant = plants[plantId];
+            name = plant.Stage < Plant.StageCount - 1 ? youngPlantNames[plant.SpeciesIndex] : plantNames[plant.SpeciesIndex];
+            return true;
+        }
+
+        // Names shown when aiming, worked out once.
+        private string[] animalNames;
+        private string[] plantNames;
+        private string[] youngPlantNames;
+
+        // The plant nearest along the ray. A plant's aiming box stays within its own column, so only
+        // the columns the ray crosses are looked at, walked one after the other (Amanatides and Woo, in
+        // the horizontal plane; distances along the ray, whose direction is normalized).
         private bool TryPickPlant(
             System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance, out int plantId, out float nearest)
         {
@@ -292,23 +332,69 @@ namespace Voxel.Client
             nearest = maxDistance;
             bool found = false;
 
-            foreach (KeyValuePair<int, PlantView> entry in plants)
-            {
-                PlantView plant = entry.Value;
-                PlantShape.GetBounds(
-                    species[plant.SpeciesIndex], plant.X, plant.Y, plant.Z, plant.Stage,
-                    out System.Numerics.Vector3 min, out System.Numerics.Vector3 max);
+            int x = Mathf.FloorToInt(origin.X);
+            int z = Mathf.FloorToInt(origin.Z);
+            int stepX = direction.X > 0f ? 1 : -1;
+            int stepZ = direction.Z > 0f ? 1 : -1;
+            float deltaX = direction.X != 0f ? Mathf.Abs(1f / direction.X) : float.PositiveInfinity;
+            float deltaZ = direction.Z != 0f ? Mathf.Abs(1f / direction.Z) : float.PositiveInfinity;
+            float nextX = direction.X != 0f ? (direction.X > 0f ? x + 1 - origin.X : origin.X - x) * deltaX : float.PositiveInfinity;
+            float nextZ = direction.Z != 0f ? (direction.Z > 0f ? z + 1 - origin.Z : origin.Z - z) * deltaZ : float.PositiveInfinity;
 
-                float distance = PlantShape.RayDistance(origin, direction, min, max);
-                if (distance >= 0f && distance <= nearest)
+            float travelled = 0f;
+            while (travelled <= nearest)
+            {
+                if (plantAtColumn.TryGetValue(ColumnKey(x, z), out int id) && plants.TryGetValue(id, out PlantView plant))
                 {
-                    nearest = distance;
-                    plantId = entry.Key;
-                    found = true;
+                    PlantShape.GetBounds(
+                        species[plant.SpeciesIndex], plant.X, plant.Y, plant.Z, plant.Stage,
+                        out System.Numerics.Vector3 min, out System.Numerics.Vector3 max);
+
+                    float distance = PlantShape.RayDistance(origin, direction, min, max);
+                    if (distance >= 0f && distance <= nearest)
+                    {
+                        nearest = distance;
+                        plantId = id;
+                        found = true;
+                    }
+                }
+
+                if (nextX < nextZ)
+                {
+                    travelled = nextX;
+                    nextX += deltaX;
+                    x += stepX;
+                }
+                else
+                {
+                    travelled = nextZ;
+                    nextZ += deltaZ;
+                    z += stepZ;
                 }
             }
 
             return found;
+        }
+
+        private static long ColumnKey(int x, int z) => ((long)x << 32) | (uint)z;
+
+        // An asset's name as players read it: "TallGrass" becomes "Tall grass".
+        internal static string DisplayName(string assetName)
+        {
+            var text = new System.Text.StringBuilder(assetName.Length + 4);
+            for (int i = 0; i < assetName.Length; i++)
+            {
+                char c = assetName[i];
+                if (i > 0 && char.IsUpper(c))
+                {
+                    text.Append(' ');
+                    c = char.ToLowerInvariant(c);
+                }
+
+                text.Append(c);
+            }
+
+            return text.ToString();
         }
 
         // Felling requested by the local player. The server decides; a client removes the plant right
@@ -403,6 +489,7 @@ namespace Voxel.Client
         private void SetView(int plantId, PlantView view)
         {
             plants[plantId] = view;
+            plantAtColumn[ColumnKey(view.X, view.Z)] = plantId;
             plantRenderer?.Set(plantId, view);
             PlantShown?.Invoke(plantId, view);
         }
@@ -412,6 +499,8 @@ namespace Voxel.Client
             if (!plants.TryGetValue(plantId, out PlantView view)) return;
 
             plants.Remove(plantId);
+            long column = ColumnKey(view.X, view.Z);
+            if (plantAtColumn.TryGetValue(column, out int standing) && standing == plantId) plantAtColumn.Remove(column);
             plantRenderer?.Remove(plantId, view);
             PlantHidden?.Invoke(plantId, view);
         }
