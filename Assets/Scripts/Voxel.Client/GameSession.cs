@@ -47,6 +47,7 @@ namespace Voxel.Client
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private AppearanceSync appearanceSync;
+        [SerializeField] private CommandSync commandSync;
         [SerializeField] private AppearanceMenu appearanceMenu;
         [SerializeField] private MapScreen mapScreen;
         [SerializeField] private ushort port = 7777;
@@ -262,6 +263,7 @@ namespace Voxel.Client
             ecosystemSync.StartClient();
             inventorySync.StartClient();
             appearanceSync.StartClient();
+            commandSync.StartClient();
             sessionActive = true;
         }
 
@@ -303,6 +305,7 @@ namespace Voxel.Client
             ecosystemSync.StartServer(voxelWorld.World, dataDirectory, startTimeScale, IsAdmin);
             inventorySync.StartServer(registry);
             appearanceSync.StartServer(registry);
+            commandSync.StartServer();
             sessionActive = true;
             nextAutosave = Time.unscaledTime + autosaveInterval;
             Debug.Log($"Server started on port {port}. Saves in {dataDirectory}, every {autosaveInterval} s.");
@@ -405,6 +408,7 @@ namespace Voxel.Client
             ecosystemSync.Stop();
             inventorySync.Stop();
             appearanceSync.Stop();
+            commandSync.Stop();
             worldSync.Stop();
             if (registry != null)
             {

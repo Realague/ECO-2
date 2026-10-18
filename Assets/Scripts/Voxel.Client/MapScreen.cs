@@ -11,7 +11,8 @@ namespace Voxel.Client
     // The full-screen map, opened and closed with M (Escape also closes it): the world's picture
     // (WorldMap) with the same markers as the minimap. The mouse is freed while it is open: the
     // wheel zooms around the pointer, dragging moves the map, Space centres it on the player
-    // again, and the coordinates under the pointer are shown below. Tab lays the climate over the
+    // again, a right click teleports the player there (the "tp" command, CommandSync), and the
+    // coordinates under the pointer are shown below. Tab lays the climate over the
     // terrain: temperature, then humidity, from the world's geography. Meanwhile the player stands
     // still and the other on-screen texts are hidden. The screen is Assets/UI/Map.uxml.
     public class MapScreen : MonoBehaviour
@@ -33,6 +34,7 @@ namespace Voxel.Client
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private WorldMap worldMap;
         [SerializeField] private AppearanceMenu appearanceMenu;
+        [SerializeField] private CommandSync commandSync;
         [SerializeField] private UIDocument document;
 
         private VisualElement screen;
@@ -112,8 +114,9 @@ namespace Voxel.Client
                 return;
             }
 
+            // An M typed in the command line does not open the map.
             Keyboard keyboard = Keyboard.current;
-            if (keyboard != null)
+            if (keyboard != null && !CommandConsole.HoldsInput)
             {
                 if (MapKey(keyboard).wasPressedThisFrame)
                 {
@@ -302,6 +305,22 @@ namespace Voxel.Client
 
         private void OnPointerDown(PointerDownEvent e)
         {
+            // A right click teleports the player to the column under the pointer; the map follows them there.
+            if (e.button == 1)
+            {
+                Vector2 column = Unproject(e.localPosition);
+                Voxel.Core.World world = worldMap.World;
+                int x = Mathf.FloorToInt(column.x);
+                int z = Mathf.FloorToInt(column.y);
+                if (world != null && world.InBounds(x, 0, z))
+                {
+                    commandSync.Run($"tp {x} {z}");
+                    following = true;
+                }
+
+                return;
+            }
+
             if (e.button != 0) return;
 
             dragging = true;

@@ -1,0 +1,18 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="Common.uss" />
+    <Style src="Console.uss" />
+
+    <!-- CommandConsole adds the answers to the log and shows the entry (line and hint) while it is open. -->
+    <ui:VisualElement name="screen" class="screen console-screen" picking-mode="Ignore">
+        <ui:VisualElement class="console" picking-mode="Ignore">
+            <ui:VisualElement name="console-log" class="console-log" picking-mode="Ignore" />
+            <ui:VisualElement name="console-entry" class="console-entry">
+                <ui:VisualElement class="console-input-row">
+                    <ui:Label text="/" class="console-prompt" picking-mode="Ignore" />
+                    <ui:TextField name="console-input" class="console-input" />
+                </ui:VisualElement>
+                <ui:Label text="Enter: send    Escape: close    /help: the commands" class="console-hint" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

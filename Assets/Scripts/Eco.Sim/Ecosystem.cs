@@ -130,6 +130,36 @@ namespace Eco.Sim
         // Sprouts a seed in the given column, if the ground, the room and the fertility allow it.
         public bool TryPlant(int speciesIndex, int x, int z) => TryAdd(speciesIndex, x, z, 0f, 0);
 
+        // Places a grown plant in the given column, as a player's command asks: only its ground, its
+        // room and, for reeds, water beside it count, not the climate, the fertility or the spacing,
+        // so it stands wherever it physically can. Outside its climate it then makes no seeds.
+        public bool TryPlaceGrownPlant(int speciesIndex, int x, int z)
+        {
+            if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) return false;
+            if (plantAtColumn[ColumnIndex(x, z)] != 0) return false;
+
+            Species kind = species[speciesIndex];
+            int y = SurfaceAt(x, z);
+            if (!HasGroundAndRoom(kind, x, y, z)) return false;
+            if (kind.NeedsWater && !IsBesideWater(x, y, z)) return false;
+
+            var plant = new Plant
+            {
+                Id = nextPlantId++,
+                SpeciesIndex = speciesIndex,
+                X = x,
+                Y = y,
+                Z = z,
+                Age = kind.MaturitySteps,
+                Growth = 1f,
+                Vigour = suitability[speciesIndex][CellIndex(x, z)]
+            };
+
+            Append(plant);
+            PlantAdded?.Invoke(plant);
+            return true;
+        }
+
         // Removes a plant, for instance one felled by a player. Returns false if it does not exist.
         public bool Remove(int plantId)
         {

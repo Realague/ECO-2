@@ -1,0 +1,74 @@
+/* The command line, bottom left, above the inventory text. Sizes are for the 1920 x 1080 reference resolution. */
+
+.console-screen {
+    justify-content: flex-end;
+    align-items: flex-start;
+    padding: 0 0 150px 24px;
+}
+
+.console {
+    width: 760px;
+}
+
+/* The answers, newest at the bottom, on a dark veil so they read over any ground. */
+.console-log {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.console-line {
+    margin: 2px 0 0 0;
+    padding: 4px 10px;
+    font-size: 18px;
+    color: #f4f2ec;
+    background-color: rgba(20, 22, 26, 0.6);
+    border-radius: 8px;
+    white-space: normal;
+    max-width: 760px;
+}
+
+.console-entry {
+    margin: 8px 0 0 0;
+}
+
+.console-input-row {
+    flex-direction: row;
+    align-items: center;
+    height: 46px;
+    padding: 0 6px 0 14px;
+    background-color: rgba(246, 244, 239, 0.95);
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: var(--panel-border);
+}
+
+.console-prompt {
+    margin: 0 4px 0 0;
+    padding: 0;
+    font-size: 20px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text-muted);
+}
+
+.console-input {
+    flex-grow: 1;
+    margin: 0;
+    font-size: 20px;
+}
+
+/* The field itself: no frame of its own, the row is the frame. */
+.console-input > .unity-base-text-field__input {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    color: var(--text);
+    -unity-font-definition: url("Fonts/Inter-Regular.ttf");
+}
+
+.console-hint {
+    margin: 4px 0 0 4px;
+    padding: 2px 8px;
+    font-size: 14px;
+    color: #f4f2ec;
+    background-color: rgba(20, 22, 26, 0.45);
+    border-radius: 6px;
+}

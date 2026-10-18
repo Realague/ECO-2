@@ -43,6 +43,8 @@
                     <ui:Label text="centre on you" class="key-label" />
                     <ui:VisualElement class="key"><ui:Label text="Tab" class="key-text" /></ui:VisualElement>
                     <ui:Label text="climate" class="key-label" />
+                    <ui:VisualElement class="key"><ui:Label text="Right click" class="key-text" /></ui:VisualElement>
+                    <ui:Label text="teleport here" class="key-label" />
                     <ui:VisualElement class="key"><ui:Label text="M" class="key-text" /></ui:VisualElement>
                     <ui:Label text="close" class="key-label map-last-key" />
                 </ui:VisualElement>

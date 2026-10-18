@@ -88,6 +88,25 @@ namespace Voxel.Client
             Cursor.lockState = CursorLockMode.None;
         }
 
+        // Moves the local player at once, as a command asked (CommandSync): the position jumps on the
+        // other machines too instead of gliding there, and the player arrives standing still.
+        public void Teleport(Vector3 position)
+        {
+            if (!IsOwner) return;
+
+            velocity = Vector3.zero;
+            grounded = false;
+            var networkTransform = GetComponent<Unity.Netcode.Components.NetworkTransform>();
+            if (networkTransform != null && networkTransform.CanCommitToTransform)
+            {
+                networkTransform.Teleport(position, transform.rotation, transform.localScale);
+            }
+            else
+            {
+                transform.position = position;
+            }
+        }
+
         // Whatever stops the player (leaving the game, despawning), the scene gets its own fog back.
         private void OnDisable()
         {
@@ -114,8 +133,8 @@ namespace Voxel.Client
                 return;
             }
 
-            // The full-screen map has the mouse and the keyboard: the player stands where they are.
-            if (mapScreen != null && mapScreen.HoldsInput)
+            // The full-screen map, or the command line, has the keyboard: the player stands where they are.
+            if ((mapScreen != null && mapScreen.HoldsInput) || CommandConsole.HoldsInput)
             {
                 Move(keyboard, false);
                 PlaceCamera();

@@ -52,6 +52,9 @@ namespace Voxel.Client
             Mouse mouse = Mouse.current;
             if (keyboard == null || mouse == null || Cursor.lockState != CursorLockMode.Locked) return;
 
+            // Letters and digits typed in the command line are not the inventory's keys.
+            if (CommandConsole.HoldsInput) return;
+
             if (keyboard.kKey.wasPressedThisFrame) panel = panel == Panel.Speciality ? Panel.None : Panel.Speciality;
 
             int digit = PressedDigit(keyboard);
@@ -82,9 +85,17 @@ namespace Voxel.Client
             }
         }
 
+        // Screen pixels the text takes up from the bottom of the screen (0 when hidden), so that the
+        // command line can sit above it whatever its number of lines.
+        public float OccupiedHeight { get; private set; }
+
         private void OnGUI()
         {
-            if (!InGame) return;
+            if (!InGame)
+            {
+                OccupiedHeight = 0f;
+                return;
+            }
 
             if (textStyle == null)
             {
@@ -95,6 +106,7 @@ namespace Voxel.Client
             float width = Screen.width - 40f;
             float height = textStyle.CalcHeight(new GUIContent(content), width);
             var area = new Rect(20f, Screen.height - height - 20f, width, height);
+            OccupiedHeight = height + 20f;
 
             // Text doubled with a shadow to stay readable on the terrain.
             textStyle.normal.textColor = Color.black;

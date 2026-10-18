@@ -378,6 +378,68 @@ namespace Voxel.Client
 
         private static long ColumnKey(int x, int z) => ((long)x << 32) | (uint)z;
 
+        // ---- Commands (server only) ----
+
+        // The animal or plant species whose asset name matches, compared as Command.Normalise does
+        // ("snowhare" is SnowHare).
+        internal bool TryFindSpecies(string normalisedName, out bool isAnimal, out int index)
+        {
+            for (index = 0; index < animalAssets.Length; index++)
+            {
+                isAnimal = true;
+                if (Command.Normalise(animalAssets[index].name) == normalisedName) return true;
+            }
+
+            for (index = 0; index < speciesAssets.Length; index++)
+            {
+                isAnimal = false;
+                if (Command.Normalise(speciesAssets[index].name) == normalisedName) return true;
+            }
+
+            isAnimal = false;
+            index = -1;
+            return false;
+        }
+
+        internal string SpeciesList()
+        {
+            return "Animals: " + string.Join(", ", Array.ConvertAll(animalAssets, asset => DisplayName(asset.name)))
+                + ". Plants: " + string.Join(", ", Array.ConvertAll(speciesAssets, asset => DisplayName(asset.name))) + ".";
+        }
+
+        internal string SpeciesName(bool isAnimal, int index) =>
+            DisplayName(isAnimal ? animalAssets[index].name : speciesAssets[index].name);
+
+        // Places up to count adults (or grown plants) of a species in the columns around (x, z),
+        // nearest first, where the species can stand or grow and the column is free. Returns how many.
+        internal int Spawn(bool isAnimal, int index, int count, int x, int z)
+        {
+            World world = worldSync.World;
+            if (ecosystem == null || world == null) return 0;
+
+            const int MaxRing = 6;
+            int placed = 0;
+            for (int ring = 0; ring <= MaxRing && placed < count; ring++)
+            {
+                for (int dz = -ring; dz <= ring && placed < count; dz++)
+                {
+                    for (int dx = -ring; dx <= ring && placed < count; dx++)
+                    {
+                        if (Math.Max(Math.Abs(dx), Math.Abs(dz)) != ring) continue;
+
+                        int cx = x + dx, cz = z + dz;
+                        if (!world.InBounds(cx, 0, cz)) continue;
+
+                        bool done = isAnimal ? ecosystem.TryPlaceAnimal(index, cx, cz) : ecosystem.TryPlaceGrownPlant(index, cx, cz);
+                        if (done) placed++;
+                    }
+                }
+            }
+
+            if (isAnimal && placed > 0) animalRevision++;
+            return placed;
+        }
+
         // An asset's name as players read it: "TallGrass" becomes "Tall grass".
         internal static string DisplayName(string assetName)
         {
