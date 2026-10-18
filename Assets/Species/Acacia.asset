@@ -16,7 +16,7 @@ MonoBehaviour:
   lifespanDays: 35
   seedAttemptsPerDay: 1
   seedRange: 7
-  spacing: 5
+  spacing: 4
   minFertility: 0.3
   fertilityUsePerDay: 0.1
   idealWarmth: {x: 0.62, y: 1}
@@ -33,24 +33,30 @@ MonoBehaviour:
       material: {fileID: 2100000, guid: 60782fd049d31344187602bbf82bee87, type: 2}
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
     - mesh: {fileID: 4300000, guid: d34628addd5783b4ba9b4cbc6e065c04, type: 2}
       material: {fileID: 2100000, guid: d564def27764de84eb3dc947b8b89618, type: 2}
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
     - mesh: {fileID: 4300000, guid: 39b405087a3b4c14f8dd85a1fc758804, type: 2}
       material: {fileID: 2100000, guid: 0a6159239a6b99640a81c8926632d6c1, type: 2}
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
   - parts:
     - mesh: {fileID: 4300000, guid: 93f96b48a1d21fd4791ebe17928f36ab, type: 2}
       material: {fileID: 2100000, guid: 60782fd049d31344187602bbf82bee87, type: 2}
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
     - mesh: {fileID: 4300000, guid: 6f605da810e21e942aa6e490ad2577e4, type: 2}
       material: {fileID: 2100000, guid: d564def27764de84eb3dc947b8b89618, type: 2}
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
     - mesh: {fileID: 4300000, guid: f4434faf8ecbe0b44ae97f9c77558e08, type: 2}
       material: {fileID: 2100000, guid: 0a6159239a6b99640a81c8926632d6c1, type: 2}
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}

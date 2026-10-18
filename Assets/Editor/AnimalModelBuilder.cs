@@ -14,7 +14,8 @@ namespace Voxel.EditorTools
     // its AnimalSpeciesAsset, and one material per colour (Animal<Species>_<Role>, URP Lit,
     // instancing on, as AnimalViews needs).
     //
-    // The rabbit and the fox were modelled by hand and are not in this table. Run Eco > Rebuild
+    // The rabbit was modelled by hand, and the fox and the deer come from sculpted models
+    // (ModelAnimalBuilder): they are not in this table. Run Eco > Rebuild
     // animal models after changing anything below; a species asset that does not exist yet is
     // created with default rules, to be set in the inspector. The animal faces +z, its feet at y = 0.
     public static class AnimalModelBuilder
@@ -107,17 +108,6 @@ namespace Voxel.EditorTools
 
         private static readonly Spec[] Species =
         {
-            new Spec
-            {
-                Name = "Deer", WalkSpeed = 2.8f, Stride = 1.0f,
-                LegHeight = 0.72f, Leg = 0.09f, Body = new Vector3(0.36f, 0.4f, 0.95f),
-                NeckRise = 0.32f, NeckForward = 0.1f, Neck = 0.17f,
-                Head = new Vector3(0.2f, 0.2f, 0.28f), Snout = new Vector3(0.13f, 0.11f, 0.13f), Ear = new Vector3(0.07f, 0.14f, 0.03f),
-                TailLength = 0.14f, Tail = 0.08f, TailHangs = true,
-                AntlerHeight = 0.32f, AntlerSpread = 0.14f, Features = Feature.Antlers,
-                Fur = new Color(0.55f, 0.36f, 0.2f), Light = new Color(0.86f, 0.78f, 0.62f),
-                Dark = new Color(0.15f, 0.11f, 0.09f), Accent = new Color(0.7f, 0.6f, 0.45f)
-            },
             new Spec
             {
                 Name = "Reindeer", WalkSpeed = 2.6f, Stride = 1.0f,

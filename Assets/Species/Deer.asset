@@ -38,131 +38,140 @@ MonoBehaviour:
   idealWarmth: {x: 0.25, y: 0.7}
   idealWetness: {x: 0.35, y: 1}
   climateTolerance: 0.12
-  height: 1.94
-  width: 0.76
+  height: 2.41
+  width: 1
   parts:
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 8988c3b617b9ed348b285f2d0168db00, type: 2}
-    offset: {x: 0, y: 0.92, z: 0}
-    scale: {x: 0.36, y: 0.4, z: 0.95}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 732d41f8eff4303489665c741700a28f, type: 2}
-    offset: {x: 0, y: 0.74, z: 0}
-    scale: {x: 0.28800002, y: 0.06, z: 0.7125}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 8988c3b617b9ed348b285f2d0168db00, type: 2}
-    offset: {x: 0.13000001, y: 0.42000002, z: 0.412}
-    scale: {x: 0.09, y: 0.70000005, z: 0.09}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 1f61b5a6916bc714e9e278c2aa6f6375, type: 2}
-    offset: {x: 0.13000001, y: 0.035, z: 0.412}
-    scale: {x: 0.102000006, y: 0.07, z: 0.102000006}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 8988c3b617b9ed348b285f2d0168db00, type: 2}
-    offset: {x: -0.13000001, y: 0.42000002, z: 0.412}
-    scale: {x: 0.09, y: 0.70000005, z: 0.09}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 1f61b5a6916bc714e9e278c2aa6f6375, type: 2}
-    offset: {x: -0.13000001, y: 0.035, z: 0.412}
-    scale: {x: 0.102000006, y: 0.07, z: 0.102000006}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 8988c3b617b9ed348b285f2d0168db00, type: 2}
-    offset: {x: 0.13000001, y: 0.42000002, z: -0.412}
-    scale: {x: 0.09, y: 0.70000005, z: 0.09}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 1f61b5a6916bc714e9e278c2aa6f6375, type: 2}
-    offset: {x: 0.13000001, y: 0.035, z: -0.412}
-    scale: {x: 0.102000006, y: 0.07, z: 0.102000006}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 8988c3b617b9ed348b285f2d0168db00, type: 2}
-    offset: {x: -0.13000001, y: 0.42000002, z: -0.412}
-    scale: {x: 0.09, y: 0.70000005, z: 0.09}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 1f61b5a6916bc714e9e278c2aa6f6375, type: 2}
-    offset: {x: -0.13000001, y: 0.035, z: -0.412}
-    scale: {x: 0.102000006, y: 0.07, z: 0.102000006}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 8988c3b617b9ed348b285f2d0168db00, type: 2}
-    offset: {x: 0, y: 1.27, z: 0.44}
-    scale: {x: 0.1615, y: 0.42, z: 0.27}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 8988c3b617b9ed348b285f2d0168db00, type: 2}
-    offset: {x: 0, y: 1.5, z: 0.647}
-    scale: {x: 0.2, y: 0.2, z: 0.28}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 732d41f8eff4303489665c741700a28f, type: 2}
-    offset: {x: 0, y: 1.4599999, z: 0.832}
-    scale: {x: 0.13, y: 0.11, z: 0.13}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 1f61b5a6916bc714e9e278c2aa6f6375, type: 2}
-    offset: {x: 0, y: 1.4999999, z: 0.901}
-    scale: {x: 0.058499996, y: 0.035, z: 0.02}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 1f61b5a6916bc714e9e278c2aa6f6375, type: 2}
-    offset: {x: 0.104, y: 1.524, z: 0.69740003}
-    scale: {x: 0.012, y: 0.035, z: 0.035}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 1f61b5a6916bc714e9e278c2aa6f6375, type: 2}
-    offset: {x: -0.104, y: 1.524, z: 0.69740003}
-    scale: {x: 0.012, y: 0.035, z: 0.035}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 8988c3b617b9ed348b285f2d0168db00, type: 2}
-    offset: {x: 0.060000002, y: 1.66, z: 0.591}
-    scale: {x: 0.07, y: 0.14, z: 0.03}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 732d41f8eff4303489665c741700a28f, type: 2}
-    offset: {x: 0.060000002, y: 1.653, z: 0.609}
-    scale: {x: 0.0385, y: 0.098, z: 0.006}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 8988c3b617b9ed348b285f2d0168db00, type: 2}
-    offset: {x: -0.060000002, y: 1.66, z: 0.591}
-    scale: {x: 0.07, y: 0.14, z: 0.03}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 732d41f8eff4303489665c741700a28f, type: 2}
-    offset: {x: -0.060000002, y: 1.653, z: 0.609}
-    scale: {x: 0.0385, y: 0.098, z: 0.006}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 8988c3b617b9ed348b285f2d0168db00, type: 2}
-    offset: {x: 0, y: 1.02, z: -0.495}
-    scale: {x: 0.08, y: 0.14, z: 0.08}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 960523ebdc79781459a43beb2cf8e887, type: 2}
-    offset: {x: 0.07, y: 1.76, z: 0.619}
-    scale: {x: 0.035, y: 0.32, z: 0.035}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 960523ebdc79781459a43beb2cf8e887, type: 2}
-    offset: {x: 0.155, y: 1.776, z: 0.619}
-    scale: {x: 0.17000002, y: 0.03, z: 0.03}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 960523ebdc79781459a43beb2cf8e887, type: 2}
-    offset: {x: 0.24000001, y: 1.8560001, z: 0.59900004}
-    scale: {x: 0.03, y: 0.16, z: 0.03}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 960523ebdc79781459a43beb2cf8e887, type: 2}
-    offset: {x: 0.07, y: 1.84, z: 0.679}
-    scale: {x: 0.03, y: 0.03, z: 0.12}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 960523ebdc79781459a43beb2cf8e887, type: 2}
-    offset: {x: -0.07, y: 1.76, z: 0.619}
-    scale: {x: 0.035, y: 0.32, z: 0.035}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 960523ebdc79781459a43beb2cf8e887, type: 2}
-    offset: {x: -0.155, y: 1.776, z: 0.619}
-    scale: {x: 0.17000002, y: 0.03, z: 0.03}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 960523ebdc79781459a43beb2cf8e887, type: 2}
-    offset: {x: -0.24000001, y: 1.8560001, z: 0.59900004}
-    scale: {x: 0.03, y: 0.16, z: 0.03}
-  - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
-    material: {fileID: 2100000, guid: 960523ebdc79781459a43beb2cf8e887, type: 2}
-    offset: {x: -0.07, y: 1.84, z: 0.679}
-    scale: {x: 0.03, y: 0.03, z: 0.12}
+  - mesh: {fileID: 4300000, guid: 22f70c7c7e6e91f44a87162fe4f877d2, type: 2}
+    material: {fileID: 2100000, guid: 66606c0ed400feb46bcc5c48698f6641, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: e7097745d962571479be33ce0485e9a1, type: 2}
+  - mesh: {fileID: 4300000, guid: c70b0a4507ab97b49895de0baedb85aa, type: 2}
+    material: {fileID: 2100000, guid: 049c1d59d0d70814a87417ca87046277, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 9bd5dd4ef342e0b4ca11f2cbe3d40c82, type: 2}
+  - mesh: {fileID: 4300000, guid: 4bbdc669a9dd23c43a58467636bc8ddf, type: 2}
+    material: {fileID: 2100000, guid: 95f4d904c711fd440a5af63e5a8442aa, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 9b37253a528f523438d063f7d8f83753, type: 2}
+  - mesh: {fileID: 4300000, guid: a429ba590e5343340b7edd53d7daeafc, type: 2}
+    material: {fileID: 2100000, guid: e7241cf21a871404c9ef4329c054711b, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 71024fc067c817f47a1ec5d945b435bb, type: 2}
+  - mesh: {fileID: 4300000, guid: 34971c3fbd6b506429abf35242714e9a, type: 2}
+    material: {fileID: 2100000, guid: 89f54a023f59c6b44a18c22dfd1cf87f, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 4803921593c478e43b8ec0183a809b02, type: 2}
+  - mesh: {fileID: 4300000, guid: cb426b96faf1c494dae55db4ad41978c, type: 2}
+    material: {fileID: 2100000, guid: 98fc618e0d0eab94ba396927fdd9835c, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 5a61db4bd762e6a4f8b9a8f8039204f1, type: 2}
+  - mesh: {fileID: 4300000, guid: 2daea96a1e33f984ebbace7f82c99093, type: 2}
+    material: {fileID: 2100000, guid: 66606c0ed400feb46bcc5c48698f6641, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 6a5755d7e8fd0ac49b05b33c9aabe3e4, type: 2}
+  - mesh: {fileID: 4300000, guid: 42325c611b63f1d4bb1a595277dcf8c7, type: 2}
+    material: {fileID: 2100000, guid: 049c1d59d0d70814a87417ca87046277, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 475559865a584704e81bd8f6cebd976f, type: 2}
+  - mesh: {fileID: 4300000, guid: 5f2e37de335e59b4bbabb1a581071596, type: 2}
+    material: {fileID: 2100000, guid: 95f4d904c711fd440a5af63e5a8442aa, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: caafa2e99c946174eba9a76804e0ca65, type: 2}
+  - mesh: {fileID: 4300000, guid: 64dbf17e64dec2b42b2cf704e78999db, type: 2}
+    material: {fileID: 2100000, guid: e7241cf21a871404c9ef4329c054711b, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 0d4fdc804f69f2a478b0c6c07b797cdf, type: 2}
+  - mesh: {fileID: 4300000, guid: e41b6b41aaba4b844b060a9714bae30b, type: 2}
+    material: {fileID: 2100000, guid: 89f54a023f59c6b44a18c22dfd1cf87f, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 08153d169bc753d48810d0faecacfdd6, type: 2}
+  - mesh: {fileID: 4300000, guid: 17e85118223bebb40abbe6bcc8f4b2ab, type: 2}
+    material: {fileID: 2100000, guid: 66606c0ed400feb46bcc5c48698f6641, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 1cabd548048fe4c44aa866f9e2679db4, type: 2}
+  - mesh: {fileID: 4300000, guid: 7539fa204414b0640a4b670db865921e, type: 2}
+    material: {fileID: 2100000, guid: 049c1d59d0d70814a87417ca87046277, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 636ea06945eb43b439bfc234da6893d9, type: 2}
+  - mesh: {fileID: 4300000, guid: a709c39cfbf3d1d418193181a62668a5, type: 2}
+    material: {fileID: 2100000, guid: 95f4d904c711fd440a5af63e5a8442aa, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 2799e5764fed30042991ca8c60b7e4c3, type: 2}
+  - mesh: {fileID: 4300000, guid: 512538b8baed6dc4ab7e4812e6dfc5a2, type: 2}
+    material: {fileID: 2100000, guid: e7241cf21a871404c9ef4329c054711b, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: f34b8362b206aa145aada5aad6729e42, type: 2}
+  - mesh: {fileID: 4300000, guid: 208e36248ecc49440a9c41ffb822af4d, type: 2}
+    material: {fileID: 2100000, guid: 66606c0ed400feb46bcc5c48698f6641, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: a9778e766d79bd043b52aa2d4f93b121, type: 2}
+  - mesh: {fileID: 4300000, guid: 3e6bd4dc8adf3024d9c2dd85bc4b2c21, type: 2}
+    material: {fileID: 2100000, guid: 049c1d59d0d70814a87417ca87046277, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: cdc16856b34ba8642a035ca17cc622aa, type: 2}
+  - mesh: {fileID: 4300000, guid: f4a38350a65060f4381cba8474c8bf86, type: 2}
+    material: {fileID: 2100000, guid: 95f4d904c711fd440a5af63e5a8442aa, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: e6255951b69c45f40ab73180f2763ffd, type: 2}
+  - mesh: {fileID: 4300000, guid: d2ca40b2174c0bf498f43598eec382c9, type: 2}
+    material: {fileID: 2100000, guid: e7241cf21a871404c9ef4329c054711b, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 1eff8511f0ee73948a65bf185f895f39, type: 2}
+  - mesh: {fileID: 4300000, guid: 464701a4d4ef72540b0360c65ab7f2ba, type: 2}
+    material: {fileID: 2100000, guid: 89f54a023f59c6b44a18c22dfd1cf87f, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: f317c39325fa4b1469fc4dc19f2924a8, type: 2}
+  - mesh: {fileID: 4300000, guid: aedf05f4f270b5541b953c6a42e6fc5e, type: 2}
+    material: {fileID: 2100000, guid: 66606c0ed400feb46bcc5c48698f6641, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 72a6f4c870bc2be47bb90b458f467285, type: 2}
+  - mesh: {fileID: 4300000, guid: 8af124f434650b74cb9d628ddbbfb045, type: 2}
+    material: {fileID: 2100000, guid: 049c1d59d0d70814a87417ca87046277, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: e209db6dcecdc0840a961e447df677c0, type: 2}
+  - mesh: {fileID: 4300000, guid: adecb43eec91e79448ad475c9b7d388d, type: 2}
+    material: {fileID: 2100000, guid: 95f4d904c711fd440a5af63e5a8442aa, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 5fed8bd7ed137a343b71d10ebb50f3b2, type: 2}
+  - mesh: {fileID: 4300000, guid: 4e0cfbb6cdd4b054399ba94e1504e087, type: 2}
+    material: {fileID: 2100000, guid: e7241cf21a871404c9ef4329c054711b, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 493cdb8e7b0ebc945b08507602c26325, type: 2}
+  - mesh: {fileID: 4300000, guid: 4daeb5a158580964f8bf9160187e45c8, type: 2}
+    material: {fileID: 2100000, guid: 89f54a023f59c6b44a18c22dfd1cf87f, type: 2}
+    offset: {x: 0, y: 0, z: 0}
+    scale: {x: 1, y: 1, z: 1}
+    shadowMesh: {fileID: 4300000, guid: 7237cfb017aa68d4785a80f364850695, type: 2}
   gait: 2
   hopLength: 0.6
   hopDuration: 0.3
   hopHeight: 0.2
   walkSpeed: 2.8
-  strideLength: 1
+  strideLength: 1.3
   flightHeight: 4
   wingbeatsPerSecond: 4
   wingFold: 0.45
@@ -172,57 +181,49 @@ MonoBehaviour:
     pivot: {x: 0, y: 0, z: 0}
   - motion: 0
     pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
+  - motion: 0
+    pivot: {x: 0, y: 0, z: 0}
   - motion: 2
-    pivot: {x: 0.13000001, y: 0.72, z: 0.412}
+    pivot: {x: -0.10613258, y: 0.68137926, z: 0.41933614}
   - motion: 2
-    pivot: {x: 0.13000001, y: 0.72, z: 0.412}
+    pivot: {x: -0.10613258, y: 0.68137926, z: 0.41933614}
   - motion: 2
-    pivot: {x: -0.13000001, y: 0.72, z: 0.412}
+    pivot: {x: -0.10613258, y: 0.68137926, z: 0.41933614}
   - motion: 2
-    pivot: {x: -0.13000001, y: 0.72, z: 0.412}
+    pivot: {x: -0.10613258, y: 0.68137926, z: 0.41933614}
+  - motion: 2
+    pivot: {x: -0.10613258, y: 0.68137926, z: 0.41933614}
+  - motion: 2
+    pivot: {x: 0.20919392, y: 0.68137926, z: 0.40178975}
+  - motion: 2
+    pivot: {x: 0.20919392, y: 0.68137926, z: 0.40178975}
+  - motion: 2
+    pivot: {x: 0.20919392, y: 0.68137926, z: 0.40178975}
+  - motion: 2
+    pivot: {x: 0.20919392, y: 0.68137926, z: 0.40178975}
   - motion: 3
-    pivot: {x: 0.13000001, y: 0.72, z: -0.412}
+    pivot: {x: -0.105783746, y: 0.6813794, z: -0.50475264}
   - motion: 3
-    pivot: {x: 0.13000001, y: 0.72, z: -0.412}
+    pivot: {x: -0.105783746, y: 0.6813794, z: -0.50475264}
   - motion: 3
-    pivot: {x: -0.13000001, y: 0.72, z: -0.412}
+    pivot: {x: -0.105783746, y: 0.6813794, z: -0.50475264}
   - motion: 3
-    pivot: {x: -0.13000001, y: 0.72, z: -0.412}
-  - motion: 0
-    pivot: {x: 0, y: 0, z: 0}
-  - motion: 0
-    pivot: {x: 0, y: 0, z: 0}
-  - motion: 0
-    pivot: {x: 0, y: 0, z: 0}
-  - motion: 0
-    pivot: {x: 0, y: 0, z: 0}
-  - motion: 0
-    pivot: {x: 0, y: 0, z: 0}
-  - motion: 0
-    pivot: {x: 0, y: 0, z: 0}
-  - motion: 1
-    pivot: {x: 0.060000002, y: 1.6, z: 0.591}
-  - motion: 1
-    pivot: {x: 0.060000002, y: 1.6, z: 0.591}
-  - motion: 1
-    pivot: {x: -0.060000002, y: 1.6, z: 0.591}
-  - motion: 1
-    pivot: {x: -0.060000002, y: 1.6, z: 0.591}
-  - motion: 4
-    pivot: {x: 0, y: 1.09, z: -0.475}
-  - motion: 0
-    pivot: {x: 0, y: 0, z: 0}
-  - motion: 0
-    pivot: {x: 0, y: 0, z: 0}
-  - motion: 0
-    pivot: {x: 0, y: 0, z: 0}
-  - motion: 0
-    pivot: {x: 0, y: 0, z: 0}
-  - motion: 0
-    pivot: {x: 0, y: 0, z: 0}
-  - motion: 0
-    pivot: {x: 0, y: 0, z: 0}
-  - motion: 0
-    pivot: {x: 0, y: 0, z: 0}
-  - motion: 0
-    pivot: {x: 0, y: 0, z: 0}
+    pivot: {x: -0.105783746, y: 0.6813794, z: -0.50475264}
+  - motion: 3
+    pivot: {x: -0.105783746, y: 0.6813794, z: -0.50475264}
+  - motion: 3
+    pivot: {x: 0.1886092, y: 0.6813795, z: -0.53509235}
+  - motion: 3
+    pivot: {x: 0.1886092, y: 0.6813795, z: -0.53509235}
+  - motion: 3
+    pivot: {x: 0.1886092, y: 0.6813795, z: -0.53509235}
+  - motion: 3
+    pivot: {x: 0.1886092, y: 0.6813795, z: -0.53509235}
+  - motion: 3
+    pivot: {x: 0.1886092, y: 0.6813795, z: -0.53509235}

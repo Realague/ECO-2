@@ -14,11 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.SpeciesAsset
   maturityDays: 3
   lifespanDays: 30
-  seedAttemptsPerDay: 1.5
+  seedAttemptsPerDay: 2.2
   seedRange: 6
-  spacing: 4
-  minFertility: 0.6
-  fertilityUsePerDay: 0.2
+  spacing: 2
+  minFertility: 0.5
+  fertilityUsePerDay: 0.08
   idealWarmth: {x: 0.4, y: 0.68}
   idealWetness: {x: 0.4, y: 1}
   climateTolerance: 0.12
@@ -33,24 +33,30 @@ MonoBehaviour:
       material: {fileID: 2100000, guid: 60782fd049d31344187602bbf82bee87, type: 2}
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
     - mesh: {fileID: 4300000, guid: da93657ac8def904fb79dca72192f3e3, type: 2}
       material: {fileID: 2100000, guid: fa81fe0d9af6b7c4da8177d24c5b5801, type: 2}
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
     - mesh: {fileID: 4300000, guid: e0a0c7189f3b46d4b8cde1a47aacd889, type: 2}
       material: {fileID: 2100000, guid: 0a6159239a6b99640a81c8926632d6c1, type: 2}
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
   - parts:
     - mesh: {fileID: 4300000, guid: da346d4565ca4ea41a8df389f81a8f3c, type: 2}
       material: {fileID: 2100000, guid: 60782fd049d31344187602bbf82bee87, type: 2}
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
     - mesh: {fileID: 4300000, guid: 3efada417d5bb4b498cfff21645b9677, type: 2}
       material: {fileID: 2100000, guid: fa81fe0d9af6b7c4da8177d24c5b5801, type: 2}
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
     - mesh: {fileID: 4300000, guid: 48ba3ad9808e1ed428743547012a0c7a, type: 2}
       material: {fileID: 2100000, guid: 0a6159239a6b99640a81c8926632d6c1, type: 2}
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}

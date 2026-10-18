@@ -6,23 +6,25 @@ using UnityEngine;
 
 namespace Voxel.EditorTools
 {
-    // Builds an animal's model from a sculpted mesh (an FBX in Assets/Models) instead of boxes. The
-    // mesh is scaled to the animal's size, simplified (edge collapses chosen by quadric error, so flat
-    // areas lose their triangles first and the silhouette keeps its shape), cut into the parts the
-    // animation moves (body, legs, ears, tail, each about a pivot) and painted by region, since the
-    // model has no texture: every triangle takes one of the species' materials. The parts are written
-    // into the species asset like AnimalModelBuilder's boxes, as meshes in Assets/Species/Models
-    // (<Species>_<Part>_<Colour>.asset), drawn flat-shaded, facet by facet.
+    // Builds animals' models from sculpted meshes (FBX files in Assets/Models) instead of boxes. Each
+    // mesh is scaled and placed in the animal's space (facing +z, feet at y = 0, the middle of its legs
+    // on the origin), posed if needed (the deer's head, turned aside in its model, is turned forward),
+    // simplified (edge collapses chosen by quadric error, so flat areas lose their triangles first and
+    // the silhouette keeps its shape), cut along planes into the parts the animation moves (legs,
+    // ears, tail, each about a pivot on its cut, the cuts capped) and coloured: by region rules for a
+    // model without texture (the fox), or from the model's colour texture, its colours gathered into
+    // a few tones (the deer). Each part is one mesh per colour, drawn flat-shaded with one material,
+    // written into the species asset like AnimalModelBuilder's boxes (meshes in Assets/Species/Models,
+    // <Species>_<Part>_<Colour>.asset, each with a smooth-normal shadow mesh).
     //
-    // The regions are boxes in the animal's space (facing +z, feet at y = 0), found by looking at
-    // the model's profile; a new model needs its own. Run Eco > Rebuild fox from model after changing
-    // anything below.
+    // The regions are boxes in the animal's space, found by looking at the model's profile; a new
+    // model needs its own. Run Eco > Rebuild animals from models after changing anything below.
     public static class ModelAnimalBuilder
     {
         private const string ModelFolder = "Assets/Species/Models";
+        private const string MaterialFolder = "Assets/Materials";
 
-        private enum Colour { Fur, White, Dark }
-
+        // A part the animation moves. A pivot left at zero is worked out: the middle of the part's cut.
         private struct Region
         {
             public string Name;
@@ -33,15 +35,55 @@ namespace Voxel.EditorTools
         // The motions of AnimalSpeciesAsset.PartMotion, by name, so this file reads on its own.
         private enum AnimalPart { Body, Ear, FrontLeg, HindLeg, Tail }
 
-        // ---- The fox ----
+        // An eye drawn open over the model (the left one mirrors this right one).
+        private struct Eye
+        {
+            public Vector3 InnerCorner;
+            public Vector3 OuterCorner;
+            public Vector3 Facing;
+            public float Length;
+            public float Height;
+        }
 
-        private const string FoxModel = "Assets/Models/Fox/Fox.fbx";
-        private const string FoxAsset = "Assets/Species/Fox.asset";
-        private const float FoxLength = 1.3f;
+        // One animal made from a model.
+        private sealed class Spec
+        {
+            public string Species;
+            public string Model;
+            public float Length;
 
-        // Where the middle between front and hind legs lies along the scaled model, from its back end.
-        private const float FoxLegsMiddle = 0.70f;
-        private const int FoxTriangles = 2400;
+            // Where the middle of the legs lies in the scaled model: x from the centre of its bounds,
+            // z from its back end. That point becomes the origin.
+            public Vector2 LegsCentre;
+            public int Triangles;
+
+            // The finished model, its pivots and eyes are scaled by this. Everything else here
+            // (Length, LegsCentre, the pose, cuts and regions) stays in the size it was measured in.
+            public float Scale = 1f;
+
+            // Optional, in the animal's space, before simplifying.
+            public Func<Vector3, Vector3> Pose;
+            public Vector4[] Cuts;
+            public Region[] Regions;
+            public Func<Vector3, int> RegionOf;
+
+            // Colours by rule: a tone index for a triangle (its region, centre and normal), and the
+            // name and material of each tone.
+            public Func<int, Vector3, Vector3, int> ColourOf;
+            public string[] ToneNames;
+            public string[] ToneMaterials;
+
+            // Or colours from the model's texture, gathered into this many tones, whose materials
+            // (Animal<Species>_Tone<n>) are written by the build.
+            public string Texture;
+            public int Tones;
+
+            public Eye? Eyes;
+        }
+
+        // ---- The fox (no texture: painted by region) ----
+
+        private enum FoxTone { Fur, White, Dark }
 
         private static readonly Region[] FoxRegions =
         {
@@ -53,17 +95,6 @@ namespace Voxel.EditorTools
             new Region { Name = "EarLeft", Motion = AnimalPart.Ear, Pivot = new Vector3(-0.07f, 0.65f, 0.38f) },
             new Region { Name = "EarRight", Motion = AnimalPart.Ear, Pivot = new Vector3(0.07f, 0.65f, 0.38f) },
             new Region { Name = "Tail", Motion = AnimalPart.Tail, Pivot = new Vector3(0f, 0.42f, -0.32f) }
-        };
-
-        // Planes the mesh is cut along before its triangles are sorted into regions, so that a moving
-        // part meets the body on one clean flat cut through its pivot (a hinge) instead of along the
-        // ragged edges of whole triangles: behind the rump for the tail, under the belly for the
-        // legs, above the skull for the ears. Each plane is a normal and its distance from the origin.
-        private static readonly Vector4[] FoxCuts =
-        {
-            new Vector4(0f, 0f, 1f, -0.32f),
-            new Vector4(0f, 1f, 0f, 0.29f),
-            new Vector4(0f, 1f, 0f, 0.665f)
         };
 
         // The region of a triangle, by its centre: an index in FoxRegions.
@@ -79,79 +110,135 @@ namespace Voxel.EditorTools
 
         // A red fox's coat: white throat, chest, belly, lower jaw and tail tip, black socks, ear backs
         // and nose.
-        private static Colour FoxColour(int region, Vector3 c, Vector3 normal)
+        private static int FoxColour(int region, Vector3 c, Vector3 normal)
         {
             switch (FoxRegions[region].Motion)
             {
                 case AnimalPart.Tail:
-                    return c.z < -0.58f ? Colour.White : Colour.Fur;
+                    return (int)(c.z < -0.58f ? FoxTone.White : FoxTone.Fur);
                 case AnimalPart.FrontLeg:
                 case AnimalPart.HindLeg:
-                    return c.y < 0.17f ? Colour.Dark : Colour.Fur;
+                    return (int)(c.y < 0.17f ? FoxTone.Dark : FoxTone.Fur);
                 case AnimalPart.Ear:
                     // Only the ear itself, above the skull: the head around its base stays fur.
-                    if (c.y > 0.725f || (c.y > 0.69f && normal.z < -0.2f)) return Colour.Dark;
-                    return c.y > 0.68f && normal.z > 0.5f ? Colour.White : Colour.Fur;
+                    if (c.y > 0.725f || (c.y > 0.69f && normal.z < -0.2f)) return (int)FoxTone.Dark;
+                    return (int)(c.y > 0.68f && normal.z > 0.5f ? FoxTone.White : FoxTone.Fur);
                 default:
-                    if (c.z > 0.575f) return Colour.Dark;
-                    if (c.z > 0.36f && c.y < 0.53f) return Colour.White;
+                    if (c.z > 0.575f) return (int)FoxTone.Dark;
+                    if (c.z > 0.36f && c.y < 0.53f) return (int)FoxTone.White;
 
                     // The bib, down the middle of the throat and chest, never on the shoulders.
                     if (c.z > 0.12f && c.z <= 0.42f && Mathf.Abs(c.x) < 0.075f && c.y < 0.56f && normal.y < 0.3f
-                        && (normal.z > 0.2f || normal.y < -0.3f)) return Colour.White;
-                    if (c.z > -0.22f && c.z < 0.15f && Mathf.Abs(c.x) < 0.07f && normal.y < -0.6f) return Colour.White;
-                    return Colour.Fur;
+                        && (normal.z > 0.2f || normal.y < -0.3f)) return (int)FoxTone.White;
+                    if (c.z > -0.22f && c.z < 0.15f && Mathf.Abs(c.x) < 0.07f && normal.y < -0.6f) return (int)FoxTone.White;
+                    return (int)FoxTone.Fur;
             }
         }
 
-        // The right eye (the left one mirrors it): the model only has a closed slit there, from its
-        // inner corner by the nose to its outer corner, rising towards the ear. The eye is drawn open
-        // over it, as a dark almond with a glint.
-        private static readonly Eye FoxEye = new Eye
+        private static readonly Spec Fox = new Spec
         {
-            InnerCorner = new Vector3(0.034f, 0.580f, 0.470f),
-            OuterCorner = new Vector3(0.070f, 0.592f, 0.448f),
-            Facing = new Vector3(0.55f, 0.1f, 0.83f),
-            Length = 0.042f,
-            Height = 0.018f
+            Species = "Fox",
+            Model = "Assets/Models/Fox/Fox.fbx",
+            Length = 1.3f,
+            LegsCentre = new Vector2(0f, 0.70f),
+            Triangles = 2400,
+
+            // Planes the mesh is cut along before its triangles are sorted into regions, so that a
+            // moving part meets the body on one clean flat cut through its pivot (a hinge) instead of
+            // along the ragged edges of whole triangles: behind the rump for the tail, under the belly
+            // for the legs, above the skull for the ears. Each plane is a normal and its distance from
+            // the origin.
+            Cuts = new[] { new Vector4(0f, 0f, 1f, -0.32f), new Vector4(0f, 1f, 0f, 0.29f), new Vector4(0f, 1f, 0f, 0.665f) },
+            Regions = FoxRegions,
+            RegionOf = FoxRegion,
+            ColourOf = FoxColour,
+            ToneNames = new[] { "Fur", "White", "Dark" },
+            ToneMaterials = new[] { "AnimalFox", "AnimalFox_White", "AnimalFox_Dark" },
+
+            // The model only has a closed slit there, from its inner corner by the nose to its outer
+            // corner, rising towards the ear. The eye is drawn open over it, as a dark almond with a glint.
+            Eyes = new Eye
+            {
+                InnerCorner = new Vector3(0.034f, 0.580f, 0.470f),
+                OuterCorner = new Vector3(0.070f, 0.592f, 0.448f),
+                Facing = new Vector3(0.55f, 0.1f, 0.83f),
+                Length = 0.042f,
+                Height = 0.018f
+            }
         };
 
-        [MenuItem("Eco/Rebuild fox from model")]
-        public static void BuildFox()
+        // ---- The deer (coloured from its texture) ----
+
+        // The model holds its head turned about 38° to its right. Turned forward about the top of the
+        // neck, fully from the head up and fading out down the neck and back over the shoulders, so the
+        // deer looks where it walks.
+        private static Vector3 DeerPose(Vector3 p)
         {
-            var materials = new Dictionary<Colour, Material>
+            var neck = new Vector3(0.117f, 0f, 0.453f);
+            float weight = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.95f, 1.12f, p.y))
+                           * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.10f, 0.30f, p.z));
+            if (weight <= 0f) return p;
+
+            Vector3 offset = p - neck;
+            return neck + Quaternion.Euler(0f, -38f * weight, 0f) * offset;
+        }
+
+        // The legs below the belly, the hind ones slanting back. Ears and tail are too small to move.
+        private static int DeerRegion(Vector3 c)
+        {
+            int side = c.x < 0f ? 0 : 1;
+            if (c.y < 0.52f && c.z > -0.70f && c.z < -0.18f) return 3 + side;
+            if (c.y < 0.52f && c.z > 0.24f && c.z < 0.70f) return 1 + side;
+            return 0;
+        }
+
+        private static readonly Spec Deer = new Spec
+        {
+            Species = "Deer",
+            Model = "Assets/Models/Deer/Deer.fbx",
+            Length = 1.45f,
+            LegsCentre = new Vector2(-0.108f, 0.592f),
+            Triangles = 3600,
+
+            // 1.9 blocks long, about 1.25 at the shoulder and 2.4 to the tips of the antlers: a red deer.
+            Scale = 1.9f / 1.45f,
+            Pose = DeerPose,
+            Cuts = new[] { new Vector4(0f, 1f, 0f, 0.52f) },
+            Regions = new[]
             {
-                [Colour.Fur] = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/AnimalFox.mat"),
-                [Colour.White] = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/AnimalFox_White.mat"),
-                [Colour.Dark] = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/AnimalFox_Dark.mat")
-            };
+                new Region { Name = "Body", Motion = AnimalPart.Body },
+                new Region { Name = "FrontLegLeft", Motion = AnimalPart.FrontLeg },
+                new Region { Name = "FrontLegRight", Motion = AnimalPart.FrontLeg },
+                new Region { Name = "HindLegLeft", Motion = AnimalPart.HindLeg },
+                new Region { Name = "HindLegRight", Motion = AnimalPart.HindLeg }
+            },
+            RegionOf = DeerRegion,
+            Texture = "Assets/Models/Deer/Deer_Diffuse.png",
+            Tones = 6
+        };
 
-            Build("Fox", FoxModel, FoxAsset, FoxLength, FoxLegsMiddle, FoxTriangles, FoxCuts, FoxRegions, FoxRegion, FoxColour, FoxEye, materials);
+        [MenuItem("Eco/Rebuild animals from models")]
+        public static void BuildAll()
+        {
+            Build(Fox);
+            Build(Deer);
+            AssetDatabase.SaveAssets();
         }
 
-        private struct Eye
+        private static void Build(Spec spec)
         {
-            public Vector3 InnerCorner;
-            public Vector3 OuterCorner;
-            public Vector3 Facing;
-            public float Length;
-            public float Height;
-        }
-
-        private static void Build(string species, string modelPath, string assetPath, float length, float legsMiddle, int triangles, Vector4[] cuts,
-            Region[] regions, Func<Vector3, int> regionOf, Func<int, Vector3, Vector3, Colour> colourOf, Eye eye, Dictionary<Colour, Material> materials)
-        {
-            var model = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
-            var asset = AssetDatabase.LoadAssetAtPath<ScriptableObject>(assetPath);
+            var model = AssetDatabase.LoadAssetAtPath<GameObject>(spec.Model);
+            var asset = AssetDatabase.LoadAssetAtPath<ScriptableObject>($"Assets/Species/{spec.Species}.asset");
             if (model == null || asset == null)
             {
-                Debug.LogError($"Model {modelPath} or species asset {assetPath} is missing.");
+                Debug.LogError($"Model {spec.Model} or the species asset of {spec.Species} is missing.");
                 return;
             }
 
-            // Every mesh of the model, in the model's space, then scaled to the length wanted, centred
-            // across, its feet at y = 0 and the middle of its legs at z = 0.
+            // Every mesh of the model, in the model's space, then scaled to the length wanted, its feet
+            // at y = 0 and the middle of its legs on the origin, then posed.
             var positions = new List<Vector3>();
+            var uvs = new List<Vector2>();
             var indices = new List<int>();
             foreach (MeshFilter filter in model.GetComponentsInChildren<MeshFilter>())
             {
@@ -160,33 +247,42 @@ namespace Voxel.EditorTools
                 toModel = Matrix4x4.TRS(Vector3.zero, model.transform.localRotation, model.transform.localScale) * toModel;
                 int first = positions.Count;
                 foreach (Vector3 vertex in mesh.vertices) positions.Add(toModel.MultiplyPoint3x4(vertex));
+                Vector2[] meshUvs = mesh.uv;
+                for (int i = 0; i < mesh.vertexCount; i++) uvs.Add(i < meshUvs.Length ? meshUvs[i] : Vector2.zero);
                 foreach (int index in mesh.triangles) indices.Add(first + index);
             }
 
             var bounds = new Bounds(positions[0], Vector3.zero);
             foreach (Vector3 position in positions) bounds.Encapsulate(position);
-            float scale = length / bounds.size.z;
+            float scale = spec.Length / bounds.size.z;
             for (int i = 0; i < positions.Count; i++)
             {
                 Vector3 p = positions[i];
-                positions[i] = new Vector3((p.x - bounds.center.x) * scale, (p.y - bounds.min.y) * scale, (p.z - bounds.min.z) * scale - legsMiddle);
+                p = new Vector3((p.x - bounds.center.x) * scale - spec.LegsCentre.x, (p.y - bounds.min.y) * scale,
+                    (p.z - bounds.min.z) * scale - spec.LegsCentre.y);
+                positions[i] = spec.Pose != null ? spec.Pose(p) : p;
             }
+
+            // The texture's colour on the model, before the triangles that carry its coordinates go.
+            ColourField field = spec.Texture != null ? new ColourField(spec.Texture, positions, uvs, indices) : null;
 
             var simplifier = new Simplifier(positions, indices);
             int before = simplifier.TriangleCount;
-            simplifier.Reduce(triangles);
+            simplifier.Reduce(spec.Triangles);
             simplifier.Result(out List<Vector3> vertices, out List<int> faces);
 
-            // The eyes, both made of a dark almond and a glint, moving with the body; laid on the
-            // surface before the caps below are added inside it.
-            BuildEyes(vertices, faces, eye, out Mesh almonds, out Mesh glints);
+            // Eyes drawn over the model are laid on the surface before the caps below are added inside it.
+            Mesh almonds = null, glints = null;
+            if (spec.Eyes.HasValue) BuildEyes(vertices, faces, spec.Eyes.Value, out almonds, out glints);
 
-            foreach (Vector4 cut in cuts) SplitByPlane(vertices, faces, new Vector3(cut.x, cut.y, cut.z), cut.w);
+            foreach (Vector4 cut in spec.Cuts) SplitByPlane(vertices, faces, new Vector3(cut.x, cut.y, cut.z), cut.w);
 
             // Each triangle's part and colour, the colours then smoothed, then one flat-shaded mesh per pair.
             int faceCount = faces.Count / 3;
             var regionsOf = new int[faceCount];
-            var colours = new Colour[faceCount];
+            var tones = new int[faceCount];
+            var sampled = new Color[faceCount];
+            var areas = new float[faceCount];
             for (int i = 0; i < faceCount; i++)
             {
                 int f = i * 3;
@@ -195,25 +291,67 @@ namespace Voxel.EditorTools
                 if (!TryFacetNormal(a, b, c, out Vector3 normal)) continue;
 
                 Vector3 centre = (a + b + c) / 3f;
-                regionsOf[i] = regionOf(centre);
-                colours[i] = colourOf(regionsOf[i], centre, normal);
+                regionsOf[i] = spec.RegionOf(centre);
+                if (field == null)
+                {
+                    tones[i] = spec.ColourOf(regionsOf[i], centre, normal);
+                    continue;
+                }
+
+                sampled[i] = (field.At(centre) * 2f + field.At((a + centre) * 0.5f) + field.At((b + centre) * 0.5f) + field.At((c + centre) * 0.5f)) / 5f;
+                areas[i] = Vector3.Cross(b - a, c - a).magnitude;
             }
 
-            SmoothColours(faces, regionsOf, colours);
+            string[] toneNames;
+            Material[] materials;
+            if (field == null)
+            {
+                toneNames = spec.ToneNames;
+                materials = Array.ConvertAll(spec.ToneMaterials, name => AssetDatabase.LoadAssetAtPath<Material>($"{MaterialFolder}/{name}.mat"));
+            }
+            else
+            {
+                Color[] palette = GatherTones(sampled, areas, regionsOf, spec.Tones, tones);
+                toneNames = new string[palette.Length];
+                materials = new Material[palette.Length];
+                for (int t = 0; t < palette.Length; t++)
+                {
+                    toneNames[t] = $"Tone{t}";
+                    materials[t] = SaveToneMaterial($"Animal{spec.Species}_Tone{t}", palette[t]);
+                }
+            }
+
+            SmoothColours(faces, regionsOf, tones, toneNames.Length);
 
             // The surface's smooth normals, for the shadow meshes, worked out before the caps.
             int surfaceFaceCount = faceCount;
             Vector3[] smoothNormals = SmoothNormals(vertices, faces, surfaceFaceCount);
 
-            AddCaps(vertices, faces, ref regionsOf, ref colours);
+            Vector3[] pivots = Pivots(spec.Regions, vertices, faces, regionsOf);
+            AddCaps(vertices, faces, ref regionsOf, ref tones);
             faceCount = regionsOf.Length;
+
+            if (spec.Scale != 1f)
+            {
+                for (int i = 0; i < vertices.Count; i++) vertices[i] *= spec.Scale;
+                for (int r = 0; r < pivots.Length; r++) pivots[r] *= spec.Scale;
+                foreach (Mesh eyes in new[] { almonds, glints })
+                {
+                    if (eyes == null) continue;
+
+                    Vector3[] corners = eyes.vertices;
+                    for (int i = 0; i < corners.Length; i++) corners[i] *= spec.Scale;
+                    eyes.vertices = corners;
+                    eyes.RecalculateBounds();
+                }
+            }
 
             var groups = new SortedDictionary<int, List<int>>();
             for (int i = 0; i < faceCount; i++)
             {
                 if (regionsOf[i] < 0) continue;
 
-                int key = regionsOf[i] * 8 + (int)colours[i];
+                int key = regionsOf[i] * 64 + tones[i];
                 if (!groups.TryGetValue(key, out List<int> list)) groups[key] = list = new List<int>();
                 list.Add(i * 3);
             }
@@ -222,72 +360,266 @@ namespace Voxel.EditorTools
             var serialized = new SerializedObject(asset);
             SerializedProperty parts = serialized.FindProperty("parts");
             SerializedProperty rig = serialized.FindProperty("rig");
-            parts.arraySize = groups.Count + 2;
-            rig.arraySize = groups.Count + 2;
+            int eyeParts = spec.Eyes.HasValue ? 2 : 0;
+            parts.arraySize = groups.Count + eyeParts;
+            rig.arraySize = groups.Count + eyeParts;
             int partIndex = 0;
 
-            foreach ((string colourName, Colour colour, Mesh mesh) in new[] { ("Dark", Colour.Dark, almonds), ("White", Colour.White, glints) })
+            void WritePart(Mesh mesh, Mesh shadow, Material material, AnimalPart motion, Vector3 pivot)
             {
-                string name = $"{species}_Eyes_{colourName}";
-                Mesh saved = SaveMesh($"{ModelFolder}/{name}.asset", name, mesh);
-                written.Add(name);
                 SerializedProperty part = parts.GetArrayElementAtIndex(partIndex);
-                part.FindPropertyRelative("mesh").objectReferenceValue = saved;
-                part.FindPropertyRelative("shadowMesh").objectReferenceValue = null;
-                part.FindPropertyRelative("material").objectReferenceValue = materials[colour];
+                part.FindPropertyRelative("mesh").objectReferenceValue = mesh;
+                part.FindPropertyRelative("shadowMesh").objectReferenceValue = shadow;
+                part.FindPropertyRelative("material").objectReferenceValue = material;
                 part.FindPropertyRelative("offset").vector3Value = Vector3.zero;
                 part.FindPropertyRelative("scale").vector3Value = Vector3.one;
                 SerializedProperty entry = rig.GetArrayElementAtIndex(partIndex);
-                entry.FindPropertyRelative("motion").enumValueIndex = (int)AnimalPart.Body;
-                entry.FindPropertyRelative("pivot").vector3Value = Vector3.zero;
+                entry.FindPropertyRelative("motion").enumValueIndex = (int)motion;
+                entry.FindPropertyRelative("pivot").vector3Value = motion == AnimalPart.Body ? Vector3.zero : pivot;
                 partIndex++;
+            }
+
+            if (spec.Eyes.HasValue)
+            {
+                // Both eyes, each a dark almond and a glint, moving with the body.
+                foreach ((string colourName, int tone, Mesh mesh) in new[] { ("Dark", (int)FoxTone.Dark, almonds), ("White", (int)FoxTone.White, glints) })
+                {
+                    string name = $"{spec.Species}_Eyes_{colourName}";
+                    written.Add(name);
+                    WritePart(SaveMesh($"{ModelFolder}/{name}.asset", name, mesh), null, materials[tone], AnimalPart.Body, Vector3.zero);
+                }
             }
 
             foreach (KeyValuePair<int, List<int>> group in groups)
             {
-                Region region = regions[group.Key / 8];
-                var colour = (Colour)(group.Key % 8);
-                string name = $"{species}_{region.Name}_{colour}";
+                int region = group.Key / 64;
+                int tone = group.Key % 64;
+                string name = $"{spec.Species}_{spec.Regions[region].Name}_{toneNames[tone]}";
                 Mesh mesh = SaveMesh($"{ModelFolder}/{name}.asset", name, FlatMesh(vertices, faces, group.Value));
-                written.Add(name);
                 Mesh shadow = SaveMesh($"{ModelFolder}/{name}_Shadow.asset", name + "_Shadow",
                     SmoothMesh(vertices, faces, group.Value, smoothNormals, surfaceFaceCount));
+                written.Add(name);
                 written.Add(name + "_Shadow");
-
-                SerializedProperty part = parts.GetArrayElementAtIndex(partIndex);
-                part.FindPropertyRelative("mesh").objectReferenceValue = mesh;
-                part.FindPropertyRelative("shadowMesh").objectReferenceValue = shadow;
-                part.FindPropertyRelative("material").objectReferenceValue = materials[colour];
-                part.FindPropertyRelative("offset").vector3Value = Vector3.zero;
-                part.FindPropertyRelative("scale").vector3Value = Vector3.one;
-                SerializedProperty entry = rig.GetArrayElementAtIndex(partIndex);
-                entry.FindPropertyRelative("motion").enumValueIndex = (int)region.Motion;
-                entry.FindPropertyRelative("pivot").vector3Value = region.Motion == AnimalPart.Body ? Vector3.zero : region.Pivot;
-                partIndex++;
+                WritePart(mesh, shadow, materials[tone], spec.Regions[region].Motion, pivots[region]);
             }
 
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(asset);
 
             // Meshes of parts this build no longer makes.
-            foreach (string guid in AssetDatabase.FindAssets($"{species}_ t:Mesh", new[] { ModelFolder }))
+            foreach (string guid in AssetDatabase.FindAssets($"{spec.Species}_ t:Mesh", new[] { ModelFolder }))
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 string file = Path.GetFileNameWithoutExtension(path);
-                if (file.StartsWith(species + "_") && !written.Contains(file) && AssetDatabase.LoadMainAssetAtPath(path) is Mesh)
+                if (file.StartsWith(spec.Species + "_") && !written.Contains(file) && AssetDatabase.LoadMainAssetAtPath(path) is Mesh)
                 {
                     AssetDatabase.DeleteAsset(path);
                 }
             }
 
-            AssetDatabase.SaveAssets();
-            Debug.Log($"{species}: {before} triangles simplified to {faces.Count / 3}, in {groups.Count} parts.");
+            Debug.Log($"{spec.Species}: {before} triangles simplified to {surfaceFaceCount}, in {groups.Count} parts of {toneNames.Length} colours.");
         }
 
-        // Rules by position and facing leave stray triangles and ragged edges between colours: a
-        // triangle whose neighbours across at least two of its sides share another colour takes it.
-        // Only neighbours in the same part count, so a sock never spreads up into the body.
-        private static void SmoothColours(List<int> faces, int[] regions, Colour[] colours)
+        // Each region's pivot: its own, or the middle of the vertices it shares with other regions (its cut).
+        private static Vector3[] Pivots(Region[] regions, List<Vector3> vertices, List<int> faces, int[] regionsOf)
+        {
+            var regionsAt = new Dictionary<int, HashSet<int>>();
+            for (int i = 0; i < regionsOf.Length; i++)
+            {
+                if (regionsOf[i] < 0) continue;
+
+                for (int k = 0; k < 3; k++)
+                {
+                    int vertex = faces[i * 3 + k];
+                    if (!regionsAt.TryGetValue(vertex, out HashSet<int> set)) regionsAt[vertex] = set = new HashSet<int>();
+                    set.Add(regionsOf[i]);
+                }
+            }
+
+            var pivots = new Vector3[regions.Length];
+            for (int r = 0; r < regions.Length; r++)
+            {
+                pivots[r] = regions[r].Pivot;
+                if (regions[r].Pivot != Vector3.zero || regions[r].Motion == AnimalPart.Body) continue;
+
+                Vector3 sum = Vector3.zero;
+                int count = 0;
+                foreach (KeyValuePair<int, HashSet<int>> vertex in regionsAt)
+                {
+                    if (vertex.Value.Count < 2 || !vertex.Value.Contains(r)) continue;
+
+                    sum += vertices[vertex.Key];
+                    count++;
+                }
+
+                if (count > 0) pivots[r] = sum / count;
+            }
+
+            return pivots;
+        }
+
+        // The colours of a model's texture over its surface: each original triangle's colour (the
+        // texture sampled at a few points of it), found again by position, from the nearest triangle
+        // centre, once the triangles and their texture coordinates are gone.
+        private sealed class ColourField
+        {
+            private const float CellSize = 0.03f;
+            private readonly Dictionary<(int, int, int), List<int>> cells = new Dictionary<(int, int, int), List<int>>();
+            private readonly List<Vector3> centres = new List<Vector3>();
+            private readonly List<Color> colours = new List<Color>();
+
+            public ColourField(string texturePath, List<Vector3> positions, List<Vector2> uvs, List<int> indices)
+            {
+                var texture = new Texture2D(2, 2);
+                texture.LoadImage(File.ReadAllBytes(texturePath));
+                for (int f = 0; f < indices.Count; f += 3)
+                {
+                    int a = indices[f], b = indices[f + 1], c = indices[f + 2];
+                    Vector2 uvCentre = (uvs[a] + uvs[b] + uvs[c]) / 3f;
+                    Color colour = texture.GetPixelBilinear(uvCentre.x, uvCentre.y) * 2f;
+                    foreach (int corner in new[] { a, b, c })
+                    {
+                        Vector2 uv = Vector2.Lerp(uvCentre, uvs[corner], 0.5f);
+                        colour += texture.GetPixelBilinear(uv.x, uv.y);
+                    }
+
+                    Vector3 centre = (positions[a] + positions[b] + positions[c]) / 3f;
+                    (int, int, int) cell = CellOf(centre);
+                    if (!cells.TryGetValue(cell, out List<int> list)) cells[cell] = list = new List<int>();
+                    list.Add(centres.Count);
+                    centres.Add(centre);
+                    colours.Add(colour / 5f);
+                }
+
+                UnityEngine.Object.DestroyImmediate(texture);
+            }
+
+            public Color At(Vector3 point)
+            {
+                (int x, int y, int z) = CellOf(point);
+                for (int reach = 1; reach <= 4; reach++)
+                {
+                    int nearest = -1;
+                    float best = float.MaxValue;
+                    for (int dx = -reach; dx <= reach; dx++)
+                    for (int dy = -reach; dy <= reach; dy++)
+                    for (int dz = -reach; dz <= reach; dz++)
+                    {
+                        if (!cells.TryGetValue((x + dx, y + dy, z + dz), out List<int> list)) continue;
+
+                        foreach (int i in list)
+                        {
+                            float distance = (centres[i] - point).sqrMagnitude;
+                            if (distance < best)
+                            {
+                                best = distance;
+                                nearest = i;
+                            }
+                        }
+                    }
+
+                    if (nearest >= 0) return colours[nearest];
+                }
+
+                return Color.grey;
+            }
+
+            private static (int, int, int) CellOf(Vector3 p) =>
+                (Mathf.FloorToInt(p.x / CellSize), Mathf.FloorToInt(p.y / CellSize), Mathf.FloorToInt(p.z / CellSize));
+        }
+
+        // Gathers the triangles' colours into a few tones (k-means, weighted by area, started from
+        // colours spread by brightness, so the result is the same every time), darkest first; each
+        // triangle gets the nearest tone.
+        private static Color[] GatherTones(Color[] colours, float[] areas, int[] regions, int count, int[] tones)
+        {
+            var chosen = new List<int>();
+            for (int i = 0; i < colours.Length; i++)
+            {
+                if (regions[i] >= 0) chosen.Add(i);
+            }
+
+            chosen.Sort((p, q) => Brightness(colours[p]).CompareTo(Brightness(colours[q])));
+            float total = 0f;
+            foreach (int i in chosen) total += areas[i];
+
+            var centres = new Vector3[count];
+            float running = 0f;
+            int next = 0;
+            foreach (int i in chosen)
+            {
+                running += areas[i];
+                while (next < count && running >= total * (next + 0.5f) / count)
+                {
+                    centres[next++] = ToVector(colours[i]);
+                }
+            }
+
+            for (int iteration = 0; iteration < 30; iteration++)
+            {
+                var sums = new Vector3[count];
+                var weights = new float[count];
+                foreach (int i in chosen)
+                {
+                    int tone = Nearest(centres, ToVector(colours[i]));
+                    sums[tone] += ToVector(colours[i]) * areas[i];
+                    weights[tone] += areas[i];
+                }
+
+                for (int t = 0; t < count; t++)
+                {
+                    if (weights[t] > 0f) centres[t] = sums[t] / weights[t];
+                }
+            }
+
+            Array.Sort(centres, (p, q) => (p.x + p.y + p.z).CompareTo(q.x + q.y + q.z));
+            foreach (int i in chosen) tones[i] = Nearest(centres, ToVector(colours[i]));
+            return Array.ConvertAll(centres, c => new Color(c.x, c.y, c.z));
+        }
+
+        private static float Brightness(Color c) => c.r + c.g + c.b;
+
+        private static Vector3 ToVector(Color c) => new Vector3(c.r, c.g, c.b);
+
+        private static int Nearest(Vector3[] centres, Vector3 colour)
+        {
+            int nearest = 0;
+            for (int t = 1; t < centres.Length; t++)
+            {
+                if ((centres[t] - colour).sqrMagnitude < (centres[nearest] - colour).sqrMagnitude) nearest = t;
+            }
+
+            return nearest;
+        }
+
+        // A tone's material: a copy of the fox's fur (URP Lit, instancing on), in the tone's colour.
+        private static Material SaveToneMaterial(string name, Color colour)
+        {
+            string path = $"{MaterialFolder}/{name}.mat";
+            var template = AssetDatabase.LoadAssetAtPath<Material>($"{MaterialFolder}/AnimalFox.mat");
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null)
+            {
+                material = new Material(template) { name = name };
+                AssetDatabase.CreateAsset(material, path);
+            }
+            else
+            {
+                material.CopyPropertiesFromMaterial(template);
+            }
+
+            material.enableInstancing = true;
+            material.SetColor("_BaseColor", colour);
+            material.color = colour;
+            EditorUtility.SetDirty(material);
+            return material;
+        }
+
+        // Rules by position and facing, or a texture's colours, leave stray triangles and ragged
+        // edges between colours: a triangle whose neighbours across at least two of its sides share
+        // another colour takes it. Only neighbours in the same part count, so a sock never spreads up
+        // into the body.
+        private static void SmoothColours(List<int> faces, int[] regions, int[] tones, int toneCount)
         {
             int faceCount = regions.Length;
             var trianglesOfEdge = new Dictionary<(int, int), List<int>>();
@@ -306,28 +638,28 @@ namespace Voxel.EditorTools
 
             for (int pass = 0; pass < 3; pass++)
             {
-                var next = (Colour[])colours.Clone();
+                var next = (int[])tones.Clone();
                 for (int i = 0; i < faceCount; i++)
                 {
                     if (regions[i] < 0) continue;
 
-                    var votes = new int[3];
+                    var votes = new int[toneCount];
                     for (int k = 0; k < 3; k++)
                     {
                         int u = faces[i * 3 + k], v = faces[i * 3 + (k + 1) % 3];
                         foreach (int j in trianglesOfEdge[u < v ? (u, v) : (v, u)])
                         {
-                            if (j != i && regions[j] == regions[i]) votes[(int)colours[j]]++;
+                            if (j != i && regions[j] == regions[i]) votes[tones[j]]++;
                         }
                     }
 
-                    for (int c = 0; c < 3; c++)
+                    for (int t = 0; t < toneCount; t++)
                     {
-                        if (c != (int)colours[i] && votes[c] >= 2) next[i] = (Colour)c;
+                        if (t != tones[i] && votes[t] >= 2) next[i] = t;
                     }
                 }
 
-                Array.Copy(next, colours, faceCount);
+                Array.Copy(next, tones, faceCount);
             }
         }
 
@@ -410,7 +742,7 @@ namespace Voxel.EditorTools
         // sides of every cut get a cap, a fan from the cut's edge to its middle, each triangle
         // coloured like the one along its edge: at rest the caps lie inside, back to back; in motion
         // the crack shows them, opaque.
-        private static void AddCaps(List<Vector3> vertices, List<int> faces, ref int[] regions, ref Colour[] colours)
+        private static void AddCaps(List<Vector3> vertices, List<int> faces, ref int[] regions, ref int[] colours)
         {
             var faceOfEdge = new Dictionary<(int, int), int>();
             for (int i = 0; i < regions.Length; i++)
@@ -472,7 +804,7 @@ namespace Voxel.EditorTools
 
             // Going round the edge the other way from its face keeps the cap's facing consistent with it.
             var allRegions = new List<int>(regions);
-            var allColours = new List<Colour>(colours);
+            var allColours = new List<int>(colours);
             foreach ((int u, int v, int face) in cut)
             {
                 faces.Add(v);
