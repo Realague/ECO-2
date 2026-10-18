@@ -3,6 +3,14 @@ using Voxel.Core;
 
 namespace Eco.Sim
 {
+    // Where a plant's base may stand (Species.Rooting). The value is part of the species' data, not saved.
+    public enum Rooting
+    {
+        Dry,
+        Flooded,
+        Either
+    }
+
     // Rules of a plant species. Durations are in simulation steps.
     public sealed class Species
     {
@@ -49,6 +57,10 @@ namespace Eco.Sim
 
         // It only grows at the water's edge: water beside its ground or its base.
         public bool NeedsWater { get; set; }
+
+        // Where its base stands: in the air on dry ground (most plants), in water one block deep
+        // (water lilies), or either (swamp cypresses). Grounds are then those of the bed.
+        public Rooting Rooting { get; set; } = Rooting.Dry;
 
         // How well the species does in a climate, from 0 (it cannot live there) to 1: its seeds take
         // that often, and it grows that fast.

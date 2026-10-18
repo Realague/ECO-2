@@ -24,6 +24,8 @@ MonoBehaviour:
   climateTolerance: 0.12
   grounds: 7
   needsWater: 0
+  rooting: 0
+  floatsOnWater: 0
   woodYield: 0
   height: 0.7
   width: 0.5
@@ -33,8 +35,10 @@ MonoBehaviour:
       material: {fileID: 2100000, guid: 9fc13ef9cb5b1444588994d7f9482d7c, type: 2}
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
   - parts:
     - mesh: {fileID: 4300000, guid: bf32ec8d7b6a240428a44d1db543f817, type: 2}
       material: {fileID: 2100000, guid: 9fc13ef9cb5b1444588994d7f9482d7c, type: 2}
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}

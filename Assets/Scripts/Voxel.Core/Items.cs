@@ -63,6 +63,7 @@ namespace Voxel.Core
                 case Blocks.RockSalt: return "Rock salt";
                 case Blocks.Flint: return "Flint";
                 case Blocks.Bedrock: return "Bedrock";
+                case Blocks.Mud: return "Mud";
                 case Wood: return "Wood";
                 default: return IsSeed(item) ? "Seed" : "Unknown item";
             }

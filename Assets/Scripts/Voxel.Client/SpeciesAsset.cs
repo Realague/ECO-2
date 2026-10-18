@@ -45,7 +45,8 @@ namespace Voxel.Client
             Sand = 4,
             Snow = 8,
             Clay = 16,
-            Gravel = 32
+            Gravel = 32,
+            Mud = 64
         }
 
         [Header("Climate and ground")]
@@ -58,6 +59,10 @@ namespace Voxel.Client
         [SerializeField] private Ground grounds = Ground.Grass | Ground.Dirt;
         [Tooltip("Only grows at the water's edge.")]
         [SerializeField] private bool needsWater;
+        [Tooltip("Where its base stands: on dry ground, in water one block deep, or either. Grounds are then those of the bed.")]
+        [SerializeField] private Rooting rooting = Rooting.Dry;
+        [Tooltip("Drawn at the water's surface rather than on the bed (water lilies).")]
+        [SerializeField] private bool floatsOnWater;
 
         [Header("Harvest")]
         [Tooltip("Wood obtained by felling an adult plant; a younger plant gives less.")]
@@ -95,6 +100,8 @@ namespace Voxel.Client
 
         public int WoodYield => woodYield;
 
+        public bool FloatsOnWater => floatsOnWater;
+
         public Species ToSpecies()
         {
             return new Species
@@ -115,7 +122,8 @@ namespace Voxel.Client
                 WetnessMax = idealWetness.y,
                 ClimateTolerance = climateTolerance,
                 Grounds = GroundBlocks(),
-                NeedsWater = needsWater
+                NeedsWater = needsWater,
+                Rooting = rooting
             };
         }
 
@@ -128,6 +136,7 @@ namespace Voxel.Client
             if ((grounds & Ground.Snow) != 0) blocks.Add(Blocks.Snow);
             if ((grounds & Ground.Clay) != 0) blocks.Add(Blocks.Clay);
             if ((grounds & Ground.Gravel) != 0) blocks.Add(Blocks.Gravel);
+            if ((grounds & Ground.Mud) != 0) blocks.Add(Blocks.Mud);
             return blocks.ToArray();
         }
     }

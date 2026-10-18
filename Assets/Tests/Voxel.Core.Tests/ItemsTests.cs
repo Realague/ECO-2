@@ -80,7 +80,7 @@ namespace Voxel.Core.Tests
         {
             for (ushort type = Blocks.Air; type <= Blocks.LastType; type++)
             {
-                if (type >= 4 && type <= 6) continue;
+                if ((type >= 4 && type <= 6) || (type >= 26 && type <= 31)) continue;
                 Assert.IsFalse(Blocks.IsRetired(type), Items.NameOf(type));
             }
         }

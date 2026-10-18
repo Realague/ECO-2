@@ -12,6 +12,14 @@ namespace Voxel.Client
         private static readonly Color LushGrass = new Color(0.22f, 0.55f, 0.16f);
         private static readonly Color ColdGrass = new Color(0.42f, 0.58f, 0.52f);
 
+        // Grass where it is hot and very wet (the jungle), and in marshes.
+        private static readonly Color TropicalGrass = new Color(0.10f, 0.56f, 0.12f);
+        private static readonly Color MarshGrass = new Color(0.33f, 0.40f, 0.16f);
+
+        // Above this temperature and humidity both, grass turns towards TropicalGrass, fully TropicalRange higher.
+        private const float TropicalStart = 0.6f;
+        private const float TropicalRange = 0.2f;
+
         // Below this temperature grass turns towards ColdGrass, fully ColdRange lower.
         private const float ColdStart = 0.38f;
         private const float ColdRange = 0.3f;
@@ -26,13 +34,17 @@ namespace Voxel.Client
         // The colour of grass in a mild, fairly wet climate: what grass looks like before the climate is known.
         public static Color MildGrass => Grass(IntNoise.One / 2, IntNoise.One * 6 / 10);
 
-        // Temperature and humidity in fixed point (IntNoise.One is 1), as Geography gives them.
-        public static Color Grass(int temperature, int humidity)
+        // Temperature and humidity in fixed point (IntNoise.One is 1), as Geography gives them; marsh,
+        // from 0 to 1, the share of marsh in the place (Landscape.IsMarsh).
+        public static Color Grass(int temperature, int humidity, float marsh = 0f)
         {
             float warmth = (float)temperature / IntNoise.One;
             float wetness = (float)humidity / IntNoise.One;
             Color colour = Color.Lerp(DryGrass, LushGrass, Mathf.SmoothStep(0f, 1f, wetness));
-            return Color.Lerp(colour, ColdGrass, Mathf.Clamp01((ColdStart - warmth) / ColdRange));
+            float tropical = Mathf.Clamp01(Mathf.Min(warmth - TropicalStart, wetness - TropicalStart) / TropicalRange);
+            colour = Color.Lerp(colour, TropicalGrass, Mathf.SmoothStep(0f, 1f, tropical));
+            colour = Color.Lerp(colour, ColdGrass, Mathf.Clamp01((ColdStart - warmth) / ColdRange));
+            return Color.Lerp(colour, MarshGrass, marsh);
         }
 
         public static Color TemperatureLayer(int temperature)

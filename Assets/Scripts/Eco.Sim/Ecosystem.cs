@@ -139,7 +139,7 @@ namespace Eco.Sim
             if (plantAtColumn[ColumnIndex(x, z)] != 0) return false;
 
             Species kind = species[speciesIndex];
-            int y = SurfaceAt(x, z);
+            int y = PlantBaseAt(kind, x, z);
             if (!HasGroundAndRoom(kind, x, y, z)) return false;
             if (kind.NeedsWater && !IsBesideWater(x, y, z)) return false;
 
@@ -243,7 +243,7 @@ namespace Eco.Sim
             float vigour = suitability[speciesIndex][cell];
             if (vigour <= 0f) return false;
 
-            int y = SurfaceAt(x, z);
+            int y = PlantBaseAt(kind, x, z);
             if (!HasGroundAndRoom(kind, x, y, z)) return false;
             if (kind.NeedsWater && !IsBesideWater(x, y, z)) return false;
             if (fertility[cell] < kind.MinFertility) return false;
@@ -389,14 +389,32 @@ namespace Eco.Sim
 
         private static float Lerp(float from, float to, float t) => from + (to - from) * t;
 
-        // A plant needs a ground its species grows on (Species.Grounds) under it, and air at its
-        // base: not under water.
+        // A plant needs a ground its species grows on (Species.Grounds) under it, and at its base air
+        // (not under water) or, for water plants (Species.Rooting), water one block deep with air above.
         private bool HasGroundAndRoom(Species kind, int x, int y, int z)
         {
             if (y <= 0 || y >= world.SizeY) return false;
             if (!kind.GrowsOn(world.GetBlock(x, y - 1, z))) return false;
 
-            return Blocks.TypeOf(world.GetBlock(x, y, z)) == Blocks.Air;
+            ushort at = Blocks.TypeOf(world.GetBlock(x, y, z));
+            if (at == Blocks.Air) return kind.Rooting != Rooting.Flooded;
+            if (at == Blocks.Water) return kind.Rooting != Rooting.Dry && Blocks.TypeOf(world.GetBlock(x, y + 1, z)) == Blocks.Air;
+            return false;
+        }
+
+        // Where a plant of this species would stand in the column: above dry ground, or for water
+        // plants on the bed of water one block deep; -1 where neither.
+        private int PlantBaseAt(Species kind, int x, int z)
+        {
+            if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) return -1;
+
+            int column = ColumnIndex(x, z);
+            ReadColumn(column, x, z);
+            int top = columnTop[column] - 1;
+            if (!columnWet[column]) return kind.Rooting == Rooting.Flooded ? -1 : top;
+
+            int bed = columnBed[column];
+            return kind.Rooting != Rooting.Dry && top - bed == 1 ? bed : -1;
         }
 
         // Water in one of the eight columns around, beside the plant's ground or its base.

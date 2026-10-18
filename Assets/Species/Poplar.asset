@@ -24,6 +24,8 @@ MonoBehaviour:
   climateTolerance: 0.1
   grounds: 3
   needsWater: 0
+  rooting: 0
+  floatsOnWater: 0
   woodYield: 3
   height: 9
   width: 0.8

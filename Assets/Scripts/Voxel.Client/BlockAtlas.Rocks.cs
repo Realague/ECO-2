@@ -37,6 +37,8 @@ namespace Voxel.Client
         // bright and warm, so whiter snow saturates to a flat pink in its light.
         private static readonly Color[] SnowShades = Palette(0x7F93B5, 0x9DB0CC, 0xB8C8DE, 0xCCDAEB, 0xDCE6F3);
         private static readonly Color SnowSparkle = new Color(1f, 1f, 1f);
+        private static readonly Color[] MudShades = Palette(0x241A12, 0x33261A, 0x453424, 0x584432, 0x6B5641);
+        private static readonly Color[] PuddleShades = Palette(0x2A2622, 0x36322D, 0x45413A, 0x5A574F);
 
         private static bool IsPainted(int tile)
         {
@@ -58,6 +60,7 @@ namespace Voxel.Client
                 case FlintTile:
                 case BedrockTile:
                 case SnowTile:
+                case MudTile:
                     return true;
                 default:
                     return false;
@@ -85,6 +88,7 @@ namespace Voxel.Client
                 case GoldTile: return Ore(tile, x, y, light, GoldShades);
                 case SaltTile: return SaltColour(tile, x, y, light);
                 case SnowTile: return SnowColour(tile, x, y, light);
+                case MudTile: return MudColour(tile, x, y, light);
                 default: return FlintColour(tile, x, y, light);
             }
         }
@@ -133,6 +137,9 @@ namespace Voxel.Client
                     return Fbm(tile + 1, x, y, 8, 3) * 0.5f + NoduleDome(tile, x, y) * 1.2f;
                 case SnowTile:
                     return Fbm(tile + 1, x, y, 4, 3) * 0.5f + SnowRipple(tile, x, y) * 0.35f;
+                case MudTile:
+                    // Puddles lie flat; around them the mud is trampled into soft lumps, with a few pebbles.
+                    return IsPuddle(tile, x, y) ? 0.2f : Fbm(tile + 1, x, y, 4, 4) * 0.6f + (Noise(tile + 9, x / 2, y / 2) > 0.985f ? 0.5f : 0f);
                 default:
                     // Ores: the stone around, with the nuggets standing out of it.
                     return StoneHeight(tile, x, y) + OreCrystal(tile, x, y, out _) * 1.4f;
@@ -339,6 +346,31 @@ namespace Voxel.Client
             float wave = (3f * y + x) / TileSize + Fbm(tile + 5, x, y, 4, 2) * 1.5f;
             float within = wave - Mathf.Floor(wave);
             return within < 0.75f ? within / 0.75f : (1f - within) / 0.25f;
+        }
+
+        // ---- Mud ----
+
+        // Dark wet earth, trampled into soft lumps, with greyish puddles that catch the sky: a light
+        // streak along their upper left edge, as water's surface shines.
+        private static Color MudColour(int tile, int x, int y, float light)
+        {
+            if (IsPuddle(tile, x, y))
+            {
+                bool shore = !IsPuddle(tile, x - 1, y + 1);
+                float sheen = 0.45f + (Fbm(tile + 6, x, y, 8, 2) - 0.5f) * 0.5f + (shore ? 0.35f : 0f);
+                return Ramp(PuddleShades, sheen, x, y);
+            }
+
+            if (Noise(tile + 9, x / 2, y / 2) > 0.985f) return Ramp(GravelBrown, 0.3f + light * 1.5f, x, y);
+
+            float grain = (Noise(tile + 8, x, y) - 0.5f) * 0.08f;
+            float tone = 0.45f + (Fbm(tile + 1, x, y, 4, 4) - 0.5f) * 0.8f + grain + light * 1.0f;
+            return Ramp(MudShades, tone, x, y);
+        }
+
+        private static bool IsPuddle(int tile, int x, int y)
+        {
+            return Fbm(tile + 4, Wrap(x), Wrap(y), 4, 3) > 0.64f;
         }
 
         // ---- Tools ----

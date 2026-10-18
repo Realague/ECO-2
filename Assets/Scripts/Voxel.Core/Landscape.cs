@@ -6,7 +6,8 @@ namespace Voxel.Core
     // world from its seed and size: the relief (TerrainGenerator.ReliefHeight) lowered into lake
     // basins and, along the west edge, into a sea; lakes filled up to where they would spill;
     // rivers that gather the rain of the land and run down through lakes to the sea or the
-    // world's edge; ice where the water is cold; and the climate (Geography) over all of it.
+    // world's edge; the climate (Geography) over all of it; marshes, with their shallow pools, on
+    // low land where it is very wet; and ice where the water is cold.
     //
     // Like the terrain, everything is integer and done in a fixed order, so the server and every
     // client get exactly the same landscape without anything being sent.
@@ -95,6 +96,21 @@ namespace Voxel.Core
 
         private const int BeachWidth = 2;
 
+        // Marshes: low, gentle and very wet land that is not cold, its edges ragged by noise of about
+        // 32 blocks (which moves the humidity threshold by up to a tenth either way); only stretches
+        // of at least MinMarshColumns. Within them, pools one block deep where noise of about 4
+        // blocks is high and the ground is flat all around.
+        private const int MarshHumidity = IntNoise.One * 66 / 100;
+        private const int MarshTemperature = IntNoise.One * 25 / 100;
+        private const int MarshHighest = SeaLevel + 4;
+        private const int MarshCellShift = 5;
+        private const int MarshEdgeTenths = 2;
+        private const uint MarshSeedMask = 0x3C6EF372u;
+        private const int MinMarshColumns = 300;
+        private const int PoolCellShift = 2;
+        private const int PoolFloor = IntNoise.One * 50 / 100;
+        private const uint PoolSeedMask = 0x9E3779B9u;
+
         private static Landscape last;
 
         private readonly int seed;
@@ -115,6 +131,9 @@ namespace Voxel.Core
         private readonly short[] coverBottom;
         private readonly bool[] marble;
 
+        // Per block column: part of a marsh, its pools or the land between them.
+        private readonly bool[] marsh;
+
         private Landscape(int seed, int sizeX, int sizeZ)
         {
             this.seed = seed;
@@ -131,6 +150,7 @@ namespace Voxel.Core
             cover = new ushort[count];
             coverBottom = new short[count];
             marble = new bool[count];
+            marsh = new bool[count];
         }
 
         // What a column's water is part of.
@@ -138,6 +158,7 @@ namespace Voxel.Core
         private const byte SeaWater = 1;
         private const byte LakeWater = 2;
         private const byte RiverWater = 3;
+        private const byte MarshWater = 4;
 
         // A column's geology, as TerrainGenerator lays it out from the bottom up: bedrock, granite,
         // then from CoverBottom the cover rock (with a band of marble at its base where Marble is
@@ -199,6 +220,12 @@ namespace Voxel.Core
         // Whether the topmost water block is ice.
         public bool IsIce(int x, int z) => ice[x + sizeX * z];
 
+        // Whether the column is part of a marsh: one of its pools or the land between them.
+        public bool IsMarsh(int x, int z) => marsh[x + sizeX * z];
+
+        // Whether the column's water is a marsh pool (one block deep).
+        public bool IsMarshPool(int x, int z) => kind[x + sizeX * z] == MarshWater;
+
         private void Build()
         {
             int count = sizeX * sizeZ;
@@ -258,6 +285,9 @@ namespace Voxel.Core
             Geography = Geography.Create(seed, sizeX, sizeZ,
                 (x, z) => Math.Max(Ground(x, z), WaterTop(x, z)),
                 (x, z) => WaterTop(x, z) >= 0);
+
+            // Marshes come from the climate, so the climate is that of the land before them.
+            LayMarshes(noiseSeed);
             MarkIce();
             LayGeology(noiseSeed);
             Caves = new Caves(seed, this, sizeX, sizeZ);
@@ -294,9 +324,17 @@ namespace Voxel.Core
                     bool snowy = warmth < SnowTemperature || (height >= SnowLine && warmth < HighSnowTemperature);
                     if (water[index] > height)
                     {
-                        ushort bed = kind[index] == RiverWater ? Blocks.Gravel : kind[index] == SeaWater ? Blocks.Sand : Blocks.Clay;
+                        ushort bed = kind[index] == RiverWater ? Blocks.Gravel
+                            : kind[index] == SeaWater ? Blocks.Sand
+                            : kind[index] == MarshWater ? Blocks.Mud
+                            : Blocks.Clay;
                         top[index] = bed;
                         under[index] = bed;
+                    }
+                    else if (marsh[index])
+                    {
+                        top[index] = Blocks.Grass;
+                        under[index] = Blocks.Mud;
                     }
                     else if (snowy)
                     {
@@ -340,6 +378,109 @@ namespace Voxel.Core
             }
 
             return near;
+        }
+
+        // Marshes spread over low, gentle, dry land where it is very wet and not cold; small stretches
+        // are left out. In them, a pool one block deep is dug where no ground around is lower:
+        // its water stands where its ground was, no higher than the ground beside it, so it is always
+        // held, and pools never touch other water, whose surface may be lower.
+        private void LayMarshes(uint noiseSeed)
+        {
+            int count = sizeX * sizeZ;
+            for (int z = 0; z < sizeZ; z++)
+            {
+                for (int x = 0; x < sizeX; x++)
+                {
+                    int index = x + sizeX * z;
+                    int height = ground[index];
+                    if (water[index] >= 0 || rock[index] || height > MarshHighest || !IsGentle(x, z, height)) continue;
+                    if (Geography.TemperatureAt(x, z) < MarshTemperature) continue;
+
+                    int edge = (IntNoise.TurnedFractal(x, z, MarshCellShift, 2, noiseSeed ^ MarshSeedMask) - IntNoise.One / 2) * MarshEdgeTenths / 10;
+                    marsh[index] = Geography.HumidityAt(x, z) + edge >= MarshHumidity;
+                }
+            }
+
+            DropSmallAreas(marsh, MinMarshColumns);
+
+            var pool = new bool[count];
+            for (int z = 1; z < sizeZ - 1; z++)
+            {
+                for (int x = 1; x < sizeX - 1; x++)
+                {
+                    int index = x + sizeX * z;
+                    if (!marsh[index] || IntNoise.TurnedFractal(x, z, PoolCellShift, 2, noiseSeed ^ PoolSeedMask) < PoolFloor) continue;
+
+                    // Two pools side by side are thus at the same height: each needs the other to be no lower.
+                    bool held = true;
+                    for (int dz = -1; dz <= 1 && held; dz++)
+                    {
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            int around = index + dx + sizeX * dz;
+                            if (ground[around] < ground[index] || water[around] >= 0)
+                            {
+                                held = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    pool[index] = held;
+                }
+            }
+
+            for (int index = 0; index < count; index++)
+            {
+                if (!pool[index]) continue;
+
+                water[index] = ground[index];
+                ground[index]--;
+                kind[index] = MarshWater;
+            }
+        }
+
+        // Neighbours at most one block higher or lower.
+        private bool IsGentle(int x, int z, int height)
+        {
+            return Math.Abs(GroundOrSame(x - 1, z, height) - height) <= 1 && Math.Abs(GroundOrSame(x + 1, z, height) - height) <= 1
+                   && Math.Abs(GroundOrSame(x, z - 1, height) - height) <= 1 && Math.Abs(GroundOrSame(x, z + 1, height) - height) <= 1;
+        }
+
+        // Clears the stretches of the mask (columns joined side by side) smaller than minColumns.
+        private void DropSmallAreas(bool[] mask, int minColumns)
+        {
+            int count = mask.Length;
+            var seen = new bool[count];
+            var area = new System.Collections.Generic.List<int>();
+            var stack = new System.Collections.Generic.Stack<int>();
+
+            for (int start = 0; start < count; start++)
+            {
+                if (!mask[start] || seen[start]) continue;
+
+                area.Clear();
+                seen[start] = true;
+                stack.Push(start);
+                while (stack.Count > 0)
+                {
+                    int index = stack.Pop();
+                    area.Add(index);
+                    int x = index % sizeX;
+                    int z = index / sizeX;
+                    Join(x + 1, z, mask, seen, stack);
+                    Join(x - 1, z, mask, seen, stack);
+                    Join(x, z + 1, mask, seen, stack);
+                    Join(x, z - 1, mask, seen, stack);
+                }
+
+                if (area.Count >= minColumns) continue;
+
+                foreach (int index in area)
+                {
+                    mask[index] = false;
+                }
+            }
         }
 
         // Less than a block of smooth noise, without straight lines that water would follow.

@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c90fb7040ab281a4dabfdc0c96f5baf2, type: 3}
+  m_Name: Cypress
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.SpeciesAsset
+  maturityDays: 3.5
+  lifespanDays: 50
+  seedAttemptsPerDay: 1.5
+  seedRange: 5
+  spacing: 4
+  minFertility: 0.3
+  fertilityUsePerDay: 0.06
+  idealWarmth: {x: 0.4, y: 0.9}
+  idealWetness: {x: 0.72, y: 1}
+  climateTolerance: 0.08
+  grounds: 83
+  needsWater: 1
+  rooting: 2
+  floatsOnWater: 0
+  woodYield: 4
+  height: 8.6
+  width: 1
+  models:
+  - parts:
+    - mesh: {fileID: 4300000, guid: 7ec6c27d7adf94c4ca55154621575220, type: 2}
+      material: {fileID: 2100000, guid: b88d20421c7e6714f8860a23ff932fde, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: 783396ef2d16b9c42b6ca5abfedffbfd, type: 2}
+      material: {fileID: 2100000, guid: fa754d052e7fc7d4db2063ffece3dc7a, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+  - parts:
+    - mesh: {fileID: 4300000, guid: d3424cbda11188d478c91c3bc7e7c93e, type: 2}
+      material: {fileID: 2100000, guid: b88d20421c7e6714f8860a23ff932fde, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: 6569f83e3fa720342a8c1a7271e93406, type: 2}
+      material: {fileID: 2100000, guid: fa754d052e7fc7d4db2063ffece3dc7a, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}

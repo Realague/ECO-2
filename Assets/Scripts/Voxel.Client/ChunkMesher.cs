@@ -25,7 +25,8 @@ namespace Voxel.Client
 
         private const int FaceCount = 6;
         private const float UvInset = 0.01f;
-        private const float WaterSurface = 0.875f;
+        // Height of a water surface open to the air, above the bottom of its block.
+        public const float WaterSurface = 0.875f;
 
         private static readonly Vector3Int[] FaceNormals =
         {

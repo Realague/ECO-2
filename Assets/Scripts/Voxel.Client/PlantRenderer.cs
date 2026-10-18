@@ -231,6 +231,7 @@ namespace Voxel.Client
 
                     float size = PlantShape.Scale(plant.Stage);
                     var foot = new Vector3(plant.X + 0.5f, plant.Y, plant.Z + 0.5f);
+                    if (renderer.species[plant.SpeciesIndex].FloatsOnWater) foot.y += ChunkMesher.WaterSurface;
                     Quaternion turn = TurnOf(plant.X, plant.Z);
                     IReadOnlyList<SpeciesAsset.Part> parts = renderer.lookParts[look];
                     for (int p = 0; p < parts.Count; p++)

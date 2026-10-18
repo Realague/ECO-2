@@ -316,6 +316,7 @@ namespace Voxel.Client
             int minZ = tileZ * TileSize;
             float heightScale = 1f / world.SizeY;
             Geography geography = world.Geography;
+            Landscape landscape = Landscape.For(world.Seed, world.SizeX, world.SizeZ);
 
             for (int z = minZ; z < minZ + TileSize; z++)
             {
@@ -341,7 +342,7 @@ namespace Voxel.Client
                         else
                         {
                             ground = top == Blocks.Grass
-                                ? ClimateColours.Grass(geography.TemperatureAt(x, z), geography.HumidityAt(x, z))
+                                ? ClimateColours.Grass(geography.TemperatureAt(x, z), geography.HumidityAt(x, z), landscape.IsMarsh(x, z) ? 1f : 0f)
                                 : BlockAtlas.MapColour(top);
                         }
 

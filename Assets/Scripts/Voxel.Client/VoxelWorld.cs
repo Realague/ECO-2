@@ -17,8 +17,8 @@ namespace Voxel.Client
             new BlockPos(0, 0, 1), new BlockPos(0, 0, -1)
         };
 
-        // In chunks: 32 × 8 × 32 is 512 × 128 × 512 blocks.
-        [SerializeField] private Vector3Int sizeInChunks = new Vector3Int(32, 8, 32);
+        // In chunks: 64 × 8 × 64 is 1024 × 128 × 1024 blocks.
+        [SerializeField] private Vector3Int sizeInChunks = new Vector3Int(64, 8, 64);
         [SerializeField] private int seed = 1;
         [SerializeField] private Material blockMaterial;
 

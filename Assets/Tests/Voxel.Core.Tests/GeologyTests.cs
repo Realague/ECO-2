@@ -53,6 +53,7 @@ namespace Voxel.Core.Tests
         [TestCase(Blocks.Snow)]
         [TestCase(Blocks.Gravel)]
         [TestCase(Blocks.Clay)]
+        [TestCase(Blocks.Mud)]
         [TestCase(Blocks.CoalOre)]
         [TestCase(Blocks.IronOre)]
         [TestCase(Blocks.CopperOre)]

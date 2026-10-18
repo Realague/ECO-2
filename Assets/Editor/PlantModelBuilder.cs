@@ -7,7 +7,8 @@ namespace Voxel.EditorTools
 {
     // Builds the plants' models from boxes, in the blocky style of the world, and gives them to the
     // species (Assets/Species): oaks, birches, poplars, acacias and pines, bushes, tufts of green and
-    // of dry grass, cacti and reeds, two or three models each. Each plant shows one of its species'
+    // of dry grass, cacti and reeds, jungle trees, palms, ferns, willows, swamp cypresses and water
+    // lilies, two or three models each. Each plant shows one of its species'
     // models, picked from its column (SpeciesAsset.ModelAt).
     //
     // Within a model, the boxes of one material are merged into one mesh, drawn as one part.
@@ -74,6 +75,16 @@ namespace Voxel.EditorTools
         private const string CactusSkin = "PlantCactus";
         private const string ReedStalk = "PlantReed";
         private const string ReedHead = "PlantReedHead";
+        private const string JungleLeaves = "PlantLeavesJungle";
+        private const string GreyBark = "PlantBarkGrey";
+        private const string PalmTrunk = "PlantPalmTrunk";
+        private const string Frond = "PlantFrond";
+        private const string FernLeaves = "PlantFern";
+        private const string WillowLeaves = "PlantWillow";
+        private const string CypressBark = "PlantCypressBark";
+        private const string CypressLeaves = "PlantCypress";
+        private const string LilyPad = "PlantLily";
+        private const string LilyFlower = "PlantLilyFlower";
 
         private static readonly MaterialLook[] Materials =
         {
@@ -90,6 +101,16 @@ namespace Voxel.EditorTools
             new MaterialLook { Name = CactusSkin, Texture = "Bark", Colour = new Color(0.3f, 0.55f, 0.27f), Smoothness = 0.3f },
             new MaterialLook { Name = ReedStalk, Texture = "Bark", Colour = new Color(0.5f, 0.62f, 0.3f), Smoothness = 0.1f },
             new MaterialLook { Name = ReedHead, Texture = null, Colour = new Color(0.42f, 0.27f, 0.15f), Smoothness = 0.1f },
+            new MaterialLook { Name = JungleLeaves, Texture = "Leaves", Colour = new Color(0.1f, 0.42f, 0.14f), Smoothness = 0.15f },
+            new MaterialLook { Name = GreyBark, Texture = "Bark", Colour = new Color(0.58f, 0.55f, 0.47f), Smoothness = 0.1f },
+            new MaterialLook { Name = PalmTrunk, Texture = "Bark", Colour = new Color(0.6f, 0.49f, 0.33f), Smoothness = 0.1f },
+            new MaterialLook { Name = Frond, Texture = "Leaves", Colour = new Color(0.3f, 0.58f, 0.2f), Smoothness = 0.15f },
+            new MaterialLook { Name = FernLeaves, Texture = "Leaves", Colour = new Color(0.2f, 0.52f, 0.2f), Smoothness = 0.1f },
+            new MaterialLook { Name = WillowLeaves, Texture = "Leaves", Colour = new Color(0.46f, 0.58f, 0.31f), Smoothness = 0.1f },
+            new MaterialLook { Name = CypressBark, Texture = "Bark", Colour = new Color(0.52f, 0.36f, 0.27f), Smoothness = 0.1f },
+            new MaterialLook { Name = CypressLeaves, Texture = "Leaves", Colour = new Color(0.26f, 0.42f, 0.2f), Smoothness = 0.1f },
+            new MaterialLook { Name = LilyPad, Texture = "Leaves", Colour = new Color(0.24f, 0.52f, 0.2f), Smoothness = 0.4f },
+            new MaterialLook { Name = LilyFlower, Texture = null, Colour = new Color(0.96f, 0.82f, 0.88f), Smoothness = 0.3f },
         };
 
         // Faces of different boxes of one model never lie in the same plane: they would flicker where they overlap.
@@ -663,6 +684,412 @@ namespace Voxel.EditorTools
             },
         };
 
+        // Emergent trees of the jungle: a tall bare trunk on buttress roots, a few branches near the
+        // top and a wide flat crown well above the rest of the forest.
+        private static readonly Model[] JungleTrees =
+        {
+            new Model
+            {
+                Name = "JungleTree",
+                Parts = new[]
+                {
+                    new Part
+                    {
+                        Material = GreyBark,
+                        Boxes = new[]
+                        {
+                            new Box(0f, 7f, 0f, 0.9f, 14f, 0.9f),
+                            new Box(0.62f, 0.75f, 0.03f, 0.84f, 1.5f, 0.16f),
+                            new Box(-0.6f, 0.7f, -0.04f, 0.8f, 1.4f, 0.17f),
+                            new Box(0.02f, 0.8f, 0.61f, 0.15f, 1.6f, 0.82f),
+                            new Box(-0.03f, 0.65f, -0.58f, 0.18f, 1.3f, 0.76f),
+                            new Box(1.0f, 13.6f, 0.1f, 0.35f, 2.4f, 0.35f, tiltZ: -55f),
+                            new Box(-0.9f, 13.9f, -0.2f, 0.32f, 2.2f, 0.32f, tiltZ: 50f),
+                            new Box(0.1f, 14.1f, 0.9f, 0.3f, 2.0f, 0.3f, tiltX: 50f),
+                        }
+                    },
+                    new Part
+                    {
+                        Material = JungleLeaves,
+                        Boxes = new[]
+                        {
+                            new Box(0.2f, 15.2f, 0f, 6.2f, 1.4f, 5.6f),
+                            new Box(-0.1f, 16.3f, 0.2f, 4.4f, 1.1f, 4.0f),
+                            new Box(2.6f, 14.7f, -1.2f, 2.2f, 1.1f, 2.4f),
+                            new Box(-2.5f, 14.9f, 1.4f, 2.4f, 1.0f, 2.2f),
+                            new Box(0.4f, 14.55f, -2.7f, 2.6f, 0.9f, 1.8f),
+                            new Box(0.65f, 8.3f, 0.2f, 0.7f, 0.6f, 0.9f),
+                        }
+                    },
+                    new Part
+                    {
+                        Material = LightLeaves,
+                        Boxes = new[]
+                        {
+                            new Box(0f, 17.05f, 0.1f, 2.4f, 0.45f, 2.2f),
+                            new Box(1.8f, 15.95f, 1.3f, 1.6f, 0.5f, 1.5f),
+                        }
+                    },
+                }
+            },
+            new Model
+            {
+                Name = "JungleTreeTall",
+                Parts = new[]
+                {
+                    new Part
+                    {
+                        Material = GreyBark,
+                        Boxes = new[]
+                        {
+                            new Box(0f, 8.5f, 0f, 0.8f, 17f, 0.8f),
+                            new Box(0.57f, 0.85f, -0.02f, 0.76f, 1.7f, 0.15f),
+                            new Box(-0.3f, 0.7f, 0.5f, 0.14f, 1.4f, 0.7f),
+                            new Box(-0.28f, 0.75f, -0.52f, 0.62f, 1.5f, 0.13f),
+                            new Box(0.85f, 11.6f, 0.2f, 0.26f, 1.8f, 0.26f, tiltZ: -60f),
+                            new Box(-0.8f, 12.3f, -0.3f, 0.27f, 1.6f, 0.27f, tiltZ: 60f),
+                        }
+                    },
+                    new Part
+                    {
+                        Material = JungleLeaves,
+                        Boxes = new[]
+                        {
+                            new Box(0f, 17.6f, 0f, 5.0f, 1.2f, 5.4f),
+                            new Box(0.3f, 18.5f, -0.2f, 3.2f, 0.9f, 3.4f),
+                            new Box(1.6f, 12.2f, 0.4f, 2.6f, 0.8f, 2.2f),
+                            new Box(-1.5f, 12.9f, -0.6f, 2.2f, 0.85f, 2.4f),
+                        }
+                    },
+                    new Part
+                    {
+                        Material = LightLeaves,
+                        Boxes = new[]
+                        {
+                            new Box(0.25f, 19.15f, -0.1f, 1.8f, 0.4f, 1.9f),
+                            new Box(-1.6f, 18.05f, 1.5f, 1.3f, 0.45f, 1.2f),
+                        }
+                    },
+                }
+            },
+        };
+
+        // Palms: a trunk of segments bending a little more at each, four drooping fronds, coconuts.
+        private static readonly Model[] Palms =
+        {
+            new Model
+            {
+                Name = "Palm",
+                Parts = new[]
+                {
+                    new Part
+                    {
+                        Material = PalmTrunk,
+                        Boxes = new[]
+                        {
+                            new Box(0f, 0.9f, 0f, 0.45f, 1.8f, 0.45f),
+                            new Box(0.12f, 2.6f, 0f, 0.42f, 1.8f, 0.42f, tiltZ: -8f),
+                            new Box(0.38f, 4.3f, 0f, 0.4f, 1.8f, 0.4f, tiltZ: -12f),
+                            new Box(0.72f, 5.9f, 0f, 0.38f, 1.6f, 0.38f, tiltZ: -16f),
+                        }
+                    },
+                    new Part
+                    {
+                        Material = Frond,
+                        Boxes = new[]
+                        {
+                            new Box(1.0f, 7.0f, 0f, 0.9f, 0.5f, 0.9f),
+                            new Box(2.25f, 6.6f, 0f, 2.4f, 0.12f, 0.6f, tiltZ: -22f),
+                            new Box(-0.25f, 6.65f, 0.05f, 2.4f, 0.13f, 0.62f, tiltZ: 22f),
+                            new Box(1.0f, 6.62f, 1.25f, 0.58f, 0.12f, 2.4f, tiltX: 22f),
+                            new Box(1.05f, 6.58f, -1.25f, 0.6f, 0.13f, 2.3f, tiltX: -24f),
+                        }
+                    },
+                    new Part
+                    {
+                        Material = ReedHead,
+                        Boxes = new[]
+                        {
+                            new Box(0.82f, 6.55f, 0.22f, 0.22f, 0.22f, 0.22f),
+                            new Box(1.12f, 6.5f, -0.17f, 0.21f, 0.21f, 0.21f),
+                        }
+                    },
+                }
+            },
+            new Model
+            {
+                Name = "PalmTall",
+                Parts = new[]
+                {
+                    new Part
+                    {
+                        Material = PalmTrunk,
+                        Boxes = new[]
+                        {
+                            new Box(0f, 1.0f, 0f, 0.44f, 2.0f, 0.44f),
+                            new Box(-0.05f, 3.0f, 0.06f, 0.41f, 2.0f, 0.41f, tiltX: 4f),
+                            new Box(-0.12f, 5.0f, 0.2f, 0.39f, 2.0f, 0.39f, tiltX: 6f),
+                            new Box(-0.2f, 6.9f, 0.38f, 0.37f, 1.8f, 0.37f, tiltX: 8f),
+                        }
+                    },
+                    new Part
+                    {
+                        Material = Frond,
+                        Boxes = new[]
+                        {
+                            new Box(-0.25f, 8.05f, 0.5f, 0.85f, 0.45f, 0.85f),
+                            new Box(1.0f, 7.7f, 0.5f, 2.5f, 0.12f, 0.58f, tiltZ: -26f),
+                            new Box(-1.5f, 7.72f, 0.52f, 2.4f, 0.13f, 0.6f, tiltZ: 24f),
+                            new Box(-0.25f, 7.68f, 1.8f, 0.6f, 0.12f, 2.5f, tiltX: 26f),
+                            new Box(-0.22f, 7.66f, -0.75f, 0.58f, 0.13f, 2.4f, tiltX: -22f),
+                            new Box(-0.2f, 8.4f, 0.55f, 0.16f, 0.6f, 0.16f),
+                        }
+                    },
+                    new Part
+                    {
+                        Material = ReedHead,
+                        Boxes = new[] { new Box(-0.05f, 7.6f, 0.55f, 0.22f, 0.22f, 0.22f) }
+                    },
+                }
+            },
+        };
+
+        // Ferns of the forest floor: fronds arching out of a crown.
+        private static readonly Model[] Ferns =
+        {
+            new Model
+            {
+                Name = "Fern",
+                Parts = new[]
+                {
+                    new Part
+                    {
+                        Material = FernLeaves,
+                        Boxes = new[]
+                        {
+                            new Box(0f, 0.15f, 0f, 0.14f, 0.3f, 0.14f),
+                            new Box(0.32f, 0.3f, 0.02f, 0.62f, 0.06f, 0.22f, tiltZ: 32f),
+                            new Box(-0.3f, 0.28f, -0.03f, 0.6f, 0.07f, 0.21f, tiltZ: -34f),
+                            new Box(0.03f, 0.32f, 0.31f, 0.2f, 0.06f, 0.64f, tiltX: -30f),
+                            new Box(-0.02f, 0.26f, -0.29f, 0.23f, 0.07f, 0.58f, tiltX: 36f),
+                        }
+                    },
+                }
+            },
+            new Model
+            {
+                Name = "FernLarge",
+                Parts = new[]
+                {
+                    new Part
+                    {
+                        Material = FernLeaves,
+                        Boxes = new[]
+                        {
+                            new Box(0f, 0.2f, 0f, 0.16f, 0.4f, 0.16f),
+                            new Box(0.42f, 0.42f, 0.05f, 0.82f, 0.06f, 0.26f, tiltZ: 38f),
+                            new Box(-0.4f, 0.4f, -0.04f, 0.8f, 0.07f, 0.25f, tiltZ: -40f),
+                            new Box(0.04f, 0.44f, 0.41f, 0.24f, 0.06f, 0.84f, tiltX: -36f),
+                            new Box(-0.05f, 0.38f, -0.4f, 0.27f, 0.07f, 0.78f, tiltX: 42f),
+                            new Box(0.3f, 0.22f, -0.28f, 0.5f, 0.05f, 0.19f, tiltZ: 18f),
+                            new Box(-0.27f, 0.2f, 0.3f, 0.18f, 0.05f, 0.52f, tiltX: -16f),
+                        }
+                    },
+                    new Part
+                    {
+                        Material = GrassBlades,
+                        Boxes = new[] { new Box(0.02f, 0.55f, 0.01f, 0.09f, 0.3f, 0.09f) }
+                    },
+                }
+            },
+        };
+
+        // Weeping willows: a short thick trunk, a round crown and curtains of leaves hanging to the ground.
+        private static readonly Model[] Willows =
+        {
+            new Model
+            {
+                Name = "Willow",
+                Parts = new[]
+                {
+                    new Part
+                    {
+                        Material = Bark,
+                        Boxes = new[]
+                        {
+                            new Box(0f, 0.2f, 0f, 0.9f, 0.4f, 0.9f),
+                            new Box(0f, 1.6f, 0f, 0.65f, 3.2f, 0.65f),
+                            new Box(0.55f, 3.3f, 0.1f, 0.3f, 1.3f, 0.3f, tiltZ: -45f),
+                            new Box(-0.5f, 3.4f, -0.15f, 0.28f, 1.2f, 0.28f, tiltZ: 42f),
+                        }
+                    },
+                    new Part
+                    {
+                        Material = WillowLeaves,
+                        Boxes = new[]
+                        {
+                            new Box(0f, 4.3f, 0f, 3.4f, 1.0f, 3.4f),
+                            new Box(0.1f, 5.0f, -0.05f, 2.4f, 0.6f, 2.3f),
+                            new Box(1.82f, 3.1f, 0f, 0.26f, 2.2f, 3.0f),
+                            new Box(-1.8f, 2.95f, 0.05f, 0.24f, 2.5f, 2.9f),
+                            new Box(0f, 3.15f, 1.81f, 3.1f, 2.1f, 0.25f),
+                            new Box(0.05f, 3.0f, -1.83f, 2.8f, 2.3f, 0.27f),
+                        }
+                    },
+                    new Part
+                    {
+                        Material = LightLeaves,
+                        Boxes = new[] { new Box(0.2f, 5.45f, 0.1f, 1.6f, 0.35f, 1.5f) }
+                    },
+                }
+            },
+            new Model
+            {
+                Name = "WillowLeaning",
+                Parts = new[]
+                {
+                    new Part
+                    {
+                        Material = Bark,
+                        Boxes = new[]
+                        {
+                            new Box(0f, 0.2f, 0f, 0.85f, 0.4f, 0.85f),
+                            new Box(0.3f, 1.5f, 0f, 0.6f, 2.8f, 0.6f, tiltZ: -14f),
+                            new Box(0.95f, 3.0f, 0.1f, 0.3f, 1.2f, 0.3f, tiltZ: -40f),
+                        }
+                    },
+                    new Part
+                    {
+                        Material = WillowLeaves,
+                        Boxes = new[]
+                        {
+                            new Box(0.7f, 3.9f, 0f, 3.6f, 0.9f, 3.0f),
+                            new Box(0.8f, 4.55f, 0.1f, 2.2f, 0.55f, 2.0f),
+                            new Box(2.6f, 2.7f, 0.05f, 0.24f, 2.2f, 2.6f),
+                            new Box(-1.15f, 2.85f, -0.05f, 0.25f, 1.9f, 2.5f),
+                            new Box(0.65f, 2.8f, 1.58f, 3.2f, 2.0f, 0.24f),
+                            new Box(0.75f, 2.65f, -1.57f, 3.0f, 2.3f, 0.26f),
+                        }
+                    },
+                }
+            },
+        };
+
+        // Bald cypresses: a flared base with knees about it, a straight trunk and tiers of feathery
+        // foliage narrowing upwards. They stand in shallow water as well as on mud.
+        private static readonly Model[] Cypresses =
+        {
+            new Model
+            {
+                Name = "Cypress",
+                Parts = new[]
+                {
+                    new Part
+                    {
+                        Material = CypressBark,
+                        Boxes = new[]
+                        {
+                            new Box(0f, 0.5f, 0f, 1.1f, 1.0f, 1.1f),
+                            new Box(0f, 4.0f, 0f, 0.5f, 7.0f, 0.5f),
+                            new Box(0.95f, 0.3f, 0.35f, 0.2f, 0.6f, 0.2f),
+                            new Box(-0.8f, 0.25f, -0.6f, 0.18f, 0.5f, 0.18f),
+                            new Box(0.4f, 0.35f, -1.0f, 0.19f, 0.7f, 0.19f),
+                        }
+                    },
+                    new Part
+                    {
+                        Material = CypressLeaves,
+                        Boxes = new[]
+                        {
+                            new Box(0f, 4.2f, 0f, 2.8f, 0.7f, 2.6f),
+                            new Box(0.1f, 5.3f, -0.05f, 2.3f, 0.75f, 2.2f),
+                            new Box(-0.05f, 6.4f, 0.05f, 1.8f, 0.8f, 1.7f),
+                            new Box(0.05f, 7.45f, 0f, 1.3f, 0.85f, 1.25f),
+                            new Box(0f, 8.3f, 0.02f, 0.75f, 0.6f, 0.7f),
+                        }
+                    },
+                }
+            },
+            new Model
+            {
+                Name = "CypressFlat",
+                Parts = new[]
+                {
+                    new Part
+                    {
+                        Material = CypressBark,
+                        Boxes = new[]
+                        {
+                            new Box(0f, 0.55f, 0f, 1.2f, 1.1f, 1.2f),
+                            new Box(0f, 3.6f, 0f, 0.55f, 6.2f, 0.55f),
+                            new Box(-1.0f, 0.3f, 0.3f, 0.2f, 0.6f, 0.2f),
+                            new Box(0.7f, 0.28f, 0.8f, 0.17f, 0.55f, 0.17f),
+                            new Box(0.5f, 6.2f, 0.1f, 0.25f, 1.3f, 0.25f, tiltZ: -45f),
+                        }
+                    },
+                    new Part
+                    {
+                        Material = CypressLeaves,
+                        Boxes = new[]
+                        {
+                            new Box(0f, 5.0f, 0f, 2.2f, 0.7f, 2.0f),
+                            new Box(0.2f, 6.9f, 0.1f, 3.6f, 0.8f, 3.2f),
+                            new Box(0.1f, 7.6f, -0.1f, 2.6f, 0.6f, 2.4f),
+                        }
+                    },
+                }
+            },
+        };
+
+        // Water lilies: flat pads lying on the water (drawn at its surface: SpeciesAsset.floatsOnWater), one flowering.
+        private static readonly Model[] LilyPads =
+        {
+            new Model
+            {
+                Name = "LilyPad",
+                Parts = new[]
+                {
+                    new Part
+                    {
+                        Material = LilyPad,
+                        Boxes = new[]
+                        {
+                            new Box(0f, 0.03f, 0f, 0.62f, 0.04f, 0.56f),
+                            new Box(0.32f, 0.04f, 0.3f, 0.36f, 0.05f, 0.4f),
+                            new Box(-0.28f, 0.037f, -0.25f, 0.34f, 0.03f, 0.3f),
+                        }
+                    },
+                    new Part
+                    {
+                        Material = LilyFlower,
+                        Boxes = new[]
+                        {
+                            new Box(0.06f, 0.125f, -0.04f, 0.18f, 0.14f, 0.18f),
+                            new Box(0.06f, 0.145f, -0.04f, 0.26f, 0.06f, 0.08f),
+                        }
+                    },
+                }
+            },
+            new Model
+            {
+                Name = "LilyPads",
+                Parts = new[]
+                {
+                    new Part
+                    {
+                        Material = LilyPad,
+                        Boxes = new[]
+                        {
+                            new Box(-0.1f, 0.03f, 0.05f, 0.5f, 0.04f, 0.48f),
+                            new Box(0.3f, 0.04f, -0.28f, 0.42f, 0.05f, 0.38f),
+                            new Box(0.25f, 0.037f, 0.33f, 0.3f, 0.03f, 0.28f),
+                            new Box(-0.33f, 0.046f, -0.3f, 0.26f, 0.04f, 0.26f),
+                        }
+                    },
+                }
+            },
+        };
+
         // Each species asset and its models.
         private static readonly (string Species, Model[] Models)[] SpeciesModels =
         {
@@ -676,6 +1103,12 @@ namespace Voxel.EditorTools
             ("DryGrass", DryGrasses),
             ("Cactus", Cacti),
             ("Reeds", Reeds),
+            ("JungleTree", JungleTrees),
+            ("Palm", Palms),
+            ("Fern", Ferns),
+            ("Willow", Willows),
+            ("Cypress", Cypresses),
+            ("LilyPad", LilyPads),
         };
 
         [MenuItem("Eco/Rebuild plant models")]

@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c90fb7040ab281a4dabfdc0c96f5baf2, type: 3}
+  m_Name: LilyPad
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.SpeciesAsset
+  maturityDays: 0.8
+  lifespanDays: 12
+  seedAttemptsPerDay: 1.5
+  seedRange: 3
+  spacing: 2
+  minFertility: 0.1
+  fertilityUsePerDay: 0.01
+  idealWarmth: {x: 0.3, y: 1}
+  idealWetness: {x: 0.4, y: 1}
+  climateTolerance: 0.15
+  grounds: 118
+  needsWater: 0
+  rooting: 1
+  floatsOnWater: 1
+  woodYield: 0
+  height: 0.2
+  width: 0.6
+  models:
+  - parts:
+    - mesh: {fileID: 4300000, guid: 98ca4fccfa268e245b4e415387336950, type: 2}
+      material: {fileID: 2100000, guid: 14246be75f38cdd48bb2d723071ffa0a, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: 8e98a26a944660847a409db86d8f7c98, type: 2}
+      material: {fileID: 2100000, guid: 665849b2309258d45a6e731179271ec5, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+  - parts:
+    - mesh: {fileID: 4300000, guid: d77a63d19fe862a4b82274b94335fbd6, type: 2}
+      material: {fileID: 2100000, guid: 14246be75f38cdd48bb2d723071ffa0a, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}

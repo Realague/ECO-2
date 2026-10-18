@@ -38,7 +38,7 @@ namespace Voxel.Core
 
         private Landscape landscape;
 
-        public int Version => 5;
+        public int Version => 6;
 
         // Height of the topmost block of the relief, before Landscape digs the lakes, the sea and
         // the rivers: plains at BaseHeight, hills, massifs.

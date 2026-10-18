@@ -558,6 +558,12 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 5da8a1fa28d16f5478ad6efb03ed3f7f, type: 2}
   - {fileID: 11400000, guid: d00ed81b9f142a24c8a330692a41513b, type: 2}
   - {fileID: 11400000, guid: d9ffd36495cfdee41abeed1a2301f162, type: 2}
+  - {fileID: 11400000, guid: 031736ac4b8679c4a87965e9eba87225, type: 2}
+  - {fileID: 11400000, guid: 8b343f07bd205684eb25045d5d460a3b, type: 2}
+  - {fileID: 11400000, guid: 14d6ae9b6ace58946a66c9ea9b34c2dc, type: 2}
+  - {fileID: 11400000, guid: 57be46173a9403147bdebd605de1e269, type: 2}
+  - {fileID: 11400000, guid: 26f3b62cd5c291d41b77d8f8d73de390, type: 2}
+  - {fileID: 11400000, guid: 1f227bf5014c21345ab890f8a0e34e81, type: 2}
   animalAssets:
   - {fileID: 11400000, guid: 6574d881bcfa74945b4cf99af2886576, type: 2}
   - {fileID: 11400000, guid: 86ee08040998fa64898d08a9f9aff1ba, type: 2}
@@ -576,6 +582,11 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 0670f214234fcab49af9f6346bed2fc8, type: 2}
   - {fileID: 11400000, guid: bb3074f42f54d354b892de2502d8df50, type: 2}
   - {fileID: 11400000, guid: 921f954e1d75e7f49a4db76caa63830c, type: 2}
+  - {fileID: 11400000, guid: 0dc216d066827ce45b3451be0209cc7e, type: 2}
+  - {fileID: 11400000, guid: 39ef221cbe761064b9ab5182615755bc, type: 2}
+  - {fileID: 11400000, guid: 5a6987439fbbe564382831719b43f4bb, type: 2}
+  - {fileID: 11400000, guid: 98a606a92b352d94eab820e11da30c61, type: 2}
+  - {fileID: 11400000, guid: 25beb05f3e6c7dd4e95192c1c2f7539c, type: 2}
   plantViewDistance: 128
 --- !u!114 &490447449
 MonoBehaviour:
@@ -958,7 +969,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 145a9ce74d72eaa4d868c9bcfb973e94, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.VoxelWorld
-  sizeInChunks: {x: 32, y: 8, z: 32}
+  sizeInChunks: {x: 64, y: 8, z: 64}
   seed: 1
   blockMaterial: {fileID: 2100000, guid: 94b05fea58d6f8246bd6ef44fd341669, type: 2}
   waterMaterial: {fileID: 2100000, guid: 5bd02ebd5f8fc8d44a82e5211d374a64, type: 2}

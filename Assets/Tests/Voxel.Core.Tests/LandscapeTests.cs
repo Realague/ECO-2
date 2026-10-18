@@ -95,6 +95,94 @@ namespace Voxel.Core.Tests
             }
         }
 
+        // Ground, water, surface and marshes of the whole landscape, recorded with version 6 of the
+        // generator. If this fails, generation changed: bump TerrainGenerator.Version, then update it.
+        [Test]
+        public void Landscape_IsUnchangedSinceThisGeneratorVersion()
+        {
+            ulong hash = 14695981039346656037UL;
+            for (int z = 0; z < Size; z++)
+            {
+                for (int x = 0; x < Size; x++)
+                {
+                    Landscape.ColumnGeology column = Shared.Column(x, z);
+                    int value = Shared.Ground(x, z) * 31 + Shared.WaterTop(x, z) * 7 + column.Top * 131 + column.Under * 1031 + (Shared.IsMarsh(x, z) ? 50000 : 0);
+                    unchecked
+                    {
+                        hash = (hash ^ (uint)value) * 1099511628211UL;
+                    }
+                }
+            }
+
+            Assert.AreEqual(4095116596572024413UL, hash);
+        }
+
+        [Test]
+        public void Marshes_CoverAFewPercent_AndHoldPools()
+        {
+            int marsh = 0;
+            int pools = 0;
+            for (int z = 0; z < Size; z++)
+            {
+                for (int x = 0; x < Size; x++)
+                {
+                    if (Shared.IsMarsh(x, z)) marsh++;
+                    if (Shared.IsMarshPool(x, z)) pools++;
+                }
+            }
+
+            Assert.That(marsh, Is.InRange(Size * Size / 100, Size * Size / 10), "marshes");
+            Assert.That(pools * 5, Is.GreaterThan(marsh), "about a third of a marsh is pools");
+            Assert.That(pools * 3, Is.LessThan(marsh * 2), "and the rest land");
+        }
+
+        // A marsh lies on low, very wet land that is not cold; its pools are one block deep with a
+        // mud bed, its land grass on mud.
+        [Test]
+        public void Marshes_AreLowWetAndWarmEnough_WithShallowPools()
+        {
+            Geography climate = Shared.Geography;
+            for (int z = 0; z < Size; z++)
+            {
+                for (int x = 0; x < Size; x++)
+                {
+                    if (!Shared.IsMarsh(x, z)) continue;
+
+                    string at = $"Marsh at ({x}, {z})";
+                    bool pool = Shared.IsMarshPool(x, z);
+                    int land = Shared.Ground(x, z) + (pool ? 1 : 0);
+                    Assert.That(land, Is.LessThanOrEqualTo(Landscape.SeaLevel + 4), at);
+                    Assert.That(climate.TemperatureAt(x, z), Is.GreaterThanOrEqualTo(IntNoise.One / 5), at);
+                    Assert.That(climate.HumidityAt(x, z), Is.GreaterThan(IntNoise.One / 2), at);
+
+                    Landscape.ColumnGeology column = Shared.Column(x, z);
+                    if (pool)
+                    {
+                        Assert.AreEqual(Shared.Ground(x, z) + 1, Shared.WaterTop(x, z), at);
+                        Assert.AreEqual(Blocks.Mud, column.Top, at);
+                        Assert.IsFalse(Shared.IsIce(x, z), at);
+
+                        // Beside it, pools at the same height or ground at least as high: never other water.
+                        for (int dz = -1; dz <= 1; dz++)
+                        {
+                            for (int dx = -1; dx <= 1; dx++)
+                            {
+                                int ox = x + dx, oz = z + dz;
+                                if (Shared.IsMarshPool(ox, oz)) Assert.AreEqual(Shared.WaterTop(x, z), Shared.WaterTop(ox, oz), at);
+                                else Assert.IsTrue(Shared.WaterTop(ox, oz) < 0 && Shared.Ground(ox, oz) >= Shared.WaterTop(x, z), at);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Assert.AreEqual(-1, Shared.WaterTop(x, z), at);
+                        Assert.AreEqual(Blocks.Grass, column.Top, at);
+                        Assert.AreEqual(Blocks.Mud, column.Under, at);
+                    }
+                }
+            }
+        }
+
         private static void AssertHeld(int x, int z, int water, int fromX, int fromZ)
         {
             if (x < 0 || z < 0 || x >= Size || z >= Size) return;

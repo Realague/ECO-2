@@ -8,8 +8,9 @@ namespace Voxel.EditorTools
 {
     // Builds the models of the animal species from boxes, in the blocky style of the world: a bird
     // (BirdLayout), a fish (FishLayout), or, for most, a quadruped laid out from a few proportions
-    // (legs, body, neck, head, snout, ears, tail) plus the features that set a species apart (antlers, horns, a ruff, a hump, a flank stripe, a dark
-    // saddle, the big haunches and long feet of a hopping animal). It writes each species' parts,
+    // (legs, body, neck, head, snout, ears, tail) plus the features that set a species apart (antlers,
+    // horns, a ruff, a hump, a flank stripe, a saddle, rosettes, ridged scales along the back, the big
+    // haunches and long feet of a hopping animal). It writes each species' parts,
     // their rig (which parts swing as legs, ears or tail, and about which point) and its gait into
     // its AnimalSpeciesAsset, and one material per colour (Animal<Species>_<Role>, URP Lit,
     // instancing on, as AnimalViews needs).
@@ -35,7 +36,9 @@ namespace Voxel.EditorTools
             Saddle = 32,
             Haunches = 64,
             TailTip = 128,
-            DarkTailTip = 256
+            DarkTailTip = 256,
+            Spots = 512,
+            Scutes = 1024
         }
 
         private sealed class Spec
@@ -242,6 +245,60 @@ namespace Voxel.EditorTools
             },
             new Spec
             {
+                Name = "Tapir", WalkSpeed = 1.8f, Stride = 0.9f,
+                LegHeight = 0.38f, Leg = 0.11f, Body = new Vector3(0.42f, 0.44f, 1.0f),
+                NeckRise = 0.04f, NeckForward = 0.08f, Neck = 0.26f,
+                Head = new Vector3(0.24f, 0.24f, 0.28f), Snout = new Vector3(0.12f, 0.1f, 0.2f), Ear = new Vector3(0.07f, 0.08f, 0.03f),
+                TailLength = 0.06f, Tail = 0.06f, TailHangs = true,
+                Features = Feature.Saddle,
+                Fur = new Color(0.15f, 0.14f, 0.15f), Light = new Color(0.3f, 0.28f, 0.28f),
+                Dark = new Color(0.06f, 0.06f, 0.06f), Accent = new Color(0.85f, 0.84f, 0.8f)
+            },
+            new Spec
+            {
+                Name = "Jaguar", WalkSpeed = 2.8f, Stride = 0.9f,
+                LegHeight = 0.32f, Leg = 0.09f, Body = new Vector3(0.3f, 0.32f, 0.85f),
+                NeckRise = 0.06f, NeckForward = 0.06f, Neck = 0.22f,
+                Head = new Vector3(0.24f, 0.22f, 0.22f), Snout = new Vector3(0.13f, 0.1f, 0.09f), Ear = new Vector3(0.07f, 0.07f, 0.03f),
+                TailLength = 0.55f, Tail = 0.08f,
+                Features = Feature.Spots | Feature.TailTip | Feature.DarkTailTip,
+                Fur = new Color(0.85f, 0.62f, 0.28f), Light = new Color(0.93f, 0.88f, 0.75f),
+                Dark = new Color(0.12f, 0.1f, 0.08f), Accent = new Color(0.2f, 0.15f, 0.1f)
+            },
+            new Spec
+            {
+                // Low on short legs, its head level with its body (the neck reaches down), a long thick tail.
+                Name = "Crocodile", WalkSpeed = 1.0f, Stride = 0.5f,
+                LegHeight = 0.14f, Leg = 0.09f, Body = new Vector3(0.4f, 0.22f, 1.1f),
+                NeckRise = -0.1f, NeckForward = 0.04f, Neck = 0.3f,
+                Head = new Vector3(0.3f, 0.16f, 0.3f), Snout = new Vector3(0.2f, 0.09f, 0.45f), Ear = new Vector3(0.03f, 0.02f, 0.02f),
+                TailLength = 1.0f, Tail = 0.18f,
+                Features = Feature.Scutes,
+                Fur = new Color(0.28f, 0.33f, 0.2f), Light = new Color(0.46f, 0.47f, 0.3f),
+                Dark = new Color(0.08f, 0.08f, 0.07f), Accent = new Color(0.2f, 0.24f, 0.14f)
+            },
+            new Spec
+            {
+                Name = "Frog", Gait = AnimalSpeciesAsset.Gait.Hop, HopLength = 0.5f, HopDuration = 0.25f, HopHeight = 0.25f,
+                LegHeight = 0.05f, Leg = 0.035f, Body = new Vector3(0.16f, 0.09f, 0.17f),
+                NeckRise = -0.02f, NeckForward = 0f, Neck = 0.1f,
+                Head = new Vector3(0.15f, 0.08f, 0.09f), Snout = new Vector3(0.12f, 0.04f, 0.03f), Ear = new Vector3(0.02f, 0.015f, 0.01f),
+                TailLength = 0.01f, Tail = 0.01f,
+                Features = Feature.Haunches,
+                Fur = new Color(0.3f, 0.55f, 0.2f), Light = new Color(0.8f, 0.82f, 0.55f),
+                Dark = new Color(0.08f, 0.12f, 0.06f), Accent = new Color(0.2f, 0.35f, 0.12f)
+            },
+            new Spec
+            {
+                Name = "Parrot", Shape = BodyShape.Bird, Gait = AnimalSpeciesAsset.Gait.Fly, WalkSpeed = 5f,
+                LegHeight = 0.08f, Leg = 0.02f, Body = new Vector3(0.12f, 0.13f, 0.22f),
+                NeckRise = 0.03f, Neck = 0.07f, Head = new Vector3(0.09f, 0.09f, 0.09f), Beak = new Vector3(0.04f, 0.06f, 0.05f),
+                TailLength = 0.2f, WingSpan = 0.22f, FlightHeight = 5f, Wingbeats = 5f,
+                Fur = new Color(0.85f, 0.12f, 0.1f), Light = new Color(0.15f, 0.42f, 0.85f),
+                Dark = new Color(0.05f, 0.05f, 0.05f), Accent = new Color(0.9f, 0.2f, 0.12f), Bill = new Color(0.9f, 0.88f, 0.8f)
+            },
+            new Spec
+            {
                 Name = "Fish", Shape = BodyShape.Fish, WalkSpeed = 1.8f, Stride = 0.4f,
                 Body = new Vector3(0.1f, 0.13f, 0.3f), SwimHeight = 0.42f,
                 Fur = new Color(0.42f, 0.5f, 0.42f), Light = new Color(0.82f, 0.82f, 0.74f),
@@ -342,6 +399,13 @@ namespace Voxel.EditorTools
         }
 
         private static readonly float[] Sides = { 1f, -1f };
+
+        // Spots: height on the flank (fraction of the body's height) and place along it (fraction of its length).
+        private static readonly Vector2[] SpotPattern =
+        {
+            new Vector2(0.68f, 0.32f), new Vector2(0.4f, 0.18f), new Vector2(0.72f, 0.02f), new Vector2(0.38f, -0.14f),
+            new Vector2(0.66f, -0.3f), new Vector2(0.42f, 0.38f), new Vector2(0.3f, -0.36f)
+        };
 
         // A leg with its hoof or paw, swinging about the top of the leg.
         private static void AddLegPair(List<Box> boxes, Spec s, float legX, float z, AnimalSpeciesAsset.PartMotion motion)
@@ -453,6 +517,37 @@ namespace Voxel.EditorTools
             if ((s.Features & Feature.Saddle) != 0)
             {
                 Add(boxes, AccentRole, new Vector3(0f, bodyTop + 0.005f, -0.02f), new Vector3(s.Body.x * 0.7f, 0.02f, s.Body.z * 0.6f));
+            }
+
+            if ((s.Features & Feature.Spots) != 0)
+            {
+                // Dark rosettes over the flanks and the back, the same pattern on both sides.
+                float spot = s.Body.y * 0.18f;
+                foreach (Vector2 at in SpotPattern)
+                {
+                    foreach (float side in Sides)
+                    {
+                        Add(boxes, AccentRole, new Vector3(side * (s.Body.x / 2f + 0.003f), s.LegHeight + s.Body.y * at.x, s.Body.z * at.y),
+                            new Vector3(0.008f, spot, spot * 1.2f));
+                    }
+
+                    Add(boxes, AccentRole, new Vector3(s.Body.x * (at.x - 0.5f) * 0.6f, bodyTop + 0.003f, s.Body.z * (at.y + 0.05f)),
+                        new Vector3(spot, 0.008f, spot * 1.2f));
+                }
+            }
+
+            if ((s.Features & Feature.Scutes) != 0)
+            {
+                // Two rows of ridged scales along the back.
+                int count = Mathf.Max(3, Mathf.RoundToInt(s.Body.z / 0.14f));
+                for (int i = 0; i < count; i++)
+                {
+                    float z = front - s.Body.z * (i + 0.5f) / count;
+                    foreach (float side in Sides)
+                    {
+                        Add(boxes, AccentRole, new Vector3(side * s.Body.x * 0.18f, bodyTop + 0.02f, z), new Vector3(s.Body.x * 0.12f, 0.04f, s.Body.z / count * 0.6f));
+                    }
+                }
             }
         }
 

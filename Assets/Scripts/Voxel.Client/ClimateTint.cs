@@ -55,13 +55,15 @@ namespace Voxel.Client
                 wrapMode = TextureWrapMode.Clamp
             };
 
+            // Marshes darken the grass of a cell by their share of it.
+            Landscape landscape = Landscape.For(world.Seed, world.SizeX, world.SizeZ);
             var pixels = new Color32[geography.CellsX * geography.CellsZ];
             for (int cellZ = 0; cellZ < geography.CellsZ; cellZ++)
             {
                 for (int cellX = 0; cellX < geography.CellsX; cellX++)
                 {
                     pixels[cellX + geography.CellsX * cellZ] =
-                        ClimateColours.Grass(geography.Temperature(cellX, cellZ), geography.Humidity(cellX, cellZ));
+                        ClimateColours.Grass(geography.Temperature(cellX, cellZ), geography.Humidity(cellX, cellZ), MarshShare(landscape, cellX, cellZ));
                 }
             }
 
@@ -71,6 +73,20 @@ namespace Voxel.Client
             // Pixel i covers the columns of cell i: its centre is the cell's centre.
             Publish(texture, new Vector4(
                 1f / (geography.CellsX * Geography.CellSize), 1f / (geography.CellsZ * Geography.CellSize), 0f, 0f));
+        }
+
+        private static float MarshShare(Landscape landscape, int cellX, int cellZ)
+        {
+            int marsh = 0;
+            for (int z = 0; z < Geography.CellSize; z++)
+            {
+                for (int x = 0; x < Geography.CellSize; x++)
+                {
+                    if (landscape.IsMarsh(cellX * Geography.CellSize + x, cellZ * Geography.CellSize + z)) marsh++;
+                }
+            }
+
+            return (float)marsh / (Geography.CellSize * Geography.CellSize);
         }
 
         private static void Publish(Texture2D tint, Vector4 transform)

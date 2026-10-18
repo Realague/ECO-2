@@ -36,8 +36,9 @@ namespace Voxel.Client
         private const int SaltTile = 19;
         private const int FlintTile = 20;
         private const int BedrockTile = 21;
+        private const int MudTile = 22;
 
-        public const int TileCount = 22;
+        public const int TileCount = 23;
 
         // The tile of each block type for all its faces; grass is handled apart.
         private static readonly int[] TypeTiles = BuildTypeTiles();
@@ -63,6 +64,7 @@ namespace Voxel.Client
         private static readonly Color Gravel = new Color(0.53f, 0.51f, 0.49f);
         private static readonly Color Clay = new Color(0.62f, 0.59f, 0.57f);
         private static readonly Color Bedrock = new Color(0.17f, 0.17f, 0.19f);
+        private static readonly Color Mud = new Color(0.30f, 0.24f, 0.18f);
 
         // The colour of water on the maps, shallow and deep.
         private static readonly Color ShallowWater = new Color(0.30f, 0.55f, 0.75f);
@@ -106,6 +108,7 @@ namespace Voxel.Client
                 case Blocks.Gravel: return Gravel;
                 case Blocks.Clay: return Clay;
                 case Blocks.Bedrock: return Bedrock;
+                case Blocks.Mud: return Mud;
                 default: return Granite;
             }
         }
@@ -201,6 +204,7 @@ namespace Voxel.Client
             tiles[Blocks.RockSalt] = SaltTile;
             tiles[Blocks.Flint] = FlintTile;
             tiles[Blocks.Bedrock] = BedrockTile;
+            tiles[Blocks.Mud] = MudTile;
             return tiles;
         }
 

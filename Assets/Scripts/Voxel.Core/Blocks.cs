@@ -44,12 +44,16 @@ namespace Voxel.Core
         // The bottom of the world: it cannot be broken.
         public const ushort Bedrock = 25;
 
-        public const ushort LastType = Bedrock;
+        // The wet ground of marshes: the bed of their pools and what lies under their grass.
+        public const ushort Mud = 32;
 
-        // A type that existed in earlier versions and no longer does.
+        public const ushort LastType = Mud;
+
+        // Types that existed in earlier versions and no longer do: two gaps.
         private const ushort FirstRetiredGap = 4;
         private const ushort LastRetiredGap = 6;
-        private const ushort LastEverType = 31;
+        private const ushort FirstLaterRetired = 26;
+        private const ushort LastLaterRetired = 31;
 
         public static ushort TypeOf(ushort block) => (ushort)(block & TypeMask);
 
@@ -89,7 +93,7 @@ namespace Voxel.Core
         public static bool IsRetired(ushort block)
         {
             ushort type = TypeOf(block);
-            return (type >= FirstRetiredGap && type <= LastRetiredGap) || (type > LastType && type <= LastEverType);
+            return (type >= FirstRetiredGap && type <= LastRetiredGap) || (type >= FirstLaterRetired && type <= LastLaterRetired);
         }
     }
 }

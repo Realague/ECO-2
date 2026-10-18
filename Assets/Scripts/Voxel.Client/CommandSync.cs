@@ -222,7 +222,7 @@ namespace Voxel.Client
             int placed = ecosystemSync.Spawn(isAnimal, index, command.Count, aimX, aimZ);
             if (placed == 0)
             {
-                string why = isAnimal ? "where it can stand (land, water or shore, by species)" : "of its own ground (grass or dirt for most, sand for cacti, the water's edge for reeds)";
+                string why = isAnimal ? "where it can stand (land, water or shore, by species)" : "of its own ground (grass or dirt for most, sand for cacti, the water's edge for reeds, willows and cypresses, water one block deep for lilies)";
                 Reply(clientId, $"No room for {name} here: it needs a free column {why}.");
             }
             else

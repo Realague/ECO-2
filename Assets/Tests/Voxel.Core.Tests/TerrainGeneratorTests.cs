@@ -6,7 +6,8 @@ namespace Voxel.Core.Tests
     {
         private const int Seed = 1;
 
-        // Relief recorded with version 3 of the generator, the whole world with version 5. If this
+        // Relief recorded with version 3 of the generator, the whole world with version 5 (version 6
+        // added marshes, which this small world has none of: LandscapeTests pins them). If this
         // test fails, the produced terrain has changed: existing saves no longer match and clients on
         // another version would generate another world. Bump TerrainGenerator.Version, then update
         // these values.
@@ -25,7 +26,7 @@ namespace Voxel.Core.Tests
         [Test]
         public void GeneratedWorld_IsUnchangedSinceThisGeneratorVersion()
         {
-            Assert.AreEqual(5, new TerrainGenerator().Version, "reference value to update for the new version");
+            Assert.AreEqual(6, new TerrainGenerator().Version, "reference value to update for the new version");
             Assert.AreEqual(8051785332826314626UL, CreateWorld().TerrainFingerprint);
         }
 

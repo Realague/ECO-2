@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c90fb7040ab281a4dabfdc0c96f5baf2, type: 3}
+  m_Name: Willow
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.SpeciesAsset
+  maturityDays: 2.5
+  lifespanDays: 30
+  seedAttemptsPerDay: 1.5
+  seedRange: 5
+  spacing: 3
+  minFertility: 0.35
+  fertilityUsePerDay: 0.07
+  idealWarmth: {x: 0.3, y: 0.85}
+  idealWetness: {x: 0.66, y: 1}
+  climateTolerance: 0.1
+  grounds: 67
+  needsWater: 1
+  rooting: 0
+  floatsOnWater: 0
+  woodYield: 3
+  height: 5.7
+  width: 0.9
+  models:
+  - parts:
+    - mesh: {fileID: 4300000, guid: 93cebb23c839179438b6d29aef42ece2, type: 2}
+      material: {fileID: 2100000, guid: 60782fd049d31344187602bbf82bee87, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: 9bacae60072632747a887542a8277715, type: 2}
+      material: {fileID: 2100000, guid: fc0ab15a0d81dd746b38f133a05cc657, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: 1956e39de10d9e54abba5385b148c33d, type: 2}
+      material: {fileID: 2100000, guid: 0a6159239a6b99640a81c8926632d6c1, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+  - parts:
+    - mesh: {fileID: 4300000, guid: d2fd2ebb6b3e28941912f9be611e9521, type: 2}
+      material: {fileID: 2100000, guid: 60782fd049d31344187602bbf82bee87, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: 98c92592afcf3ac4e8ca4c8b9cf0c8ab, type: 2}
+      material: {fileID: 2100000, guid: fc0ab15a0d81dd746b38f133a05cc657, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}

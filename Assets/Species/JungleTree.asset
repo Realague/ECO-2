@@ -1,0 +1,64 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c90fb7040ab281a4dabfdc0c96f5baf2, type: 3}
+  m_Name: JungleTree
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.SpeciesAsset
+  maturityDays: 5
+  lifespanDays: 60
+  seedAttemptsPerDay: 1.6
+  seedRange: 7
+  spacing: 3
+  minFertility: 0.5
+  fertilityUsePerDay: 0.1
+  idealWarmth: {x: 0.66, y: 1}
+  idealWetness: {x: 0.66, y: 1}
+  climateTolerance: 0.1
+  grounds: 3
+  needsWater: 0
+  rooting: 0
+  floatsOnWater: 0
+  woodYield: 8
+  height: 19.4
+  width: 1
+  models:
+  - parts:
+    - mesh: {fileID: 4300000, guid: a74a2b033148de14bb29e3b22daa1a1d, type: 2}
+      material: {fileID: 2100000, guid: dc9fdae1262d4154f814b127a9c07d9a, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: eb455823d341ea04f8e045d9285b709c, type: 2}
+      material: {fileID: 2100000, guid: 0bbdd30333312d248bd0f285aa8cc847, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: fbf063581c49f234aafb3fecfe2128e3, type: 2}
+      material: {fileID: 2100000, guid: 0a6159239a6b99640a81c8926632d6c1, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+  - parts:
+    - mesh: {fileID: 4300000, guid: 57a4c07205645cd44bce426863da6abe, type: 2}
+      material: {fileID: 2100000, guid: dc9fdae1262d4154f814b127a9c07d9a, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: 8178e07ec1bdab8448973f8168a1de3d, type: 2}
+      material: {fileID: 2100000, guid: 0bbdd30333312d248bd0f285aa8cc847, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: b6e182db23fab1d4db8599451bf3ed50, type: 2}
+      material: {fileID: 2100000, guid: 0a6159239a6b99640a81c8926632d6c1, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
