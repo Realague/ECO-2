@@ -17,8 +17,8 @@ MonoBehaviour:
   seedAttemptsPerDay: 1.6
   seedRange: 7
   spacing: 3
-  minFertility: 0.5
-  fertilityUsePerDay: 0.1
+  minFertility: 0.79
+  fertilityUsePerDay: 0.15
   idealWarmth: {x: 0.66, y: 1}
   idealWetness: {x: 0.66, y: 1}
   climateTolerance: 0.1

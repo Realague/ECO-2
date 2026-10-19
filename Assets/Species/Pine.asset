@@ -16,9 +16,9 @@ MonoBehaviour:
   lifespanDays: 45
   seedAttemptsPerDay: 1.8
   seedRange: 6
-  spacing: 2
-  minFertility: 0.3
-  fertilityUsePerDay: 0.06
+  spacing: 3
+  minFertility: 0.7
+  fertilityUsePerDay: 0.09
   idealWarmth: {x: 0, y: 0.3}
   idealWetness: {x: 0.15, y: 1}
   climateTolerance: 0.12

@@ -1,13 +1,14 @@
 using UnityEngine;
+using static Voxel.Client.BlockAtlas;
 
-namespace Voxel.Client
+namespace Voxel.EditorTools
 {
-    // The rocks of the atlas, and snow, drawn like pixel art rather than as noisy flat colour: each pixel's
+    // The rocks, and snow, drawn like pixel art rather than as noisy flat colour: each pixel's
     // shade is picked from a small palette (with ordered dithering between shades), from a tone that
     // follows the rock's structure (crystals, columns, beds, veins, plates, pebbles, nuggets, built
     // from cellular and smooth noise that wrap around the tile) and from a relief lit from the upper
     // left, so grains and stones stand out. Everything wraps, so neighbouring blocks match.
-    internal static partial class BlockAtlas
+    internal static partial class BlockTextureBuilder
     {
         // Palettes, darkest first.
         private static readonly Color[] GraniteGrey = Palette(0x5C5A5C, 0x7A787A, 0x989494, 0xB0ACAA, 0xC8C4C2);
