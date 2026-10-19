@@ -68,6 +68,7 @@
 .icon--house { background-image: url("Icons/HouseSimple.png"); }
 .icon--plant { background-image: url("Icons/Plant.png"); }
 .icon--play { background-image: url("Icons/Play.png"); }
+.icon--plus { background-image: url("Icons/Plus.png"); }
 .icon--sign-out { background-image: url("Icons/SignOut.png"); }
 .icon--warning { background-image: url("Icons/WarningCircle.png"); }
 

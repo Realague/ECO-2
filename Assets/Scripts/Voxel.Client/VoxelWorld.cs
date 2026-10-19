@@ -82,17 +82,21 @@ namespace Voxel.Client
             Destroy(atlas);
         }
 
-        // Server world: read from the save in the given folder, or generated if there is none,
-        // and written back by Save and Unload. A size in chunks can replace the one set in the scene.
-        public void LoadPersistent(string directory, Vector3Int? size = null)
+        // Server world: read from the save in the given folder, with its own seed and size, or
+        // generated if there is none, and written back by Save and Unload. A new world takes the
+        // given size in chunks and seed, or those set in the scene, and is saved at once, so that
+        // the list of worlds knows it.
+        public void LoadPersistent(string directory, Vector3Int? size = null, int? newSeed = null)
         {
             if (size.HasValue) sizeInChunks = size.Value;
 
             var timer = System.Diagnostics.Stopwatch.StartNew();
             string path = Path.Combine(directory, saveFileName);
-            Show(LoadOrCreateWorld(path), path);
+            Show(LoadOrCreateWorld(path, newSeed ?? seed, out bool created), path);
+            if (created) Save();
             Debug.Log(
-                $"World of {World.SizeX} × {World.SizeY} × {World.SizeZ} blocks ({World.Chunks.Count} chunks) ready in {timer.Elapsed.TotalSeconds:0.0} s.");
+                $"World of {World.SizeX} × {World.SizeY} × {World.SizeZ} blocks ({World.Chunks.Count} chunks), seed {World.Seed}, "
+                + $"{(created ? "created" : "loaded")} in {timer.Elapsed.TotalSeconds:0.0} s.");
         }
 
         // Client world: generated here from the server's seed, then completed by the modified chunks
@@ -184,18 +188,15 @@ namespace Voxel.Client
             Debug.Log($"Sky light worked out in {lightSeconds * 1000:0} ms, chunks meshed in {(timer.Elapsed.TotalSeconds - lightSeconds) * 1000:0} ms.");
         }
 
-        private World LoadOrCreateWorld(string path)
+        // A saved world keeps its own seed and size; only a new one takes those asked for.
+        private World LoadOrCreateWorld(string path, int worldSeed, out bool created)
         {
+            created = false;
             if (File.Exists(path))
             {
                 try
                 {
-                    World saved = WorldSave.LoadFromFile(path, new TerrainGenerator());
-                    if (MatchesSettings(saved)) return saved;
-
-                    Debug.LogWarning(
-                        $"Save ignored: its seed or dimensions do not match the world's settings. " +
-                        $"It will be replaced at the next save. ({path})");
+                    return WorldSave.LoadFromFile(path, new TerrainGenerator());
                 }
                 catch (Exception e) when (e is IOException || e is InvalidDataException)
                 {
@@ -204,22 +205,10 @@ namespace Voxel.Client
                 }
             }
 
-            return CreateWorld();
-        }
-
-        private World CreateWorld()
-        {
+            created = true;
             var world = new World(sizeInChunks.x, sizeInChunks.y, sizeInChunks.z);
-            world.Generate(new TerrainGenerator(), seed);
+            world.Generate(new TerrainGenerator(), worldSeed);
             return world;
-        }
-
-        private bool MatchesSettings(World world)
-        {
-            return world.Seed == seed
-                && world.ChunksX == sizeInChunks.x
-                && world.ChunksY == sizeInChunks.y
-                && world.ChunksZ == sizeInChunks.z;
         }
 
         private void CreateChunkObject(Chunk chunk)

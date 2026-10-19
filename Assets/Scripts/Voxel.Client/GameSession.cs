@@ -26,6 +26,7 @@ namespace Voxel.Client
     //   -timescale <factor>   simulation speed when the server starts, 1 by default
     //   -admin <id,id,...>    ids of the players allowed to set the simulation speed
     //   -worldsize <x,y,z>    server world size in chunks, instead of the one set in the scene
+    //   -seed <seed>          seed of a new world (when the data folder holds none), a number or a word
     //   -noupnp               the server does not ask the router to forward its port
     public class GameSession : MonoBehaviour
     {
@@ -58,6 +59,12 @@ namespace Voxel.Client
         private string password = "";
         private string playerId;
         private string dataDirectory;
+
+        // The folder of the world being hosted (one of WorldSlots, or the data folder itself), and the
+        // seed it gets if it has no save yet (null: the one set in the scene).
+        private string worldDirectory;
+        private int? newWorldSeed;
+        private int? argumentSeed;
         private float startTimeScale = 1f;
         private string[] adminIds = Array.Empty<string>();
         private Vector3Int? worldSize;
@@ -178,11 +185,24 @@ namespace Voxel.Client
             }
         }
 
-        // Hosts a game; players who join it must give this password, unless it is empty.
+        // The folder that holds the saves: the worlds are listed from it (WorldSlots).
+        public string DataDirectory => dataDirectory;
+
+        // Hosts the world saved in the data folder itself; players who join it must give this
+        // password, unless it is empty.
         public void Host(string gamePassword)
         {
+            HostWorld(dataDirectory, argumentSeed, gamePassword);
+        }
+
+        // Hosts the world of this folder: its save, or a new world with this seed if it has none
+        // (null: the seed set in the scene).
+        public void HostWorld(string directory, int? seedOfNewWorld, string gamePassword)
+        {
+            worldDirectory = directory;
+            newWorldSeed = seedOfNewWorld;
             password = gamePassword ?? "";
-            StartHost();
+            StartServerSession(true);
         }
 
         public void Join(string serverAddress, string serverPassword)
@@ -232,11 +252,15 @@ namespace Voxel.Client
 
         public void StartHost()
         {
+            worldDirectory = dataDirectory;
+            newWorldSeed = argumentSeed;
             StartServerSession(true);
         }
 
         public void StartDedicatedServer()
         {
+            worldDirectory = dataDirectory;
+            newWorldSeed = argumentSeed;
             StartServerSession(false);
         }
 
@@ -272,9 +296,9 @@ namespace Voxel.Client
             message = "";
             leaving = false;
 
-            Directory.CreateDirectory(dataDirectory);
-            voxelWorld.LoadPersistent(dataDirectory, worldSize);
-            registry = new PlayerRegistry(networkManager, voxelWorld.World, dataDirectory, password);
+            Directory.CreateDirectory(worldDirectory);
+            voxelWorld.LoadPersistent(worldDirectory, worldSize, newWorldSeed);
+            registry = new PlayerRegistry(networkManager, voxelWorld.World, worldDirectory, password);
 
             // The server listens on every interface so it can be reached from other machines.
             Transport.SetConnectionData(LocalAddress, port, AnyAddress);
@@ -302,13 +326,13 @@ namespace Voxel.Client
             }
 
             worldSync.StartServer();
-            ecosystemSync.StartServer(voxelWorld.World, dataDirectory, startTimeScale, IsAdmin);
+            ecosystemSync.StartServer(voxelWorld.World, worldDirectory, startTimeScale, IsAdmin);
             inventorySync.StartServer(registry);
             appearanceSync.StartServer(registry);
             commandSync.StartServer();
             sessionActive = true;
             nextAutosave = Time.unscaledTime + autosaveInterval;
-            Debug.Log($"Server started on port {port}. Saves in {dataDirectory}, every {autosaveInterval} s.");
+            Debug.Log($"Server started on port {port}. Saves in {worldDirectory}, every {autosaveInterval} s.");
             OpenRouterPort();
         }
 
@@ -488,6 +512,9 @@ namespace Voxel.Client
             }
 
             if (Array.IndexOf(arguments, "-noupnp") >= 0) openRouterPort = false;
+
+            string seedText = ArgumentValue(arguments, "-seed");
+            if (!string.IsNullOrEmpty(seedText)) argumentSeed = WorldSlots.SeedOf(seedText, 0);
 
             string admins = ArgumentValue(arguments, "-admin");
             if (admins != null) adminIds = admins.Split(',');

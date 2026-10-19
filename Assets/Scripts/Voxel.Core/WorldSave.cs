@@ -47,36 +47,15 @@ namespace Voxel.Core
         {
             using (var reader = new BinaryReader(stream, Encoding.UTF8, true))
             {
-                if (reader.ReadUInt32() != Magic)
-                {
-                    throw new InvalidDataException("This file is not a world save.");
-                }
-
-                int formatVersion = reader.ReadInt32();
-                if (formatVersion != FormatVersion)
+                Header header = ReadHeader(reader);
+                if (header.GeneratorVersion != generator.Version)
                 {
                     throw new InvalidDataException(
-                        $"Unsupported save format {formatVersion} (expected: {FormatVersion}).");
+                        $"Save created with generator version {header.GeneratorVersion}, incompatible with version {generator.Version}.");
                 }
 
-                int seed = reader.ReadInt32();
-                int generatorVersion = reader.ReadInt32();
-                if (generatorVersion != generator.Version)
-                {
-                    throw new InvalidDataException(
-                        $"Save created with generator version {generatorVersion}, incompatible with version {generator.Version}.");
-                }
-
-                int chunksX = reader.ReadInt32();
-                int chunksY = reader.ReadInt32();
-                int chunksZ = reader.ReadInt32();
-                if (chunksX <= 0 || chunksY <= 0 || chunksZ <= 0)
-                {
-                    throw new InvalidDataException("Invalid world dimensions in the save.");
-                }
-
-                var world = new World(chunksX, chunksY, chunksZ);
-                world.Generate(generator, seed);
+                var world = new World(header.ChunksX, header.ChunksY, header.ChunksZ);
+                world.Generate(generator, header.Seed);
 
                 int modifiedCount = reader.ReadInt32();
                 for (int i = 0; i < modifiedCount; i++)
@@ -94,6 +73,57 @@ namespace Voxel.Core
 
                 return world;
             }
+        }
+
+        // What a save says about its world, read without generating it (for a list of saves).
+        public struct Header
+        {
+            public int Seed;
+            public int GeneratorVersion;
+            public int ChunksX;
+            public int ChunksY;
+            public int ChunksZ;
+        }
+
+        // Throws InvalidDataException if the file is not a world save, and EndOfStreamException if it is truncated.
+        public static Header ReadHeaderFromFile(string path)
+        {
+            using (FileStream stream = File.OpenRead(path))
+            using (var reader = new BinaryReader(stream, Encoding.UTF8, true))
+            {
+                return ReadHeader(reader);
+            }
+        }
+
+        private static Header ReadHeader(BinaryReader reader)
+        {
+            if (reader.ReadUInt32() != Magic)
+            {
+                throw new InvalidDataException("This file is not a world save.");
+            }
+
+            int formatVersion = reader.ReadInt32();
+            if (formatVersion != FormatVersion)
+            {
+                throw new InvalidDataException(
+                    $"Unsupported save format {formatVersion} (expected: {FormatVersion}).");
+            }
+
+            var header = new Header
+            {
+                Seed = reader.ReadInt32(),
+                GeneratorVersion = reader.ReadInt32(),
+                ChunksX = reader.ReadInt32(),
+                ChunksY = reader.ReadInt32(),
+                ChunksZ = reader.ReadInt32()
+            };
+
+            if (header.ChunksX <= 0 || header.ChunksY <= 0 || header.ChunksZ <= 0)
+            {
+                throw new InvalidDataException("Invalid world dimensions in the save.");
+            }
+
+            return header;
         }
 
         public static void SaveToFile(string path, World world)

@@ -2,7 +2,7 @@
     <Style src="Common.uss" />
     <Style src="MainMenu.uss" />
 
-    <!-- MainMenu shows one view at a time: home, host, join, or busy (connecting or loading). -->
+    <!-- MainMenu shows one view at a time: home, host (the list of worlds), new world, join, or busy (connecting or loading). -->
     <ui:VisualElement name="screen" class="screen">
         <ui:VisualElement name="card" class="panel">
             <ui:VisualElement class="brand">
@@ -50,9 +50,15 @@
                 </ui:Button>
             </ui:VisualElement>
 
-            <!-- Host: an optional password. -->
+            <!-- Host: which world (MainMenu fills the list with WorldSlots), and an optional password. -->
             <ui:VisualElement name="view-host" class="view hidden">
                 <ui:Label text="Host a game" class="view-title" />
+                <ui:ScrollView name="world-list" class="world-list" />
+                <ui:Label name="world-empty" text="No world yet: create one to start." class="world-empty hidden" />
+                <ui:Button name="world-new" class="world-new">
+                    <ui:VisualElement class="icon icon--plus" />
+                    <ui:Label text="New world" class="button-text" />
+                </ui:Button>
                 <ui:Label text="Password" class="field-label" />
                 <ui:TextField name="host-password" password="true" max-length="64" class="field" />
                 <ui:Label name="host-hint" class="field-hint" />
@@ -63,7 +69,28 @@
                     </ui:Button>
                     <ui:Button name="host-start" class="button button--primary">
                         <ui:VisualElement class="icon icon--play" />
-                        <ui:Label text="Start" class="button-text" />
+                        <ui:Label text="Play" class="button-text" />
+                    </ui:Button>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- New world: a name and a seed; it is then hosted with the password of the host view. -->
+            <ui:VisualElement name="view-new" class="view hidden">
+                <ui:Label text="New world" class="view-title" />
+                <ui:Label text="Name" class="field-label" />
+                <ui:TextField name="new-name" max-length="40" class="field" />
+                <ui:Label text="Shown in the list of worlds." class="field-hint" />
+                <ui:Label text="Seed" class="field-label" />
+                <ui:TextField name="new-seed" max-length="32" class="field" />
+                <ui:Label text="The same seed always gives the same world. A number or a word; leave it empty for a random world." class="field-hint" />
+                <ui:VisualElement class="view-buttons">
+                    <ui:Button name="new-back" class="button button--secondary">
+                        <ui:VisualElement class="icon icon--arrow-left" />
+                        <ui:Label text="Back" class="button-text" />
+                    </ui:Button>
+                    <ui:Button name="new-create" class="button button--primary">
+                        <ui:VisualElement class="icon icon--play" />
+                        <ui:Label text="Create and play" class="button-text" />
                     </ui:Button>
                 </ui:VisualElement>
             </ui:VisualElement>

@@ -243,3 +243,81 @@
     background-color: var(--green);
     border-radius: 7px;
 }
+
+/* The list of worlds to host: one row per world, the chosen one highlighted. */
+.world-list {
+    max-height: 330px;
+    margin: 0 0 12px 0;
+}
+
+.world-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px 18px;
+    margin: 0 0 8px 0;
+    background-color: var(--control);
+    border-width: 1px;
+    border-color: var(--control-border);
+    border-radius: 10px;
+}
+
+.world-row:hover {
+    background-color: var(--control-hover);
+}
+
+.world-row--selected,
+.world-row--selected:hover {
+    background-color: var(--selected);
+    border-color: var(--green);
+    border-width: 2px;
+}
+
+.world-row-name {
+    -unity-text-align: middle-left;
+    font-size: 22px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text);
+    margin: 0;
+    padding: 0;
+}
+
+.world-row-details {
+    -unity-text-align: middle-left;
+    font-size: 16px;
+    color: var(--text-muted);
+    white-space: normal;
+    margin: 2px 0 0 0;
+    padding: 0;
+}
+
+.world-empty {
+    font-size: 18px;
+    color: var(--text-muted);
+    margin: 0 0 12px 0;
+    padding: 0;
+}
+
+.world-new {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    height: 50px;
+    margin: 0 0 22px 0;
+    font-size: 20px;
+    color: var(--text-body);
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 2px;
+    border-color: var(--control-border);
+    border-radius: 10px;
+}
+
+.world-new:hover {
+    background-color: rgba(0, 0, 0, 0.04);
+    border-color: var(--green);
+}
+
+.world-new > .icon {
+    width: 22px;
+    height: 22px;
+    margin-right: 10px;
+}
