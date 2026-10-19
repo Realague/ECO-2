@@ -13,6 +13,9 @@ namespace Voxel.Client
         public int Y;
         public int Z;
         public int Stage;
+
+        // Stage of ripeness of a crop, 0 (nothing to harvest) to Plant.RipeStageCount.
+        public int RipeStage;
     }
 
     // Draws plants in batches (GPU instancing), without creating one object per plant. Plants are
@@ -21,7 +24,8 @@ namespace Voxel.Client
     //
     // A species may have several models; each plant shows the one its column picks
     // (SpeciesAsset.ModelAt), turned by a quarter turn also picked from its column. Batches are
-    // made per look, that is per model of a species, then per part.
+    // made per look, that is per model of a species, then per part. A ripe crop also shows the
+    // fruit of its model at its stage of ripeness, each stage a look of its own.
     internal sealed class PlantRenderer
     {
         private const int RegionSize = 32;
@@ -43,6 +47,9 @@ namespace Voxel.Client
         // By species: the index of its first look; its models follow.
         private readonly int[] firstLook;
 
+        // By model look, then by stage of ripeness (from 1): the look of its fruit, or -1 for none.
+        private readonly int[][] fruitLooks;
+
         // By look: its parts and how to draw each.
         private readonly IReadOnlyList<SpeciesAsset.Part>[] lookParts;
         private readonly RenderParams[][] renderParams;
@@ -59,6 +66,23 @@ namespace Voxel.Client
                 for (int m = 0; m < species[s].ModelCount; m++)
                 {
                     parts.Add(species[s].PartsOf(m));
+                }
+            }
+
+            // Then the fruit of each model at each stage of ripeness, as looks of their own.
+            fruitLooks = new int[parts.Count][];
+            int model = 0;
+            for (int s = 0; s < species.Length; s++)
+            {
+                for (int m = 0; m < species[s].ModelCount; m++, model++)
+                {
+                    fruitLooks[model] = new int[Plant.RipeStageCount];
+                    for (int ripeStage = 1; ripeStage <= Plant.RipeStageCount; ripeStage++)
+                    {
+                        IReadOnlyList<SpeciesAsset.Part> fruit = species[s].FruitPartsOf(m, ripeStage);
+                        fruitLooks[model][ripeStage - 1] = fruit.Count > 0 ? parts.Count : -1;
+                        if (fruit.Count > 0) parts.Add(fruit);
+                    }
                 }
             }
 
@@ -152,6 +176,14 @@ namespace Voxel.Client
             return asset.ModelCount == 0 ? -1 : firstLook[plant.SpeciesIndex] + asset.ModelAt(plant.X, plant.Z);
         }
 
+        // The look of the fruit a plant of this look bears, or -1 if it bears none (not ripe).
+        private int FruitLookOf(int look, PlantView plant)
+        {
+            if (plant.RipeStage < 1 || plant.RipeStage > Plant.RipeStageCount) return -1;
+
+            return fruitLooks[look][plant.RipeStage - 1];
+        }
+
         private static long KeyOf(int regionX, int regionZ) => ((long)regionX << 32) | (uint)regionZ;
 
         private static Quaternion TurnOf(int x, int z)
@@ -211,7 +243,11 @@ namespace Voxel.Client
                 foreach (PlantView plant in Plants.Values)
                 {
                     int look = renderer.LookOf(plant);
-                    if (look >= 0) Counts[look]++;
+                    if (look < 0) continue;
+
+                    Counts[look]++;
+                    int fruitLook = renderer.FruitLookOf(look, plant);
+                    if (fruitLook >= 0) Counts[fruitLook]++;
                 }
 
                 for (int look = 0; look < Counts.Length; look++)
@@ -233,16 +269,24 @@ namespace Voxel.Client
                     var foot = new Vector3(plant.X + 0.5f, plant.Y, plant.Z + 0.5f);
                     if (renderer.species[plant.SpeciesIndex].FloatsOnWater) foot.y += ChunkMesher.WaterSurface;
                     Quaternion turn = TurnOf(plant.X, plant.Z);
-                    IReadOnlyList<SpeciesAsset.Part> parts = renderer.lookParts[look];
-                    for (int p = 0; p < parts.Count; p++)
-                    {
-                        Matrices[look][p][Counts[look]] = Matrix4x4.TRS(foot + turn * parts[p].offset * size, turn, parts[p].scale * size);
-                    }
+                    Place(renderer, look, foot, turn, size);
 
-                    Counts[look]++;
+                    int fruitLook = renderer.FruitLookOf(look, plant);
+                    if (fruitLook >= 0) Place(renderer, fruitLook, foot, turn, size);
                 }
 
                 Dirty = false;
+            }
+
+            private void Place(PlantRenderer renderer, int look, Vector3 foot, Quaternion turn, float size)
+            {
+                IReadOnlyList<SpeciesAsset.Part> parts = renderer.lookParts[look];
+                for (int p = 0; p < parts.Count; p++)
+                {
+                    Matrices[look][p][Counts[look]] = Matrix4x4.TRS(foot + turn * parts[p].offset * size, turn, parts[p].scale * size);
+                }
+
+                Counts[look]++;
             }
         }
     }

@@ -18,7 +18,7 @@ namespace Voxel.EditorTools
     // Run Eco > Rebuild plant models after changing anything below: meshes, textures and materials
     // are rewritten in place, so every reference to them survives. A species asset that does not
     // exist yet is created with default rules, to be set in the inspector.
-    public static class PlantModelBuilder
+    public static partial class PlantModelBuilder
     {
         private const string SpeciesFolder = "Assets/Species";
         private const string ModelFolder = "Assets/Species/Models";
@@ -52,6 +52,10 @@ namespace Voxel.EditorTools
         {
             public string Name;
             public Part[] Parts;
+
+            // A crop's fruit at full size, drawn over the model once ripe: GiveModels writes them at
+            // each stage of ripeness, each box shrunk about its own centre (FruitScales).
+            public Part[] Fruit;
         }
 
         private sealed class MaterialLook
@@ -1122,7 +1126,18 @@ namespace Voxel.EditorTools
                 SaveMaterial(look);
             }
 
+            foreach (MaterialLook look in CropMaterials)
+            {
+                SaveMaterial(look);
+            }
+
+            GiveTreesFruit();
             foreach ((string species, Model[] models) in SpeciesModels)
+            {
+                GiveModels($"{SpeciesFolder}/{species}.asset", models);
+            }
+
+            foreach ((string species, Model[] models) in CropModels())
             {
                 GiveModels($"{SpeciesFolder}/{species}.asset", models);
             }
@@ -1147,25 +1162,47 @@ namespace Voxel.EditorTools
 
             for (int m = 0; m < models.Length; m++)
             {
-                SerializedProperty parts = modelList.GetArrayElementAtIndex(m).FindPropertyRelative("parts");
+                SerializedProperty model = modelList.GetArrayElementAtIndex(m);
+                SerializedProperty parts = model.FindPropertyRelative("parts");
                 parts.arraySize = models[m].Parts.Length;
                 for (int p = 0; p < models[m].Parts.Length; p++)
                 {
                     Part part = models[m].Parts[p];
-                    string meshName = $"{models[m].Name}_{part.Material}";
-                    Mesh mesh = SaveMesh(BuildMesh(meshName, part.Boxes), $"{ModelFolder}/{meshName}.asset");
+                    WritePart(parts.GetArrayElementAtIndex(p), $"{models[m].Name}_{part.Material}", part.Material, part.Boxes);
+                }
 
-                    SerializedProperty entry = parts.GetArrayElementAtIndex(p);
-                    entry.FindPropertyRelative("mesh").objectReferenceValue = mesh;
-                    entry.FindPropertyRelative("material").objectReferenceValue =
-                        AssetDatabase.LoadAssetAtPath<Material>($"{MaterialFolder}/{part.Material}.mat");
-                    entry.FindPropertyRelative("offset").vector3Value = Vector3.zero;
-                    entry.FindPropertyRelative("scale").vector3Value = Vector3.one;
+                // The fruit, once per stage of ripeness, each fruit larger at the next.
+                Part[] fruit = models[m].Fruit ?? System.Array.Empty<Part>();
+                SerializedProperty fruits = model.FindPropertyRelative("fruits");
+                fruits.arraySize = fruit.Length == 0 ? 0 : FruitScales.Length;
+                for (int stage = 0; stage < fruits.arraySize; stage++)
+                {
+                    SerializedProperty fruitParts = fruits.GetArrayElementAtIndex(stage).FindPropertyRelative("parts");
+                    fruitParts.arraySize = fruit.Length;
+                    for (int p = 0; p < fruit.Length; p++)
+                    {
+                        float scale = FruitScales[stage];
+                        Box[] boxes = System.Array.ConvertAll(fruit[p].Boxes, box => new Box(
+                            box.Centre.x, box.Centre.y, box.Centre.z, box.Size.x * scale, box.Size.y * scale, box.Size.z * scale, box.Tilt.x, box.Tilt.y));
+                        WritePart(fruitParts.GetArrayElementAtIndex(p), $"{models[m].Name}_{fruit[p].Material}_Ripe{stage + 1}", fruit[p].Material, boxes);
+                    }
                 }
             }
 
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(species);
+        }
+
+        // The size of each fruit at each stage of ripeness, from the first.
+        private static readonly float[] FruitScales = { 0.55f, 0.78f, 1f };
+
+        private static void WritePart(SerializedProperty entry, string meshName, string material, Box[] boxes)
+        {
+            Mesh mesh = SaveMesh(BuildMesh(meshName, boxes), $"{ModelFolder}/{meshName}.asset");
+            entry.FindPropertyRelative("mesh").objectReferenceValue = mesh;
+            entry.FindPropertyRelative("material").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Material>($"{MaterialFolder}/{material}.mat");
+            entry.FindPropertyRelative("offset").vector3Value = Vector3.zero;
+            entry.FindPropertyRelative("scale").vector3Value = Vector3.one;
         }
 
         private static Mesh BuildMesh(string name, Box[] boxes)

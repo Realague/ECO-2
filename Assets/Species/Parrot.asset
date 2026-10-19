@@ -16,6 +16,10 @@ MonoBehaviour:
   - {fileID: 11400000, guid: cc9f79da0d803bf40932a87b727b2553, type: 2}
   - {fileID: 11400000, guid: 14d6ae9b6ace58946a66c9ea9b34c2dc, type: 2}
   - {fileID: 11400000, guid: 3cea0d69dde6c7c4aa80c412ed149f05, type: 2}
+  - {fileID: 11400000, guid: c675c193fa4af544c872b7b6889dccd8, type: 2}
+  - {fileID: 11400000, guid: 1de4a08b056e898409a0b6e4ad97de1b, type: 2}
+  - {fileID: 11400000, guid: dd67c302382b51c46bce9f8a524f7ad8, type: 2}
+  - {fileID: 11400000, guid: 7be27e523c6a97046941afd6821972f0, type: 2}
   eatsAnimals: []
   eatsCarrion: 0
   spreadsSeeds: 1

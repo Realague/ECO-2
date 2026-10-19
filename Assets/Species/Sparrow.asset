@@ -15,6 +15,9 @@ MonoBehaviour:
   eatsPlants:
   - {fileID: 11400000, guid: 3cea0d69dde6c7c4aa80c412ed149f05, type: 2}
   - {fileID: 11400000, guid: cc9f79da0d803bf40932a87b727b2553, type: 2}
+  - {fileID: 11400000, guid: c51d5d2bb5e7e994daabc4fcf75e553e, type: 2}
+  - {fileID: 11400000, guid: ad518876522ce614bbd6eed726ae58a8, type: 2}
+  - {fileID: 11400000, guid: 37afe8892d64bd14f82d147f5905de05, type: 2}
   eatsAnimals: []
   eatsCarrion: 0
   spreadsSeeds: 1

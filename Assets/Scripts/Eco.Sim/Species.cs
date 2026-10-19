@@ -11,6 +11,16 @@ namespace Eco.Sim
         Either
     }
 
+    // What a plant gives when it is harvested (Species.Harvest): nothing (it can only be felled),
+    // its crop once, the plant then being pulled up (annuals: wheat, carrots), or its fruit again
+    // and again (perennials: strawberries, fruit trees).
+    public enum HarvestKind
+    {
+        None,
+        Annual,
+        Perennial
+    }
+
     // Rules of a plant species. Durations are in simulation steps.
     public sealed class Species
     {
@@ -61,6 +71,17 @@ namespace Eco.Sim
         // Where its base stands: in the air on dry ground (most plants), in water one block deep
         // (water lilies), or either (swamp cypresses). Grounds are then those of the bed.
         public Rooting Rooting { get; set; } = Rooting.Dry;
+
+        // It only sprouts in the shade: a grown plant at least ShadeHeight blocks high within
+        // ShadeRange columns (mushrooms).
+        public bool NeedsShade { get; set; }
+
+        // A crop: once adult, it ripens (Plant.Fruit) over FruitSteps on fertile soil in a climate
+        // that suits it, through Plant.RipeStageCount stages, and is harvested from the first.
+        public HarvestKind Harvest { get; set; }
+        public int FruitSteps { get; set; } = 1;
+
+        public bool BearsCrop => Harvest != HarvestKind.None;
 
         // How well the species does in a climate, from 0 (it cannot live there) to 1: its seeds take
         // that often, and it grows that fast.

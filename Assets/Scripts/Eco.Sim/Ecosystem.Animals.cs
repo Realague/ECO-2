@@ -395,7 +395,7 @@ namespace Eco.Sim
             {
                 int plantIndex = IndexOf(plantAtColumn[ColumnIndex(foodX, foodZ)]);
                 if (kind.SpreadsSeeds) animal.CarriedSeed = plants[plantIndex].SpeciesIndex + 1;
-                Graze(plantIndex);
+                Eat(plantIndex);
             }
 
             animal.Hunger = Math.Max(0f, animal.Hunger - kind.MealValue);
@@ -453,7 +453,35 @@ namespace Eco.Sim
             Plant plant = plants[IndexOf(plantId)];
             if (plant.Growth < MinEdibleGrowth || Array.IndexOf(kind.EatsPlants, plant.SpeciesIndex) < 0) return false;
 
+            // Ripe fruit is within reach of whoever eats it, however tall the tree: birds, deer under apple trees.
+            if (plant.RipeStage >= 1 && species[plant.SpeciesIndex].Harvest == HarvestKind.Perennial) return true;
+
             return species[plant.SpeciesIndex].Height * PlantShape.Scale(plant.Stage) <= kind.ReachHeight;
+        }
+
+        // A plant is eaten: a perennial's ripe fruit are taken and the plant is spared; otherwise it is
+        // grazed, and an annual's crop is lost with its foliage.
+        private void Eat(int plantIndex)
+        {
+            Plant plant = plants[plantIndex];
+            Species kind = species[plant.SpeciesIndex];
+            if (plant.RipeStage >= 1 && kind.Harvest == HarvestKind.Perennial)
+            {
+                plant.Fruit = 0f;
+                plants[plantIndex] = plant;
+                PlantChanged?.Invoke(plant);
+                return;
+            }
+
+            if (kind.BearsCrop && plant.Fruit > 0f)
+            {
+                int previousRipeStage = plant.RipeStage;
+                plant.Fruit = 0f;
+                plants[plantIndex] = plant;
+                if (previousRipeStage != 0) PlantChanged?.Invoke(plant);
+            }
+
+            Graze(plantIndex);
         }
 
         private bool IsPrey(int animalId, int hunterId, AnimalSpecies kind)

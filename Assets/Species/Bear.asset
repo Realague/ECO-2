@@ -14,6 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.AnimalSpeciesAsset
   eatsPlants:
   - {fileID: 11400000, guid: cc9f79da0d803bf40932a87b727b2553, type: 2}
+  - {fileID: 11400000, guid: e0b2f866812f971428c1c1aa24ec804e, type: 2}
+  - {fileID: 11400000, guid: d79ceb71a3b1a02469a1433ea5b99491, type: 2}
+  - {fileID: 11400000, guid: a118a8c5bf5bb7942984730b55064092, type: 2}
+  - {fileID: 11400000, guid: 503dbd236c4205040a1c8541bfb58e3d, type: 2}
+  - {fileID: 11400000, guid: 4ea99aee5614fd741a520e189acd403d, type: 2}
   eatsAnimals:
   - {fileID: 11400000, guid: dfcae1fb9eafaf3418dbc52a5fd7cf4c, type: 2}
   - {fileID: 11400000, guid: 6574d881bcfa74945b4cf99af2886576, type: 2}

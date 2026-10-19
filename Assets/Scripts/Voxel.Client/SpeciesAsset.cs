@@ -64,13 +64,38 @@ namespace Voxel.Client
         [Tooltip("Drawn at the water's surface rather than on the bed (water lilies).")]
         [SerializeField] private bool floatsOnWater;
 
+        [Tooltip("Only sprouts in the shade of a grown plant at least 3 blocks high, within 2 columns (mushrooms).")]
+        [SerializeField] private bool needsShade;
+
         [Header("Harvest")]
         [Tooltip("Wood obtained by felling an adult plant; a younger plant gives less.")]
         [SerializeField] private int woodYield;
+        [Tooltip("A crop: none, an annual (pulled up when harvested) or a perennial (picked again and again). " +
+                 "Once adult it ripens through 3 stages, giving a third, two thirds and all of its harvest.")]
+        [SerializeField] private HarvestKind harvest;
+        [Tooltip("What the harvest gives, its item named so: \"Apple\", \"Wheat grain\".")]
+        [SerializeField] private string produceName;
+        [Tooltip("Crops given by a fully ripe harvest.")]
+        [SerializeField] private int produceYield = 3;
+        [Tooltip("An annual's seeds given by a fully ripe harvest (none when picked unripe).")]
+        [SerializeField] private int seedYield = 2;
+        [Tooltip("Straw given by a fully ripe harvest (wheat).")]
+        [SerializeField] private int strawYield;
+        [Tooltip("Days for an adult plant to go from unripe to fully ripe, on rich soil in a climate that suits it (and to ripen again once picked).")]
+        [SerializeField] private float fruitDays = 3f;
 
-        // One look of the species. Each plant shows one of the models, picked from its column.
+        // One look of the species. Each plant shows one of the models, picked from its column. A
+        // crop's fruit are drawn over it once ripe: fruits[0] at the first stage of ripeness, then
+        // the next, each fruit larger (PlantModelBuilder makes them).
         [Serializable]
         public struct Model
+        {
+            public Part[] parts;
+            public FruitLook[] fruits;
+        }
+
+        [Serializable]
+        public struct FruitLook
         {
             public Part[] parts;
         }
@@ -98,7 +123,26 @@ namespace Voxel.Client
             return (int)(hash % (uint)models.Length);
         }
 
+        // The fruit drawn over a model at a stage of ripeness (1 to Plant.RipeStageCount); none at 0.
+        public IReadOnlyList<Part> FruitPartsOf(int model, int ripeStage)
+        {
+            FruitLook[] fruits = models[model].fruits;
+            if (fruits == null || ripeStage < 1 || ripeStage > fruits.Length) return Array.Empty<Part>();
+
+            return fruits[ripeStage - 1].parts ?? Array.Empty<Part>();
+        }
+
         public int WoodYield => woodYield;
+
+        public HarvestKind Harvest => harvest;
+
+        public string ProduceName => string.IsNullOrEmpty(produceName) ? name : produceName;
+
+        public int ProduceYield => produceYield;
+
+        public int SeedYield => seedYield;
+
+        public int StrawYield => strawYield;
 
         public bool FloatsOnWater => floatsOnWater;
 
@@ -123,7 +167,10 @@ namespace Voxel.Client
                 ClimateTolerance = climateTolerance,
                 Grounds = GroundBlocks(),
                 NeedsWater = needsWater,
-                Rooting = rooting
+                Rooting = rooting,
+                NeedsShade = needsShade,
+                Harvest = harvest,
+                FruitSteps = Mathf.Max(1, Mathf.RoundToInt(fruitDays * SimClock.StepsPerDay))
             };
         }
 

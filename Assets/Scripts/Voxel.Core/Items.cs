@@ -6,10 +6,16 @@ namespace Voxel.Core
     {
         public const int None = 0;
         public const int Wood = 100;
+        public const int Straw = 101;
 
         // One seed per plant species: FirstSeed + index of the species.
         public const int MaxSeedSpecies = 100;
         private const int FirstSeed = 200;
+
+        // One crop per plant species, what its harvest gives (an apple, a carrot): FirstProduce + index
+        // of the species. Its name is the species' (SpeciesAsset.ProduceName), which only the ecosystem knows.
+        public const int MaxProduceSpecies = 100;
+        private const int FirstProduce = 300;
 
         public static int OfBlock(ushort block) => Blocks.TypeOf(block);
 
@@ -27,7 +33,13 @@ namespace Voxel.Core
 
         public static int SeedSpecies(int item) => item - FirstSeed;
 
-        public static bool IsValid(int item) => IsBlock(item) || item == Wood || IsSeed(item);
+        public static int Produce(int plantSpecies) => FirstProduce + plantSpecies;
+
+        public static bool IsProduce(int item) => item >= FirstProduce && item < FirstProduce + MaxProduceSpecies;
+
+        public static int ProduceSpecies(int item) => item - FirstProduce;
+
+        public static bool IsValid(int item) => IsBlock(item) || item == Wood || item == Straw || IsSeed(item) || IsProduce(item);
 
         // What a broken block yields. Grass cannot be picked up: it gives dirt.
         public static int DropOf(ushort block)
@@ -65,7 +77,8 @@ namespace Voxel.Core
                 case Blocks.Bedrock: return "Bedrock";
                 case Blocks.Mud: return "Mud";
                 case Wood: return "Wood";
-                default: return IsSeed(item) ? "Seed" : "Unknown item";
+                case Straw: return "Straw";
+                default: return IsSeed(item) ? "Seed" : IsProduce(item) ? "Crop" : "Unknown item";
             }
         }
     }

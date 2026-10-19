@@ -14,6 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.AnimalSpeciesAsset
   eatsPlants:
   - {fileID: 11400000, guid: cc9f79da0d803bf40932a87b727b2553, type: 2}
+  - {fileID: 11400000, guid: 905417f2df628a04795c4a69ab4110cf, type: 2}
+  - {fileID: 11400000, guid: a118a8c5bf5bb7942984730b55064092, type: 2}
+  - {fileID: 11400000, guid: c51d5d2bb5e7e994daabc4fcf75e553e, type: 2}
   eatsAnimals: []
   eatsCarrion: 1
   spreadsSeeds: 1

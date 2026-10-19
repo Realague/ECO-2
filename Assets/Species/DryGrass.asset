@@ -26,7 +26,14 @@ MonoBehaviour:
   needsWater: 0
   rooting: 0
   floatsOnWater: 0
+  needsShade: 0
   woodYield: 0
+  harvest: 0
+  produceName: 
+  produceYield: 3
+  seedYield: 2
+  strawYield: 0
+  fruitDays: 3
   height: 0.7
   width: 0.5
   models:
@@ -36,9 +43,11 @@ MonoBehaviour:
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
       shadowMesh: {fileID: 0}
+    fruits: []
   - parts:
     - mesh: {fileID: 4300000, guid: bf32ec8d7b6a240428a44d1db543f817, type: 2}
       material: {fileID: 2100000, guid: 9fc13ef9cb5b1444588994d7f9482d7c, type: 2}
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
       shadowMesh: {fileID: 0}
+    fruits: []

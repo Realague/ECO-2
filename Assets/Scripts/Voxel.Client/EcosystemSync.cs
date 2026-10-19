@@ -17,6 +17,7 @@ namespace Voxel.Client
     {
         private const string UpdateMessage = "Eco.Update";
         private const string FellMessage = "Eco.Fell";
+        private const string HarvestMessage = "Eco.Harvest";
         private const string CommandMessage = "Eco.Command";
         private const string AnimalsMessage = "Eco.Animals";
         private const string KillMessage = "Eco.Kill";
@@ -36,7 +37,11 @@ namespace Voxel.Client
         // Computing time granted to the simulation per frame: beyond it, the remaining steps wait.
         private const double StepBudgetMilliseconds = 8.0;
         private const float ClockSendInterval = 0.5f;
-        private const int ColumnsPerInitialPlant = 64;
+
+        // A new world is sown with one attempt per species for this many block columns, so that
+        // adding species does not thin the others out (with the first 16 species, one plant attempt
+        // per 64 columns).
+        private const int ColumnsPerInitialAttempt = 1024;
 
         // Each player receives, at most twice a second, the full list of the animals around them,
         // a little beyond what they see. The cost therefore does not depend on the size of the world.
@@ -45,7 +50,6 @@ namespace Voxel.Client
         private const float AnimalFeedInterval = 0.5f;
         private const float AnimalInterestMargin = 32f;
         private const float AnimalFeedMoveThreshold = 8f;
-        private const float MinAnimalTravelSeconds = 0.25f;
 
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private InventorySync inventorySync;
@@ -215,6 +219,7 @@ namespace Voxel.Client
             if (networkManager.IsHost) animalFeeds[networkManager.LocalClientId] = new AnimalFeed();
 
             Messaging.RegisterNamedMessageHandler(FellMessage, OnFellRequest);
+            Messaging.RegisterNamedMessageHandler(HarvestMessage, OnHarvestRequest);
             Messaging.RegisterNamedMessageHandler(KillMessage, OnKillRequest);
             Messaging.RegisterNamedMessageHandler(CommandMessage, OnCommand);
             networkManager.OnClientConnectedCallback += OnClientConnected;
@@ -300,6 +305,10 @@ namespace Voxel.Client
                 animalNames = Array.ConvertAll(animalAssets, asset => DisplayName(asset.name));
                 plantNames = Array.ConvertAll(speciesAssets, asset => DisplayName(asset.name));
                 youngPlantNames = Array.ConvertAll(plantNames, plantName => "Young " + char.ToLowerInvariant(plantName[0]) + plantName.Substring(1));
+                ripePlantNames = Array.ConvertAll(plantNames, plantName => new[]
+                {
+                    plantName, plantName + " (unripe)", plantName + " (ripe)", plantName + " (fully ripe)"
+                });
             }
 
             bool plantHit = TryPickPlant(origin, direction, maxDistance, out int plantId, out float plantDistance);
@@ -313,14 +322,16 @@ namespace Voxel.Client
             if (!plantHit) return false;
 
             PlantView plant = plants[plantId];
-            name = plant.Stage < Plant.StageCount - 1 ? youngPlantNames[plant.SpeciesIndex] : plantNames[plant.SpeciesIndex];
+            name = plant.Stage < Plant.StageCount - 1 ? youngPlantNames[plant.SpeciesIndex]
+                : ripePlantNames[plant.SpeciesIndex][Mathf.Clamp(plant.RipeStage, 0, Plant.RipeStageCount)];
             return true;
         }
 
-        // Names shown when aiming, worked out once.
+        // Names shown when aiming, worked out once; a crop's name says how ripe it is.
         private string[] animalNames;
         private string[] plantNames;
         private string[] youngPlantNames;
+        private string[][] ripePlantNames;
 
         // The plant nearest along the ray. A plant's aiming box stays within its own column, so only
         // the columns the ray crosses are looked at, walked one after the other (Amanatides and Woo, in
@@ -479,6 +490,50 @@ namespace Voxel.Client
             }
         }
 
+        // Right click: picks the crop of the plant aimed at, at most maxDistance away. Returns false
+        // if the ray hits no ripe crop, the click then using the held item.
+        public bool TryHarvestAimed(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance)
+        {
+            if (!TryPickPlant(origin, direction, maxDistance, out int plantId, out _)) return false;
+            if (plants[plantId].RipeStage < 1 || speciesAssets[plants[plantId].SpeciesIndex].Harvest == HarvestKind.None) return false;
+
+            RequestHarvest(plantId);
+            return true;
+        }
+
+        // Harvest requested by the local player, on the same principle as felling: a client shows the
+        // result right away (an annual pulled up, a perennial without its fruit), and the server sends
+        // the plant back if it refuses.
+        public void RequestHarvest(int plantId)
+        {
+            if (!running) return;
+
+            if (ecosystem != null)
+            {
+                TryHarvest(networkManager.LocalClientId, plantId);
+                return;
+            }
+
+            if (plants.TryGetValue(plantId, out PlantView view))
+            {
+                if (speciesAssets[view.SpeciesIndex].Harvest == HarvestKind.Annual)
+                {
+                    RemoveView(plantId);
+                }
+                else
+                {
+                    view.RipeStage = 0;
+                    SetView(plantId, view);
+                }
+            }
+
+            using (var writer = new FastBufferWriter(sizeof(int), Allocator.Temp))
+            {
+                writer.WriteValueSafe(plantId);
+                Messaging.SendNamedMessage(HarvestMessage, NetworkManager.ServerClientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
+            }
+        }
+
         // Kill requested by the local player, on the same principle as felling.
         public void RequestKill(int animalId)
         {
@@ -533,7 +588,15 @@ namespace Voxel.Client
             {
                 try
                 {
-                    return Ecosystem.LoadFromFile(savePath, world, species, animalSpecies);
+                    Ecosystem loaded = Ecosystem.LoadFromFile(savePath, world, species, animalSpecies);
+                    if (loaded.SavedSpeciesCount < species.Count)
+                    {
+                        // Species added since the save are sown as in a new world, or they would never appear.
+                        int sown = loaded.Populate(world.SizeX * world.SizeZ / ColumnsPerInitialAttempt * species.Count, loaded.SavedSpeciesCount);
+                        Debug.Log($"{species.Count - loaded.SavedSpeciesCount} plant species added since the ecosystem was saved: {sown} plants sown.");
+                    }
+
+                    return loaded;
                 }
                 catch (Exception e) when (e is IOException || e is InvalidDataException)
                 {
@@ -543,7 +606,7 @@ namespace Voxel.Client
             }
 
             var created = new Ecosystem(world, species, animalSpecies, world.Seed);
-            created.Populate(world.SizeX * world.SizeZ / ColumnsPerInitialPlant);
+            created.Populate(world.SizeX * world.SizeZ / ColumnsPerInitialAttempt * species.Count);
             created.PopulateAnimals();
             return created;
         }
@@ -582,7 +645,42 @@ namespace Voxel.Client
 
         private bool TryFell(ulong clientId, int plantId)
         {
-            if (!ecosystem.TryGet(plantId, out Plant plant)) return false;
+            if (!ecosystem.TryGet(plantId, out Plant plant) || !IsWithinReach(clientId, plant)) return false;
+            if (!ecosystem.Remove(plantId)) return false;
+
+            // Felling yields wood according to the plant's size, a seed if it was adult, and its
+            // crop if it was ripe, so nothing is lost by felling rather than picking it.
+            SpeciesAsset asset = speciesAssets[plant.SpeciesIndex];
+            int wood = Mathf.RoundToInt(asset.WoodYield * PlantShape.Scale(plant.Stage));
+            inventorySync.Give(clientId, Items.Wood, wood);
+            if (plant.Growth >= 1f) inventorySync.Give(clientId, Items.Seed(plant.SpeciesIndex), 1);
+            if (asset.Harvest != HarvestKind.None) GiveCrop(clientId, plant.SpeciesIndex, plant.RipeStage, false);
+            return true;
+        }
+
+        // Server side: a player picks a ripe crop. An annual is pulled up and gives seeds too.
+        private bool TryHarvest(ulong clientId, int plantId)
+        {
+            if (!ecosystem.TryGet(plantId, out Plant plant) || !IsWithinReach(clientId, plant)) return false;
+            if (!ecosystem.TryHarvest(plantId, out int ripeStage)) return false;
+
+            GiveCrop(clientId, plant.SpeciesIndex, ripeStage, speciesAssets[plant.SpeciesIndex].Harvest == HarvestKind.Annual);
+            return true;
+        }
+
+        // What a harvest at this stage of ripeness gives: a share of the crop and of the straw, and,
+        // with seeds, a share of an annual's seeds (none when picked unripe).
+        private void GiveCrop(ulong clientId, int speciesIndex, int ripeStage, bool withSeeds)
+        {
+            SpeciesAsset asset = speciesAssets[speciesIndex];
+            inventorySync.Give(clientId, Items.Produce(speciesIndex), CropYield.Share(asset.ProduceYield, ripeStage));
+            inventorySync.Give(clientId, Items.Straw, CropYield.Share(asset.StrawYield, ripeStage));
+            if (withSeeds) inventorySync.Give(clientId, Items.Seed(speciesIndex), CropYield.Seeds(asset.SeedYield, ripeStage));
+        }
+
+        // Whether a player's eyes are within reach of a plant, with the same tolerance as for blocks.
+        private bool IsWithinReach(ulong clientId, Plant plant)
+        {
             if (!networkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client)) return false;
             if (client.PlayerObject == null) return false;
 
@@ -592,14 +690,7 @@ namespace Voxel.Client
                 out System.Numerics.Vector3 min, out System.Numerics.Vector3 max);
 
             float maxDistance = PlayerRules.Reach + BlockEditRules.ReachTolerance;
-            if (PlantShape.DistanceSquared(eyes.ToNumerics(), min, max) > maxDistance * maxDistance) return false;
-            if (!ecosystem.Remove(plantId)) return false;
-
-            // Felling yields wood according to the plant's size, and a seed if it was adult.
-            int wood = Mathf.RoundToInt(speciesAssets[plant.SpeciesIndex].WoodYield * PlantShape.Scale(plant.Stage));
-            inventorySync.Give(clientId, Items.Wood, wood);
-            if (plant.Growth >= 1f) inventorySync.Give(clientId, Items.Seed(plant.SpeciesIndex), 1);
-            return true;
+            return PlantShape.DistanceSquared(eyes.ToNumerics(), min, max) <= maxDistance * maxDistance;
         }
 
         // Server side: sprouts a seed in the column a player is aiming at, if it is within their
@@ -631,12 +722,32 @@ namespace Voxel.Client
             return speciesIndex >= 0 && speciesIndex < speciesAssets.Length ? speciesAssets[speciesIndex].name : "?";
         }
 
+        // Name of what a plant species' harvest gives (Items.Produce), for display.
+        public string ProduceName(int speciesIndex)
+        {
+            return speciesIndex >= 0 && speciesIndex < speciesAssets.Length ? speciesAssets[speciesIndex].ProduceName : "?";
+        }
+
         private void OnFellRequest(ulong senderId, FastBufferReader reader)
         {
             reader.ReadValueSafe(out int plantId);
             if (TryFell(senderId, plantId)) return;
 
             // Refusal: if the plant still exists, it is sent back to the requester, who had removed it in anticipation.
+            if (ecosystem.TryGet(plantId, out Plant plant))
+            {
+                outgoing.Clear();
+                outgoing.Add(plant);
+                SendUpdate(senderId, outgoing, null);
+            }
+        }
+
+        private void OnHarvestRequest(ulong senderId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out int plantId);
+            if (TryHarvest(senderId, plantId)) return;
+
+            // Refusal: the plant, if it still exists, is sent back to the requester, who had changed it in anticipation.
             if (ecosystem.TryGet(plantId, out Plant plant))
             {
                 outgoing.Clear();
@@ -760,7 +871,7 @@ namespace Voxel.Client
             animalViews.BeginList();
             foreach (Animal animal in nearbyAnimals)
             {
-                animalViews.Add(animal.Id, animal.SpeciesIndex, new Vector3(animal.X + 0.5f, animal.Y, animal.Z + 0.5f), worldSync.World, AnimalTravelSeconds());
+                animalViews.Add(animal.Id, animal.SpeciesIndex, new Vector3(animal.X + 0.5f, animal.Y, animal.Z + 0.5f), worldSync.World, AnimalListSeconds());
             }
 
             animalViews.EndList();
@@ -802,7 +913,7 @@ namespace Voxel.Client
         private void OnAnimals(ulong senderId, FastBufferReader reader)
         {
             reader.ReadValueSafe(out int count);
-            float travelSeconds = AnimalTravelSeconds();
+            float listSeconds = AnimalListSeconds();
 
             animalViews.BeginList();
             for (int i = 0; i < count; i++)
@@ -812,7 +923,7 @@ namespace Voxel.Client
                 reader.ReadValueSafe(out int x);
                 reader.ReadValueSafe(out int y);
                 reader.ReadValueSafe(out int z);
-                animalViews.Add(animalId, speciesIndex, new Vector3(x + 0.5f, y, z + 0.5f), worldSync.World, travelSeconds);
+                animalViews.Add(animalId, speciesIndex, new Vector3(x + 0.5f, y, z + 0.5f), worldSync.World, listSeconds);
             }
 
             animalViews.EndList();
@@ -829,13 +940,14 @@ namespace Voxel.Client
             }
         }
 
-        // Longest a displayed move between two positions may last: one simulation step at the current
-        // speed, so that an animal always arrives before its next move. AnimalViews plays shorter
-        // moves at the species' own pace.
-        private float AnimalTravelSeconds()
+        // About how long until the next animal list: one simulation step at the current speed, but
+        // lists come at most every AnimalFeedInterval, so at high speed a list covers several steps.
+        // AnimalViews spreads each move over it (so at speed 1 animals do not dash then stand still
+        // for most of the step), or quickens it to fit (so at high speed they move on without stopping).
+        private float AnimalListSeconds()
         {
             float stepSeconds = SimClock.RealSecondsPerStep / Mathf.Max(multiplier, 0.01f);
-            return Mathf.Clamp(stepSeconds, MinAnimalTravelSeconds, SimClock.RealSecondsPerStep);
+            return Mathf.Min(Mathf.Max(stepSeconds, AnimalFeedInterval), 4f * SimClock.RealSecondsPerStep);
         }
 
         // Once per network tick: only the final state of each changed plant is sent, even if the
@@ -927,7 +1039,7 @@ namespace Voxel.Client
                     writer.WriteValueSafe(plant.X);
                     writer.WriteValueSafe(plant.Y);
                     writer.WriteValueSafe(plant.Z);
-                    writer.WriteValueSafe((byte)plant.Stage);
+                    writer.WriteValueSafe(PackStages(plant.Stage, plant.RipeStage));
                 }
 
                 writer.WriteValueSafe(removedCount);
@@ -965,7 +1077,7 @@ namespace Voxel.Client
                 // A species unknown to this client cannot be displayed: it is ignored.
                 if (speciesIndex >= species.Count) continue;
 
-                SetView(plantId, new PlantView { SpeciesIndex = speciesIndex, X = x, Y = y, Z = z, Stage = stage });
+                SetView(plantId, new PlantView { SpeciesIndex = speciesIndex, X = x, Y = y, Z = z, Stage = stage & StageMask, RipeStage = stage >> RipeShift });
             }
 
             reader.ReadValueSafe(out int removedCount);
@@ -976,9 +1088,16 @@ namespace Voxel.Client
             }
         }
 
+        // A plant's growth stage (0 to Plant.StageCount - 1) and stage of ripeness (0 to
+        // Plant.RipeStageCount) travel in one byte: growth in the low bits, ripeness in the top two.
+        private const int RipeShift = 6;
+        private const int StageMask = (1 << RipeShift) - 1;
+
+        private static byte PackStages(int stage, int ripeStage) => (byte)(stage | (ripeStage << RipeShift));
+
         private static PlantView ViewOf(Plant plant)
         {
-            return new PlantView { SpeciesIndex = plant.SpeciesIndex, X = plant.X, Y = plant.Y, Z = plant.Z, Stage = plant.Stage };
+            return new PlantView { SpeciesIndex = plant.SpeciesIndex, X = plant.X, Y = plant.Y, Z = plant.Z, Stage = plant.Stage, RipeStage = plant.RipeStage };
         }
 
         private sealed class AnimalFeed

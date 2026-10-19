@@ -10,7 +10,10 @@ namespace Eco.Sim
     public sealed partial class Ecosystem
     {
         private const uint Magic = 0x454F4345; // "ECOE"
-        private const int FormatVersion = 5;
+        private const int FormatVersion = 6;
+
+        // Last format without crops' ripeness (Plant.Fruit). It still loads, every crop unripe.
+        private const int FormatWithoutFruit = 5;
 
         // Last format without the seeds animals carry. It still loads, with none.
         private const int FormatWithoutCarriedSeeds = 4;
@@ -62,6 +65,7 @@ namespace Eco.Sim
                     writer.Write(plant.Z);
                     writer.Write(plant.Age);
                     writer.Write(plant.Growth);
+                    writer.Write(plant.Fruit);
                 }
 
                 writer.Write(animalSpecies.Length);
@@ -106,14 +110,15 @@ namespace Eco.Sim
                 }
 
                 int formatVersion = reader.ReadInt32();
-                if (formatVersion != FormatVersion && formatVersion != FormatWithoutCarriedSeeds && formatVersion != FormatWithoutCarrion && formatVersion != FormatWithoutAnimals)
+                if (formatVersion != FormatVersion && formatVersion != FormatWithoutFruit && formatVersion != FormatWithoutCarriedSeeds && formatVersion != FormatWithoutCarrion && formatVersion != FormatWithoutAnimals)
                 {
                     throw new InvalidDataException(
                         $"Unsupported ecosystem save format {formatVersion} (expected: {FormatVersion}).");
                 }
 
+                // Species may have been added at the end of the list since the save, never removed or reordered.
                 int speciesCount = reader.ReadInt32();
-                if (speciesCount != species.Count)
+                if (speciesCount > species.Count)
                 {
                     throw new InvalidDataException("The species list has changed since this save.");
                 }
@@ -138,7 +143,7 @@ namespace Eco.Sim
                     throw new InvalidDataException("The ecosystem save was made on a different terrain than this world's.");
                 }
 
-                var ecosystem = new Ecosystem(world, species, animalSpecies, 0);
+                var ecosystem = new Ecosystem(world, species, animalSpecies, 0) { SavedSpeciesCount = speciesCount };
                 ecosystem.StepCount = reader.ReadInt64();
                 ecosystem.random.State = reader.ReadUInt64();
                 ecosystem.nextPlantId = reader.ReadInt32();
@@ -164,11 +169,14 @@ namespace Eco.Sim
                         Growth = reader.ReadSingle()
                     };
 
+                    if (formatVersion > FormatWithoutFruit) plant.Fruit = reader.ReadSingle();
+
                     // Plants are stored by increasing id, an order the rest of the code relies on.
-                    bool valid = (uint)plant.SpeciesIndex < (uint)species.Count
+                    bool valid = (uint)plant.SpeciesIndex < (uint)speciesCount
                         && (uint)plant.X < (uint)world.SizeX
                         && (uint)plant.Z < (uint)world.SizeZ
-                        && plant.Id > previousId;
+                        && plant.Id > previousId
+                        && plant.Fruit >= 0f && plant.Fruit <= 1f;
                     if (!valid)
                     {
                         throw new InvalidDataException($"Invalid plant in the ecosystem save (id {plant.Id}).");
@@ -179,7 +187,7 @@ namespace Eco.Sim
                     ecosystem.Append(plant);
                 }
 
-                if (formatVersion != FormatWithoutAnimals) ecosystem.ReadAnimals(reader, formatVersion >= FormatVersion);
+                if (formatVersion != FormatWithoutAnimals) ecosystem.ReadAnimals(reader, formatVersion > FormatWithoutCarriedSeeds);
                 if (formatVersion >= FormatWithoutCarriedSeeds) ecosystem.ReadCarrion(reader);
                 return ecosystem;
             }
@@ -201,8 +209,9 @@ namespace Eco.Sim
 
         private void ReadAnimals(BinaryReader reader, bool withCarriedSeeds)
         {
+            // As for plants, species may have been added at the end of the list since the save.
             int speciesCount = reader.ReadInt32();
-            if (speciesCount != animalSpecies.Length)
+            if (speciesCount > animalSpecies.Length)
             {
                 throw new InvalidDataException("The animal species list has changed since this save.");
             }

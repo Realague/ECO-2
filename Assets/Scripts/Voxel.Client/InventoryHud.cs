@@ -179,9 +179,10 @@ namespace Voxel.Client
 
         private string NameOf(int item)
         {
-            return Items.IsSeed(item)
-                ? $"Seed ({ecosystemSync.PlantName(Items.SeedSpecies(item))})"
-                : Items.NameOf(item);
+            if (Items.IsSeed(item)) return $"Seed ({ecosystemSync.PlantName(Items.SeedSpecies(item))})";
+            if (Items.IsProduce(item)) return ecosystemSync.ProduceName(Items.ProduceSpecies(item));
+
+            return Items.NameOf(item);
         }
 
         // Digit key pressed this frame, from 1 to 9, or 0. Keys designate a physical position:

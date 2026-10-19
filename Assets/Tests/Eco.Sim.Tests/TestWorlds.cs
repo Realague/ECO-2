@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using Voxel.Core;
 
 namespace Eco.Sim.Tests
@@ -71,5 +72,45 @@ namespace Eco.Sim.Tests
         public static IReadOnlyList<Species> TreeOnly() => new[] { Tree() };
 
         public static IReadOnlyList<Species> TreeAndBush() => new[] { Tree(), Bush() };
+    }
+
+    internal static class OldSaves
+    {
+        // A save in the current format, turned into format 5, written before crops ripened: the
+        // same, without each plant's ripeness.
+        public static byte[] WithoutFruit(byte[] data, World world)
+        {
+            var input = new BinaryReader(new MemoryStream(data));
+            var output = new MemoryStream();
+            var writer = new BinaryWriter(output);
+
+            writer.Write(input.ReadUInt32());
+            input.ReadInt32();
+            writer.Write(5);
+            int speciesCount = input.ReadInt32();
+            writer.Write(speciesCount);
+            for (int i = 0; i < speciesCount; i++) writer.Write(input.ReadString());
+            for (int i = 0; i < 4; i++) writer.Write(input.ReadInt32());
+            writer.Write(input.ReadInt64());
+            writer.Write(input.ReadUInt64());
+            writer.Write(input.ReadInt32());
+
+            int cells = (world.SizeX + Ecosystem.CellSize - 1) / Ecosystem.CellSize * ((world.SizeZ + Ecosystem.CellSize - 1) / Ecosystem.CellSize);
+            for (int i = 0; i < 2 * cells; i++) writer.Write(input.ReadSingle());
+
+            int plantCount = input.ReadInt32();
+            writer.Write(plantCount);
+            for (int i = 0; i < plantCount; i++)
+            {
+                for (int field = 0; field < 6; field++) writer.Write(input.ReadInt32());
+                writer.Write(input.ReadSingle());
+                input.ReadSingle();
+            }
+
+            byte[] rest = input.ReadBytes(data.Length);
+            writer.Write(rest);
+            writer.Flush();
+            return output.ToArray();
+        }
     }
 }

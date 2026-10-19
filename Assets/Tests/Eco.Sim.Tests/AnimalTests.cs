@@ -421,9 +421,10 @@ namespace Eco.Sim.Tests
             var stream = new MemoryStream();
             withoutAnimals.Write(stream);
 
-            // The old format stopped after the plants: the animal and carcass sections are removed
-            // (four integers for an ecosystem without animal species) and the old format number is put back.
-            byte[] data = stream.ToArray();
+            // The old format stopped after the plants, which had no ripeness: the animal and carcass
+            // sections are removed (four integers for an ecosystem without animal species) and the old
+            // format number is put back.
+            byte[] data = OldSaves.WithoutFruit(stream.ToArray(), world);
             var oldFormat = new byte[data.Length - 4 * sizeof(int)];
             Array.Copy(data, oldFormat, oldFormat.Length);
             BitConverter.GetBytes(2).CopyTo(oldFormat, sizeof(uint));

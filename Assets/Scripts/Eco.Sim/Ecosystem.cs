@@ -25,6 +25,13 @@ namespace Eco.Sim
         private const float WetnessShare = 0.7f;
         private const float IdealWarmth = 0.55f;
 
+        // Populate: how many more times a species that needs water beside it tries to take.
+        private const int WaterSideAttempts = 4;
+
+        // Species.NeedsShade: a grown plant this high (in blocks) within this many columns.
+        private const float ShadeHeight = 3f;
+        private const int ShadeRange = 2;
+
         private readonly World world;
         private readonly Species[] species;
         private readonly SimRandom random;
@@ -69,6 +76,7 @@ namespace Eco.Sim
             }
 
             random = new SimRandom(seed);
+            SavedSpeciesCount = species.Count;
 
             cellsX = (world.SizeX + CellSize - 1) / CellSize;
             cellsZ = (world.SizeZ + CellSize - 1) / CellSize;
@@ -85,7 +93,7 @@ namespace Eco.Sim
 
         public event Action<Plant> PlantAdded;
 
-        // Raised when a plant moves to another growth stage, not at every step.
+        // Raised when a plant moves to another growth or ripeness stage, not at every step.
         public event Action<Plant> PlantChanged;
         public event Action<int> PlantRemoved;
 
@@ -95,6 +103,10 @@ namespace Eco.Sim
         public IReadOnlyList<Plant> Plants => new ArraySegment<Plant>(plants, 0, plantCount);
 
         public IReadOnlyList<Species> AllSpecies => species;
+
+        // How many of the species the loaded save knew (the first ones): fewer than AllSpecies
+        // when species were added since. All of them for an ecosystem not loaded.
+        public int SavedSpeciesCount { get; private set; }
 
         public float GetFertility(int x, int z) => fertility[CellIndex(x, z)];
 
@@ -111,17 +123,33 @@ namespace Eco.Sim
             return false;
         }
 
-        // Sows adult plants at random to start a new world. Returns the number of plants created.
-        public int Populate(int attempts)
+        // Sows adult plants at random to start a new world, the attempts shared among the species.
+        // Species that grow by the water try WaterSideAttempts times as often, since their habitat
+        // is a small part of the world (otherwise a world may start with a single willow); species
+        // that need shade come last, once there are trees to give it. Returns the number of plants created.
+        public int Populate(int attempts) => Populate(attempts, 0);
+
+        // The same, for the species from firstSpecies on only: those added to the game since a
+        // loaded world was saved (SavedSpeciesCount), which would otherwise never appear in it.
+        public int Populate(int attempts, int firstSpecies)
         {
             int created = 0;
-            for (int i = 0; i < attempts; i++)
+            for (int round = 0; round < 2; round++)
             {
-                int speciesIndex = i % species.Length;
-                int x = random.NextInt(world.SizeX);
-                int z = random.NextInt(world.SizeZ);
-                int age = random.NextInt(Math.Max(1, species[speciesIndex].LifespanSteps / 2));
-                if (TryAdd(speciesIndex, x, z, 1f, age)) created++;
+                for (int i = 0; i < attempts; i++)
+                {
+                    int speciesIndex = i % species.Length;
+                    Species kind = species[speciesIndex];
+                    if (speciesIndex < firstSpecies || kind.NeedsShade != (round == 1)) continue;
+
+                    for (int attempt = kind.NeedsWater ? WaterSideAttempts : 1; attempt > 0; attempt--)
+                    {
+                        int x = random.NextInt(world.SizeX);
+                        int z = random.NextInt(world.SizeZ);
+                        int age = random.NextInt(Math.Max(1, kind.LifespanSteps / 2));
+                        if (TryAdd(speciesIndex, x, z, 1f, age)) created++;
+                    }
+                }
             }
 
             return created;
@@ -157,6 +185,28 @@ namespace Eco.Sim
 
             Append(plant);
             PlantAdded?.Invoke(plant);
+            return true;
+        }
+
+        // Harvests a crop, as a player picking it: false if the plant does not exist, bears no crop
+        // or is not yet ripe (RipeStage 0). An annual is pulled up; a perennial keeps growing and
+        // ripens again from nothing. ripeStage is the stage it had reached, which sets the harvest.
+        public bool TryHarvest(int plantId, out int ripeStage)
+        {
+            ripeStage = 0;
+            int index = IndexOf(plantId);
+            if (index < 0) return false;
+
+            Plant plant = plants[index];
+            Species kind = species[plant.SpeciesIndex];
+            if (!kind.BearsCrop || plant.RipeStage < 1) return false;
+
+            ripeStage = plant.RipeStage;
+            if (kind.Harvest == HarvestKind.Annual) return Remove(plantId);
+
+            plant.Fruit = 0f;
+            plants[index] = plant;
+            PlantChanged?.Invoke(plant);
             return true;
         }
 
@@ -219,6 +269,13 @@ namespace Eco.Sim
                 plant.Growth = Math.Min(1f, plant.Growth + soil * plant.Vigour / kind.MaturitySteps);
                 if (plant.Stage != previousStage) PlantChanged?.Invoke(plant);
             }
+            else if (plant.Fruit < 1f && kind.BearsCrop)
+            {
+                // An adult crop ripens as it grew: faster on rich soil and in a climate that suits it.
+                int previousRipeStage = plant.RipeStage;
+                plant.Fruit = Math.Min(1f, plant.Fruit + soil * plant.Vigour / kind.FruitSteps);
+                if (plant.RipeStage != previousRipeStage) PlantChanged?.Invoke(plant);
+            }
 
             fertility[cell] = Math.Max(0f, soil - kind.FertilityUse * plant.Growth);
             seeds = plant.Growth >= 1f && random.NextFloat() < kind.SeedChance;
@@ -247,6 +304,7 @@ namespace Eco.Sim
             if (!HasGroundAndRoom(kind, x, y, z)) return false;
             if (kind.NeedsWater && !IsBesideWater(x, y, z)) return false;
             if (fertility[cell] < kind.MinFertility) return false;
+            if (kind.NeedsShade && !IsShaded(x, z)) return false;
             if (!IsSpaceFree(x, z, speciesIndex, kind.Spacing)) return false;
 
             // Where the climate does not quite suit the species, fewer of its seeds take.
@@ -426,6 +484,28 @@ namespace Eco.Sim
                 {
                     if (dx == 0 && dz == 0) continue;
                     if (world.IsWater(x + dx, y - 1, z + dz) || world.IsWater(x + dx, y, z + dz)) return true;
+                }
+            }
+
+            return false;
+        }
+
+        // In the shade of a grown plant at least ShadeHeight blocks high, within ShadeRange columns.
+        private bool IsShaded(int x, int z)
+        {
+            for (int dz = -ShadeRange; dz <= ShadeRange; dz++)
+            {
+                for (int dx = -ShadeRange; dx <= ShadeRange; dx++)
+                {
+                    int nx = x + dx;
+                    int nz = z + dz;
+                    if ((uint)nx >= (uint)world.SizeX || (uint)nz >= (uint)world.SizeZ) continue;
+
+                    int plantId = plantAtColumn[ColumnIndex(nx, nz)];
+                    if (plantId == 0) continue;
+
+                    Plant plant = plants[IndexOf(plantId)];
+                    if (plant.Growth >= 1f && species[plant.SpeciesIndex].Height >= ShadeHeight) return true;
                 }
             }
 

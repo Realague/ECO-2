@@ -1,0 +1,99 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c90fb7040ab281a4dabfdc0c96f5baf2, type: 3}
+  m_Name: Tomato
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.SpeciesAsset
+  maturityDays: 2
+  lifespanDays: 30
+  seedAttemptsPerDay: 0.4
+  seedRange: 8
+  spacing: 7
+  minFertility: 0.3
+  fertilityUsePerDay: 0.03
+  idealWarmth: {x: 0.5, y: 0.78}
+  idealWetness: {x: 0.4, y: 0.7}
+  climateTolerance: 0.1
+  grounds: 3
+  needsWater: 0
+  rooting: 0
+  floatsOnWater: 0
+  needsShade: 0
+  woodYield: 0
+  harvest: 2
+  produceName: Tomato
+  produceYield: 4
+  seedYield: 0
+  strawYield: 0
+  fruitDays: 3
+  height: 1.5
+  width: 0.6
+  models:
+  - parts:
+    - mesh: {fileID: 4300000, guid: 3a9ca516970753f4bbb8134c02a4d23f, type: 2}
+      material: {fileID: 2100000, guid: 29ab0d5cf832f114fbc9a2e84c440c29, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: b390bb83ec5427e4b91c849747fba507, type: 2}
+      material: {fileID: 2100000, guid: eb4111ecfe1561f48830ab530898b73a, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    fruits:
+    - parts:
+      - mesh: {fileID: 4300000, guid: ed7136ecd931b674d9252d72ca4e3a48, type: 2}
+        material: {fileID: 2100000, guid: 6507e1e14d627b048a71b300466255a8, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}
+    - parts:
+      - mesh: {fileID: 4300000, guid: f271f1dd70f5c8c4a91fbfc1ccbecbc1, type: 2}
+        material: {fileID: 2100000, guid: 6507e1e14d627b048a71b300466255a8, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}
+    - parts:
+      - mesh: {fileID: 4300000, guid: d76e1aef657c47b4898731beab5ecf6d, type: 2}
+        material: {fileID: 2100000, guid: 6507e1e14d627b048a71b300466255a8, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}
+  - parts:
+    - mesh: {fileID: 4300000, guid: b20064f49d59b3d4382cab076743d294, type: 2}
+      material: {fileID: 2100000, guid: 29ab0d5cf832f114fbc9a2e84c440c29, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: d27ef45347fea5046b604e8299c7772e, type: 2}
+      material: {fileID: 2100000, guid: eb4111ecfe1561f48830ab530898b73a, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    fruits:
+    - parts:
+      - mesh: {fileID: 4300000, guid: a9deb7f67df2ce94da618d04d4224e2b, type: 2}
+        material: {fileID: 2100000, guid: 6507e1e14d627b048a71b300466255a8, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}
+    - parts:
+      - mesh: {fileID: 4300000, guid: 77e7010c521dcaf4f8f95c1a69cb03e0, type: 2}
+        material: {fileID: 2100000, guid: 6507e1e14d627b048a71b300466255a8, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}
+    - parts:
+      - mesh: {fileID: 4300000, guid: c9b328aa0e8728d4bbf980e73936201a, type: 2}
+        material: {fileID: 2100000, guid: 6507e1e14d627b048a71b300466255a8, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}

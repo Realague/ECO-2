@@ -25,9 +25,37 @@ namespace Eco.Sim
         // grows that fast. Worked out when the plant appears or is loaded, never saved or sent.
         public float Vigour;
 
+        // A crop's ripeness, from 0 to 1, once the plant is adult (Species.Harvest): sent as one of
+        // RipeStageCount stages (RipeStage), the harvest growing with the stage.
+        public float Fruit;
+
+        // Stages of ripeness: 0, nothing to harvest; 1 (unripe), 2 (ripe) and 3 (fully ripe) give a
+        // third, two thirds and all of the crop.
+        public const int RipeStageCount = 3;
+
         public int Stage => StageOf(Growth);
 
+        public int RipeStage => RipeStageOf(Fruit);
+
         public static int StageOf(float growth) => Math.Min(StageCount - 1, (int)(growth * StageCount));
+
+        public static int RipeStageOf(float fruit) => Math.Min(RipeStageCount, (int)(fruit * RipeStageCount));
+    }
+
+    // How much a harvest gives at each stage of ripeness (Plant.RipeStage).
+    public static class CropYield
+    {
+        // A third, two thirds or all of a full harvest, rounded up: a ripe crop always gives something.
+        public static int Share(int full, int ripeStage)
+        {
+            if (full <= 0 || ripeStage <= 0) return 0;
+
+            int stage = Math.Min(ripeStage, Plant.RipeStageCount);
+            return (full * stage + Plant.RipeStageCount - 1) / Plant.RipeStageCount;
+        }
+
+        // An annual's seeds: none if picked unripe, then a share of the full number, at least one.
+        public static int Seeds(int full, int ripeStage) => ripeStage < 2 ? 0 : Math.Max(1, Share(full, ripeStage));
     }
 
     // Volume occupied by a plant, to aim at it and to check that it is within reach.

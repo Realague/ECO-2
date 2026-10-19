@@ -47,6 +47,30 @@ namespace Voxel.Core.Tests
         }
 
         [Test]
+        public void Produce_KeepsItsSpecies_AndIsNoSeed()
+        {
+            int crop = Items.Produce(7);
+
+            Assert.IsTrue(Items.IsProduce(crop));
+            Assert.IsTrue(Items.IsValid(crop));
+            Assert.IsFalse(Items.IsSeed(crop));
+            Assert.IsFalse(Items.IsBlock(crop));
+            Assert.AreEqual(7, Items.ProduceSpecies(crop));
+            Assert.IsFalse(Items.IsProduce(Items.Seed(7)));
+            Assert.IsFalse(Items.IsProduce(Items.Seed(Items.MaxSeedSpecies - 1)));
+        }
+
+        [Test]
+        public void Straw_IsAnItemOfItsOwn()
+        {
+            Assert.IsTrue(Items.IsValid(Items.Straw));
+            Assert.IsFalse(Items.IsBlock(Items.Straw));
+            Assert.IsFalse(Items.IsSeed(Items.Straw));
+            Assert.IsFalse(Items.IsProduce(Items.Straw));
+            Assert.AreEqual("Straw", Items.NameOf(Items.Straw));
+        }
+
+        [Test]
         public void DropOf_Grass_IsDirt()
         {
             Assert.AreEqual((int)Blocks.Dirt, Items.DropOf(Blocks.Grass));

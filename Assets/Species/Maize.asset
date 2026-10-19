@@ -1,0 +1,109 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c90fb7040ab281a4dabfdc0c96f5baf2, type: 3}
+  m_Name: Maize
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.SpeciesAsset
+  maturityDays: 2
+  lifespanDays: 10
+  seedAttemptsPerDay: 1.5
+  seedRange: 6
+  spacing: 5
+  minFertility: 0.3
+  fertilityUsePerDay: 0.04
+  idealWarmth: {x: 0.5, y: 0.75}
+  idealWetness: {x: 0.4, y: 0.7}
+  climateTolerance: 0.1
+  grounds: 3
+  needsWater: 0
+  rooting: 0
+  floatsOnWater: 0
+  needsShade: 0
+  woodYield: 0
+  harvest: 1
+  produceName: Corn
+  produceYield: 3
+  seedYield: 2
+  strawYield: 0
+  fruitDays: 2
+  height: 2.7
+  width: 0.6
+  models:
+  - parts:
+    - mesh: {fileID: 4300000, guid: 4f83dc11164e681448f53bbb5c0228a9, type: 2}
+      material: {fileID: 2100000, guid: a81b427aeb46cb140a8f9de1aff947ec, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: 9da1ddf2ff93cc34094425e7ad542212, type: 2}
+      material: {fileID: 2100000, guid: 88bcd9fad61a60341936ed553d98831a, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: add10e11e0630394cb5f80e361ca9551, type: 2}
+      material: {fileID: 2100000, guid: 9fc13ef9cb5b1444588994d7f9482d7c, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    fruits:
+    - parts:
+      - mesh: {fileID: 4300000, guid: a455ed579c7d1d54da2081d20a846dce, type: 2}
+        material: {fileID: 2100000, guid: ac407972ada35df428612c63b058acd6, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}
+    - parts:
+      - mesh: {fileID: 4300000, guid: 481624070db53334a9ab3ee0b21fecd0, type: 2}
+        material: {fileID: 2100000, guid: ac407972ada35df428612c63b058acd6, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}
+    - parts:
+      - mesh: {fileID: 4300000, guid: f8464973ad924f042904569f95b77fd5, type: 2}
+        material: {fileID: 2100000, guid: ac407972ada35df428612c63b058acd6, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}
+  - parts:
+    - mesh: {fileID: 4300000, guid: df683f483f7d9de4b8cfc6dda9069fba, type: 2}
+      material: {fileID: 2100000, guid: a81b427aeb46cb140a8f9de1aff947ec, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: 93cc9523986a85149b3a4eef95bb6629, type: 2}
+      material: {fileID: 2100000, guid: 88bcd9fad61a60341936ed553d98831a, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: 643ccb1899480e741b0b1de162ebda8e, type: 2}
+      material: {fileID: 2100000, guid: 9fc13ef9cb5b1444588994d7f9482d7c, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    fruits:
+    - parts:
+      - mesh: {fileID: 4300000, guid: 098b4fa589731db4ab4e55f21eafabf5, type: 2}
+        material: {fileID: 2100000, guid: ac407972ada35df428612c63b058acd6, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}
+    - parts:
+      - mesh: {fileID: 4300000, guid: 4674d099a4245214eb3b8354043162a9, type: 2}
+        material: {fileID: 2100000, guid: ac407972ada35df428612c63b058acd6, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}
+    - parts:
+      - mesh: {fileID: 4300000, guid: 346eac58cf579324a88a58e26ac7dfae, type: 2}
+        material: {fileID: 2100000, guid: ac407972ada35df428612c63b058acd6, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}

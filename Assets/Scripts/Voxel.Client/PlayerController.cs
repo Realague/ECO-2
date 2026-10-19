@@ -247,12 +247,11 @@ namespace Voxel.Client
             System.Numerics.Vector3 direction = cameraTransform.forward.ToNumerics();
             bool blockHit = VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, out VoxelHit hit);
 
-            // A left click strikes the targeted animal or plant if it is in front of the targeted block.
-            if (breakBlock)
-            {
-                float blockDistance = blockHit ? hit.Distance : PlayerRules.Reach;
-                if (ecosystemSync.TryStrike(origin, direction, blockDistance)) return;
-            }
+            // A left click strikes the targeted animal or plant if it is in front of the targeted
+            // block; a right click picks the targeted crop if it is ripe.
+            float reachedDistance = blockHit ? hit.Distance : PlayerRules.Reach;
+            if (breakBlock && ecosystemSync.TryStrike(origin, direction, reachedDistance)) return;
+            if (placeBlock && ecosystemSync.TryHarvestAimed(origin, direction, reachedDistance)) return;
 
             if (!blockHit) return;
 

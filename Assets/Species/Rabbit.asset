@@ -15,7 +15,15 @@ MonoBehaviour:
   eatsPlants:
   - {fileID: 11400000, guid: cc9f79da0d803bf40932a87b727b2553, type: 2}
   - {fileID: 11400000, guid: 3cea0d69dde6c7c4aa80c412ed149f05, type: 2}
+  - {fileID: 11400000, guid: ca4db3ca98c3c424b8a54fbf413192ed, type: 2}
+  - {fileID: 11400000, guid: 4a08265f30b62f4488336af1b62b6090, type: 2}
+  - {fileID: 11400000, guid: e8af727b0a5b0474ab15e9aabfdcfbf3, type: 2}
+  - {fileID: 11400000, guid: e0b2f866812f971428c1c1aa24ec804e, type: 2}
+  - {fileID: 11400000, guid: 0d2e522b1fe0f3e40be2a89430639742, type: 2}
   eatsAnimals: []
+  eatsCarrion: 0
+  spreadsSeeds: 0
+  habitat: 0
   moveRange: 3
   senseRange: 5
   lifespanDays: 15
@@ -39,88 +47,111 @@ MonoBehaviour:
     material: {fileID: 2100000, guid: 864637f18cad53143bacf9e93669da1d, type: 2}
     offset: {x: 0, y: 0.21000001, z: -0.029999994}
     scale: {x: 0.3, y: 0.26, z: 0.42000002}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 937baf64966de164e8e98756bedcd448, type: 2}
     offset: {x: 0, y: 0.19, z: 0.185}
     scale: {x: 0.2, y: 0.18, z: 0.00999999}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 864637f18cad53143bacf9e93669da1d, type: 2}
     offset: {x: 0, y: 0.37, z: 0.24000001}
     scale: {x: 0.24, y: 0.22, z: 0.24000001}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 937baf64966de164e8e98756bedcd448, type: 2}
     offset: {x: 0, y: 0.315, z: 0.38}
     scale: {x: 0.14, y: 0.09, z: 0.03999999}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 4bf087d5a4f90754094c46b03fee06d2, type: 2}
     offset: {x: 0, y: 0.36, z: 0.405}
     scale: {x: 0.05, y: 0.030000001, z: 0.00999999}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: ee54f3dde334bcb408bbc24e17f731dd, type: 2}
     offset: {x: 0.124, y: 0.39999998, z: 0.29000002}
     scale: {x: 0.008000009, y: 0.03999999, z: 0.03999999}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: ee54f3dde334bcb408bbc24e17f731dd, type: 2}
     offset: {x: -0.124, y: 0.39999998, z: 0.29000002}
     scale: {x: 0.008000009, y: 0.03999999, z: 0.03999999}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 864637f18cad53143bacf9e93669da1d, type: 2}
     offset: {x: 0.065, y: 0.595, z: 0.22}
     scale: {x: 0.06, y: 0.25000003, z: 0.03999999}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 864637f18cad53143bacf9e93669da1d, type: 2}
     offset: {x: -0.065, y: 0.595, z: 0.22}
     scale: {x: 0.06, y: 0.25000003, z: 0.03999999}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 38994d9927f14a14489cac0afaf9df11, type: 2}
     offset: {x: 0.065, y: 0.6, z: 0.24399999}
     scale: {x: 0.04, y: 0.19999999, z: 0.008000001}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 38994d9927f14a14489cac0afaf9df11, type: 2}
     offset: {x: -0.065, y: 0.6, z: 0.24399999}
     scale: {x: 0.04, y: 0.19999999, z: 0.008000001}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 478582ba5a85e1d4bb8aa91bfbe00076, type: 2}
     offset: {x: 0, y: 0.265, z: -0.275}
     scale: {x: 0.12, y: 0.11, z: 0.07000001}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 864637f18cad53143bacf9e93669da1d, type: 2}
     offset: {x: 0.08, y: 0.06, z: 0.135}
     scale: {x: 0.06, y: 0.12, z: 0.07}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 864637f18cad53143bacf9e93669da1d, type: 2}
     offset: {x: -0.08, y: 0.06, z: 0.135}
     scale: {x: 0.06, y: 0.12, z: 0.07}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 937baf64966de164e8e98756bedcd448, type: 2}
     offset: {x: 0.08, y: 0.0175, z: 0.18}
     scale: {x: 0.06, y: 0.035, z: 0.019999996}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 937baf64966de164e8e98756bedcd448, type: 2}
     offset: {x: -0.08, y: 0.0175, z: 0.18}
     scale: {x: 0.06, y: 0.035, z: 0.019999996}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: c6a41f6774f62564cbfacb5314649331, type: 2}
     offset: {x: 0.1625, y: 0.17999999, z: -0.12}
     scale: {x: 0.024999991, y: 0.16, z: 0.17999999}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: c6a41f6774f62564cbfacb5314649331, type: 2}
     offset: {x: -0.1625, y: 0.17999999, z: -0.12}
     scale: {x: 0.024999991, y: 0.16, z: 0.17999999}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 864637f18cad53143bacf9e93669da1d, type: 2}
     offset: {x: 0.12, y: 0.03, z: -0.125}
     scale: {x: 0.08, y: 0.06, z: 0.22999999}
+    shadowMesh: {fileID: 0}
   - mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
     material: {fileID: 2100000, guid: 864637f18cad53143bacf9e93669da1d, type: 2}
     offset: {x: -0.12, y: 0.03, z: -0.125}
     scale: {x: 0.08, y: 0.06, z: 0.22999999}
+    shadowMesh: {fileID: 0}
   gait: 1
   hopLength: 0.6
   hopDuration: 0.3
   hopHeight: 0.2
   walkSpeed: 2.5
   strideLength: 0.7
+  flightHeight: 4
+  wingbeatsPerSecond: 4
+  wingFold: 0.45
   bodyPivot: {x: 0, y: 0.2, z: 0}
   rig:
   - motion: 0

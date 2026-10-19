@@ -26,7 +26,14 @@ MonoBehaviour:
   needsWater: 0
   rooting: 0
   floatsOnWater: 0
+  needsShade: 0
   woodYield: 4
+  harvest: 2
+  produceName: Acorn
+  produceYield: 4
+  seedYield: 0
+  strawYield: 0
+  fruitDays: 5
   height: 6.4
   width: 1
   models:
@@ -46,6 +53,25 @@ MonoBehaviour:
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
       shadowMesh: {fileID: 0}
+    fruits:
+    - parts:
+      - mesh: {fileID: 4300000, guid: f4eab61b2d4b1e04da20083eea376b80, type: 2}
+        material: {fileID: 2100000, guid: 7a000a7d41305d0408fbf7e3d30d11cb, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}
+    - parts:
+      - mesh: {fileID: 4300000, guid: e525b981d7488f945acfaa45dd727e4c, type: 2}
+        material: {fileID: 2100000, guid: 7a000a7d41305d0408fbf7e3d30d11cb, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}
+    - parts:
+      - mesh: {fileID: 4300000, guid: 5d51ae641753e9542af98b06c7ecbde5, type: 2}
+        material: {fileID: 2100000, guid: 7a000a7d41305d0408fbf7e3d30d11cb, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}
   - parts:
     - mesh: {fileID: 4300000, guid: da346d4565ca4ea41a8df389f81a8f3c, type: 2}
       material: {fileID: 2100000, guid: 60782fd049d31344187602bbf82bee87, type: 2}
@@ -62,3 +88,22 @@ MonoBehaviour:
       offset: {x: 0, y: 0, z: 0}
       scale: {x: 1, y: 1, z: 1}
       shadowMesh: {fileID: 0}
+    fruits:
+    - parts:
+      - mesh: {fileID: 4300000, guid: 51ea13dfebadf2546b1ac61454df43d5, type: 2}
+        material: {fileID: 2100000, guid: 7a000a7d41305d0408fbf7e3d30d11cb, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}
+    - parts:
+      - mesh: {fileID: 4300000, guid: a65fc186e534e3d4ab7eba3746535598, type: 2}
+        material: {fileID: 2100000, guid: 7a000a7d41305d0408fbf7e3d30d11cb, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}
+    - parts:
+      - mesh: {fileID: 4300000, guid: 792ce829ff2c604438e1f00eae99c2a9, type: 2}
+        material: {fileID: 2100000, guid: 7a000a7d41305d0408fbf7e3d30d11cb, type: 2}
+        offset: {x: 0, y: 0, z: 0}
+        scale: {x: 1, y: 1, z: 1}
+        shadowMesh: {fileID: 0}

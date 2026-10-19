@@ -564,6 +564,32 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 57be46173a9403147bdebd605de1e269, type: 2}
   - {fileID: 11400000, guid: 26f3b62cd5c291d41b77d8f8d73de390, type: 2}
   - {fileID: 11400000, guid: 1f227bf5014c21345ab890f8a0e34e81, type: 2}
+  - {fileID: 11400000, guid: ad518876522ce614bbd6eed726ae58a8, type: 2}
+  - {fileID: 11400000, guid: c51d5d2bb5e7e994daabc4fcf75e553e, type: 2}
+  - {fileID: 11400000, guid: 4a08265f30b62f4488336af1b62b6090, type: 2}
+  - {fileID: 11400000, guid: ca4db3ca98c3c424b8a54fbf413192ed, type: 2}
+  - {fileID: 11400000, guid: 9bd613ad04a519544b8425817e7e606b, type: 2}
+  - {fileID: 11400000, guid: e8af727b0a5b0474ab15e9aabfdcfbf3, type: 2}
+  - {fileID: 11400000, guid: 905417f2df628a04795c4a69ab4110cf, type: 2}
+  - {fileID: 11400000, guid: 37afe8892d64bd14f82d147f5905de05, type: 2}
+  - {fileID: 11400000, guid: 0d2e522b1fe0f3e40be2a89430639742, type: 2}
+  - {fileID: 11400000, guid: 3e9856fffb64e5d498e6227fb68d9cd5, type: 2}
+  - {fileID: 11400000, guid: 7ab3ff94aa256fa42ac476ea53497773, type: 2}
+  - {fileID: 11400000, guid: 4ea99aee5614fd741a520e189acd403d, type: 2}
+  - {fileID: 11400000, guid: e0b2f866812f971428c1c1aa24ec804e, type: 2}
+  - {fileID: 11400000, guid: 71e32feabcc9b324682dcd1db59ea82d, type: 2}
+  - {fileID: 11400000, guid: 503dbd236c4205040a1c8541bfb58e3d, type: 2}
+  - {fileID: 11400000, guid: a6f10551ddeaea9428ecfa0645cbab11, type: 2}
+  - {fileID: 11400000, guid: 00512ec46bede12419199276b3d5d926, type: 2}
+  - {fileID: 11400000, guid: d79ceb71a3b1a02469a1433ea5b99491, type: 2}
+  - {fileID: 11400000, guid: a118a8c5bf5bb7942984730b55064092, type: 2}
+  - {fileID: 11400000, guid: 7f1bdf54f56f63d4397cbdded8507418, type: 2}
+  - {fileID: 11400000, guid: 19b9715bc9f738647b7821e86032aebf, type: 2}
+  - {fileID: 11400000, guid: 1de4a08b056e898409a0b6e4ad97de1b, type: 2}
+  - {fileID: 11400000, guid: dd67c302382b51c46bce9f8a524f7ad8, type: 2}
+  - {fileID: 11400000, guid: 7be27e523c6a97046941afd6821972f0, type: 2}
+  - {fileID: 11400000, guid: c675c193fa4af544c872b7b6889dccd8, type: 2}
+  - {fileID: 11400000, guid: d2157bcb2cd7f4e4a9a0beb715e717fc, type: 2}
   animalAssets:
   - {fileID: 11400000, guid: 6574d881bcfa74945b4cf99af2886576, type: 2}
   - {fileID: 11400000, guid: 86ee08040998fa64898d08a9f9aff1ba, type: 2}
