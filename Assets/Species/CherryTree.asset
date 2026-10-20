@@ -19,6 +19,10 @@ MonoBehaviour:
   spacing: 7
   minFertility: 0.45
   fertilityUsePerDay: 0.05
+  nitrogenNeed: 0.4
+  phosphorusNeed: 0.7
+  potassiumNeed: 0.9
+  nitrogenFixPerDay: 0
   idealWarmth: {x: 0.35, y: 0.62}
   idealWetness: {x: 0.4, y: 0.72}
   climateTolerance: 0.1

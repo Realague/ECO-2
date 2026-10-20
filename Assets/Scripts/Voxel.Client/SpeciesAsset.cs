@@ -36,6 +36,16 @@ namespace Voxel.Client
         [SerializeField, Range(0f, 1f)] private float minFertility = 0.2f;
         [SerializeField] private float fertilityUsePerDay = 0.2f;
 
+        [Header("Soil (NPK)")]
+        [Tooltip("How much it needs nitrogen, from 0 (it does without) to 1. A plant is limited by the nutrient it lacks most and draws on each as much as it needs it.")]
+        [SerializeField, Range(0f, 1f)] private float nitrogenNeed = 1f;
+        [Tooltip("How much it needs phosphorus, from 0 to 1.")]
+        [SerializeField, Range(0f, 1f)] private float phosphorusNeed = 1f;
+        [Tooltip("How much it needs potassium, from 0 to 1.")]
+        [SerializeField, Range(0f, 1f)] private float potassiumNeed = 1f;
+        [Tooltip("Nitrogen an adult gives back to the soil each day: legumes.")]
+        [SerializeField] private float nitrogenFixPerDay;
+
         // The blocks a plant can stand on.
         [Flags]
         public enum Ground
@@ -158,6 +168,10 @@ namespace Voxel.Client
                 Spacing = Mathf.Max(1, spacing),
                 MinFertility = minFertility,
                 FertilityUse = fertilityUsePerDay / SimClock.StepsPerDay,
+                NeedNitrogen = nitrogenNeed,
+                NeedPhosphorus = phosphorusNeed,
+                NeedPotassium = potassiumNeed,
+                FixesNitrogen = nitrogenFixPerDay / SimClock.StepsPerDay,
                 Height = height,
                 Width = width,
                 WarmthMin = idealWarmth.x,

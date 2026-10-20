@@ -71,6 +71,25 @@ namespace Voxel.Client
             return colour;
         }
 
+        // A nutrient's level in the soil on the map (Eco.Sim.Nutrient: 0 nitrogen, 1 phosphorus,
+        // 2 potassium), from poor (a pale sand, at 0.4, the lowest capacity) to rich (its own colour, at 1,
+        // the highest capacity; what carcasses and legumes add above it shows as rich), so the land's
+        // whole range of capacities spans the ramp.
+        public static Color SoilLayer(int nutrient, float level)
+        {
+            Color colour = Color.Lerp(PoorSoil, NutrientColour(nutrient), Mathf.Clamp01((level - 0.4f) / 0.6f));
+            colour.a = 0.8f;
+            return colour;
+        }
+
+        // The colour of rich soil for each nutrient: nitrogen green, phosphorus orange, potassium violet.
+        public static Color NutrientColour(int nutrient)
+        {
+            return nutrient == 0 ? new Color(0.13f, 0.55f, 0.2f) : nutrient == 1 ? new Color(0.9f, 0.45f, 0.08f) : new Color(0.5f, 0.25f, 0.75f);
+        }
+
+        private static readonly Color PoorSoil = new Color(0.93f, 0.88f, 0.74f);
+
         private static readonly Color SparseSpecies = new Color(0.78f, 0.12f, 0.62f);
         private static readonly Color CrowdedSpecies = new Color(1f, 0.93f, 0.25f);
 

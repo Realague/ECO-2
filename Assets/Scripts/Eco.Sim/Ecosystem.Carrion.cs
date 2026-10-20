@@ -17,11 +17,10 @@ namespace Eco.Sim
         // A whole carcass rots away in this many steps (three days).
         private const float RotSteps = 3 * SimClock.StepsPerDay;
 
-        // Fertility the soil gains per unit of meat that rots into it, and how far above its capacity
-        // it may go; beyond its capacity, it comes back down this much slower than it regenerates.
-        private const float FertilityPerMeat = 1f;
-        private const float MaxEnrichment = 0.6f;
-        private const int EnrichmentFadeSlowness = 4;
+        // Nutrients the soil gains per unit of meat that rots into it, mostly nitrogen, the rest
+        // phosphorus (up to Ecosystem.Soil's MaxEnrichment above its capacity).
+        private const float NutrientsPerMeat = 1f;
+        private const float MeatNitrogenShare = 0.6f;
 
         // Meat one meal takes from a carcass.
         private const float CarrionBite = 0.25f;
@@ -80,23 +79,12 @@ namespace Eco.Sim
                 carcass.Meat -= rotted;
                 carcasses[i] = carcass;
 
-                int cell = CellIndex(carcass.X, carcass.Z);
-                fertility[cell] = Math.Min(capacity[cell] + MaxEnrichment, fertility[cell] + rotted * FertilityPerMeat);
+                int at = CellIndex(carcass.X, carcass.Z) * NutrientCount;
+                Enrich(at, rotted * NutrientsPerMeat * MeatNitrogenShare);
+                Enrich(at + 1, rotted * NutrientsPerMeat * (1f - MeatNitrogenShare));
             }
 
             RemoveEmptyCarcasses();
-        }
-
-        // Soil above its capacity (enriched by a carcass) comes back down slowly; soil below it regenerates.
-        private void RegenerateSoil()
-        {
-            for (int i = 0; i < fertility.Length; i++)
-            {
-                float soil = fertility[i];
-                fertility[i] = soil <= capacity[i]
-                    ? Math.Min(capacity[i], soil + FertilityRegenPerStep)
-                    : Math.Max(capacity[i], soil - FertilityRegenPerStep / EnrichmentFadeSlowness);
-            }
         }
 
         private bool IsCarrion(int x, int z, AnimalSpecies kind) => kind.EatsCarrion && carcassAtColumn[ColumnIndex(x, z)];

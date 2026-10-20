@@ -275,7 +275,9 @@ namespace Voxel.Client
             string climateName = LayerNames[(int)layer];
             layerName.text = speciesPanel == null || speciesPanel.SelectedName == null
                 ? climateName
-                : $"{climateName}   ·   {speciesPanel.SelectedName}: {speciesPanel.SelectedCount}, yellow where they are most";
+                : speciesPanel.SelectedKind == SpeciesCensus.Kind.Soil
+                    ? $"{climateName}   ·   {speciesPanel.SelectedName} in the soil: {speciesPanel.SelectedCount} on average, deeper where richer"
+                    : $"{climateName}   ·   {speciesPanel.SelectedName}: {speciesPanel.SelectedCount}, yellow where they are most";
         }
 
         // When a new census has come: the counts in the list, and the chosen species' layer if the
@@ -312,10 +314,14 @@ namespace Voxel.Client
                 if (count > most) most = count;
             }
 
+            // A species: its density against the most crowded cell; the soil: the nutrient's level.
+            bool soilLayer = census.GridKind == SpeciesCensus.Kind.Soil;
             var pixels = new Color32[census.Grid.Length];
             for (int i = 0; i < pixels.Length; i++)
             {
-                pixels[i] = ClimateColours.DensityLayer((float)census.Grid[i] / most);
+                pixels[i] = soilLayer
+                    ? ClimateColours.SoilLayer(census.GridSpecies, census.Grid[i] / SpeciesCensus.SoilLevelScale)
+                    : ClimateColours.DensityLayer((float)census.Grid[i] / most);
             }
 
             speciesTexture.SetPixels32(pixels);

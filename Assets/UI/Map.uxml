@@ -33,11 +33,11 @@
                     <vc:MapArrow name="map-arrow" class="map-arrow" />
                 </ui:VisualElement>
 
-                <!-- SpeciesPanel fills the list: every plant and animal species, with its colour and how many there are. -->
+                <!-- SpeciesPanel fills the list: every plant and animal species, with its colour and how many there are, and the soil's nutrients. -->
                 <ui:VisualElement name="species-panel" class="species-panel">
-                    <ui:Label text="Species" class="species-title" />
+                    <ui:Label text="Layers" class="species-title" />
                     <ui:TextField name="species-search" max-length="32" class="field species-search" />
-                    <ui:Label text="Click one to see where it lives." class="species-hint" />
+                    <ui:Label text="Click one to lay it over the map." class="species-hint" />
                     <ui:ScrollView name="species-list" class="species-list" />
                 </ui:VisualElement>
             </ui:VisualElement>

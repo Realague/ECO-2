@@ -76,9 +76,15 @@ namespace Eco.Sim.Tests
 
     internal static class OldSaves
     {
-        // A save in the current format, turned into format 5, written before crops ripened: the
-        // same, without each plant's ripeness.
-        public static byte[] WithoutFruit(byte[] data, World world)
+        // A save in the current format, turned into format 5, written before crops ripened and
+        // before the soil had nutrients: each plant without its ripeness, each cell with a single
+        // fertility at its capacity.
+        public static byte[] WithoutFruit(byte[] data, World world) => Convert(data, world, 5, 1f);
+
+        // The same in format 6: ripeness kept, each cell a fertility at this share of its capacity.
+        public static byte[] WithoutNutrients(byte[] data, World world, float share) => Convert(data, world, 6, share);
+
+        private static byte[] Convert(byte[] data, World world, int format, float share)
         {
             var input = new BinaryReader(new MemoryStream(data));
             var output = new MemoryStream();
@@ -86,7 +92,7 @@ namespace Eco.Sim.Tests
 
             writer.Write(input.ReadUInt32());
             input.ReadInt32();
-            writer.Write(5);
+            writer.Write(format);
             int speciesCount = input.ReadInt32();
             writer.Write(speciesCount);
             for (int i = 0; i < speciesCount; i++) writer.Write(input.ReadString());
@@ -95,8 +101,14 @@ namespace Eco.Sim.Tests
             writer.Write(input.ReadUInt64());
             writer.Write(input.ReadInt32());
 
+            // Format 7 keeps three nutrient levels per cell; before, a fertility and its capacity.
             int cells = (world.SizeX + Ecosystem.CellSize - 1) / Ecosystem.CellSize * ((world.SizeZ + Ecosystem.CellSize - 1) / Ecosystem.CellSize);
-            for (int i = 0; i < 2 * cells; i++) writer.Write(input.ReadSingle());
+            for (int i = 0; i < cells; i++)
+            {
+                for (int n = 0; n < Ecosystem.NutrientCount; n++) input.ReadSingle();
+                writer.Write(share);
+                writer.Write(1f);
+            }
 
             int plantCount = input.ReadInt32();
             writer.Write(plantCount);
@@ -104,7 +116,8 @@ namespace Eco.Sim.Tests
             {
                 for (int field = 0; field < 6; field++) writer.Write(input.ReadInt32());
                 writer.Write(input.ReadSingle());
-                input.ReadSingle();
+                float fruit = input.ReadSingle();
+                if (format >= 6) writer.Write(fruit);
             }
 
             byte[] rest = input.ReadBytes(data.Length);

@@ -43,11 +43,21 @@ namespace Eco.Sim
         // In any case, a block column holds a single plant.
         public int Spacing { get; set; }
 
-        // Below this fertility, the seed does not sprout and the plant withers.
+        // Below this much soil to live on (Ecosystem.Available: the scarcest nutrient, weighted by
+        // the species' needs), the seed does not sprout and the plant withers.
         public float MinFertility { get; set; }
 
-        // Fertility drawn at each step by an adult plant.
+        // Soil drawn at each step by an adult plant, from each nutrient times the species' need of it.
         public float FertilityUse { get; set; }
+
+        // How much the species needs each nutrient, from 0 (it does without) to 1: it is limited by
+        // the one it lacks most, and draws on each as much as it needs it (Ecosystem.Soil).
+        public float NeedNitrogen { get; set; } = 1f;
+        public float NeedPhosphorus { get; set; } = 1f;
+        public float NeedPotassium { get; set; } = 1f;
+
+        // Nitrogen an adult gives back to its cell's soil at each step: legumes (beans, acacias).
+        public float FixesNitrogen { get; set; }
 
         // Adult size, in blocks: used to aim at the plant.
         public float Height { get; set; }

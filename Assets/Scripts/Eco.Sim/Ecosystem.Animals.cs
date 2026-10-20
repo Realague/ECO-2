@@ -499,6 +499,7 @@ namespace Eco.Sim
             Plant plant = plants[plantIndex];
             if (plant.Growth - GrazedGrowth < MinSurvivingGrowth)
             {
+                ReturnToSoil(plant);
                 Remove(plant.Id);
                 return;
             }

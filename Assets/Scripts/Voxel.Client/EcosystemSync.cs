@@ -582,15 +582,33 @@ namespace Voxel.Client
                 Version = version
             };
 
-            if (kind == SpeciesCensus.Kind.None) return census;
+            for (int n = 0; n < Ecosystem.NutrientCount; n++)
+            {
+                census.SoilMeans[n] = ecosystem.MeanSoil((Nutrient)n);
+            }
 
-            int[] cells = kind == SpeciesCensus.Kind.Plant
-                ? ecosystem.PlantDensity(species, SpeciesCensus.CellSize)
-                : ecosystem.AnimalDensity(species, SpeciesCensus.CellSize);
+            if (kind == SpeciesCensus.Kind.None) return census;
+            if (kind == SpeciesCensus.Kind.Soil && (species < 0 || species >= Ecosystem.NutrientCount)) return census;
+
             census.GridKind = kind;
             census.GridSpecies = species;
             census.CellsX = ecosystem.CensusCellsX(SpeciesCensus.CellSize);
             census.CellsZ = ecosystem.CensusCellsZ(SpeciesCensus.CellSize);
+            if (kind == SpeciesCensus.Kind.Soil)
+            {
+                float[] levels = ecosystem.SoilLevels((Nutrient)species, SpeciesCensus.CellSize);
+                census.Grid = new byte[levels.Length];
+                for (int i = 0; i < levels.Length; i++)
+                {
+                    census.Grid[i] = (byte)Mathf.Clamp(Mathf.RoundToInt(levels[i] * SpeciesCensus.SoilLevelScale), 0, byte.MaxValue);
+                }
+
+                return census;
+            }
+
+            int[] cells = kind == SpeciesCensus.Kind.Plant
+                ? ecosystem.PlantDensity(species, SpeciesCensus.CellSize)
+                : ecosystem.AnimalDensity(species, SpeciesCensus.CellSize);
             census.Grid = new byte[cells.Length];
             for (int i = 0; i < cells.Length; i++)
             {
@@ -604,7 +622,7 @@ namespace Voxel.Client
         {
             reader.ReadValueSafe(out byte kind);
             reader.ReadValueSafe(out int species);
-            if (kind > (byte)SpeciesCensus.Kind.Animal) return;
+            if (kind > (byte)SpeciesCensus.Kind.Soil) return;
 
             // The map asks every 2 s while it is open: anything faster is ignored.
             float now = Time.unscaledTime;
@@ -613,11 +631,16 @@ namespace Voxel.Client
             lastCensus[senderId] = now;
             SpeciesCensus census = TakeCensus((SpeciesCensus.Kind)kind, species, 0);
             int size = 4 * sizeof(int) + (census.PlantCounts.Length + census.AnimalCounts.Length) * sizeof(int)
-                + sizeof(byte) + 3 * sizeof(int) + census.Grid.Length;
+                + census.SoilMeans.Length * sizeof(float) + sizeof(byte) + 4 * sizeof(int) + census.Grid.Length;
             using (var writer = new FastBufferWriter(size, Allocator.Temp))
             {
                 WriteCounts(writer, census.PlantCounts);
                 WriteCounts(writer, census.AnimalCounts);
+                foreach (float mean in census.SoilMeans)
+                {
+                    writer.WriteValueSafe(mean);
+                }
+
                 writer.WriteValueSafe((byte)census.GridKind);
                 writer.WriteValueSafe(census.GridSpecies);
                 writer.WriteValueSafe(census.CellsX);
@@ -636,6 +659,11 @@ namespace Voxel.Client
                 AnimalCounts = ReadCounts(reader),
                 Version = Census.Version + 1
             };
+
+            for (int n = 0; n < census.SoilMeans.Length; n++)
+            {
+                reader.ReadValueSafe(out census.SoilMeans[n]);
+            }
 
             reader.ReadValueSafe(out byte kind);
             reader.ReadValueSafe(out census.GridSpecies);

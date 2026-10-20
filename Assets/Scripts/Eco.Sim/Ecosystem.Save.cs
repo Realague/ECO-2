@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -10,7 +11,11 @@ namespace Eco.Sim
     public sealed partial class Ecosystem
     {
         private const uint Magic = 0x454F4345; // "ECOE"
-        private const int FormatVersion = 6;
+        private const int FormatVersion = 7;
+
+        // Last format with a single fertility per cell instead of the soil's three nutrients. It still
+        // loads: each nutrient starts as far below its capacity as the fertility was below its own.
+        private const int FormatWithoutNutrients = 6;
 
         // Last format without crops' ripeness (Plant.Fruit). It still loads, every crop unripe.
         private const int FormatWithoutFruit = 5;
@@ -48,10 +53,10 @@ namespace Eco.Sim
                 writer.Write(random.State);
                 writer.Write(nextPlantId);
 
-                for (int i = 0; i < fertility.Length; i++)
+                // The soil's levels; its capacities come from the land and are worked out again.
+                for (int i = 0; i < soil.Length; i++)
                 {
-                    writer.Write(fertility[i]);
-                    writer.Write(capacity[i]);
+                    writer.Write(soil[i]);
                 }
 
                 writer.Write(plantCount);
@@ -110,7 +115,7 @@ namespace Eco.Sim
                 }
 
                 int formatVersion = reader.ReadInt32();
-                if (formatVersion != FormatVersion && formatVersion != FormatWithoutFruit && formatVersion != FormatWithoutCarriedSeeds && formatVersion != FormatWithoutCarrion && formatVersion != FormatWithoutAnimals)
+                if (formatVersion != FormatVersion && formatVersion != FormatWithoutNutrients && formatVersion != FormatWithoutFruit && formatVersion != FormatWithoutCarriedSeeds && formatVersion != FormatWithoutCarrion && formatVersion != FormatWithoutAnimals)
                 {
                     throw new InvalidDataException(
                         $"Unsupported ecosystem save format {formatVersion} (expected: {FormatVersion}).");
@@ -148,11 +153,8 @@ namespace Eco.Sim
                 ecosystem.random.State = reader.ReadUInt64();
                 ecosystem.nextPlantId = reader.ReadInt32();
 
-                for (int i = 0; i < ecosystem.fertility.Length; i++)
-                {
-                    ecosystem.fertility[i] = reader.ReadSingle();
-                    ecosystem.capacity[i] = reader.ReadSingle();
-                }
+                if (formatVersion > FormatWithoutNutrients) ecosystem.ReadSoil(reader);
+                else ecosystem.ReadFertility(reader);
 
                 int savedCount = reader.ReadInt32();
                 int previousId = 0;
@@ -204,6 +206,38 @@ namespace Eco.Sim
             using (FileStream stream = File.OpenRead(path))
             {
                 return Read(stream, world, species, animalSpecies);
+            }
+        }
+
+        private void ReadSoil(BinaryReader reader)
+        {
+            for (int i = 0; i < soil.Length; i++)
+            {
+                float level = reader.ReadSingle();
+                if (!(level >= 0f && level <= soilCapacity[i] + MaxEnrichment + 0.01f))
+                {
+                    throw new InvalidDataException($"Invalid soil level in the ecosystem save (cell {i / NutrientCount}).");
+                }
+
+                soil[i] = level;
+            }
+        }
+
+        // A save from before the soil had nutrients: a fertility and its capacity per cell. Each
+        // nutrient starts as far below (or above) its own capacity as the fertility was.
+        private void ReadFertility(BinaryReader reader)
+        {
+            int cells = soil.Length / NutrientCount;
+            for (int cell = 0; cell < cells; cell++)
+            {
+                float fertility = reader.ReadSingle();
+                float capacity = reader.ReadSingle();
+                float share = capacity > 0f ? Math.Max(0f, fertility / capacity) : 1f;
+                for (int n = 0; n < NutrientCount; n++)
+                {
+                    int index = cell * NutrientCount + n;
+                    soil[index] = Math.Min(soilCapacity[index] + MaxEnrichment, soilCapacity[index] * share);
+                }
             }
         }
 

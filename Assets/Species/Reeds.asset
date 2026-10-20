@@ -14,11 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.SpeciesAsset
   maturityDays: 1
   lifespanDays: 15
-  seedAttemptsPerDay: 2
+  seedAttemptsPerDay: 1.5
   seedRange: 2
   spacing: 1
   minFertility: 0.1
   fertilityUsePerDay: 0.02
+  nitrogenNeed: 1
+  phosphorusNeed: 0.4
+  potassiumNeed: 0.4
+  nitrogenFixPerDay: 0
   idealWarmth: {x: 0.2, y: 0.9}
   idealWetness: {x: 0.3, y: 1}
   climateTolerance: 0.2

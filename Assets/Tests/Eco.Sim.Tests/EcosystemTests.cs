@@ -66,7 +66,7 @@ namespace Eco.Sim.Tests
                 if (plant.Id == firstId) stages.Add(plant.Stage);
             };
 
-            // Even on the poorest soil (fertility 0.4), three days of growth need fewer than eight.
+            // Even on the poorest soil (each nutrient at 0.4 at least), three days of growth need fewer than eight.
             Run(ecosystem, 8 * SimClock.StepsPerDay);
 
             Assert.IsTrue(ecosystem.TryGet(firstId, out Plant adult));
@@ -330,7 +330,8 @@ namespace Eco.Sim.Tests
             {
                 for (int x = 0; x < world.SizeX; x += Ecosystem.CellSize)
                 {
-                    total += ecosystem.GetFertility(x, z);
+                    SoilSample soil = ecosystem.GetSoil(x, z);
+                    total += soil.Nitrogen + soil.Phosphorus + soil.Potassium;
                     cells++;
                 }
             }
@@ -349,8 +350,8 @@ namespace Eco.Sim.Tests
                 Assert.AreEqual((a.Id, a.SpeciesIndex, a.X, a.Y, a.Z, a.Age, a.Growth), (b.Id, b.SpeciesIndex, b.X, b.Y, b.Z, b.Age, b.Growth));
             }
 
-            Assert.AreEqual(expected.GetFertility(0, 0), actual.GetFertility(0, 0));
-            Assert.AreEqual(expected.GetFertility(17, 9), actual.GetFertility(17, 9));
+            Assert.AreEqual(expected.GetSoil(0, 0), actual.GetSoil(0, 0));
+            Assert.AreEqual(expected.GetSoil(17, 9), actual.GetSoil(17, 9));
         }
     }
 }

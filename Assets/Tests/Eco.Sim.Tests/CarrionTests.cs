@@ -16,7 +16,8 @@ namespace Eco.Sim.Tests
         {
             Ecosystem ecosystem = CreateEcosystem(Rabbit(hungerPerStep: 0.2f), Fox());
             ecosystem.TryPlaceAnimal(RabbitIndex, 10, 10);
-            float soilBefore = ecosystem.GetFertility(10, 10);
+            float soilBefore = ecosystem.GetSoil(10, 10).Nitrogen;
+            float phosphorusBefore = ecosystem.GetSoil(10, 10).Phosphorus;
 
             Run(ecosystem, 6);
 
@@ -26,7 +27,8 @@ namespace Eco.Sim.Tests
             Assert.AreEqual(RabbitIndex, carcass.SpeciesIndex);
 
             Run(ecosystem, SimClock.StepsPerDay);
-            Assert.That(ecosystem.GetFertility(carcass.X, carcass.Z), Is.GreaterThan(soilBefore), "the rotting carcass feeds the soil past its usual richness");
+            Assert.That(ecosystem.GetSoil(carcass.X, carcass.Z).Nitrogen, Is.GreaterThan(soilBefore), "the rotting carcass feeds the soil past its usual richness");
+            Assert.That(ecosystem.GetSoil(carcass.X, carcass.Z).Phosphorus, Is.GreaterThan(phosphorusBefore), "with phosphorus too");
 
             Run(ecosystem, 3 * SimClock.StepsPerDay);
             Assert.AreEqual(0, ecosystem.Carcasses.Count, "rotted away");
@@ -37,11 +39,11 @@ namespace Eco.Sim.Tests
         {
             Ecosystem ecosystem = CreateEcosystem(Rabbit(hungerPerStep: 0.2f), Fox());
             ecosystem.TryPlaceAnimal(RabbitIndex, 10, 10);
-            float usual = ecosystem.GetFertility(10, 10);
+            float usual = ecosystem.GetSoil(10, 10).Nitrogen;
 
             Run(ecosystem, 30 * SimClock.StepsPerDay);
 
-            Assert.AreEqual(usual, ecosystem.GetFertility(10, 10), 0.001f);
+            Assert.AreEqual(usual, ecosystem.GetSoil(10, 10).Nitrogen, 0.001f);
         }
 
         [Test]
@@ -115,7 +117,7 @@ namespace Eco.Sim.Tests
             Run(original, 100);
             Run(loaded, 100);
             Assert.AreEqual(original.Carcasses.Count, loaded.Carcasses.Count);
-            Assert.AreEqual(original.GetFertility(10, 10), loaded.GetFertility(10, 10));
+            Assert.AreEqual(original.GetSoil(10, 10), loaded.GetSoil(10, 10));
         }
 
         private static AnimalSpecies Rabbit(float hungerPerStep = 0f)

@@ -65,6 +65,45 @@ namespace Eco.Sim
             return cells;
         }
 
+        // The mean level of a nutrient in each square of cellSize × cellSize columns, laid out as the
+        // densities are (the soil's own cells are CellSize wide: a census cell averages those it covers).
+        public float[] SoilLevels(Nutrient nutrient, int cellSize)
+        {
+            cellSize = Math.Max(1, cellSize);
+            int cellsX = CensusCellsX(cellSize);
+            var sums = new float[cellsX * CensusCellsZ(cellSize)];
+            var counts = new int[sums.Length];
+            for (int cz = 0; cz < this.cellsZ; cz++)
+            {
+                for (int cx = 0; cx < this.cellsX; cx++)
+                {
+                    int target = cx * CellSize / cellSize + cellsX * (cz * CellSize / cellSize);
+                    sums[target] += soil[(cx + this.cellsX * cz) * NutrientCount + (int)nutrient];
+                    counts[target]++;
+                }
+            }
+
+            for (int i = 0; i < sums.Length; i++)
+            {
+                if (counts[i] > 0) sums[i] /= counts[i];
+            }
+
+            return sums;
+        }
+
+        // The mean level of a nutrient over the whole world.
+        public float MeanSoil(Nutrient nutrient)
+        {
+            int cells = soil.Length / NutrientCount;
+            float sum = 0f;
+            for (int cell = 0; cell < cells; cell++)
+            {
+                sum += soil[cell * NutrientCount + (int)nutrient];
+            }
+
+            return cells > 0 ? sum / cells : 0f;
+        }
+
         // Cells across the world for a census: a world whose size is not a multiple of the cell
         // has a narrower last row.
         public int CensusCellsX(int cellSize) => (world.SizeX + Math.Max(1, cellSize) - 1) / Math.Max(1, cellSize);
