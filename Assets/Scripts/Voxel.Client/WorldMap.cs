@@ -61,6 +61,14 @@ namespace Voxel.Client
             return speciesIndex >= 0 && speciesIndex < animalColours.Length ? animalColours[speciesIndex] : Color.magenta;
         }
 
+        // A plant species' colour on the map: that of its first model.
+        internal Color PlantColour(int speciesIndex)
+        {
+            return speciesIndex >= 0 && speciesIndex < plantColours.Length && plantColours[speciesIndex].Length > 0
+                ? plantColours[speciesIndex][0]
+                : Color.magenta;
+        }
+
         // Plants are announced from the start of a session, possibly before other objects' Start.
         private void Awake()
         {

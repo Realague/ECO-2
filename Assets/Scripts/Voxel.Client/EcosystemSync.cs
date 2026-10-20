@@ -21,6 +21,8 @@ namespace Voxel.Client
         private const string CommandMessage = "Eco.Command";
         private const string AnimalsMessage = "Eco.Animals";
         private const string KillMessage = "Eco.Kill";
+        private const string CensusRequestMessage = "Eco.CensusRequest";
+        private const string CensusMessage = "Eco.Census";
         private const string SaveFileName = "ecosystem.dat";
 
         private const byte SetMultiplierCommand = 0;
@@ -50,6 +52,11 @@ namespace Voxel.Client
         private const float AnimalFeedInterval = 0.5f;
         private const float AnimalInterestMargin = 32f;
         private const float AnimalFeedMoveThreshold = 8f;
+
+        // The map asks for a census every 2 s while it is open; a player asking faster is ignored, and a
+        // census grid larger than this many cells (a world of 8,192 columns a side) is refused.
+        private const float CensusInterval = 1f;
+        private const int MaxCensusCells = 1 << 20;
 
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private InventorySync inventorySync;
@@ -89,6 +96,9 @@ namespace Voxel.Client
 
         // For each player, the version of the animal world at the time of their last send.
         private readonly Dictionary<ulong, AnimalFeed> animalFeeds = new Dictionary<ulong, AnimalFeed>();
+
+        // Server: when each player last had a census, to refuse requests coming faster than CensusInterval.
+        private readonly Dictionary<ulong, float> lastCensus = new Dictionary<ulong, float>();
         private readonly List<Animal> nearbyAnimals = new List<Animal>();
         private readonly List<Carcass> nearbyCarcasses = new List<Carcass>();
         private int animalRevision;
@@ -222,6 +232,7 @@ namespace Voxel.Client
             Messaging.RegisterNamedMessageHandler(HarvestMessage, OnHarvestRequest);
             Messaging.RegisterNamedMessageHandler(KillMessage, OnKillRequest);
             Messaging.RegisterNamedMessageHandler(CommandMessage, OnCommand);
+            Messaging.RegisterNamedMessageHandler(CensusRequestMessage, OnCensusRequest);
             networkManager.OnClientConnectedCallback += OnClientConnected;
             networkManager.OnClientDisconnectCallback += OnClientDisconnected;
             networkManager.NetworkTickSystem.Tick += SendChanges;
@@ -233,6 +244,7 @@ namespace Voxel.Client
             running = true;
             Messaging.RegisterNamedMessageHandler(UpdateMessage, OnUpdate);
             Messaging.RegisterNamedMessageHandler(AnimalsMessage, OnAnimals);
+            Messaging.RegisterNamedMessageHandler(CensusMessage, OnCensus);
         }
 
         public void Stop()
@@ -257,6 +269,8 @@ namespace Voxel.Client
             removedPlants.Clear();
             snapshots.Clear();
             animalFeeds.Clear();
+            lastCensus.Clear();
+            Census = new SpeciesCensus();
             running = false;
             stepCount = 0;
             multiplier = 1f;
@@ -532,6 +546,129 @@ namespace Voxel.Client
                 writer.WriteValueSafe(plantId);
                 Messaging.SendNamedMessage(HarvestMessage, NetworkManager.ServerClientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
             }
+        }
+
+        // The last census received (SpeciesCensus), for the map's species layers.
+        public SpeciesCensus Census { get; private set; } = new SpeciesCensus();
+
+        // Asks for a census, with the density grid of one species (Kind.None: the counts only).
+        // The host works it out at once; a client asks the server, which answers if its last
+        // census is at least CensusInterval old.
+        public void RequestCensus(SpeciesCensus.Kind kind, int species)
+        {
+            if (!running) return;
+
+            if (ecosystem != null)
+            {
+                Census = TakeCensus(kind, species, Census.Version + 1);
+                return;
+            }
+
+            using (var writer = new FastBufferWriter(sizeof(byte) + sizeof(int), Allocator.Temp))
+            {
+                writer.WriteValueSafe((byte)kind);
+                writer.WriteValueSafe(species);
+                Messaging.SendNamedMessage(CensusRequestMessage, NetworkManager.ServerClientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
+            }
+        }
+
+        // Server side: the counts of every species and the density grid of one.
+        private SpeciesCensus TakeCensus(SpeciesCensus.Kind kind, int species, int version)
+        {
+            var census = new SpeciesCensus
+            {
+                PlantCounts = ecosystem.PlantCounts(),
+                AnimalCounts = ecosystem.AnimalCounts(),
+                Version = version
+            };
+
+            if (kind == SpeciesCensus.Kind.None) return census;
+
+            int[] cells = kind == SpeciesCensus.Kind.Plant
+                ? ecosystem.PlantDensity(species, SpeciesCensus.CellSize)
+                : ecosystem.AnimalDensity(species, SpeciesCensus.CellSize);
+            census.GridKind = kind;
+            census.GridSpecies = species;
+            census.CellsX = ecosystem.CensusCellsX(SpeciesCensus.CellSize);
+            census.CellsZ = ecosystem.CensusCellsZ(SpeciesCensus.CellSize);
+            census.Grid = new byte[cells.Length];
+            for (int i = 0; i < cells.Length; i++)
+            {
+                census.Grid[i] = (byte)Mathf.Min(cells[i], byte.MaxValue);
+            }
+
+            return census;
+        }
+
+        private void OnCensusRequest(ulong senderId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out byte kind);
+            reader.ReadValueSafe(out int species);
+            if (kind > (byte)SpeciesCensus.Kind.Animal) return;
+
+            // The map asks every 2 s while it is open: anything faster is ignored.
+            float now = Time.unscaledTime;
+            if (lastCensus.TryGetValue(senderId, out float last) && now - last < CensusInterval) return;
+
+            lastCensus[senderId] = now;
+            SpeciesCensus census = TakeCensus((SpeciesCensus.Kind)kind, species, 0);
+            int size = 4 * sizeof(int) + (census.PlantCounts.Length + census.AnimalCounts.Length) * sizeof(int)
+                + sizeof(byte) + 3 * sizeof(int) + census.Grid.Length;
+            using (var writer = new FastBufferWriter(size, Allocator.Temp))
+            {
+                WriteCounts(writer, census.PlantCounts);
+                WriteCounts(writer, census.AnimalCounts);
+                writer.WriteValueSafe((byte)census.GridKind);
+                writer.WriteValueSafe(census.GridSpecies);
+                writer.WriteValueSafe(census.CellsX);
+                writer.WriteValueSafe(census.CellsZ);
+                writer.WriteValueSafe(census.Grid.Length);
+                writer.WriteBytesSafe(census.Grid);
+                Messaging.SendNamedMessage(CensusMessage, senderId, writer, NetworkDelivery.ReliableFragmentedSequenced);
+            }
+        }
+
+        private void OnCensus(ulong senderId, FastBufferReader reader)
+        {
+            var census = new SpeciesCensus
+            {
+                PlantCounts = ReadCounts(reader),
+                AnimalCounts = ReadCounts(reader),
+                Version = Census.Version + 1
+            };
+
+            reader.ReadValueSafe(out byte kind);
+            reader.ReadValueSafe(out census.GridSpecies);
+            reader.ReadValueSafe(out census.CellsX);
+            reader.ReadValueSafe(out census.CellsZ);
+            reader.ReadValueSafe(out int length);
+            if (length < 0 || length != census.CellsX * census.CellsZ || length > MaxCensusCells) return;
+
+            census.GridKind = (SpeciesCensus.Kind)kind;
+            census.Grid = new byte[length];
+            if (length > 0) reader.ReadBytesSafe(ref census.Grid, length);
+            Census = census;
+        }
+
+        private static void WriteCounts(FastBufferWriter writer, int[] counts)
+        {
+            writer.WriteValueSafe(counts.Length);
+            foreach (int count in counts)
+            {
+                writer.WriteValueSafe(count);
+            }
+        }
+
+        private static int[] ReadCounts(FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out int length);
+            var counts = new int[Mathf.Clamp(length, 0, 1024)];
+            for (int i = 0; i < counts.Length; i++)
+            {
+                reader.ReadValueSafe(out counts[i]);
+            }
+
+            return counts;
         }
 
         // Kill requested by the local player, on the same principle as felling.

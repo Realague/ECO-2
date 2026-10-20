@@ -45,7 +45,7 @@
     opacity: 0.7;
 }
 
-/* One entry per animal species: the line wraps, from the right, when there are many. */
+/* The legend: you and the other players (each species has its colour in the species list). It wraps from the right. */
 .legend {
     flex-direction: row;
     flex-wrap: wrap;
@@ -106,4 +106,135 @@
 
 .map-last-key {
     margin-right: 0;
+}
+
+/* The map and the species list side by side. */
+.map-body {
+    flex-direction: row;
+    flex-grow: 1;
+}
+
+/* Where the chosen species lives: drawn over the terrain and the climate, which show through its empty cells. */
+.map-species {
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.species-panel {
+    width: 330px;
+    flex-shrink: 0;
+    margin-left: 18px;
+}
+
+.species-title {
+    font-size: 24px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text);
+    margin: 0 0 10px 0;
+    padding: 0;
+}
+
+.species-search {
+    margin: 0;
+}
+
+.species-search > .unity-base-text-field__input,
+.species-search > .unity-text-field__input {
+    height: 44px;
+    padding: 0 14px;
+    font-size: 19px;
+    color: var(--text);
+    background-color: var(--control);
+    border-width: 1px;
+    border-color: var(--control-border);
+    border-radius: 10px;
+}
+
+.species-search:focus > .unity-base-text-field__input,
+.species-search:focus > .unity-text-field__input {
+    border-color: var(--green);
+}
+
+.species-hint {
+    font-size: 15px;
+    color: var(--text-muted);
+    white-space: normal;
+    margin: 6px 0 10px 0;
+    padding: 0;
+}
+
+.species-list {
+    flex-grow: 1;
+}
+
+/* The drop-down menus "Plants" and "Animals" (Foldout), their species inside. */
+.species-group {
+    margin: 4px 0 2px 0;
+}
+
+.species-group > .unity-foldout__toggle {
+    margin: 0;
+    padding: 6px 6px;
+    border-radius: 8px;
+}
+
+.species-group > .unity-foldout__toggle:hover {
+    background-color: var(--control-hover);
+}
+
+.species-group .unity-foldout__text {
+    font-size: 18px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text);
+}
+
+.species-group > .unity-foldout__content {
+    margin: 2px 0 6px 6px;
+}
+
+.species-row {
+    flex-direction: row;
+    align-items: center;
+    height: 36px;
+    padding: 0 10px;
+    margin: 0 0 2px 0;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 1px;
+    border-color: rgba(0, 0, 0, 0);
+    border-radius: 8px;
+}
+
+.species-row:hover {
+    background-color: var(--control-hover);
+}
+
+.species-row--selected,
+.species-row--selected:hover {
+    background-color: var(--selected);
+    border-color: var(--green);
+}
+
+.species-swatch {
+    width: 14px;
+    height: 14px;
+    margin-right: 10px;
+    border-width: 1px;
+    border-color: rgba(20, 22, 26, 0.6);
+    border-radius: 7px;
+}
+
+.species-name {
+    flex-grow: 1;
+    -unity-text-align: middle-left;
+    font-size: 17px;
+    color: var(--text-body);
+    margin: 0;
+    padding: 0;
+}
+
+.species-count {
+    -unity-text-align: middle-right;
+    font-size: 16px;
+    color: var(--text-muted);
+    margin: 0;
+    padding: 0;
 }

@@ -58,6 +58,22 @@ namespace Voxel.Client
             return Color.Lerp(Arid, Soaked, (float)humidity / IntNoise.One);
         }
 
+        // A species' density on the map, share from 0 (none here) to 1 (the most crowded cell):
+        // transparent where there is none, then magenta turning bright yellow, which stand out on
+        // the greens and blues of the terrain. The square root lifts thinly peopled cells.
+        public static Color DensityLayer(float share)
+        {
+            if (share <= 0f) return Color.clear;
+
+            float level = Mathf.Sqrt(Mathf.Clamp01(share));
+            Color colour = Color.Lerp(SparseSpecies, CrowdedSpecies, level);
+            colour.a = Mathf.Lerp(0.55f, 0.95f, level);
+            return colour;
+        }
+
+        private static readonly Color SparseSpecies = new Color(0.78f, 0.12f, 0.62f);
+        private static readonly Color CrowdedSpecies = new Color(1f, 0.93f, 0.25f);
+
         // Rough readings for players: a temperature in degrees Celsius and a humidity in percent.
         public static int Celsius(int temperature) => Mathf.RoundToInt(-12f + 48f * temperature / IntNoise.One);
 

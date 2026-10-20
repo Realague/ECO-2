@@ -3,8 +3,8 @@
     <Style src="MapMarkers.uss" />
     <Style src="Map.uss" />
 
-    <!-- MapScreen places the picture, the climate layer, the dots and the arrow, adds the animals
-         to the legend and fills in the layer's name and what lies under the pointer. -->
+    <!-- MapScreen places the picture, the climate and species layers, the dots and the arrow, and
+         fills in the layers' names and what lies under the pointer; SpeciesPanel fills the species list. -->
     <ui:VisualElement name="screen" class="screen map-screen">
         <ui:VisualElement class="panel map-panel">
             <ui:VisualElement class="map-header">
@@ -24,12 +24,22 @@
                 </ui:VisualElement>
             </ui:VisualElement>
 
-            <ui:VisualElement name="map-view" class="map-view">
-                <ui:VisualElement name="map-image" class="map-image" picking-mode="Ignore" />
-                <ui:VisualElement name="map-climate" class="map-image map-climate" picking-mode="Ignore" />
-                <ui:VisualElement name="map-animals" class="map-layer" picking-mode="Ignore" />
-                <ui:VisualElement name="map-players" class="map-layer" picking-mode="Ignore" />
-                <vc:MapArrow name="map-arrow" class="map-arrow" />
+            <ui:VisualElement class="map-body">
+                <ui:VisualElement name="map-view" class="map-view">
+                    <ui:VisualElement name="map-image" class="map-image" picking-mode="Ignore" />
+                    <ui:VisualElement name="map-climate" class="map-image map-climate" picking-mode="Ignore" />
+                    <ui:VisualElement name="map-species" class="map-image map-species" picking-mode="Ignore" />
+                    <ui:VisualElement name="map-players" class="map-layer" picking-mode="Ignore" />
+                    <vc:MapArrow name="map-arrow" class="map-arrow" />
+                </ui:VisualElement>
+
+                <!-- SpeciesPanel fills the list: every plant and animal species, with its colour and how many there are. -->
+                <ui:VisualElement name="species-panel" class="species-panel">
+                    <ui:Label text="Species" class="species-title" />
+                    <ui:TextField name="species-search" max-length="32" class="field species-search" />
+                    <ui:Label text="Click one to see where it lives." class="species-hint" />
+                    <ui:ScrollView name="species-list" class="species-list" />
+                </ui:VisualElement>
             </ui:VisualElement>
 
             <ui:VisualElement class="map-footer">

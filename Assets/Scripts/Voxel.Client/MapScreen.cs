@@ -9,17 +9,24 @@ using Cursor = UnityEngine.Cursor;
 namespace Voxel.Client
 {
     // The full-screen map, opened and closed with M (Escape also closes it): the world's picture
-    // (WorldMap) with the same markers as the minimap. The mouse is freed while it is open: the
-    // wheel zooms around the pointer, dragging moves the map, Space centres it on the player
+    // (WorldMap) with the other players and the player's arrow (no animal dots: the species layers
+    // show where animals live). The mouse is freed while it is open: the wheel zooms around the
+    // pointer, dragging moves the map, Space centres it on the player
     // again, a right click teleports the player there (the "tp" command, CommandSync), and the
     // coordinates under the pointer are shown below. Tab lays the climate over the
-    // terrain: temperature, then humidity, from the world's geography. Meanwhile the player stands
-    // still and the other on-screen texts are hidden. The screen is Assets/UI/Map.uxml.
+    // terrain: temperature, then humidity, from the world's geography. The list beside it
+    // (SpeciesPanel) shows how many of each species live in the world, and lays where the chosen one
+    // lives over the map, densest in yellow (from a census, EcosystemSync.RequestCensus, asked for
+    // every CensusInterval while the map is open). Meanwhile the player stands still and the other
+    // on-screen texts are hidden. The screen is Assets/UI/Map.uxml.
     public class MapScreen : MonoBehaviour
     {
         private const float StartPixelsPerBlock = 3f;
         private const float MaxPixelsPerBlock = 12f;
         private const float ZoomStep = 1.25f;
+
+        // How often the census behind the species list and layer is asked for while the map is open.
+        private const float CensusInterval = 2f;
 
         private enum Layer
         {
@@ -41,6 +48,8 @@ namespace Voxel.Client
         private VisualElement view;
         private VisualElement image;
         private VisualElement climate;
+        private VisualElement speciesLayer;
+        private SpeciesPanel speciesPanel;
         private Label layerName;
         private Label pointerText;
         private MapMarkers markers;
@@ -67,6 +76,12 @@ namespace Voxel.Client
         private Texture2D humidityLayer;
         private Texture2D shownLayerTexture;
 
+        // The species layer: its picture (one pixel per census cell), the census it was drawn from,
+        // and when to ask for the next one.
+        private Texture2D speciesTexture;
+        private int shownCensus = -1;
+        private float nextCensus;
+
         public bool IsOpen { get; private set; }
 
         // Also true on the frame the map closes, so that the key that closed it does nothing else.
@@ -80,11 +95,14 @@ namespace Voxel.Client
             view = root.Q("map-view");
             image = root.Q("map-image");
             climate = root.Q("map-climate");
+            speciesLayer = root.Q("map-species");
             layerName = root.Q<Label>("layer-name");
             pointerText = root.Q<Label>("pointer-position");
-            markers = new MapMarkers(root.Q("map-animals"), root.Q("map-players"), root.Q("map-arrow"));
+            markers = new MapMarkers(null, root.Q("map-players"), root.Q("map-arrow"));
             projection = Project;
-            AddAnimalsToLegend(root.Q("legend"));
+            speciesPanel = new SpeciesPanel(root, ecosystemSync, worldMap);
+            speciesPanel.SelectionChanged += OnSpeciesChosen;
+            speciesLayer.style.display = DisplayStyle.None;
 
             view.RegisterCallback<WheelEvent>(OnWheel);
             view.RegisterCallback<PointerDownEvent>(OnPointerDown);
@@ -101,6 +119,7 @@ namespace Voxel.Client
         private void OnDestroy()
         {
             DropLayers();
+            if (speciesTexture != null) Destroy(speciesTexture);
         }
 
         private void Update()
@@ -114,9 +133,14 @@ namespace Voxel.Client
                 return;
             }
 
-            // An M typed in the command line does not open the map.
+            // An M typed in the command line, or in the species search, does not toggle the map;
+            // Escape then leaves the search first.
             Keyboard keyboard = Keyboard.current;
-            if (keyboard != null && !CommandConsole.HoldsInput)
+            if (keyboard != null && IsOpen && speciesPanel.HasFocus)
+            {
+                if (keyboard.escapeKey.wasPressedThisFrame) speciesPanel.Blur();
+            }
+            else if (keyboard != null && !CommandConsole.HoldsInput)
             {
                 if (MapKey(keyboard).wasPressedThisFrame)
                 {
@@ -137,7 +161,22 @@ namespace Voxel.Client
                 }
             }
 
-            if (IsOpen) Place(worldMap.Texture, player.transform);
+            if (!IsOpen) return;
+
+            if (Time.unscaledTime >= nextCensus)
+            {
+                nextCensus = Time.unscaledTime + CensusInterval;
+                ecosystemSync.RequestCensus(speciesPanel.SelectedKind, speciesPanel.SelectedSpecies);
+            }
+
+            Place(worldMap.Texture, player.transform);
+        }
+
+        // Another species chosen (or none): its census is asked for at once.
+        private void OnSpeciesChosen()
+        {
+            nextCensus = 0f;
+            ShowLayerName();
         }
 
         // The key showing M on this keyboard's layout: Input System keys are named after their place
@@ -151,6 +190,7 @@ namespace Voxel.Client
         {
             IsOpen = true;
             following = true;
+            nextCensus = 0f;
             pixelsPerBlock = StartPixelsPerBlock;
             pointerText.text = "";
             screen.style.display = DisplayStyle.Flex;
@@ -210,14 +250,77 @@ namespace Voxel.Client
                 climate.style.translate = translate;
             }
 
+            // The species layer covers the world the same way, one pixel per census cell.
+            ShowCensus();
+            if (speciesLayer.style.display == DisplayStyle.Flex)
+            {
+                speciesLayer.style.width = image.style.width;
+                speciesLayer.style.height = image.style.height;
+                speciesLayer.style.translate = translate;
+            }
+
             markers.Place(networkManager, ecosystemSync, worldMap, player, projection);
         }
 
         private void ShowLayer(Layer shown)
         {
             layer = shown;
-            layerName.text = LayerNames[(int)shown];
             climate.style.display = shown == Layer.Terrain ? DisplayStyle.None : DisplayStyle.Flex;
+            ShowLayerName();
+        }
+
+        // The climate layer's name, then the chosen species and how many there are.
+        private void ShowLayerName()
+        {
+            string climateName = LayerNames[(int)layer];
+            layerName.text = speciesPanel == null || speciesPanel.SelectedName == null
+                ? climateName
+                : $"{climateName}   ·   {speciesPanel.SelectedName}: {speciesPanel.SelectedCount}, yellow where they are most";
+        }
+
+        // When a new census has come: the counts in the list, and the chosen species' layer if the
+        // census is for it (the one for the species chosen before may still arrive first).
+        private void ShowCensus()
+        {
+            SpeciesCensus census = ecosystemSync.Census;
+            bool forChosen = speciesPanel.SelectedKind != SpeciesCensus.Kind.None
+                && census.GridKind == speciesPanel.SelectedKind
+                && census.GridSpecies == speciesPanel.SelectedSpecies
+                && census.Grid.Length > 0;
+            speciesLayer.style.display = forChosen ? DisplayStyle.Flex : DisplayStyle.None;
+            if (census.Version == shownCensus) return;
+
+            shownCensus = census.Version;
+            speciesPanel.ShowCounts(census);
+            ShowLayerName();
+            if (!forChosen) return;
+
+            if (speciesTexture == null || speciesTexture.width != census.CellsX || speciesTexture.height != census.CellsZ)
+            {
+                if (speciesTexture != null) Destroy(speciesTexture);
+                speciesTexture = new Texture2D(census.CellsX, census.CellsZ, TextureFormat.RGBA32, false)
+                {
+                    name = "SpeciesLayer",
+                    filterMode = FilterMode.Bilinear,
+                    wrapMode = TextureWrapMode.Clamp
+                };
+            }
+
+            int most = 1;
+            foreach (byte count in census.Grid)
+            {
+                if (count > most) most = count;
+            }
+
+            var pixels = new Color32[census.Grid.Length];
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                pixels[i] = ClimateColours.DensityLayer((float)census.Grid[i] / most);
+            }
+
+            speciesTexture.SetPixels32(pixels);
+            speciesTexture.Apply(false);
+            speciesLayer.style.backgroundImage = new StyleBackground(speciesTexture);
         }
 
         // The picture of the shown climate layer, worked out once per world.
@@ -368,26 +471,5 @@ namespace Voxel.Client
             pointerText.text = $"X {x}   Y {world.GetSurfaceHeight(x, z)}   Z {z}      {celsius} °C   {humidity} % humidity";
         }
 
-        // One legend entry per animal species, with its colour on the map and its name.
-        private void AddAnimalsToLegend(VisualElement legend)
-        {
-            IReadOnlyList<AnimalSpeciesAsset> animals = ecosystemSync.AnimalAssets;
-            for (int s = 0; s < animals.Count; s++)
-            {
-                var item = new VisualElement();
-                item.AddToClassList("legend-item");
-
-                var dot = new VisualElement();
-                dot.AddToClassList("map-animal");
-                dot.AddToClassList("legend-dot");
-                dot.style.backgroundColor = worldMap.AnimalColour(s);
-                item.Add(dot);
-
-                var name = new Label(animals[s].name);
-                name.AddToClassList("legend-text");
-                item.Add(name);
-                legend.Add(item);
-            }
-        }
     }
 }

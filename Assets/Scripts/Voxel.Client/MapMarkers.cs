@@ -6,8 +6,9 @@ using UnityEngine.UIElements;
 namespace Voxel.Client
 {
     // What a map draws over the world's picture, as elements kept from frame to frame: the nearby
-    // animals (dots of their species' colour), the other players, and the local player's arrow.
-    // Each map says where a world position falls on it.
+    // animals (dots of their species' colour; the minimap only, the full-screen map passing no
+    // animal layer), the other players, and the local player's arrow. Each map says where a world
+    // position falls on it.
     internal sealed class MapMarkers
     {
         // Where a world position falls in the map's frame, and whether it is on the map at all.
@@ -29,8 +30,10 @@ namespace Voxel.Client
 
         public void Place(NetworkManager networkManager, EcosystemSync ecosystemSync, WorldMap worldMap, Transform localPlayer, Projection project)
         {
-            ecosystemSync.GetAnimalPositions(animals);
             int shown = 0;
+            if (animalLayer != null) ecosystemSync.GetAnimalPositions(animals);
+            else animals.Clear();
+
             foreach (KeyValuePair<int, Vector3> animal in animals)
             {
                 if (!project(animal.Value, out Vector2 point)) continue;
