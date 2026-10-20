@@ -31,6 +31,7 @@ namespace Eco.Sim
 
         public void Write(Stream stream)
         {
+            CompactRemoved();
             using (var writer = new BinaryWriter(stream, Encoding.UTF8, true))
             {
                 writer.Write(Magic);

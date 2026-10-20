@@ -29,9 +29,15 @@ namespace Voxel.Client
         [Tooltip("Brightness kept where no sky light reaches, deep underground (1 is open sky).")]
         [SerializeField, Range(0f, 0.2f)] private float darkestSkyLight = 0.02f;
 
-        private readonly Dictionary<Chunk, Mesh> meshes = new Dictionary<Chunk, Mesh>();
-        private readonly List<GameObject> chunkObjects = new List<GameObject>();
+        // Remeshing this many chunks or more at once is shared among the cores (ChunkMeshing).
+        private const int ParallelRemeshCount = 16;
+
+        // Only chunks with faces to draw have an object, with its mesh (most chunks are air or buried
+        // rock); a chunk that gains faces gets one when it is remeshed.
+        private readonly Dictionary<Chunk, MeshFilter> chunkMeshes = new Dictionary<Chunk, MeshFilter>();
         private readonly HashSet<Chunk> dirtyChunks = new HashSet<Chunk>();
+        private readonly List<Chunk> remeshing = new List<Chunk>();
+        private ChunkMeshBuilder builder;
         private Material materialInstance;
         private Texture2D atlas;
         private SkyLight skyLight;
@@ -67,9 +73,21 @@ namespace Voxel.Client
         {
             if (dirtyChunks.Count == 0) return;
 
-            foreach (Chunk chunk in dirtyChunks)
+            if (dirtyChunks.Count >= ParallelRemeshCount)
             {
-                ChunkMesher.Build(World, skyLight, chunk, meshes[chunk]);
+                remeshing.Clear();
+                remeshing.AddRange(dirtyChunks);
+                ChunkMeshing.BuildAll(World, skyLight, remeshing, ShowMesh);
+                remeshing.Clear();
+            }
+            else
+            {
+                builder ??= new ChunkMeshBuilder();
+                foreach (Chunk chunk in dirtyChunks)
+                {
+                    builder.Build(World, skyLight, chunk);
+                    ShowMesh(chunk, builder);
+                }
             }
 
             dirtyChunks.Clear();
@@ -148,18 +166,13 @@ namespace Voxel.Client
             World.BlockChanged -= OnBlockChanged;
             Save();
 
-            foreach (GameObject chunkObject in chunkObjects)
+            foreach (MeshFilter filter in chunkMeshes.Values)
             {
-                Destroy(chunkObject);
+                Destroy(filter.sharedMesh);
+                Destroy(filter.gameObject);
             }
 
-            foreach (Mesh mesh in meshes.Values)
-            {
-                Destroy(mesh);
-            }
-
-            chunkObjects.Clear();
-            meshes.Clear();
+            chunkMeshes.Clear();
             dirtyChunks.Clear();
             skyLight = null;
             World = null;
@@ -180,12 +193,11 @@ namespace Voxel.Client
             double lightSeconds = timer.Elapsed.TotalSeconds;
 
             World.BlockChanged += OnBlockChanged;
-            foreach (Chunk chunk in World.Chunks)
-            {
-                CreateChunkObject(chunk);
-            }
+            ChunkMeshing.BuildAll(World, skyLight, World.Chunks, ShowMesh);
 
-            Debug.Log($"Sky light worked out in {lightSeconds * 1000:0} ms, chunks meshed in {(timer.Elapsed.TotalSeconds - lightSeconds) * 1000:0} ms.");
+            Debug.Log(
+                $"Sky light worked out in {lightSeconds * 1000:0} ms, chunks meshed in {(timer.Elapsed.TotalSeconds - lightSeconds) * 1000:0} ms "
+                + $"({chunkMeshes.Count} of {World.Chunks.Count} have faces).");
         }
 
         // A saved world keeps its own seed and size; only a new one takes those asked for.
@@ -211,18 +223,34 @@ namespace Voxel.Client
             return world;
         }
 
-        private void CreateChunkObject(Chunk chunk)
+        // Puts a built mesh on screen, in a new Mesh: the chunk's object takes it in place of its old
+        // one, or a chunk without an object gets one if it now has faces (a chunk left without faces
+        // keeps its object, with an empty mesh). Meshes keep no copy of their data on the CPU
+        // (UploadMeshData), hundreds of megabytes for a whole world, so they cannot be written again:
+        // remeshing replaces them. Nothing reads them back (collisions and rays use the world).
+        private void ShowMesh(Chunk chunk, ChunkMeshBuilder built)
         {
+            bool hasObject = chunkMeshes.TryGetValue(chunk, out MeshFilter filter);
+            if (!hasObject && built.IsEmpty) return;
+
             var mesh = new Mesh { name = $"Chunk {chunk.Coord}" };
-            ChunkMesher.Build(World, skyLight, chunk, mesh);
-            meshes.Add(chunk, mesh);
+            built.ApplyTo(mesh);
+            mesh.UploadMeshData(true);
+
+            if (hasObject)
+            {
+                Destroy(filter.sharedMesh);
+                filter.sharedMesh = mesh;
+                return;
+            }
 
             var chunkObject = new GameObject(mesh.name);
             chunkObject.transform.SetParent(transform, false);
             chunkObject.transform.localPosition = new Vector3(chunk.Coord.X, chunk.Coord.Y, chunk.Coord.Z) * Chunk.Size;
-            chunkObject.AddComponent<MeshFilter>().sharedMesh = mesh;
+            filter = chunkObject.AddComponent<MeshFilter>();
+            filter.sharedMesh = mesh;
             chunkObject.AddComponent<MeshRenderer>().sharedMaterials = new[] { materialInstance, waterMaterial };
-            chunkObjects.Add(chunkObject);
+            chunkMeshes.Add(chunk, filter);
         }
 
         private void OnBlockChanged(BlockPos pos, ushort previous, ushort current)

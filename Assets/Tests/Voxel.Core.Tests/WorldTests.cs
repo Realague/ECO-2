@@ -22,6 +22,101 @@ namespace Voxel.Core.Tests
             }
         }
 
+        // GetTopHeight and GetSurfaceHeight skip empty chunks and read blocks directly: they must give
+        // what a scan of every block gives, on generated terrain (water, caves) and after edits that
+        // fill an empty chunk or empty a full one, and on chunks read from a save.
+        [Test]
+        public void ColumnHeights_MatchAScanOfEveryBlock()
+        {
+            var world = new World(2, 4, 2);
+            world.Generate(new TerrainGenerator(), 3);
+            AssertHeightsMatchScan(world);
+
+            world.SetBlock(5, 60, 7, Blocks.Stone);
+            world.SetBlock(9, 50, 3, Blocks.Water);
+            for (int y = 0; y < world.SizeY; y++)
+            {
+                world.SetBlock(20, y, 20, Blocks.Air);
+            }
+
+            AssertHeightsMatchScan(world);
+            world.SetBlock(5, 60, 7, Blocks.Air);
+            AssertHeightsMatchScan(world);
+
+            var stream = new System.IO.MemoryStream();
+            WorldSave.Write(stream, world);
+            World loaded = WorldSave.Read(new System.IO.MemoryStream(stream.ToArray()), new TerrainGenerator());
+            AssertHeightsMatchScan(loaded);
+        }
+
+        // TerrainGenerator fills chunks on every core at once (IParallelChunkGenerator): the same
+        // generator run one chunk after another must give every block the same.
+        [Test]
+        public void ParallelGeneration_GivesTheSameBlocksAsOneChunkAfterAnother()
+        {
+            var parallel = new World(4, 4, 4);
+            parallel.Generate(new TerrainGenerator(), 5);
+            var serial = new World(4, 4, 4);
+            serial.Generate(new OneAtATime(new TerrainGenerator()), 5);
+
+            for (int i = 0; i < parallel.Chunks.Count; i++)
+            {
+                Chunk a = parallel.Chunks[i];
+                Chunk b = serial.Chunks[i];
+                Assert.AreEqual(b.IsEmpty, a.IsEmpty, $"Chunk {a.Coord} emptiness");
+                for (int y = 0; y < Chunk.Size; y++)
+                {
+                    for (int z = 0; z < Chunk.Size; z++)
+                    {
+                        for (int x = 0; x < Chunk.Size; x++)
+                        {
+                            if (a.Get(x, y, z) != b.Get(x, y, z)) Assert.Fail($"Chunk {a.Coord}, block ({x}, {y}, {z})");
+                        }
+                    }
+                }
+            }
+
+            Assert.AreEqual(serial.TerrainFingerprint, parallel.TerrainFingerprint);
+        }
+
+        // Hides that a generator may run in parallel, so World.Generate calls it chunk by chunk.
+        private sealed class OneAtATime : IChunkGenerator
+        {
+            private readonly IChunkGenerator inner;
+
+            public OneAtATime(IChunkGenerator inner)
+            {
+                this.inner = inner;
+            }
+
+            public int Version => inner.Version;
+
+            public void Prepare(int seed, int sizeX, int sizeZ) => inner.Prepare(seed, sizeX, sizeZ);
+
+            public void Generate(Chunk chunk, int seed) => inner.Generate(chunk, seed);
+        }
+
+        private static void AssertHeightsMatchScan(World world)
+        {
+            for (int z = -1; z <= world.SizeZ; z++)
+            {
+                for (int x = -1; x <= world.SizeX; x++)
+                {
+                    int top = 0;
+                    int surface = 0;
+                    for (int y = world.SizeY - 1; y >= 0; y--)
+                    {
+                        ushort block = world.GetBlock(x, y, z);
+                        if (top == 0 && Blocks.TypeOf(block) != Blocks.Air) top = y + 1;
+                        if (surface == 0 && Blocks.IsSolid(block)) surface = y + 1;
+                    }
+
+                    Assert.AreEqual(top, world.GetTopHeight(x, z), $"Top of ({x}, {z})");
+                    Assert.AreEqual(surface, world.GetSurfaceHeight(x, z), $"Surface of ({x}, {z})");
+                }
+            }
+        }
+
         [Test]
         public void TerrainFingerprint_IsTheSameForTheSameTerrain_AndDiffersForAnother()
         {

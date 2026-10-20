@@ -53,6 +53,16 @@ namespace Eco.Sim
         private Animal[] animals = new Animal[64];
         private int animalCount;
         private int[] animalAtColumn;
+
+        // The species plus one of the animal in each column (0 for none), written with animalAtColumn
+        // (AddAnimal, WalkToward, Kill): searches for kin, prey or neighbours read it without looking
+        // the animal up.
+        private ushort[] animalSpeciesAtColumn;
+
+        // Whether animal species a eats plant species p (eatsPlant[a * plant species + p]) or animal
+        // species b (eatsAnimal[a * animal species + b]), from their diets, once.
+        private bool[] eatsPlant;
+        private bool[] eatsAnimal;
         private int[] animalPopulation;
         private int[] animalFloor;
 
@@ -61,10 +71,13 @@ namespace Eco.Sim
         private int nextAnimalId = 1;
         private bool animalsDied;
 
-        // Per column (ReadColumn): its top plus one (zero until read), its bed, and whether water lies on it.
-        private int[] columnTop;
-        private int[] columnBed;
-        private bool[] columnWet;
+        // Per column (ColumnInfo), packed in one int so that a move reads one place rather than three:
+        // its top plus one (low ColumnHeightBits bits; zero until read), its bed (the next bits) and
+        // whether water lies on it (WetColumn). Heights fit as long as the world is under 4,095 blocks high.
+        private const int ColumnHeightBits = 12;
+        private const int ColumnHeightMask = (1 << ColumnHeightBits) - 1;
+        private const int WetColumn = 1 << (2 * ColumnHeightBits);
+        private int[] columnInfo;
 
         // Snapshot: no longer valid after a Step or a RemoveAnimal.
         public IReadOnlyList<Animal> Animals => new ArraySegment<Animal>(animals, 0, animalCount);
@@ -146,11 +159,25 @@ namespace Eco.Sim
                 animalSpecies[i] = kinds[i];
             }
 
+            eatsPlant = new bool[animalSpecies.Length * species.Length];
+            eatsAnimal = new bool[animalSpecies.Length * animalSpecies.Length];
+            for (int a = 0; a < animalSpecies.Length; a++)
+            {
+                foreach (int p in animalSpecies[a].EatsPlants)
+                {
+                    if ((uint)p < (uint)species.Length) eatsPlant[a * species.Length + p] = true;
+                }
+
+                foreach (int b in animalSpecies[a].EatsAnimals)
+                {
+                    if ((uint)b < (uint)animalSpecies.Length) eatsAnimal[a * animalSpecies.Length + b] = true;
+                }
+            }
+
             int columns = world.SizeX * world.SizeZ;
             animalAtColumn = new int[columns];
-            columnTop = new int[columns];
-            columnBed = new int[columns];
-            columnWet = new bool[columns];
+            animalSpeciesAtColumn = new ushort[columns];
+            columnInfo = new int[columns];
             animalPopulation = new int[animalSpecies.Length];
             animalFloor = new int[animalSpecies.Length];
             animalSuitability = new float[animalSpecies.Length][];
@@ -294,9 +321,7 @@ namespace Eco.Sim
         {
             if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) return false;
 
-            int column = ColumnIndex(x, z);
-            ReadColumn(column, x, z);
-            return columnWet[column];
+            return (ColumnInfo(ColumnIndex(x, z), x, z) & WetColumn) != 0;
         }
 
         // A herd animal walks to the nearest of its kind in sight, or only ambles if one is close by.
@@ -313,23 +338,22 @@ namespace Eco.Sim
         // Searches outward around the animal for the nearest other animal of its species.
         private bool FindKin(Animal animal, AnimalSpecies kind, out int kinX, out int kinZ)
         {
+            // Ring by ring, each ring in the order of its rows (see FindFood). Only live animals stand
+            // in columns (Kill frees them), so the species in the column is enough.
+            var same = (ushort)(animal.SpeciesIndex + 1);
             for (int radius = 1; radius <= kind.SenseRange; radius++)
             {
                 for (int dz = -radius; dz <= radius; dz++)
                 {
-                    for (int dx = -radius; dx <= radius; dx++)
+                    int z = animal.Z + dz;
+                    if ((uint)z >= (uint)world.SizeZ) continue;
+
+                    int stepX = dz == -radius || dz == radius ? 1 : 2 * radius;
+                    for (int dx = -radius; dx <= radius; dx += stepX)
                     {
-                        if (Math.Max(Math.Abs(dx), Math.Abs(dz)) != radius) continue;
-
                         int x = animal.X + dx;
-                        int z = animal.Z + dz;
-                        if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) continue;
-
-                        int otherId = animalAtColumn[ColumnIndex(x, z)];
-                        if (otherId == 0) continue;
-
-                        Animal other = animals[AnimalIndexOf(otherId)];
-                        if (other.SpeciesIndex != animal.SpeciesIndex || other.Age == DeadAge) continue;
+                        if ((uint)x >= (uint)world.SizeX) continue;
+                        if (animalSpeciesAtColumn[ColumnIndex(x, z)] != same) continue;
 
                         kinX = x;
                         kinZ = z;
@@ -347,19 +371,20 @@ namespace Eco.Sim
         {
             if (kind.TerritoryRange <= 0) return true;
 
+            var same = (ushort)(animal.SpeciesIndex + 1);
+            int minX = Math.Max(0, animal.X - kind.TerritoryRange);
+            int maxX = Math.Min(world.SizeX - 1, animal.X + kind.TerritoryRange);
+            int minZ = Math.Max(0, animal.Z - kind.TerritoryRange);
+            int maxZ = Math.Min(world.SizeZ - 1, animal.Z + kind.TerritoryRange);
             int neighbours = 0;
-            for (int dz = -kind.TerritoryRange; dz <= kind.TerritoryRange; dz++)
+            for (int z = minZ; z <= maxZ; z++)
             {
-                for (int dx = -kind.TerritoryRange; dx <= kind.TerritoryRange; dx++)
+                for (int x = minX; x <= maxX; x++)
                 {
-                    int x = animal.X + dx;
-                    int z = animal.Z + dz;
-                    if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) continue;
+                    int column = ColumnIndex(x, z);
+                    if (animalSpeciesAtColumn[column] != same || animalAtColumn[column] == animal.Id) continue;
 
-                    int otherId = animalAtColumn[ColumnIndex(x, z)];
-                    if (otherId == 0 || otherId == animal.Id) continue;
-
-                    if (animals[AnimalIndexOf(otherId)].SpeciesIndex == animal.SpeciesIndex && ++neighbours >= kind.MaxNeighbours) return false;
+                    if (++neighbours >= kind.MaxNeighbours) return false;
                 }
             }
 
@@ -412,29 +437,30 @@ namespace Eco.Sim
 
         private bool FindFood(Animal animal, AnimalSpecies kind, out int foodX, out int foodZ, out Food food)
         {
+            // Ring by ring outward, the centre first; each ring in the order of its rows: the whole
+            // first row, then the two ends of each row between, then the whole last row. The first
+            // column found wins, so this order is part of what the simulation does.
             for (int radius = 0; radius <= kind.SenseRange; radius++)
             {
                 for (int dz = -radius; dz <= radius; dz++)
                 {
-                    for (int dx = -radius; dx <= radius; dx++)
-                    {
-                        // Only the outline of the square: the inside was covered by the previous radii.
-                        if (Math.Max(Math.Abs(dx), Math.Abs(dz)) != radius) continue;
+                    int z = animal.Z + dz;
+                    if ((uint)z >= (uint)world.SizeZ) continue;
 
+                    int stepX = dz == -radius || dz == radius ? 1 : 2 * radius;
+                    for (int dx = -radius; dx <= radius; dx += stepX)
+                    {
                         int x = animal.X + dx;
-                        int z = animal.Z + dz;
-                        if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) continue;
+                        if ((uint)x >= (uint)world.SizeX) continue;
 
                         int column = ColumnIndex(x, z);
-                        Food? found = IsEdiblePlant(plantAtColumn[column], kind) ? Food.Plant
-                            : IsPrey(animalAtColumn[column], animal.Id, kind) ? Food.Prey
-                            : IsCarrion(x, z, kind) ? Food.Carrion
-                            : (Food?)null;
-                        if (found == null) continue;
+                        if (IsEdiblePlant(column, animal.SpeciesIndex, kind)) food = Food.Plant;
+                        else if (IsPrey(column, animal, kind)) food = Food.Prey;
+                        else if (IsCarrion(x, z, kind)) food = Food.Carrion;
+                        else continue;
 
                         foodX = x;
                         foodZ = z;
-                        food = found.Value;
                         return true;
                     }
                 }
@@ -446,12 +472,13 @@ namespace Eco.Sim
             return false;
         }
 
-        private bool IsEdiblePlant(int plantId, AnimalSpecies kind)
+        private bool IsEdiblePlant(int column, int eaterSpecies, AnimalSpecies kind)
         {
-            if (plantId == 0 || kind.EatsPlants.Length == 0) return false;
+            int speciesPlusOne = plantSpeciesAtColumn[column];
+            if (speciesPlusOne == 0 || !eatsPlant[eaterSpecies * species.Length + speciesPlusOne - 1]) return false;
 
-            Plant plant = plants[IndexOf(plantId)];
-            if (plant.Growth < MinEdibleGrowth || Array.IndexOf(kind.EatsPlants, plant.SpeciesIndex) < 0) return false;
+            Plant plant = plants[IndexOf(plantAtColumn[column])];
+            if (plant.Growth < MinEdibleGrowth) return false;
 
             // Ripe fruit is within reach of whoever eats it, however tall the tree: birds, deer under apple trees.
             if (plant.RipeStage >= 1 && species[plant.SpeciesIndex].Harvest == HarvestKind.Perennial) return true;
@@ -484,12 +511,13 @@ namespace Eco.Sim
             Graze(plantIndex);
         }
 
-        private bool IsPrey(int animalId, int hunterId, AnimalSpecies kind)
+        // Only live animals stand in columns (Kill frees them), so the species in the column is enough.
+        private bool IsPrey(int column, Animal hunter, AnimalSpecies kind)
         {
-            if (animalId == 0 || animalId == hunterId || kind.EatsAnimals.Length == 0) return false;
+            int speciesPlusOne = animalSpeciesAtColumn[column];
+            if (speciesPlusOne == 0 || !eatsAnimal[hunter.SpeciesIndex * animalSpecies.Length + speciesPlusOne - 1]) return false;
 
-            Animal other = animals[AnimalIndexOf(animalId)];
-            return other.Age != DeadAge && Array.IndexOf(kind.EatsAnimals, other.SpeciesIndex) >= 0;
+            return animalAtColumn[column] != hunter.Id;
         }
 
         // A grazed plant loses foliage: it grows back if given the time, unless it was too young to
@@ -522,8 +550,12 @@ namespace Eco.Sim
                 if (distance == 0 || (stopNextToIt && distance <= 1)) break;
                 if (!AnimalMoves.TryNextStep(ground, animal.X, animal.Y, animal.Z, targetX, targetZ, out int x, out int y, out int z, Flies(animal))) break;
 
-                animalAtColumn[ColumnIndex(animal.X, animal.Z)] = 0;
-                animalAtColumn[ColumnIndex(x, z)] = animal.Id;
+                int from = ColumnIndex(animal.X, animal.Z);
+                int to = ColumnIndex(x, z);
+                animalAtColumn[from] = 0;
+                animalSpeciesAtColumn[from] = 0;
+                animalAtColumn[to] = animal.Id;
+                animalSpeciesAtColumn[to] = (ushort)(animal.SpeciesIndex + 1);
                 animal.X = x;
                 animal.Y = y;
                 animal.Z = z;
@@ -574,9 +606,8 @@ namespace Eco.Sim
             y = 0;
             if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) return false;
 
-            int column = ColumnIndex(x, z);
-            ReadColumn(column, x, z);
-            return AnimalMoves.GroundFor(habitat, columnTop[column] - 1, columnWet[column], columnBed[column], out y) && y < world.SizeY;
+            int info = ColumnInfo(ColumnIndex(x, z), x, z);
+            return AnimalMoves.GroundFor(habitat, ColumnTopOf(info), (info & WetColumn) != 0, ColumnBedOf(info), out y) && y < world.SizeY;
         }
 
         // The ground as AnimalMoves sees it during the simulation, for one habitat: a column with an
@@ -606,16 +637,22 @@ namespace Eco.Sim
 
         // Animals look a column up at every move: reading it from the world again would cost a whole
         // column each time, so its top, bed and whether water lies on it are kept until a block changes.
-        private void ReadColumn(int column, int x, int z)
+        private int ColumnInfo(int column, int x, int z)
         {
-            if (columnTop[column] != 0) return;
+            int info = columnInfo[column];
+            if (info != 0) return info;
 
             int top = world.GetTopHeight(x, z);
             bool wet = top > 0 && world.IsWater(x, top - 1, z);
-            columnTop[column] = top + 1;
-            columnWet[column] = wet;
-            columnBed[column] = wet ? world.GetSurfaceHeight(x, z) : top;
+            int bed = wet ? world.GetSurfaceHeight(x, z) : top;
+            info = (top + 1) | (bed << ColumnHeightBits) | (wet ? WetColumn : 0);
+            columnInfo[column] = info;
+            return info;
         }
+
+        private static int ColumnTopOf(int info) => (info & ColumnHeightMask) - 1;
+
+        private static int ColumnBedOf(int info) => (info >> ColumnHeightBits) & ColumnHeightMask;
 
         // Ids must be added in increasing order: this keeps the array sorted.
         private void AddAnimal(int id, int speciesIndex, int x, int y, int z, int age, float hunger)
@@ -624,7 +661,9 @@ namespace Eco.Sim
 
             var animal = new Animal { Id = id, SpeciesIndex = speciesIndex, X = x, Y = y, Z = z, Age = age, Hunger = hunger };
             animals[animalCount++] = animal;
-            animalAtColumn[ColumnIndex(x, z)] = animal.Id;
+            int column = ColumnIndex(x, z);
+            animalAtColumn[column] = animal.Id;
+            animalSpeciesAtColumn[column] = (ushort)(speciesIndex + 1);
             animalPopulation[speciesIndex]++;
         }
 
@@ -636,7 +675,9 @@ namespace Eco.Sim
             if (animal.Age == DeadAge) return;
 
             LeaveCarcass(animal, carcassMeat);
-            animalAtColumn[ColumnIndex(animal.X, animal.Z)] = 0;
+            int column = ColumnIndex(animal.X, animal.Z);
+            animalAtColumn[column] = 0;
+            animalSpeciesAtColumn[column] = 0;
             animalPopulation[animal.SpeciesIndex]--;
             animals[index].Age = DeadAge;
             animalsDied = true;

@@ -15,4 +15,10 @@ namespace Voxel.Core
         // world as the server.
         void Generate(Chunk chunk, int seed);
     }
+
+    // A generator whose Generate only reads what Prepare worked out and only writes its own chunk:
+    // World.Generate then fills the chunks on every core at once.
+    public interface IParallelChunkGenerator : IChunkGenerator
+    {
+    }
 }

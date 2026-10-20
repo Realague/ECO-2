@@ -90,6 +90,13 @@ namespace Voxel.Client
         private readonly float[] bodyHeights;
         private readonly float[] bodyHalfWidths;
 
+        // For each species, how far its parts reach from where it stands, with room for limbs that
+        // swing, and the box around its animals this frame: Unity culls each batch by it (for the
+        // camera and for each shadow cascade), so a species out of sight costs nothing to draw.
+        private readonly float[] reaches;
+        private readonly Vector3[] lowest;
+        private readonly Vector3[] highest;
+
         private struct CarcassView
         {
             public int SpeciesIndex;
@@ -111,15 +118,21 @@ namespace Voxel.Client
             shadowParams = new RenderParams[assets.Length][];
             bodyHeights = new float[assets.Length];
             bodyHalfWidths = new float[assets.Length];
+            reaches = new float[assets.Length];
+            lowest = new Vector3[assets.Length];
+            highest = new Vector3[assets.Length];
             for (int s = 0; s < assets.Length; s++)
             {
                 IReadOnlyList<SpeciesAsset.Part> parts = assets[s].Parts;
                 float largest = 0f;
+                float reach = 0f;
                 foreach (SpeciesAsset.Part part in parts)
                 {
                     // Boxes are unit cubes scaled; a modelled part is a mesh of its own size.
                     Bounds bounds = part.mesh.bounds;
                     Vector3 size = Vector3.Scale(bounds.size, part.scale);
+                    Vector3 centre = part.offset + Vector3.Scale(bounds.center, part.scale);
+                    reach = Mathf.Max(reach, centre.magnitude + 0.5f * new Vector3(Mathf.Abs(size.x), Mathf.Abs(size.y), Mathf.Abs(size.z)).magnitude);
                     float volume = size.x * size.y * size.z;
                     if (volume <= largest) continue;
 
@@ -128,6 +141,9 @@ namespace Voxel.Client
                     bodyHalfWidths[s] = size.x * 0.5f;
                 }
 
+                // Turned any way, a part stays within reach of the animal's position; swinging limbs
+                // and wings, a hop or a carcass rolled over stay within half as much again.
+                reaches[s] = reach * 1.5f + 1f;
                 matrices[s] = new Matrix4x4[parts.Count][];
                 renderParams[s] = new RenderParams[parts.Count];
                 shadowParams[s] = new RenderParams[parts.Count];
@@ -383,6 +399,8 @@ namespace Voxel.Client
                 }
 
                 counts[s] = 0;
+                lowest[s] = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+                highest[s] = new Vector3(float.MinValue, float.MinValue, float.MinValue);
             }
 
             float now = Time.time;
@@ -418,6 +436,7 @@ namespace Voxel.Client
                     }
                 }
 
+                Enclose(s, position);
                 counts[s]++;
             }
 
@@ -433,14 +452,21 @@ namespace Voxel.Client
                     matrices[s][p][counts[s]] = lying * Matrix4x4.TRS(parts[p].offset, Quaternion.identity, parts[p].scale);
                 }
 
+                Enclose(s, carcass.Position);
                 counts[s]++;
             }
 
             for (int s = 0; s < assets.Length; s++)
             {
+                if (counts[s] == 0) continue;
+
+                var bounds = new Bounds();
+                bounds.SetMinMax(lowest[s] - Vector3.one * reaches[s], highest[s] + Vector3.one * reaches[s]);
                 IReadOnlyList<SpeciesAsset.Part> parts = assets[s].Parts;
                 for (int p = 0; p < parts.Count; p++)
                 {
+                    renderParams[s][p].worldBounds = bounds;
+                    shadowParams[s][p].worldBounds = bounds;
                     for (int start = 0; start < counts[s]; start += MaxInstancesPerCall)
                     {
                         int count = Mathf.Min(MaxInstancesPerCall, counts[s] - start);
@@ -452,6 +478,12 @@ namespace Voxel.Client
                     }
                 }
             }
+        }
+
+        private void Enclose(int speciesIndex, Vector3 position)
+        {
+            lowest[speciesIndex] = Vector3.Min(lowest[speciesIndex], position);
+            highest[speciesIndex] = Vector3.Max(highest[speciesIndex], position);
         }
 
         // A shore animal above water floats in it, a little below the top of the block under it.

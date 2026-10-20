@@ -8,7 +8,7 @@ namespace Voxel.Core
     // on the coordinates, the seed and the world's size, and all the math is in integers (see
     // IntNoise): the server and every client therefore get exactly the same world. The relief fits
     // within 64 blocks of height.
-    public sealed class TerrainGenerator : IChunkGenerator
+    public sealed class TerrainGenerator : IParallelChunkGenerator
     {
         private const int BaseHeight = 20;
 

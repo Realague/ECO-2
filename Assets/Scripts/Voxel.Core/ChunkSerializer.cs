@@ -46,6 +46,8 @@ namespace Voxel.Core
                 Array.Fill(blocks, block, index, run);
                 index += run;
             }
+
+            chunk.RecountBlocks();
         }
     }
 }

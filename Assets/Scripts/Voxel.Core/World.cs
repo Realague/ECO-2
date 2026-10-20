@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Voxel.Core
 {
@@ -64,9 +65,16 @@ namespace Voxel.Core
             geography = null;
             generator.Prepare(seed, SizeX, SizeZ);
 
-            foreach (Chunk chunk in chunks)
+            if (generator is IParallelChunkGenerator)
             {
-                generator.Generate(chunk, seed);
+                Parallel.For(0, chunks.Length, i => generator.Generate(chunks[i], seed));
+            }
+            else
+            {
+                foreach (Chunk chunk in chunks)
+                {
+                    generator.Generate(chunk, seed);
+                }
             }
 
             TerrainFingerprint = ComputeFingerprint();
@@ -156,9 +164,21 @@ namespace Voxel.Core
         // the column is under water (the ground there is a lake's bed).
         public int GetSurfaceHeight(int x, int z)
         {
-            for (int y = SizeY - 1; y >= 0; y--)
+            if ((uint)x >= (uint)SizeX || (uint)z >= (uint)SizeZ) return 0;
+
+            // Chunk by chunk from the top, skipping empty ones, reading their blocks directly: the
+            // simulation and the maps look columns up by the hundred thousand.
+            int column = (x & Chunk.SizeMask) | ((z & Chunk.SizeMask) << Chunk.SizeBits);
+            for (int chunkY = ChunksY - 1; chunkY >= 0; chunkY--)
             {
-                if (Blocks.IsSolid(GetBlock(x, y, z))) return y + 1;
+                Chunk chunk = chunks[ChunkIndex(x >> Chunk.SizeBits, chunkY, z >> Chunk.SizeBits)];
+                if (chunk.IsEmpty) continue;
+
+                ushort[] blocks = chunk.RawBlocks;
+                for (int localY = Chunk.SizeMask; localY >= 0; localY--)
+                {
+                    if (Blocks.IsSolid(blocks[column | (localY << (2 * Chunk.SizeBits))])) return chunkY * Chunk.Size + localY + 1;
+                }
             }
 
             return 0;
@@ -168,9 +188,19 @@ namespace Voxel.Core
         // one sees from above.
         public int GetTopHeight(int x, int z)
         {
-            for (int y = SizeY - 1; y >= 0; y--)
+            if ((uint)x >= (uint)SizeX || (uint)z >= (uint)SizeZ) return 0;
+
+            int column = (x & Chunk.SizeMask) | ((z & Chunk.SizeMask) << Chunk.SizeBits);
+            for (int chunkY = ChunksY - 1; chunkY >= 0; chunkY--)
             {
-                if (Blocks.TypeOf(GetBlock(x, y, z)) != Blocks.Air) return y + 1;
+                Chunk chunk = chunks[ChunkIndex(x >> Chunk.SizeBits, chunkY, z >> Chunk.SizeBits)];
+                if (chunk.IsEmpty) continue;
+
+                ushort[] blocks = chunk.RawBlocks;
+                for (int localY = Chunk.SizeMask; localY >= 0; localY--)
+                {
+                    if (Blocks.TypeOf(blocks[column | (localY << (2 * Chunk.SizeBits))]) != Blocks.Air) return chunkY * Chunk.Size + localY + 1;
+                }
             }
 
             return 0;

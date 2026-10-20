@@ -43,8 +43,21 @@ namespace Eco.Sim
         private Plant[] plants = new Plant[256];
         private int plantCount;
 
-        // For each block column, the id of the plant standing there, or 0.
+        // A removed plant (Remove) stays in the array, marked with this age, until the next compaction
+        // (RemoveDying in a step, CompactRemoved before the array is read from outside): every loop over
+        // the array must skip it. IndexOf does not find it.
+        private const int RemovedAge = int.MinValue;
+        private int removedCount;
+        private bool stepping;
+
+        // For each block column, the id of the plant standing there, or 0, and its species plus one
+        // (0 for none): neighbourhood tests (spacing, shade, grazing) read the species without
+        // looking the plant up. Both are written together, by Append and Forget only.
         private readonly int[] plantAtColumn;
+        private readonly ushort[] plantSpeciesAtColumn;
+
+        // Per species, whether it is tall enough to shade (Height >= ShadeHeight).
+        private readonly bool[] shadingSpecies;
         private readonly List<int> dying = new List<int>();
 
         // Plants whose ground or base has changed since the last step: only those are rechecked.
@@ -76,6 +89,12 @@ namespace Eco.Sim
             speciesSoil = SpeciesSoil(this.species);
             suitability = new float[species.Count][];
             plantAtColumn = new int[world.SizeX * world.SizeZ];
+            plantSpeciesAtColumn = new ushort[world.SizeX * world.SizeZ];
+            shadingSpecies = new bool[species.Count];
+            for (int i = 0; i < species.Count; i++)
+            {
+                shadingSpecies[i] = species[i].Height >= ShadeHeight;
+            }
 
             InitializeAnimals(animalSpecies);
             InitializeCarrion();
@@ -93,7 +112,14 @@ namespace Eco.Sim
         public long StepCount { get; private set; }
 
         // Snapshot: no longer valid after a Step, a Remove or a TryPlant.
-        public IReadOnlyList<Plant> Plants => new ArraySegment<Plant>(plants, 0, plantCount);
+        public IReadOnlyList<Plant> Plants
+        {
+            get
+            {
+                CompactRemoved();
+                return new ArraySegment<Plant>(plants, 0, plantCount);
+            }
+        }
 
         public IReadOnlyList<Species> AllSpecies => species;
 
@@ -207,9 +233,11 @@ namespace Eco.Sim
             int index = IndexOf(plantId);
             if (index < 0) return false;
 
+            // Marked rather than taken out at once: shifting the array for every plant grazed to death
+            // cost more than the rest of a step. The next compaction drops it (RemoveDying, CompactRemoved).
             Plant plant = plants[index];
-            Array.Copy(plants, index + 1, plants, index, plantCount - index - 1);
-            plantCount--;
+            plants[index].Age = RemovedAge;
+            removedCount++;
             Forget(plant);
             return true;
         }
@@ -217,26 +245,36 @@ namespace Eco.Sim
         // Advances the simulation by one step of simulated time.
         public void Step()
         {
-            StepCount++;
-            RemoveUprooted();
-            RegenerateSoil();
-
-            // Plants born during this step only act from the next one.
-            int count = plantCount;
-            for (int i = 0; i < count; i++)
+            stepping = true;
+            try
             {
-                // Working copy: sowing can grow the array, so a reference into it would no longer be safe.
-                Plant plant = plants[i];
-                bool alive = Live(ref plant, out bool seeds);
-                plants[i] = plant;
+                StepCount++;
+                RemoveUprooted();
+                RegenerateSoil();
 
-                if (!alive) dying.Add(i);
-                else if (seeds) Seed(plant);
+                // Plants born during this step only act from the next one.
+                int count = plantCount;
+                for (int i = 0; i < count; i++)
+                {
+                    // Working copy: sowing can grow the array, so a reference into it would no longer be safe.
+                    Plant plant = plants[i];
+                    if (plant.Age == RemovedAge) continue;
+
+                    bool alive = Live(ref plant, out bool seeds);
+                    plants[i] = plant;
+
+                    if (!alive) dying.Add(i);
+                    else if (seeds) Seed(plant);
+                }
+
+                RemoveDying();
+                StepAnimals();
+                StepCarrion();
             }
-
-            RemoveDying();
-            StepAnimals();
-            StepCarrion();
+            finally
+            {
+                stepping = false;
+            }
         }
 
         // Runs one step of a plant's life. Returns false if it dies.
@@ -293,12 +331,15 @@ namespace Eco.Sim
             float vigour = suitability[speciesIndex][cell];
             if (vigour <= 0f) return false;
 
+            // The cheapest tests first (none of them draws at random, so their order changes nothing
+            // but the cost): the column, the soil and the spacing before the blocks.
+            if (Available(cell, speciesIndex) < kind.MinFertility) return false;
+            if (!IsSpaceFree(x, z, speciesIndex, kind.Spacing)) return false;
+
             int y = PlantBaseAt(kind, x, z);
             if (!HasGroundAndRoom(kind, x, y, z)) return false;
             if (kind.NeedsWater && !IsBesideWater(x, y, z)) return false;
-            if (Available(cell, speciesIndex) < kind.MinFertility) return false;
             if (kind.NeedsShade && !IsShaded(x, z)) return false;
-            if (!IsSpaceFree(x, z, speciesIndex, kind.Spacing)) return false;
 
             // Where the climate does not quite suit the species, fewer of its seeds take.
             if (vigour < 1f && random.NextFloat() >= vigour) return false;
@@ -325,7 +366,9 @@ namespace Eco.Sim
             if (plantCount == plants.Length) Array.Resize(ref plants, plants.Length * 2);
 
             plants[plantCount++] = plant;
-            plantAtColumn[ColumnIndex(plant.X, plant.Z)] = plant.Id;
+            int column = ColumnIndex(plant.X, plant.Z);
+            plantAtColumn[column] = plant.Id;
+            plantSpeciesAtColumn[column] = (ushort)(plant.SpeciesIndex + 1);
         }
 
         // The world only changes through World.SetBlock: rather than reading the ground of every
@@ -335,7 +378,7 @@ namespace Eco.Sim
             if ((uint)pos.X >= (uint)world.SizeX || (uint)pos.Z >= (uint)world.SizeZ) return;
 
             int column = ColumnIndex(pos.X, pos.Z);
-            columnTop[column] = 0;
+            columnInfo[column] = 0;
 
             int plantId = plantAtColumn[column];
             if (plantId != 0) disturbed.Add(plantId);
@@ -417,12 +460,11 @@ namespace Eco.Sim
         {
             if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) return -1;
 
-            int column = ColumnIndex(x, z);
-            ReadColumn(column, x, z);
-            int top = columnTop[column] - 1;
-            if (!columnWet[column]) return kind.Rooting == Rooting.Flooded ? -1 : top;
+            int info = ColumnInfo(ColumnIndex(x, z), x, z);
+            int top = ColumnTopOf(info);
+            if ((info & WetColumn) == 0) return kind.Rooting == Rooting.Flooded ? -1 : top;
 
-            int bed = columnBed[column];
+            int bed = ColumnBedOf(info);
             return kind.Rooting != Rooting.Dry && top - bed == 1 ? bed : -1;
         }
 
@@ -444,19 +486,19 @@ namespace Eco.Sim
         // In the shade of a grown plant at least ShadeHeight blocks high, within ShadeRange columns.
         private bool IsShaded(int x, int z)
         {
-            for (int dz = -ShadeRange; dz <= ShadeRange; dz++)
+            int minX = Math.Max(0, x - ShadeRange);
+            int maxX = Math.Min(world.SizeX - 1, x + ShadeRange);
+            int minZ = Math.Max(0, z - ShadeRange);
+            int maxZ = Math.Min(world.SizeZ - 1, z + ShadeRange);
+            for (int nz = minZ; nz <= maxZ; nz++)
             {
-                for (int dx = -ShadeRange; dx <= ShadeRange; dx++)
+                for (int nx = minX; nx <= maxX; nx++)
                 {
-                    int nx = x + dx;
-                    int nz = z + dz;
-                    if ((uint)nx >= (uint)world.SizeX || (uint)nz >= (uint)world.SizeZ) continue;
+                    int column = ColumnIndex(nx, nz);
+                    int speciesPlusOne = plantSpeciesAtColumn[column];
+                    if (speciesPlusOne == 0 || !shadingSpecies[speciesPlusOne - 1]) continue;
 
-                    int plantId = plantAtColumn[ColumnIndex(nx, nz)];
-                    if (plantId == 0) continue;
-
-                    Plant plant = plants[IndexOf(plantId)];
-                    if (plant.Growth >= 1f && species[plant.SpeciesIndex].Height >= ShadeHeight) return true;
+                    if (plants[IndexOf(plantAtColumn[column])].Growth >= 1f) return true;
                 }
             }
 
@@ -470,31 +512,35 @@ namespace Eco.Sim
             if (plantAtColumn[ColumnIndex(x, z)] != 0) return false;
 
             int radius = Math.Max(0, spacing - 1);
-            for (int dz = -radius; dz <= radius; dz++)
+            int minX = Math.Max(0, x - radius);
+            int maxX = Math.Min(world.SizeX - 1, x + radius);
+            int minZ = Math.Max(0, z - radius);
+            int maxZ = Math.Min(world.SizeZ - 1, z + radius);
+            var same = (ushort)(speciesIndex + 1);
+            for (int nz = minZ; nz <= maxZ; nz++)
             {
-                for (int dx = -radius; dx <= radius; dx++)
+                int row = nz * world.SizeX;
+                for (int nx = minX; nx <= maxX; nx++)
                 {
-                    int nx = x + dx;
-                    int nz = z + dz;
-                    if ((uint)nx >= (uint)world.SizeX || (uint)nz >= (uint)world.SizeZ) continue;
-
-                    int neighbourId = plantAtColumn[ColumnIndex(nx, nz)];
-                    if (neighbourId != 0 && plants[IndexOf(neighbourId)].SpeciesIndex == speciesIndex) return false;
+                    if (plantSpeciesAtColumn[row + nx] == same) return false;
                 }
             }
 
             return true;
         }
 
-        // Removes the plants that died during the step, keeping the survivors in order.
+        // Removes the plants that died during the step, and those removed since the last compaction,
+        // keeping the survivors in order.
         private void RemoveDying()
         {
-            if (dying.Count == 0) return;
+            if (dying.Count == 0 && removedCount == 0) return;
 
             int nextDying = 0;
             int kept = 0;
             for (int i = 0; i < plantCount; i++)
             {
+                if (plants[i].Age == RemovedAge) continue;
+
                 if (nextDying < dying.Count && dying[nextDying] == i)
                 {
                     nextDying++;
@@ -507,12 +553,31 @@ namespace Eco.Sim
             }
 
             plantCount = kept;
+            removedCount = 0;
             dying.Clear();
+        }
+
+        // Drops the removed plants from the array, keeping the others in order. Never during a step:
+        // the step holds indices into the array (an event handler reading Plants then sees them).
+        private void CompactRemoved()
+        {
+            if (removedCount == 0 || stepping) return;
+
+            int kept = 0;
+            for (int i = 0; i < plantCount; i++)
+            {
+                if (plants[i].Age != RemovedAge) plants[kept++] = plants[i];
+            }
+
+            plantCount = kept;
+            removedCount = 0;
         }
 
         private void Forget(Plant plant)
         {
-            plantAtColumn[ColumnIndex(plant.X, plant.Z)] = 0;
+            int column = ColumnIndex(plant.X, plant.Z);
+            plantAtColumn[column] = 0;
+            plantSpeciesAtColumn[column] = 0;
             PlantRemoved?.Invoke(plant.Id);
         }
 
@@ -525,7 +590,7 @@ namespace Eco.Sim
             {
                 int middle = (low + high) / 2;
                 int id = plants[middle].Id;
-                if (id == plantId) return middle;
+                if (id == plantId) return plants[middle].Age == RemovedAge ? -1 : middle;
 
                 if (id < plantId) low = middle + 1;
                 else high = middle - 1;

@@ -10,6 +10,7 @@ namespace Eco.Sim
         // The number of plants of each species, young ones included, in the order of the species.
         public int[] PlantCounts()
         {
+            CompactRemoved();
             var counts = new int[species.Length];
             for (int i = 0; i < plantCount; i++)
             {
@@ -39,6 +40,7 @@ namespace Eco.Sim
             var cells = new int[CensusCellsX(cellSize) * CensusCellsZ(cellSize)];
             if ((uint)speciesIndex >= (uint)species.Length) return cells;
 
+            CompactRemoved();
             int cellsX = CensusCellsX(cellSize);
             for (int i = 0; i < plantCount; i++)
             {

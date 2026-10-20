@@ -31,9 +31,8 @@ namespace Voxel.Client
         private const int RegionSize = 32;
         private const int MaxInstancesPerCall = 1023;
 
-        // Margin around a region for foliage that sticks out, and height covered above the lowest ground.
+        // Margin around a region for foliage that sticks out.
         private const float RegionMargin = 4f;
-        private const float RegionHeight = 512f;
 
         // Each plant is turned by a quarter turn chosen from its column, so that neighbours of the
         // same species do not look like copies. Display only: the same on every machine, never sent.
@@ -52,6 +51,10 @@ namespace Voxel.Client
 
         // By look: its parts and how to draw each.
         private readonly IReadOnlyList<SpeciesAsset.Part>[] lookParts;
+
+        // By look: the lowest and highest point of its parts above the plant's foot, at full size.
+        private readonly float[] lookBottoms;
+        private readonly float[] lookTops;
         private readonly RenderParams[][] renderParams;
         private readonly Dictionary<long, Region> regions = new Dictionary<long, Region>();
 
@@ -87,9 +90,26 @@ namespace Voxel.Client
             }
 
             lookParts = parts.ToArray();
+            lookBottoms = new float[lookParts.Length];
+            lookTops = new float[lookParts.Length];
             renderParams = new RenderParams[lookParts.Length][];
             for (int look = 0; look < lookParts.Length; look++)
             {
+                // Plants only turn about the vertical, so heights do not depend on the turn.
+                float bottom = float.MaxValue;
+                float top = float.MinValue;
+                foreach (SpeciesAsset.Part part in lookParts[look])
+                {
+                    Bounds bounds = part.mesh.bounds;
+                    float a = part.offset.y + bounds.min.y * part.scale.y;
+                    float b = part.offset.y + bounds.max.y * part.scale.y;
+                    bottom = Mathf.Min(bottom, Mathf.Min(a, b));
+                    top = Mathf.Max(top, Mathf.Max(a, b));
+                }
+
+                lookBottoms[look] = lookParts[look].Count > 0 ? bottom : 0f;
+                lookTops[look] = lookParts[look].Count > 0 ? top : 0f;
+
                 renderParams[look] = new RenderParams[lookParts[look].Count];
                 for (int p = 0; p < lookParts[look].Count; p++)
                 {
@@ -151,7 +171,7 @@ namespace Voxel.Client
 
         private void Draw(Region region)
         {
-            for (int look = 0; look < lookParts.Length; look++)
+            foreach (int look in region.Looks)
             {
                 IReadOnlyList<SpeciesAsset.Part> parts = lookParts[look];
                 for (int p = 0; p < parts.Count; p++)
@@ -199,7 +219,11 @@ namespace Voxel.Client
             // By look then by part: the matrices of the region's plants, recomputed when Dirty is true.
             public readonly Matrix4x4[][][] Matrices;
             public readonly int[] Counts;
-            public readonly Bounds Bounds;
+
+            // The looks the region shows, and the box of its plants (Rebuild): Unity culls each batch by
+            // it, for the camera and for each shadow cascade.
+            public readonly List<int> Looks = new List<int>();
+            public Bounds Bounds;
             public bool Dirty = true;
 
             private readonly float minX;
@@ -209,9 +233,6 @@ namespace Voxel.Client
             {
                 minX = regionX * RegionSize;
                 minZ = regionZ * RegionSize;
-
-                var centre = new Vector3(minX + RegionSize * 0.5f, RegionHeight * 0.5f, minZ + RegionSize * 0.5f);
-                Bounds = new Bounds(centre, new Vector3(RegionSize + 2f * RegionMargin, RegionHeight, RegionSize + 2f * RegionMargin));
 
                 Counts = new int[lookParts.Length];
                 Matrices = new Matrix4x4[lookParts.Length][][];
@@ -250,8 +271,10 @@ namespace Voxel.Client
                     if (fruitLook >= 0) Counts[fruitLook]++;
                 }
 
+                Looks.Clear();
                 for (int look = 0; look < Counts.Length; look++)
                 {
+                    if (Counts[look] > 0) Looks.Add(look);
                     for (int p = 0; p < Matrices[look].Length; p++)
                     {
                         if (Matrices[look][p].Length < Counts[look]) Matrices[look][p] = new Matrix4x4[Mathf.NextPowerOfTwo(Counts[look])];
@@ -260,6 +283,8 @@ namespace Voxel.Client
                     Counts[look] = 0;
                 }
 
+                float bottom = float.MaxValue;
+                float top = float.MinValue;
                 foreach (PlantView plant in Plants.Values)
                 {
                     int look = renderer.LookOf(plant);
@@ -270,11 +295,27 @@ namespace Voxel.Client
                     if (renderer.species[plant.SpeciesIndex].FloatsOnWater) foot.y += ChunkMesher.WaterSurface;
                     Quaternion turn = TurnOf(plant.X, plant.Z);
                     Place(renderer, look, foot, turn, size);
+                    bottom = Mathf.Min(bottom, foot.y + renderer.lookBottoms[look] * size);
+                    top = Mathf.Max(top, foot.y + renderer.lookTops[look] * size);
 
                     int fruitLook = renderer.FruitLookOf(look, plant);
-                    if (fruitLook >= 0) Place(renderer, fruitLook, foot, turn, size);
+                    if (fruitLook < 0) continue;
+
+                    Place(renderer, fruitLook, foot, turn, size);
+                    bottom = Mathf.Min(bottom, foot.y + renderer.lookBottoms[fruitLook] * size);
+                    top = Mathf.Max(top, foot.y + renderer.lookTops[fruitLook] * size);
                 }
 
+                // A block of margin below and above: the box only has to hold the plants.
+                if (bottom > top)
+                {
+                    bottom = 0f;
+                    top = 0f;
+                }
+
+                float height = top - bottom + 3f;
+                var centre = new Vector3(minX + RegionSize * 0.5f, bottom - 1f + height * 0.5f, minZ + RegionSize * 0.5f);
+                Bounds = new Bounds(centre, new Vector3(RegionSize + 2f * RegionMargin, height, RegionSize + 2f * RegionMargin));
                 Dirty = false;
             }
 
