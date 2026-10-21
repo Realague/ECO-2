@@ -226,6 +226,13 @@ namespace Voxel.Core
         // Whether the column's water is a marsh pool (one block deep).
         public bool IsMarshPool(int x, int z) => kind[x + sizeX * z] == MarshWater;
 
+        // What the column's water, as generated, is part of: the sea, a lake or a river (all false when dry).
+        public bool IsSea(int x, int z) => kind[x + sizeX * z] == SeaWater;
+
+        public bool IsLake(int x, int z) => kind[x + sizeX * z] == LakeWater;
+
+        public bool IsRiver(int x, int z) => kind[x + sizeX * z] == RiverWater;
+
         private void Build()
         {
             int count = sizeX * sizeZ;

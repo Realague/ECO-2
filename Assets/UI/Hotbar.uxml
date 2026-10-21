@@ -1,0 +1,87 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:vc="Voxel.Client">
+    <Style src="Common.uss" />
+    <Style src="Hotbar.uss" />
+
+    <!-- HotbarHud fills each slot with its item's icon and count and marks the chosen one. StomachHud
+         fills the stomach box, which hangs at the bar's left without moving it. -->
+    <ui:VisualElement name="screen" class="screen hotbar-screen" picking-mode="Ignore">
+        <ui:Label name="held-name" class="hotbar-held strong" picking-mode="Ignore" />
+        <ui:VisualElement name="hotbar" class="hotbar">
+            <ui:VisualElement name="stomach" class="stomach" picking-mode="Ignore">
+                <ui:VisualElement class="stomach-gauge" picking-mode="Ignore">
+                    <vc:StomachPie name="stomach-pie" class="stomach-pie" />
+                    <ui:Label name="stomach-kcal" class="stomach-kcal strong" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement class="stomach-legend" picking-mode="Ignore">
+                    <ui:VisualElement class="stomach-row" picking-mode="Ignore">
+                        <ui:VisualElement class="stomach-dot stomach-dot--carbs" picking-mode="Ignore" />
+                        <ui:Label name="stomach-nutrient-0" class="stomach-nutrient" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="stomach-row" picking-mode="Ignore">
+                        <ui:VisualElement class="stomach-dot stomach-dot--protein" picking-mode="Ignore" />
+                        <ui:Label name="stomach-nutrient-1" class="stomach-nutrient" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="stomach-row" picking-mode="Ignore">
+                        <ui:VisualElement class="stomach-dot stomach-dot--fat" picking-mode="Ignore" />
+                        <ui:Label name="stomach-nutrient-2" class="stomach-nutrient" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="stomach-row" picking-mode="Ignore">
+                        <ui:VisualElement class="stomach-dot stomach-dot--vitamins" picking-mode="Ignore" />
+                        <ui:Label name="stomach-nutrient-3" class="stomach-nutrient" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:Label text="Starving: slower" class="stomach-starving strong" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="slot-0" class="hotbar-slot">
+                <ui:VisualElement class="hotbar-icon" picking-mode="Ignore" />
+                <ui:Label text="1" class="hotbar-number strong" picking-mode="Ignore" />
+                <ui:Label class="hotbar-count strong" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="slot-1" class="hotbar-slot">
+                <ui:VisualElement class="hotbar-icon" picking-mode="Ignore" />
+                <ui:Label text="2" class="hotbar-number strong" picking-mode="Ignore" />
+                <ui:Label class="hotbar-count strong" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="slot-2" class="hotbar-slot">
+                <ui:VisualElement class="hotbar-icon" picking-mode="Ignore" />
+                <ui:Label text="3" class="hotbar-number strong" picking-mode="Ignore" />
+                <ui:Label class="hotbar-count strong" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="slot-3" class="hotbar-slot">
+                <ui:VisualElement class="hotbar-icon" picking-mode="Ignore" />
+                <ui:Label text="4" class="hotbar-number strong" picking-mode="Ignore" />
+                <ui:Label class="hotbar-count strong" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="slot-4" class="hotbar-slot">
+                <ui:VisualElement class="hotbar-icon" picking-mode="Ignore" />
+                <ui:Label text="5" class="hotbar-number strong" picking-mode="Ignore" />
+                <ui:Label class="hotbar-count strong" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="slot-5" class="hotbar-slot">
+                <ui:VisualElement class="hotbar-icon" picking-mode="Ignore" />
+                <ui:Label text="6" class="hotbar-number strong" picking-mode="Ignore" />
+                <ui:Label class="hotbar-count strong" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="slot-6" class="hotbar-slot">
+                <ui:VisualElement class="hotbar-icon" picking-mode="Ignore" />
+                <ui:Label text="7" class="hotbar-number strong" picking-mode="Ignore" />
+                <ui:Label class="hotbar-count strong" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="slot-7" class="hotbar-slot">
+                <ui:VisualElement class="hotbar-icon" picking-mode="Ignore" />
+                <ui:Label text="8" class="hotbar-number strong" picking-mode="Ignore" />
+                <ui:Label class="hotbar-count strong" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="slot-8" class="hotbar-slot">
+                <ui:VisualElement class="hotbar-icon" picking-mode="Ignore" />
+                <ui:Label text="9" class="hotbar-number strong" picking-mode="Ignore" />
+                <ui:Label class="hotbar-count strong" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="slot-9" class="hotbar-slot">
+                <ui:VisualElement class="hotbar-icon" picking-mode="Ignore" />
+                <ui:Label text="0" class="hotbar-number strong" picking-mode="Ignore" />
+                <ui:Label class="hotbar-count strong" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

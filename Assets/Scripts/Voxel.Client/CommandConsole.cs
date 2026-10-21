@@ -9,7 +9,7 @@ namespace Voxel.Client
     // The command line, opened with T: the player types a command (Command), Enter sends it
     // (CommandSync), Escape closes it. Above the line, the last answers stay a few seconds after
     // it closes. While it is open the player stands still and the game's keys (moving, the map,
-    // the inventory) do nothing, so typing never moves or acts. The screen is Assets/UI/Console.uxml.
+    // the inventory, the hotbar) do nothing, so typing never moves or acts. The screen is Assets/UI/Console.uxml.
     public class CommandConsole : MonoBehaviour
     {
         private const int MaxLines = 8;
@@ -22,10 +22,11 @@ namespace Voxel.Client
         [SerializeField] private CommandSync commandSync;
         [SerializeField] private AppearanceMenu appearanceMenu;
         [SerializeField] private MapScreen mapScreen;
-        [SerializeField] private InventoryHud inventoryHud;
+        [SerializeField] private HotbarHud hotbar;
+        [SerializeField] private InventoryScreen inventoryScreen;
         [SerializeField] private UIDocument document;
 
-        // Screen pixels between the inventory text and the line above it.
+        // Screen pixels between the hotbar and the line above it.
         private const float InventoryGap = 16f;
 
         private readonly List<(Label label, float shownAt)> lines = new List<(Label label, float shownAt)>();
@@ -66,7 +67,7 @@ namespace Voxel.Client
 
         private void Update()
         {
-            bool inGame = worldSync.World != null && networkManager.IsListening && !appearanceMenu.IsOpen && !mapScreen.HoldsInput
+            bool inGame = worldSync.World != null && networkManager.IsListening && !appearanceMenu.IsOpen && !mapScreen.HoldsInput && !inventoryScreen.HoldsInput
                           && networkManager.SpawnManager?.GetLocalPlayerObject() != null;
             screen.style.display = inGame ? DisplayStyle.Flex : DisplayStyle.None;
             if (!inGame)
@@ -82,21 +83,20 @@ namespace Voxel.Client
             // The T that opened the line can arrive in it as text, a frame later.
             if (IsOpen && Time.frameCount <= openedFrame + 2 && (input.value == "t" || input.value == "T")) input.value = "";
 
-            PlaceAboveInventory();
+            PlaceAboveHotbar();
 
             FadeLines();
         }
 
-        // The inventory text, drawn from the bottom of the screen, grows with the number of items: the
-        // line and its answers stand just above it. Its height is in screen pixels, the panel's in
-        // its own units (scaled from 1920 x 1080).
-        private void PlaceAboveInventory()
+        // The line and its answers stand just above the hotbar. Its height is in screen pixels, the
+        // panel's in its own units (scaled from 1920 x 1080).
+        private void PlaceAboveHotbar()
         {
             float panelHeight = screen.resolvedStyle.height;
             if (float.IsNaN(panelHeight) || panelHeight <= 0f || Screen.height <= 0) return;
 
             float pixelsToPanel = panelHeight / Screen.height;
-            screen.style.paddingBottom = (inventoryHud.OccupiedHeight + InventoryGap) * pixelsToPanel;
+            screen.style.paddingBottom = (hotbar.OccupiedHeight + InventoryGap) * pixelsToPanel;
         }
 
         private void Open()

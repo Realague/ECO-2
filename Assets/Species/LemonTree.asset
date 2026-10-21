@@ -38,6 +38,11 @@ MonoBehaviour:
   seedYield: 0
   strawYield: 0
   fruitDays: 4
+  calories: 30
+  carbs: 4
+  protein: 0
+  fat: 0
+  vitamins: 12
   height: 3.5
   width: 1
   models:

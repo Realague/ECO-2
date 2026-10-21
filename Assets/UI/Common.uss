@@ -1,19 +1,32 @@
-/* Shared look of the game's screens: a light theme with cream panels, dark text and green actions. */
+/* Shared look of the game's screens, a dark wooden theme: dark brown panels with cream text, a
+   lighter brown for what is chosen, gold for focus and selection frames, slate green actions and
+   tan tabs. */
 
 :root {
-    --panel: #f6f4ef;
-    --panel-border: rgba(0, 0, 0, 0.06);
-    --text: #1f2124;
-    --text-body: #2a2c30;
-    --text-muted: #5d6067;
-    --line: #dcd8ce;
-    --control: #ffffff;
-    --control-border: #d6d2c8;
-    --control-hover: #f2f0ea;
-    --selected: #e3eedb;
-    --green: #4f9a3e;
-    --green-hover: #5aab48;
-    --green-dark: #3d7d2f;
+    --panel: #27241f;
+    --panel-border: rgba(255, 255, 255, 0.08);
+    --veil: rgba(39, 36, 32, 0.92);
+    --well: rgba(25, 23, 20, 0.55);
+    --text: #f1eadc;
+    --text-body: #e2d9c7;
+    --text-muted: #b3a994;
+    --line: rgba(255, 255, 255, 0.12);
+    --control: #3a362f;
+    --control-border: #23201c;
+    --control-hover: #48433a;
+    --hover: rgba(255, 255, 255, 0.06);
+    --selected: #6a604f;
+    --accent: #e6c06a;
+    --danger: #ee927a;
+    --carbs: #d9664a;
+    --protein: #e3963f;
+    --fat: #e8cc5a;
+    --vitamins: #84b65a;
+    --action: #3f5f59;
+    --action-hover: #4a6e67;
+    --action-dark: #2b4440;
+    --tab-selected: #d7c7a6;
+    --tab-selected-text: #2c251c;
 }
 
 .screen {
@@ -91,18 +104,18 @@
 }
 
 .button--primary {
-    background-color: var(--green);
+    background-color: var(--action);
     border-bottom-width: 4px;
-    border-color: var(--green-dark);
-    color: #ffffff;
+    border-color: var(--action-dark);
+    color: var(--text);
 }
 
 .button--primary:hover {
-    background-color: var(--green-hover);
+    background-color: var(--action-hover);
 }
 
 .button--primary > .icon {
-    -unity-background-image-tint-color: #ffffff;
+    -unity-background-image-tint-color: var(--text);
 }
 
 .button--secondary {
@@ -141,7 +154,7 @@
     background-color: var(--control);
     border-width: 1px;
     border-bottom-width: 3px;
-    border-color: #cfcbc0;
+    border-color: var(--control-border);
     border-radius: 6px;
 }
 
@@ -201,6 +214,105 @@
 .dialog-buttons > .button {
     margin-left: 14px;
 }
+
+/* Tabs: the screens a panel opens on (the inventory and the map). */
+.tabs {
+    flex-direction: row;
+    background-color: rgba(0, 0, 0, 0.25);
+    border-radius: 14px;
+    padding: 5px;
+}
+
+.tab {
+    flex-direction: row;
+    align-items: center;
+    height: 52px;
+    padding: 0 24px;
+    margin: 0 2px;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-radius: 10px;
+}
+
+.tab:hover {
+    background-color: var(--hover);
+}
+
+.tab--selected,
+.tab--selected:hover {
+    background-color: var(--tab-selected);
+}
+
+.tab > .icon {
+    margin-right: 10px;
+    -unity-background-image-tint-color: var(--text-muted);
+}
+
+.tab--selected > .icon {
+    -unity-background-image-tint-color: var(--tab-selected-text);
+}
+
+.tab-text {
+    font-size: 22px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text-muted);
+    margin: 0;
+    padding: 0;
+}
+
+.tab--selected > .tab-text {
+    color: var(--tab-selected-text);
+}
+
+/* Scroll bars: a thin light thumb on a faint track, without the end buttons of Unity's default theme. */
+.screen .unity-scroller--vertical {
+    width: 10px;
+    margin-left: 4px;
+}
+
+.screen .unity-scroller__low-button,
+.screen .unity-scroller__high-button {
+    display: none;
+}
+
+.screen .unity-scroller--vertical > .unity-scroller__slider {
+    margin: 0;
+}
+
+.screen .unity-scroller .unity-base-slider__tracker {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-width: 0;
+    border-radius: 5px;
+}
+
+.screen .unity-scroller .unity-base-slider__dragger {
+    background-color: rgba(255, 255, 255, 0.22);
+    border-width: 0;
+    border-radius: 5px;
+}
+
+.screen .unity-scroller .unity-base-slider__dragger:hover {
+    background-color: rgba(255, 255, 255, 0.34);
+}
+
+/* The arrow of drop-down menus (Foldout). */
+.screen .unity-foldout__checkmark {
+    -unity-background-image-tint-color: var(--text-muted);
+}
+
+/* A nutrient's colour, as in the stomach pie (the hotbar's stomach, the inventory's food details). */
+.stomach-dot {
+    width: 10px;
+    height: 10px;
+    flex-shrink: 0;
+    margin-right: 7px;
+    border-radius: 5px;
+}
+
+.stomach-dot--carbs { background-color: var(--carbs); }
+.stomach-dot--protein { background-color: var(--protein); }
+.stomach-dot--fat { background-color: var(--fat); }
+.stomach-dot--vitamins { background-color: var(--vitamins); }
 
 .hidden {
     display: none;

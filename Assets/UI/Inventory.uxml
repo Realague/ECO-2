@@ -1,0 +1,102 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="Common.uss" />
+    <Style src="Inventory.uss" />
+
+    <!-- InventoryScreen fills the categories' counts, the grid of items, the details of the chosen
+         one and the speciality, and moves the dragged item's ghost. -->
+    <ui:VisualElement name="screen" class="screen inventory-screen">
+        <ui:VisualElement class="panel inventory-panel">
+            <ui:VisualElement class="inventory-header">
+                <ui:VisualElement class="tabs">
+                    <ui:Button name="tab-inventory" class="tab tab--selected">
+                        <ui:VisualElement class="icon icon--house" />
+                        <ui:Label text="Inventory" class="tab-text" />
+                    </ui:Button>
+                    <ui:Button name="tab-map" class="tab">
+                        <ui:VisualElement class="icon icon--globe" />
+                        <ui:Label text="Map" class="tab-text" />
+                    </ui:Button>
+                </ui:VisualElement>
+                <ui:VisualElement class="speciality">
+                    <ui:VisualElement class="icon icon--plant" />
+                    <ui:Label name="speciality-name" class="speciality-name" />
+                    <ui:Button name="speciality-choose" class="button button--primary speciality-choose">
+                        <ui:Label text="Become a gardener" class="button-text" />
+                    </ui:Button>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement class="inventory-body">
+                <ui:VisualElement class="categories">
+                    <ui:Label text="Categories" class="column-title" />
+                    <ui:ScrollView name="category-list" class="category-list" />
+                </ui:VisualElement>
+
+                <ui:VisualElement class="items">
+                    <ui:VisualElement class="items-heading">
+                        <ui:Label text="Items" class="column-title" />
+                        <ui:Label name="item-total" class="items-total" />
+                    </ui:VisualElement>
+                    <ui:TextField name="item-search" max-length="32" class="field item-search" />
+                    <ui:Label name="item-empty" class="items-empty" text="Nothing here yet: break blocks, fell trees and harvest ripe crops." />
+                    <ui:ScrollView name="item-grid" class="item-grid" />
+                </ui:VisualElement>
+
+                <ui:VisualElement name="details" class="details">
+                    <ui:VisualElement class="details-head">
+                        <ui:VisualElement name="details-icon" class="details-icon" />
+                        <ui:VisualElement class="details-titles">
+                            <ui:Label name="details-name" class="details-name" />
+                            <ui:Label name="details-kind" class="details-kind" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:Label name="details-description" class="details-description" />
+                    <ui:VisualElement class="details-line">
+                        <ui:Label text="In your bag" class="details-line-label" />
+                        <ui:Label name="details-count" class="details-line-value" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="details-line">
+                        <ui:Label text="Hotbar" class="details-line-label" />
+                        <ui:Label name="details-slot" class="details-line-value" />
+                    </ui:VisualElement>
+                    <!-- Food only: its calories, and its nutrients in the stomach pie's colours. -->
+                    <ui:VisualElement name="details-food">
+                        <ui:VisualElement class="details-line">
+                            <ui:Label text="Calories" class="details-line-label" />
+                            <ui:Label name="details-calories" class="details-line-value" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="details-line">
+                            <ui:Label text="Nutrients" class="details-line-label" />
+                            <ui:VisualElement class="details-nutrients">
+                                <ui:VisualElement class="stomach-dot stomach-dot--carbs" tooltip="Carbs" />
+                                <ui:Label name="details-nutrient-0" class="details-line-value details-nutrient" tooltip="Carbs" />
+                                <ui:VisualElement class="stomach-dot stomach-dot--protein" tooltip="Protein" />
+                                <ui:Label name="details-nutrient-1" class="details-line-value details-nutrient" tooltip="Protein" />
+                                <ui:VisualElement class="stomach-dot stomach-dot--fat" tooltip="Fat" />
+                                <ui:Label name="details-nutrient-2" class="details-line-value details-nutrient" tooltip="Fat" />
+                                <ui:VisualElement class="stomach-dot stomach-dot--vitamins" tooltip="Vitamins" />
+                                <ui:Label name="details-nutrient-3" class="details-line-value details-nutrient" tooltip="Vitamins" />
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement class="inventory-footer">
+                <ui:VisualElement class="keys">
+                    <ui:VisualElement class="key"><ui:Label text="Drag" class="key-text" /></ui:VisualElement>
+                    <ui:Label text="to a hotbar slot" class="key-label" />
+                    <ui:VisualElement class="key"><ui:Label text="1 - 0" class="key-text" /></ui:VisualElement>
+                    <ui:Label text="put in that slot" class="key-label" />
+                    <ui:VisualElement class="key"><ui:Label text="Right click" class="key-text" /></ui:VisualElement>
+                    <ui:Label text="eat food, empty a slot" class="key-label" />
+                    <ui:VisualElement class="key"><ui:Label text="Tab" class="key-text" /></ui:VisualElement>
+                    <ui:Label text="close" class="key-label inventory-last-key" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- The item being dragged, following the pointer. -->
+        <ui:VisualElement name="drag-ghost" class="drag-ghost hidden" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>

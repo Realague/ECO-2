@@ -43,6 +43,9 @@ namespace Voxel.Client
         private int expectedChunkCount;
         private int receivedChunkCount;
 
+        // Server side: a player's edit was accepted (their client id, and true if they broke a block).
+        public event Action<ulong, bool> EditApplied;
+
         // The world of the game, or null until it is fully available on this machine.
         public World World => ready ? voxelWorld.World : null;
 
@@ -140,6 +143,7 @@ namespace Voxel.Client
                 }
             }
 
+            EditApplied?.Invoke(clientId, !placing);
             return true;
         }
 

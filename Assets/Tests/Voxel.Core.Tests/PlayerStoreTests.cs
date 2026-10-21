@@ -107,6 +107,114 @@ namespace Voxel.Core.Tests
             Assert.IsNull(bob.Appearance);
         }
 
+        [Test]
+        public void WriteThenRead_RestoresTheHotbar()
+        {
+            var original = new PlayerStore();
+            PlayerState alice = original.GetOrAdd("alice");
+            alice.Hotbar.Set(0, Items.Wood);
+            alice.Hotbar.Set(9, Blocks.Stone);
+            var stream = new MemoryStream();
+            original.Write(stream);
+            stream.Position = 0;
+
+            PlayerStore loaded = PlayerStore.Read(stream);
+
+            Assert.IsTrue(loaded.TryGet("alice", out PlayerState state));
+            Assert.AreEqual(Items.Wood, state.Hotbar[0]);
+            Assert.AreEqual(Blocks.Stone, state.Hotbar[9]);
+            Assert.AreEqual(Items.None, state.Hotbar[5]);
+        }
+
+        [Test]
+        public void WriteThenRead_RestoresTheStomach()
+        {
+            var original = new PlayerStore();
+            PlayerState alice = original.GetOrAdd("alice");
+            alice.Stomach.Burn(1000f);
+            alice.Stomach.Eat(new Nutrition(200f, 2f, 10f, 1f, 2f));
+            var stream = new MemoryStream();
+            original.Write(stream);
+            stream.Position = 0;
+
+            PlayerStore loaded = PlayerStore.Read(stream);
+
+            Assert.IsTrue(loaded.TryGet("alice", out PlayerState state));
+            Assert.AreEqual(alice.Stomach.Calories, state.Stomach.Calories);
+            for (int i = 0; i < Nutrition.NutrientCount; i++)
+            {
+                Assert.AreEqual(alice.Stomach.Nutrient(i), state.Stomach.Nutrient(i));
+            }
+        }
+
+        // A save from before hunger (format 4): everything else is kept, the stomach starts half full.
+        [Test]
+        public void Read_SaveWithoutStomach_KeepsTheRestWithAStartingStomach()
+        {
+            var stream = new MemoryStream();
+            using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, true))
+            {
+                writer.Write(0x504F4345u);
+                writer.Write(4);
+                writer.Write(1);
+                writer.Write("alice");
+                writer.Write(1f);
+                writer.Write(2f);
+                writer.Write(3f);
+                writer.Write(90f);
+                writer.Write((byte)Speciality.Gardener);
+                writer.Write(1);
+                writer.Write((int)Blocks.Stone);
+                writer.Write(5);
+                writer.Write(new Appearance(4, Sex.Female, HairStyle.Ponytail).Encode());
+                writer.Write((int)Blocks.Stone);
+                for (int slot = 1; slot < Hotbar.SlotCount; slot++) writer.Write(Items.None);
+            }
+
+            stream.Position = 0;
+            PlayerStore loaded = PlayerStore.Read(stream);
+
+            Assert.IsTrue(loaded.TryGet("alice", out PlayerState state));
+            Assert.AreEqual(5, state.Inventory.Count(Blocks.Stone));
+            Assert.AreEqual((int)Blocks.Stone, state.Hotbar[0]);
+            Assert.AreEqual(Stomach.StartingCalories, state.Stomach.Calories);
+            Assert.AreEqual(0.25f, state.Stomach.Share(0), 1e-6f);
+        }
+
+        // A save from before the hotbar (format 3): everything else is kept, the hotbar starts empty.
+        [Test]
+        public void Read_SaveWithoutHotbar_KeepsTheRestWithAnEmptyHotbar()
+        {
+            var stream = new MemoryStream();
+            using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, true))
+            {
+                writer.Write(0x504F4345u);
+                writer.Write(3);
+                writer.Write(1);
+                writer.Write("alice");
+                writer.Write(1f);
+                writer.Write(2f);
+                writer.Write(3f);
+                writer.Write(90f);
+                writer.Write((byte)Speciality.Gardener);
+                writer.Write(1);
+                writer.Write((int)Blocks.Stone);
+                writer.Write(5);
+                writer.Write(new Appearance(4, Sex.Female, HairStyle.Ponytail).Encode());
+            }
+
+            stream.Position = 0;
+            PlayerStore loaded = PlayerStore.Read(stream);
+
+            Assert.IsTrue(loaded.TryGet("alice", out PlayerState state));
+            Assert.AreEqual(5, state.Inventory.Count(Blocks.Stone));
+            Assert.AreEqual(new Appearance(4, Sex.Female, HairStyle.Ponytail), state.Appearance);
+            for (int slot = 0; slot < Hotbar.SlotCount; slot++)
+            {
+                Assert.AreEqual(Items.None, state.Hotbar[slot]);
+            }
+        }
+
         // A save from before appearances: the player keeps everything else and chooses one at the next connection.
         [Test]
         public void Read_SaveWithoutAppearance_KeepsTheRestAndLeavesTheAppearanceUnchosen()
@@ -178,9 +286,11 @@ namespace Voxel.Core.Tests
             store.Write(stream);
             byte[] data = stream.ToArray();
 
-            // The appearance code is the last two bytes, low byte first: a chosen code with hair style 7, which does not exist.
-            data[data.Length - 2] = 0x70;
-            data[data.Length - 1] = 0x80;
+            // The appearance code comes just before the hotbar (10 ints) and the stomach (5 floats), low
+            // byte first: a chosen code with hair style 7, which does not exist.
+            int appearance = data.Length - Hotbar.SlotCount * 4 - (1 + Nutrition.NutrientCount) * 4 - 2;
+            data[appearance] = 0x70;
+            data[appearance + 1] = 0x80;
 
             Assert.Throws<InvalidDataException>(() => PlayerStore.Read(new MemoryStream(data)));
         }

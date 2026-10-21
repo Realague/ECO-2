@@ -111,6 +111,9 @@ namespace Voxel.Client
 
         public float Multiplier => multiplier;
 
+        // The server cannot run steps as fast as the speed asks.
+        public bool IsBehind => behind;
+
         // The simulation's time, in steps, as this machine sees it now: the last count it knows,
         // carried on at the current speed until the next one arrives, by at most what the clock's
         // messages are apart. Smooth enough to turn the sun; display only.
@@ -891,6 +894,15 @@ namespace Voxel.Client
         public string ProduceName(int speciesIndex)
         {
             return speciesIndex >= 0 && speciesIndex < speciesAssets.Length ? speciesAssets[speciesIndex].ProduceName : "?";
+        }
+
+        // What eating an item gives: a crop's food values, nothing for anything else.
+        public Nutrition FoodOf(int item)
+        {
+            if (!Items.IsProduce(item)) return default;
+
+            int speciesIndex = Items.ProduceSpecies(item);
+            return speciesIndex < speciesAssets.Length ? speciesAssets[speciesIndex].Food : default;
         }
 
         private void OnFellRequest(ulong senderId, FastBufferReader reader)

@@ -160,7 +160,7 @@ namespace Eco.Sim.Tests
             private void Add(ulong kind, Plant plant)
             {
                 Hash = Fnv(Hash, kind);
-                Hash = Fnv(Hash, (ulong)plant.Id | (ulong)plant.Stage << 32 | (ulong)plant.RipeStage << 40);
+                Hash = Fnv(Hash, (ulong)(uint)plant.Id | (ulong)plant.Stage << 32 | (ulong)plant.RipeStage << 40);
             }
         }
     }

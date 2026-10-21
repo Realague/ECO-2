@@ -94,6 +94,15 @@ namespace Voxel.Client
         [Tooltip("Days for an adult plant to go from unripe to fully ripe, on rich soil in a climate that suits it (and to ripen again once picked).")]
         [SerializeField] private float fruitDays = 3f;
 
+        [Header("Food")]
+        [Tooltip("Calories in one crop item; none means the crop cannot be eaten (cotton, coffee).")]
+        [SerializeField] private float calories;
+        [Tooltip("Nutrients of the crop, in points from 0 to about 15: they make up the balance of the eater's stomach, weighted by calories.")]
+        [SerializeField] private float carbs;
+        [SerializeField] private float protein;
+        [SerializeField] private float fat;
+        [SerializeField] private float vitamins;
+
         // One look of the species. Each plant shows one of the models, picked from its column. A
         // crop's fruit are drawn over it once ripe: fruits[0] at the first stage of ripeness, then
         // the next, each fruit larger (PlantModelBuilder makes them).
@@ -153,6 +162,9 @@ namespace Voxel.Client
         public int SeedYield => seedYield;
 
         public int StrawYield => strawYield;
+
+        // What eating one crop item gives (nothing for a plant that is not a crop).
+        public Nutrition Food => harvest == HarvestKind.None ? default : new Nutrition(calories, carbs, protein, fat, vitamins);
 
         public bool FloatsOnWater => floatsOnWater;
 

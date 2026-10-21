@@ -43,7 +43,9 @@ namespace Voxel.Client
         private WorldSync worldSync;
         private EcosystemSync ecosystemSync;
         private InventorySync inventorySync;
-        private InventoryHud inventoryHud;
+        private HungerSync hungerSync;
+        private HotbarHud hotbar;
+        private InventoryScreen inventoryScreen;
         private PlayerModel model;
         private AppearanceMenu appearanceMenu;
         private MapScreen mapScreen;
@@ -72,7 +74,9 @@ namespace Voxel.Client
             worldSync = FindAnyObjectByType<WorldSync>();
             ecosystemSync = FindAnyObjectByType<EcosystemSync>();
             inventorySync = FindAnyObjectByType<InventorySync>();
-            inventoryHud = FindAnyObjectByType<InventoryHud>();
+            hungerSync = FindAnyObjectByType<HungerSync>();
+            hotbar = FindAnyObjectByType<HotbarHud>();
+            inventoryScreen = FindAnyObjectByType<InventoryScreen>();
             model = GetComponent<PlayerModel>();
             appearanceMenu = FindAnyObjectByType<AppearanceMenu>();
             mapScreen = FindAnyObjectByType<MapScreen>();
@@ -133,8 +137,8 @@ namespace Voxel.Client
                 return;
             }
 
-            // The full-screen map, or the command line, has the keyboard: the player stands where they are.
-            if ((mapScreen != null && mapScreen.HoldsInput) || CommandConsole.HoldsInput)
+            // The full-screen map, the inventory or the command line has the keyboard: the player stands where they are.
+            if ((mapScreen != null && mapScreen.HoldsInput) || (inventoryScreen != null && inventoryScreen.HoldsInput) || CommandConsole.HoldsInput)
             {
                 Move(keyboard, false);
                 PlaceCamera();
@@ -169,7 +173,8 @@ namespace Voxel.Client
 
         private void OnGUI()
         {
-            if (world == null || (appearanceMenu != null && appearanceMenu.IsOpen) || (mapScreen != null && mapScreen.IsOpen)) return;
+            if (world == null || (appearanceMenu != null && appearanceMenu.IsOpen) || (mapScreen != null && mapScreen.IsOpen)
+                || (inventoryScreen != null && inventoryScreen.IsOpen)) return;
 
             var crosshair = new Rect(
                 (Screen.width - CrosshairSize) / 2f,
@@ -237,6 +242,15 @@ namespace Voxel.Client
             cameraTransform.SetPositionAndRotation(position, Quaternion.LookRotation(target - position));
         }
 
+        // Returns false if the item is not food the player has.
+        private bool TryEat(int item)
+        {
+            if (!hungerSync.TryEat(item, out bool tooFull)) return false;
+
+            if (tooFull) hotbar.ShowMessage("Too full to eat");
+            return true;
+        }
+
         private void Interact(Mouse mouse)
         {
             bool breakBlock = mouse.leftButton.wasPressedThisFrame;
@@ -253,6 +267,9 @@ namespace Voxel.Client
             if (breakBlock && ecosystemSync.TryStrike(origin, direction, reachedDistance)) return;
             if (placeBlock && ecosystemSync.TryHarvestAimed(origin, direction, reachedDistance)) return;
 
+            // A right click with food in hand eats it, wherever the player looks.
+            if (placeBlock && TryEat(hotbar.SelectedItem)) return;
+
             if (!blockHit) return;
 
             // The server has the last word: the request goes through WorldSync, never through World.SetBlock.
@@ -263,7 +280,7 @@ namespace Voxel.Client
             }
 
             // A right click uses the held item: a seed is planted in the targeted column, a block is placed.
-            int held = inventoryHud.SelectedItem;
+            int held = hotbar.SelectedItem;
             if (Items.IsSeed(held))
             {
                 inventorySync.RequestPlant(held, hit.Block.X, hit.Block.Z);
@@ -299,19 +316,24 @@ namespace Voxel.Client
             bool swimming = IsWaterAt(transform.position + Vector3.up * SwimDepth);
             bool spacePressed = hasControl && keyboard.spaceKey.isPressed;
 
-            Vector3 horizontal = direction.normalized * (swimming ? moveSpeed * SwimSpeedShare : moveSpeed);
+            // A starving player walks slower and jumps just high enough to climb a block.
+            bool starving = hungerSync.Stomach.IsStarving;
+            float speed = starving ? moveSpeed * HungerRules.StarvingSpeedShare : moveSpeed;
+            float jump = starving ? Mathf.Min(jumpHeight, HungerRules.StarvingJumpHeight) : jumpHeight;
+
+            Vector3 horizontal = direction.normalized * (swimming ? speed * SwimSpeedShare : speed);
             velocity.x = horizontal.x;
             velocity.z = horizontal.z;
 
             if (!swimming && grounded && spacePressed)
             {
-                velocity.y = Mathf.Sqrt(2f * gravity * jumpHeight);
+                velocity.y = Mathf.Sqrt(2f * gravity * jump);
             }
 
             // Swimming against a bank, Space gives the push of a jump: enough to climb onto ground
             // as high as the water's surface, which swimming up alone never reaches.
             bool climbingOut = swimming && spacePressed && againstWall && direction != Vector3.zero;
-            if (climbingOut) velocity.y = Mathf.Max(velocity.y, Mathf.Sqrt(2f * gravity * jumpHeight));
+            if (climbingOut) velocity.y = Mathf.Max(velocity.y, Mathf.Sqrt(2f * gravity * jump));
 
             // Vertical move with the average of the speeds before and after gravity: exact for a
             // constant acceleration, so jump height does not depend on the frame rate.

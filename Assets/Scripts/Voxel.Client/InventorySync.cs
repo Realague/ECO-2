@@ -5,27 +5,31 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // Players' inventory and speciality. The server holds them (in each player's saved state) and
-    // decides everything: choosing a speciality, giving, planting. Each client only
-    // knows its own inventory, which the server sends back at every change.
+    // Players' inventory, hotbar and speciality. The server holds them (in each player's saved state)
+    // and decides everything: choosing a speciality, giving, planting, arranging the hotbar. Each
+    // client only knows its own, which the server sends back at every change.
     public class InventorySync : MonoBehaviour
     {
         private const string StateMessage = "Inv.State";
         private const string SpecialityMessage = "Inv.Speciality";
         private const string GiveMessage = "Inv.Give";
         private const string PlantMessage = "Inv.Plant";
+        private const string HotbarMessage = "Inv.Hotbar";
 
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private EcosystemSync ecosystemSync;
 
         // Local copy of the inventory of this machine's player, when it is not the server.
         private readonly Inventory received = new Inventory();
+        private readonly Hotbar receivedHotbar = new Hotbar();
         private Speciality receivedSpeciality;
         private PlayerRegistry registry;
         private bool running;
 
-        // Inventory and speciality of the local player. On the host, they are the server's own.
+        // Inventory, hotbar and speciality of the local player. On the host, they are the server's own.
         public Inventory Inventory => TryGetLocalState(out PlayerState state) ? state.Inventory : received;
+
+        public Hotbar Hotbar => TryGetLocalState(out PlayerState state) ? state.Hotbar : receivedHotbar;
 
         public Speciality Speciality => TryGetLocalState(out PlayerState state) ? state.Speciality : receivedSpeciality;
 
@@ -39,7 +43,8 @@ namespace Voxel.Client
             Messaging.RegisterNamedMessageHandler(SpecialityMessage, OnSpeciality);
             Messaging.RegisterNamedMessageHandler(GiveMessage, OnGive);
             Messaging.RegisterNamedMessageHandler(PlantMessage, OnPlant);
-            networkManager.OnClientConnectedCallback += Publish;
+            Messaging.RegisterNamedMessageHandler(HotbarMessage, OnHotbar);
+            networkManager.OnClientConnectedCallback += OnClientConnected;
         }
 
         // To call right after a client's connection has been launched.
@@ -53,10 +58,11 @@ namespace Voxel.Client
         {
             if (!running) return;
 
-            if (registry != null) networkManager.OnClientConnectedCallback -= Publish;
+            if (registry != null) networkManager.OnClientConnectedCallback -= OnClientConnected;
 
             registry = null;
             received.Clear();
+            receivedHotbar.Clear();
             receivedSpeciality = Speciality.None;
             running = false;
         }
@@ -77,8 +83,24 @@ namespace Voxel.Client
             if (item == Items.None || count <= 0) return;
             if (registry == null || !registry.TryGetState(clientId, out PlayerState state)) return;
 
-            state.Inventory.Add(item, count);
+            Receive(state, item, count);
             Publish(clientId);
+        }
+
+        // Puts an item in one of the local player's hotbar slots (Items.None empties it). A client
+        // shows it at once; the server's state comes back with the next change.
+        public void RequestHotbarSlot(int slot, int item)
+        {
+            if (!running) return;
+
+            if (registry != null)
+            {
+                SetHotbarSlot(networkManager.LocalClientId, slot, item);
+                return;
+            }
+
+            receivedHotbar.Set(slot, item);
+            Send(HotbarMessage, slot, item);
         }
 
         public void RequestSpeciality(Speciality speciality)
@@ -147,10 +169,35 @@ namespace Voxel.Client
             }
 
             if (!found || !registry.TryGetState(nearestId, out PlayerState receiver)) return;
-            if (!Inventory.Transfer(giver.Inventory, receiver.Inventory, item, count)) return;
+            if (!giver.Inventory.TryRemove(item, count)) return;
 
+            Receive(receiver, item, count);
             Publish(clientId);
             Publish(nearestId);
+        }
+
+        // Adds items to a player's inventory; an item they did not have takes an empty hotbar slot.
+        private static void Receive(PlayerState state, int item, int count)
+        {
+            bool had = state.Inventory.Has(item);
+            state.Inventory.Add(item, count);
+            if (!had) state.Hotbar.Place(item);
+        }
+
+        private void SetHotbarSlot(ulong clientId, int slot, int item)
+        {
+            if (!registry.TryGetState(clientId, out PlayerState state)) return;
+
+            state.Hotbar.Set(slot, item);
+            Publish(clientId);
+        }
+
+        // A player whose save had no hotbar gets one filled with what they own.
+        private void OnClientConnected(ulong clientId)
+        {
+            if (registry.TryGetState(clientId, out PlayerState state) && state.Hotbar.IsEmpty) state.Hotbar.FillFrom(state.Inventory);
+
+            Publish(clientId);
         }
 
         private void Plant(ulong clientId, int seed, int x, int z)
@@ -183,13 +230,20 @@ namespace Voxel.Client
             Plant(senderId, seed, x, z);
         }
 
-        // Sends a player their inventory and speciality. The host reads its own directly.
+        private void OnHotbar(ulong senderId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out int slot);
+            reader.ReadValueSafe(out int item);
+            SetHotbarSlot(senderId, slot, item);
+        }
+
+        // Sends a player their inventory, hotbar and speciality. The host reads its own directly.
         private void Publish(ulong clientId)
         {
             if (clientId == networkManager.LocalClientId) return;
             if (!registry.TryGetState(clientId, out PlayerState state)) return;
 
-            int size = sizeof(byte) + sizeof(int) + state.Inventory.DistinctCount * 2 * sizeof(int);
+            int size = sizeof(byte) + sizeof(int) + state.Inventory.DistinctCount * 2 * sizeof(int) + Hotbar.SlotCount * sizeof(int);
             using (var writer = new FastBufferWriter(size, Allocator.Temp))
             {
                 writer.WriteValueSafe((byte)state.Speciality);
@@ -198,6 +252,11 @@ namespace Voxel.Client
                 {
                     writer.WriteValueSafe(entry.Key);
                     writer.WriteValueSafe(entry.Value);
+                }
+
+                for (int slot = 0; slot < Hotbar.SlotCount; slot++)
+                {
+                    writer.WriteValueSafe(state.Hotbar[slot]);
                 }
 
                 Messaging.SendNamedMessage(StateMessage, clientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
@@ -216,6 +275,12 @@ namespace Voxel.Client
                 reader.ReadValueSafe(out int item);
                 reader.ReadValueSafe(out int count);
                 received.Add(item, count);
+            }
+
+            for (int slot = 0; slot < Hotbar.SlotCount; slot++)
+            {
+                reader.ReadValueSafe(out int item);
+                receivedHotbar.Set(slot, item);
             }
         }
 

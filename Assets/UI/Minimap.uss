@@ -15,7 +15,7 @@
     width: 300px;
     height: 300px;
     overflow: hidden;
-    background-color: #2b3138;
+    background-color: #1b1916;
     border-width: 6px;
     border-color: var(--panel);
     border-radius: 150px;
@@ -44,6 +44,6 @@
     font-size: 16px;
     -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
     color: var(--text-body);
-    background-color: var(--panel);
+    background-color: var(--veil);
     border-radius: 13px;
 }

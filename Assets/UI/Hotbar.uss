@@ -1,0 +1,173 @@
+/* The ten quick slots at the bottom of the screen, dark with a gold frame on the held one like the
+   inventory. Sizes are for the 1920 x 1080 reference resolution. */
+
+.hotbar-screen {
+    justify-content: flex-end;
+    align-items: center;
+    padding-bottom: 22px;
+}
+
+/* The held item's name, shown a moment above the bar when it changes. */
+.hotbar-held {
+    font-size: 21px;
+    color: var(--text);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    margin: 0 0 10px 0;
+    padding: 0;
+    min-height: 28px;
+    transition-property: opacity;
+    transition-duration: 0.2s;
+}
+
+.hotbar {
+    flex-direction: row;
+    padding: 8px;
+    background-color: var(--veil);
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: var(--panel-border);
+}
+
+.hotbar-slot {
+    width: 76px;
+    height: 76px;
+    margin: 0 4px;
+    background-color: rgba(72, 66, 57, 0.85);
+    border-radius: 9px;
+    border-width: 2px;
+    border-color: var(--control-border);
+    align-items: center;
+    justify-content: center;
+    transition-property: border-color, scale;
+    transition-duration: 0.1s;
+}
+
+.hotbar-slot--selected {
+    border-width: 3px;
+    border-color: var(--accent);
+    background-color: rgba(106, 96, 79, 0.95);
+    scale: 1.06 1.06;
+}
+
+.hotbar-slot--empty {
+    background-color: rgba(52, 48, 42, 0.7);
+}
+
+/* An item the player ran out of keeps its slot, greyed. */
+.hotbar-slot--spent > .hotbar-icon {
+    opacity: 0.3;
+}
+
+.hotbar-icon {
+    width: 56px;
+    height: 56px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.hotbar-number {
+    position: absolute;
+    left: 6px;
+    top: 3px;
+    font-size: 14px;
+    color: var(--text-muted);
+    margin: 0;
+    padding: 0;
+}
+
+.hotbar-slot--selected > .hotbar-number {
+    color: var(--accent);
+}
+
+.hotbar-count {
+    position: absolute;
+    right: 6px;
+    bottom: 3px;
+    font-size: 16px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text);
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.7);
+    margin: 0;
+    padding: 0;
+}
+
+/* The stomach, hanging at the bar's left (outside it, so the bar stays centred): its pie, the
+   calories under it and each nutrient's share beside it. */
+.stomach {
+    position: absolute;
+    right: 100%;
+    top: -1px;
+    bottom: -1px;
+    flex-direction: row;
+    align-items: center;
+    margin-right: 12px;
+    padding: 6px 14px 6px 10px;
+    background-color: var(--veil);
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: var(--panel-border);
+}
+
+.stomach-gauge {
+    align-items: center;
+    margin-right: 12px;
+}
+
+.stomach-pie {
+    width: 60px;
+    height: 60px;
+    --carbs-colour: var(--carbs);
+    --protein-colour: var(--protein);
+    --fat-colour: var(--fat);
+    --vitamins-colour: var(--vitamins);
+    --pie-back: rgba(0, 0, 0, 0.35);
+    --pie-rim: rgba(230, 192, 106, 0.55);
+}
+
+.stomach-kcal {
+    font-size: 14px;
+    color: var(--text);
+    white-space: nowrap;
+    margin: 2px 0 0 0;
+    padding: 0;
+}
+
+.stomach-kcal--low {
+    color: var(--danger);
+}
+
+.stomach-legend {
+    width: 108px;
+}
+
+.stomach-row {
+    flex-direction: row;
+    align-items: center;
+    height: 18px;
+}
+
+.stomach-nutrient {
+    font-size: 14px;
+    color: var(--text-body);
+    white-space: nowrap;
+    margin: 0;
+    padding: 0;
+}
+
+/* An empty stomach has no balance to show: a warning takes the legend's place. */
+.stomach-starving {
+    display: none;
+    width: 108px;
+    font-size: 15px;
+    color: var(--danger);
+    white-space: normal;
+    margin: 0;
+    padding: 0;
+}
+
+.stomach--starving > .stomach-legend {
+    display: none;
+}
+
+.stomach--starving > .stomach-starving {
+    display: flex;
+}

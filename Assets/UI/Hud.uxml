@@ -1,0 +1,36 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:vc="Voxel.Client">
+    <Style src="Common.uss" />
+    <Style src="Hud.uss" />
+
+    <!-- HudBanner fills in the day, the hour, the sun or the moon, the speed and the place under the player. -->
+    <ui:VisualElement name="screen" class="screen hud-screen" picking-mode="Ignore">
+        <ui:VisualElement name="banner" class="hud-banner" picking-mode="Ignore">
+            <ui:VisualElement class="hud-row" picking-mode="Ignore">
+                <vc:HudGlyph name="sky" class="hud-glyph hud-sky" />
+                <ui:Label name="day" class="hud-day strong" picking-mode="Ignore" />
+                <ui:VisualElement class="hud-separator" picking-mode="Ignore" />
+                <ui:Label name="time" class="hud-time strong" picking-mode="Ignore" />
+                <ui:Label name="speed" class="hud-speed" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement class="hud-row hud-row--second" picking-mode="Ignore">
+                <vc:HudGlyph name="pin" kind="Pin" class="hud-glyph hud-pin" />
+                <ui:Label name="place" class="hud-place" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="hints" class="hud-hints" picking-mode="Ignore">
+            <ui:VisualElement class="hud-hint" picking-mode="Ignore">
+                <ui:VisualElement class="key"><ui:Label text="Tab" class="key-text" /></ui:VisualElement>
+                <ui:Label text="Inventory" class="hud-hint-text" />
+            </ui:VisualElement>
+            <ui:VisualElement class="hud-hint" picking-mode="Ignore">
+                <ui:VisualElement class="key"><ui:Label name="map-key" text="M" class="key-text" /></ui:VisualElement>
+                <ui:Label text="Map" class="hud-hint-text" />
+            </ui:VisualElement>
+            <ui:VisualElement class="hud-hint" picking-mode="Ignore">
+                <ui:VisualElement class="key"><ui:Label text="T" class="key-text" /></ui:VisualElement>
+                <ui:Label text="Commands" class="hud-hint-text" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

@@ -9,7 +9,16 @@
         <ui:VisualElement class="panel map-panel">
             <ui:VisualElement class="map-header">
                 <ui:VisualElement class="map-heading">
-                    <ui:Label text="Map" class="map-title" />
+                    <ui:VisualElement class="tabs">
+                        <ui:Button name="tab-inventory" class="tab">
+                            <ui:VisualElement class="icon icon--house" />
+                            <ui:Label text="Inventory" class="tab-text" />
+                        </ui:Button>
+                        <ui:Button name="tab-map" class="tab tab--selected">
+                            <ui:VisualElement class="icon icon--globe" />
+                            <ui:Label text="Map" class="tab-text" />
+                        </ui:Button>
+                    </ui:VisualElement>
                     <ui:Label name="layer-name" class="map-layer-name" />
                 </ui:VisualElement>
                 <ui:VisualElement name="legend" class="legend">

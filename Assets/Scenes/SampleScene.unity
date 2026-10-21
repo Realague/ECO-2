@@ -326,6 +326,96 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!1 &408005229
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 408005232}
+  - component: {fileID: 408005231}
+  - component: {fileID: 408005230}
+  - component: {fileID: 408005233}
+  m_Layer: 0
+  m_Name: HotbarUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &408005230
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 408005229}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88e19ca17c5df8c4a93b191826b984c8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.HotbarHud
+  document: {fileID: 408005231}
+  networkManager: {fileID: 947039382}
+  worldSync: {fileID: 490447447}
+  inventorySync: {fileID: 490447450}
+  ecosystemSync: {fileID: 490447448}
+  appearanceMenu: {fileID: 490447451}
+  mapScreen: {fileID: 822296572}
+--- !u!114 &408005231
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 408005229}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
+  m_PanelSettings: {fileID: 11400000, guid: 9beb8dfdb858f10469eecb5a078a09e6, type: 2}
+  m_ParentUI: {fileID: 0}
+  sourceAsset: {fileID: 9197481963319205126, guid: 1f81c29eb10ebc14cbb259ea82b785f7, type: 3}
+  m_SortingOrder: 3
+  m_Position: 0
+  m_WorldSpaceSizeMode: 1
+  m_WorldSpaceWidth: 1920
+  m_WorldSpaceHeight: 1080
+  m_PivotReferenceSize: 0
+  m_Pivot: 0
+  m_WorldSpaceCollider: {fileID: 0}
+--- !u!4 &408005232
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 408005229}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &408005233
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 408005229}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 799d3a712db6acc4983fa307f4d4b15e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.StomachHud
+  document: {fileID: 408005231}
+  hungerSync: {fileID: 490447454}
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -466,10 +556,10 @@ GameObject:
   - component: {fileID: 490447447}
   - component: {fileID: 490447448}
   - component: {fileID: 490447450}
-  - component: {fileID: 490447449}
   - component: {fileID: 490447452}
   - component: {fileID: 490447451}
   - component: {fileID: 490447453}
+  - component: {fileID: 490447454}
   m_Layer: 0
   m_Name: GameSession
   m_TagString: Untagged
@@ -494,10 +584,12 @@ MonoBehaviour:
   worldSync: {fileID: 490447447}
   ecosystemSync: {fileID: 490447448}
   inventorySync: {fileID: 490447450}
+  hungerSync: {fileID: 490447454}
   appearanceSync: {fileID: 490447452}
   commandSync: {fileID: 490447453}
   appearanceMenu: {fileID: 490447451}
   mapScreen: {fileID: 822296572}
+  inventoryScreen: {fileID: 1141440427}
   port: 50000
   autosaveInterval: 60
   openRouterPort: 1
@@ -614,24 +706,6 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 98a606a92b352d94eab820e11da30c61, type: 2}
   - {fileID: 11400000, guid: 25beb05f3e6c7dd4e95192c1c2f7539c, type: 2}
   plantViewDistance: 128
---- !u!114 &490447449
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 490447444}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f77fa772b81bda642a92cb983e47e56e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.InventoryHud
-  networkManager: {fileID: 947039382}
-  worldSync: {fileID: 490447447}
-  inventorySync: {fileID: 490447450}
-  ecosystemSync: {fileID: 490447448}
-  appearanceMenu: {fileID: 490447451}
-  mapScreen: {fileID: 822296572}
 --- !u!114 &490447450
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -690,6 +764,22 @@ MonoBehaviour:
   networkManager: {fileID: 947039382}
   worldSync: {fileID: 490447447}
   ecosystemSync: {fileID: 490447448}
+--- !u!114 &490447454
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 490447444}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 53b4c9b8e38a04e4fb496d64c2bf2fa0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.HungerSync
+  networkManager: {fileID: 947039382}
+  inventorySync: {fileID: 490447450}
+  ecosystemSync: {fileID: 490447448}
+  worldSync: {fileID: 490447447}
 --- !u!1 &822296571
 GameObject:
   m_ObjectHideFlags: 0
@@ -726,6 +816,7 @@ MonoBehaviour:
   appearanceMenu: {fileID: 490447451}
   commandSync: {fileID: 490447453}
   document: {fileID: 822296573}
+  inventoryScreen: {fileID: 1141440427}
 --- !u!114 &822296573
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -911,6 +1002,83 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 947039381}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1141440426
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1141440429}
+  - component: {fileID: 1141440428}
+  - component: {fileID: 1141440427}
+  m_Layer: 0
+  m_Name: InventoryUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1141440427
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1141440426}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 80fbb09fe17298e4d80083d21ccebe4e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.InventoryScreen
+  document: {fileID: 1141440428}
+  networkManager: {fileID: 947039382}
+  worldSync: {fileID: 490447447}
+  inventorySync: {fileID: 490447450}
+  hungerSync: {fileID: 490447454}
+  ecosystemSync: {fileID: 490447448}
+  appearanceMenu: {fileID: 490447451}
+  mapScreen: {fileID: 822296572}
+  hotbar: {fileID: 408005230}
+--- !u!114 &1141440428
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1141440426}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
+  m_PanelSettings: {fileID: 11400000, guid: 9beb8dfdb858f10469eecb5a078a09e6, type: 2}
+  m_ParentUI: {fileID: 0}
+  sourceAsset: {fileID: 9197481963319205126, guid: bffe147cc25664646b838fed6bb250d8, type: 3}
+  m_SortingOrder: 2
+  m_Position: 0
+  m_WorldSpaceSizeMode: 1
+  m_WorldSpaceWidth: 1920
+  m_WorldSpaceHeight: 1080
+  m_PivotReferenceSize: 0
+  m_Pivot: 0
+  m_WorldSpaceCollider: {fileID: 0}
+--- !u!4 &1141440429
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1141440426}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -1108,6 +1276,7 @@ MonoBehaviour:
   worldMap: {fileID: 1201000722}
   appearanceMenu: {fileID: 490447451}
   mapScreen: {fileID: 822296572}
+  inventoryScreen: {fileID: 1141440427}
   document: {fileID: 1765294191}
 --- !u!114 &1765294191
 MonoBehaviour:
@@ -1202,6 +1371,81 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1863226318
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1863226321}
+  - component: {fileID: 1863226320}
+  - component: {fileID: 1863226319}
+  m_Layer: 0
+  m_Name: HudUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1863226319
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1863226318}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e5ca64643b7c6d546b13efb8bbfa9bb7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.HudBanner
+  document: {fileID: 1863226320}
+  networkManager: {fileID: 947039382}
+  worldSync: {fileID: 490447447}
+  ecosystemSync: {fileID: 490447448}
+  appearanceMenu: {fileID: 490447451}
+  mapScreen: {fileID: 822296572}
+  inventoryScreen: {fileID: 1141440427}
+--- !u!114 &1863226320
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1863226318}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
+  m_PanelSettings: {fileID: 11400000, guid: 9beb8dfdb858f10469eecb5a078a09e6, type: 2}
+  m_ParentUI: {fileID: 0}
+  sourceAsset: {fileID: 9197481963319205126, guid: 04d88bb8e9b091c49ac815a027d4d645, type: 3}
+  m_SortingOrder: 4
+  m_Position: 0
+  m_WorldSpaceSizeMode: 1
+  m_WorldSpaceWidth: 1920
+  m_WorldSpaceHeight: 1080
+  m_PivotReferenceSize: 0
+  m_Pivot: 0
+  m_WorldSpaceCollider: {fileID: 0}
+--- !u!4 &1863226321
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1863226318}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1864166457
 GameObject:
   m_ObjectHideFlags: 0
@@ -1282,7 +1526,8 @@ MonoBehaviour:
   commandSync: {fileID: 490447453}
   appearanceMenu: {fileID: 490447451}
   mapScreen: {fileID: 822296572}
-  inventoryHud: {fileID: 490447449}
+  hotbar: {fileID: 408005230}
+  inventoryScreen: {fileID: 1141440427}
   document: {fileID: 1888504236}
 --- !u!114 &1888504236
 MonoBehaviour:
@@ -1436,6 +1681,7 @@ MonoBehaviour:
   ecosystemSync: {fileID: 490447448}
   appearanceMenu: {fileID: 490447451}
   mapScreen: {fileID: 822296572}
+  inventoryScreen: {fileID: 1141440427}
   document: {fileID: 2081992071}
 --- !u!114 &2081992071
 MonoBehaviour:
@@ -1495,3 +1741,6 @@ SceneRoots:
   - {fileID: 1575086296}
   - {fileID: 2081992072}
   - {fileID: 1888504237}
+  - {fileID: 408005232}
+  - {fileID: 1141440429}
+  - {fileID: 1863226321}

@@ -24,14 +24,14 @@
     margin-right: 20px;
     align-items: center;
     justify-content: center;
-    background-color: var(--green);
+    background-color: var(--action);
     border-radius: 18px;
 }
 
 .brand-logo > .icon {
     width: 42px;
     height: 42px;
-    -unity-background-image-tint-color: #ffffff;
+    -unity-background-image-tint-color: var(--text);
 }
 
 .brand-tagline {
@@ -102,21 +102,21 @@
 }
 
 .menu-button--primary {
-    background-color: var(--green);
-    border-color: var(--green-dark);
+    background-color: var(--action);
+    border-color: var(--action-dark);
 }
 
 .menu-button--primary:hover {
-    background-color: var(--green-hover);
+    background-color: var(--action-hover);
 }
 
 .menu-button--primary > .icon {
-    -unity-background-image-tint-color: #ffffff;
+    -unity-background-image-tint-color: var(--text);
 }
 
 .menu-button--primary .menu-button-title,
 .menu-button--primary .menu-button-text {
-    color: #ffffff;
+    color: var(--text);
 }
 
 .menu-button:disabled {
@@ -147,7 +147,7 @@
 }
 
 .link-button:hover {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: var(--hover);
 }
 
 .link-button > .icon {
@@ -176,15 +176,16 @@
     padding: 0 16px;
     font-size: 22px;
     color: var(--text);
-    background-color: var(--control);
+    background-color: var(--well);
     border-width: 1px;
     border-color: var(--control-border);
     border-radius: 10px;
+    --unity-cursor-color: var(--text);
 }
 
 .field:focus > .unity-base-text-field__input,
 .field:focus > .unity-text-field__input {
-    border-color: var(--green);
+    border-color: var(--accent);
 }
 
 .field-hint {
@@ -207,9 +208,9 @@
     align-items: center;
     padding: 14px 18px;
     margin-bottom: 22px;
-    background-color: #fbe9e5;
+    background-color: rgba(150, 52, 34, 0.28);
     border-width: 1px;
-    border-color: #efc2b8;
+    border-color: rgba(232, 128, 104, 0.45);
     border-radius: 10px;
 }
 
@@ -217,13 +218,13 @@
     width: 24px;
     height: 24px;
     margin-right: 12px;
-    -unity-background-image-tint-color: #b8432b;
+    -unity-background-image-tint-color: var(--danger);
 }
 
 .error-text {
     flex-shrink: 1;
     font-size: 18px;
-    color: #8e2f1d;
+    color: #f4c2b4;
     white-space: normal;
     margin: 0;
     padding: 0;
@@ -232,7 +233,7 @@
 /* Connecting and loading. */
 .progress {
     height: 14px;
-    background-color: #e4e1d8;
+    background-color: rgba(255, 255, 255, 0.1);
     border-radius: 7px;
     overflow: hidden;
 }
@@ -240,7 +241,7 @@
 .progress-fill {
     height: 100%;
     width: 0;
-    background-color: var(--green);
+    background-color: var(--accent);
     border-radius: 7px;
 }
 
@@ -268,7 +269,7 @@
 .world-row--selected,
 .world-row--selected:hover {
     background-color: var(--selected);
-    border-color: var(--green);
+    border-color: var(--accent);
     border-width: 2px;
 }
 
@@ -312,8 +313,8 @@
 }
 
 .world-new:hover {
-    background-color: rgba(0, 0, 0, 0.04);
-    border-color: var(--green);
+    background-color: var(--hover);
+    border-color: var(--accent);
 }
 
 .world-new > .icon {

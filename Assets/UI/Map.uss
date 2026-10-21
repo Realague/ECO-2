@@ -14,6 +14,7 @@
     flex-direction: row;
     align-items: flex-start;
     justify-content: space-between;
+    flex-shrink: 0;
     margin-bottom: 16px;
 }
 
@@ -36,7 +37,7 @@
 .map-layer-name {
     font-size: 19px;
     color: var(--text-muted);
-    margin: 0 0 5px 18px;
+    margin: 0 0 16px 18px;
     padding: 0;
 }
 
@@ -84,7 +85,7 @@
 .map-view {
     flex-grow: 1;
     overflow: hidden;
-    background-color: #2b3138;
+    background-color: #1b1916;
     border-radius: 14px;
 }
 
@@ -92,6 +93,7 @@
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
+    flex-shrink: 0;
     margin-top: 16px;
     min-height: 32px;
 }
@@ -112,6 +114,7 @@
 .map-body {
     flex-direction: row;
     flex-grow: 1;
+    flex-basis: 0;
 }
 
 /* Where the chosen species lives: drawn over the terrain and the climate, which show through its empty cells. */
@@ -143,15 +146,16 @@
     padding: 0 14px;
     font-size: 19px;
     color: var(--text);
-    background-color: var(--control);
+    background-color: var(--well);
     border-width: 1px;
     border-color: var(--control-border);
     border-radius: 10px;
+    --unity-cursor-color: var(--text);
 }
 
 .species-search:focus > .unity-base-text-field__input,
 .species-search:focus > .unity-text-field__input {
-    border-color: var(--green);
+    border-color: var(--accent);
 }
 
 .species-hint {
@@ -162,8 +166,10 @@
     padding: 0;
 }
 
+/* Its height comes from the panel, not from its rows, so a long list scrolls instead of pushing the header up. */
 .species-list {
     flex-grow: 1;
+    flex-basis: 0;
 }
 
 /* The drop-down menus "Plants" and "Animals" (Foldout), their species inside. */
@@ -178,7 +184,7 @@
 }
 
 .species-group > .unity-foldout__toggle:hover {
-    background-color: var(--control-hover);
+    background-color: var(--hover);
 }
 
 .species-group .unity-foldout__text {
@@ -204,13 +210,13 @@
 }
 
 .species-row:hover {
-    background-color: var(--control-hover);
+    background-color: var(--hover);
 }
 
 .species-row--selected,
 .species-row--selected:hover {
     background-color: var(--selected);
-    border-color: var(--green);
+    border-color: var(--accent);
 }
 
 .species-swatch {
@@ -218,7 +224,7 @@
     height: 14px;
     margin-right: 10px;
     border-width: 1px;
-    border-color: rgba(20, 22, 26, 0.6);
+    border-color: rgba(0, 0, 0, 0.6);
     border-radius: 7px;
 }
 

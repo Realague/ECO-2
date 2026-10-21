@@ -1,0 +1,123 @@
+/* The day, the hour and the place at the top left; key hints at the bottom right; dark like the
+   inventory. The banner has a fixed size, so it never changes as the time or the place
+   changes: a long place name or speed is cut with an ellipsis. Sizes are for the
+   1920 x 1080 reference resolution. */
+
+.hud-banner {
+    position: absolute;
+    left: 24px;
+    top: 22px;
+    width: 360px;
+    height: 86px;
+    padding: 12px 16px 12px 14px;
+    justify-content: center;
+    background-color: var(--veil);
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: var(--panel-border);
+    overflow: hidden;
+}
+
+.hud-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.hud-row--second {
+    margin-top: 6px;
+}
+
+.hud-glyph {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    margin-right: 10px;
+}
+
+.hud-sky {
+    --glyph-colour: var(--accent);
+}
+
+.hud-sky--night {
+    --glyph-colour: #9aa8cc;
+}
+
+.hud-pin {
+    width: 24px;
+    height: 24px;
+    margin: 0 12px 0 2px;
+    --glyph-colour: #c9b48a;
+}
+
+.hud-day,
+.hud-time {
+    font-size: 22px;
+    color: var(--text);
+    margin: 0;
+    padding: 0;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* Room for "23:59", so the speed beside it does not shift every minute. */
+.hud-time {
+    width: 62px;
+}
+
+.hud-separator {
+    width: 2px;
+    height: 22px;
+    flex-shrink: 0;
+    margin: 0 12px;
+    background-color: rgba(255, 255, 255, 0.18);
+}
+
+.hud-speed {
+    flex-shrink: 1;
+    font-size: 17px;
+    color: var(--text-muted);
+    margin: 0 0 0 8px;
+    padding: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.hud-place {
+    flex-shrink: 1;
+    font-size: 19px;
+    color: var(--text-body);
+    margin: 0;
+    padding: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.hud-hints {
+    position: absolute;
+    right: 24px;
+    bottom: 26px;
+    padding: 12px 16px 6px 16px;
+    background-color: var(--veil);
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: var(--panel-border);
+}
+
+.hud-hint {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.hud-hint > .key {
+    margin-right: 10px;
+}
+
+.hud-hint-text {
+    font-size: 17px;
+    color: var(--text-body);
+    margin: 0;
+    padding: 0;
+}

@@ -16,6 +16,7 @@ namespace Voxel.Client
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private AppearanceMenu appearanceMenu;
         [SerializeField] private MapScreen mapScreen;
+        [SerializeField] private InventoryScreen inventoryScreen;
         [SerializeField] private UIDocument document;
 
         private VisualElement screen;
@@ -43,7 +44,7 @@ namespace Voxel.Client
         {
             World world = worldSync.World;
             Camera eye = Camera.main;
-            if (world == null || eye == null || !networkManager.IsListening || appearanceMenu.IsOpen || mapScreen.IsOpen) return null;
+            if (world == null || eye == null || !networkManager.IsListening || appearanceMenu.IsOpen || mapScreen.IsOpen || inventoryScreen.IsOpen) return null;
             if (networkManager.SpawnManager?.GetLocalPlayerObject() == null) return null;
 
             // The same ray and reach as PlayerController's strike, so the label names what a click hits.

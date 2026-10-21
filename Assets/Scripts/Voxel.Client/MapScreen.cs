@@ -43,6 +43,7 @@ namespace Voxel.Client
         [SerializeField] private AppearanceMenu appearanceMenu;
         [SerializeField] private CommandSync commandSync;
         [SerializeField] private UIDocument document;
+        [SerializeField] private InventoryScreen inventoryScreen;
 
         private VisualElement screen;
         private VisualElement view;
@@ -104,6 +105,11 @@ namespace Voxel.Client
             speciesPanel.SelectionChanged += OnSpeciesChosen;
             speciesLayer.style.display = DisplayStyle.None;
 
+            Button inventoryTab = root.Q<Button>("tab-inventory");
+            inventoryTab.focusable = false;
+            inventoryTab.clicked += OpenInventory;
+            root.Q<Button>("tab-map").focusable = false;
+
             view.RegisterCallback<WheelEvent>(OnWheel);
             view.RegisterCallback<PointerDownEvent>(OnPointerDown);
             view.RegisterCallback<PointerMoveEvent>(OnPointerMove);
@@ -144,8 +150,16 @@ namespace Voxel.Client
             {
                 if (MapKey(keyboard).wasPressedThisFrame)
                 {
-                    if (IsOpen) Close(true);
-                    else Open();
+                    if (IsOpen)
+                    {
+                        Close(true);
+                    }
+                    else
+                    {
+                        // From the inventory, M goes straight to the map.
+                        inventoryScreen.Close(false);
+                        Open();
+                    }
                 }
                 else if (IsOpen && keyboard.escapeKey.wasPressedThisFrame)
                 {
@@ -186,8 +200,10 @@ namespace Voxel.Client
             return keyboard.FindKeyOnCurrentKeyboardLayout("m") ?? keyboard.mKey;
         }
 
-        private void Open()
+        public void Open()
         {
+            if (IsOpen) return;
+
             IsOpen = true;
             following = true;
             nextCensus = 0f;
@@ -195,6 +211,12 @@ namespace Voxel.Client
             pointerText.text = "";
             screen.style.display = DisplayStyle.Flex;
             Cursor.lockState = CursorLockMode.None;
+        }
+
+        private void OpenInventory()
+        {
+            Close(false);
+            inventoryScreen.Open();
         }
 
         // relock: back to the game, the mouse steers the player again.

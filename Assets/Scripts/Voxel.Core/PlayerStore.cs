@@ -19,18 +19,27 @@ namespace Voxel.Core
         public Appearance? Appearance;
 
         public Inventory Inventory { get; } = new Inventory();
+
+        // The ten quick slots, kept with the player (format 4).
+        public Hotbar Hotbar { get; } = new Hotbar();
+
+        // What they have eaten (format 5).
+        public Stomach Stomach { get; } = new Stomach();
     }
 
     // The state of every player known to the server, by player id.
     public sealed class PlayerStore
     {
         private const uint Magic = 0x504F4345; // "ECOP"
-        private const int FormatVersion = 3;
+        private const int FormatVersion = 5;
 
         // Older formats still load. Without inventory, the player keeps their position; without
-        // appearance, they choose one at their next connection.
+        // appearance, they choose one at their next connection; without a hotbar, theirs starts empty
+        // (the server fills it with what they own); without a stomach, theirs starts half full.
         private const int FormatWithoutInventory = 1;
         private const int FormatWithoutAppearance = 2;
+        private const int FormatWithoutHotbar = 3;
+        private const int FormatWithoutStomach = 4;
 
         private readonly Dictionary<string, PlayerState> players = new Dictionary<string, PlayerState>();
 
@@ -70,6 +79,8 @@ namespace Voxel.Core
                     writer.Write((byte)state.Speciality);
                     state.Inventory.Write(writer);
                     writer.Write(state.Appearance?.Encode() ?? Appearance.NotChosen);
+                    state.Hotbar.Write(writer);
+                    state.Stomach.Write(writer);
                 }
             }
         }
@@ -85,7 +96,7 @@ namespace Voxel.Core
                 }
 
                 int formatVersion = reader.ReadInt32();
-                if (formatVersion != FormatVersion && formatVersion != FormatWithoutInventory && formatVersion != FormatWithoutAppearance)
+                if (formatVersion < FormatWithoutInventory || formatVersion > FormatVersion)
                 {
                     throw new InvalidDataException(
                         $"Unsupported player save format {formatVersion} (expected: {FormatVersion}).");
@@ -116,7 +127,7 @@ namespace Voxel.Core
                         state.Inventory.Read(reader);
                     }
 
-                    if (formatVersion == FormatVersion)
+                    if (formatVersion >= FormatWithoutHotbar)
                     {
                         ushort code = reader.ReadUInt16();
                         if (code != Appearance.NotChosen)
@@ -129,6 +140,9 @@ namespace Voxel.Core
                             state.Appearance = appearance;
                         }
                     }
+
+                    if (formatVersion >= FormatWithoutStomach) state.Hotbar.Read(reader);
+                    if (formatVersion >= FormatVersion) state.Stomach.Read(reader);
 
                     store.Set(playerId, state);
                 }

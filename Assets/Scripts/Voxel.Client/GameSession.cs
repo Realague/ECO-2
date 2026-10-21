@@ -47,10 +47,12 @@ namespace Voxel.Client
         [SerializeField] private WorldSync worldSync;
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private InventorySync inventorySync;
+        [SerializeField] private HungerSync hungerSync;
         [SerializeField] private AppearanceSync appearanceSync;
         [SerializeField] private CommandSync commandSync;
         [SerializeField] private AppearanceMenu appearanceMenu;
         [SerializeField] private MapScreen mapScreen;
+        [SerializeField] private InventoryScreen inventoryScreen;
         [SerializeField] private ushort port = 7777;
         [SerializeField] private float autosaveInterval = 60f;
         [SerializeField] private bool openRouterPort = true;
@@ -242,8 +244,10 @@ namespace Voxel.Client
                 textStyle = new GUIStyle(GUI.skin.label) { fontSize = 18 };
             }
 
-            // Text doubled with a shadow to stay readable on the sky as well as on the terrain.
-            var area = new Rect(20f, 20f, Screen.width - 40f, Screen.height - 40f);
+            // Text doubled with a shadow to stay readable on the sky as well as on the terrain, under
+            // the HUD banner (about 120 of the panel's 1080 units high).
+            float top = Screen.height * 130f / 1080f;
+            var area = new Rect(26f, top, Screen.width - 52f, Screen.height - top - 20f);
             textStyle.normal.textColor = Color.black;
             GUI.Label(new Rect(area.x + 1f, area.y + 1f, area.width, area.height), text, textStyle);
             textStyle.normal.textColor = Color.white;
@@ -286,6 +290,7 @@ namespace Voxel.Client
             worldSync.StartClient();
             ecosystemSync.StartClient();
             inventorySync.StartClient();
+            hungerSync.StartClient();
             appearanceSync.StartClient();
             commandSync.StartClient();
             sessionActive = true;
@@ -328,6 +333,7 @@ namespace Voxel.Client
             worldSync.StartServer();
             ecosystemSync.StartServer(voxelWorld.World, worldDirectory, startTimeScale, IsAdmin);
             inventorySync.StartServer(registry);
+            hungerSync.StartServer(registry);
             appearanceSync.StartServer(registry);
             commandSync.StartServer();
             sessionActive = true;
@@ -431,6 +437,7 @@ namespace Voxel.Client
             ecosystemSync.Save();
             ecosystemSync.Stop();
             inventorySync.Stop();
+            hungerSync.Stop();
             appearanceSync.Stop();
             commandSync.Stop();
             worldSync.Stop();
@@ -531,18 +538,19 @@ namespace Voxel.Client
         private string ScreenText()
         {
             // The main menu (with the connection and loading screens), the character creation
-            // screen and the full-screen map have the whole screen to themselves.
-            if (appearanceMenu.IsOpen || mapScreen.IsOpen || InMenu || IsConnecting || IsLoading) return "";
+            // screen, the full-screen map and the inventory have the whole screen to themselves. The
+            // day and the hour are on the HUD banner (HudBanner); this text stands under it.
+            if (appearanceMenu.IsOpen || mapScreen.IsOpen || inventoryScreen.IsOpen || InMenu || IsConnecting || IsLoading) return "";
 
             if (Cursor.lockState != CursorLockMode.Locked)
             {
                 string role = networkManager.IsHost ? $"Game hosted on port {port}" : $"Connected to {address}";
-                return ecosystemSync.ClockText + "\n" + role + RouterPortText()
-                    + "\nClick: take control\nM: map\nF10: leave the game"
+                return role + RouterPortText()
+                    + "\nClick: take control\nF10: leave the game"
                     + "\nAdmins: F5 / F6 slow down or speed up time, F7 advance one day";
             }
 
-            return ecosystemSync.ClockText;
+            return "";
         }
 
         // What the host needs to know to invite players from outside its network. Empty on a client.

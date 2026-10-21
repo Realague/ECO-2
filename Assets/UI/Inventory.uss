@@ -1,0 +1,356 @@
+/* The inventory screen, in the game's dark wooden look: a dark panel with cream text, light tan item
+   cards, a cream details card and a slate green action. Sizes are for the 1920 x 1080 reference
+   resolution; the bottom is left free for the hotbar, which takes dragged items. */
+
+.inventory-screen {
+    --inv-card-top: #ddd0b5;
+    --inv-card: #cbbb9b;
+    --inv-card-border: #a8977a;
+    --inv-card-text: #3a3226;
+    --inv-sheet: #ebe3d1;
+    --inv-sheet-line: #d3c7af;
+    --inv-sheet-text: #2c271f;
+    --inv-sheet-muted: #6f6656;
+    padding: 124px 150px 150px 150px;
+    background-color: rgba(10, 10, 10, 0.35);
+}
+
+.inventory-panel {
+    flex-grow: 1;
+    padding: 0;
+    background-color: var(--panel);
+    border-color: var(--panel-border);
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.inventory-header {
+    flex-shrink: 0;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 22px 0 0;
+    background-color: rgba(0, 0, 0, 0.25);
+    border-bottom-width: 1px;
+    border-color: var(--panel-border);
+}
+
+/* Tabs flush along the top of the panel (their colours are the shared ones). */
+.inventory-screen .tabs {
+    background-color: rgba(0, 0, 0, 0);
+    border-radius: 0;
+    padding: 0;
+}
+
+.inventory-screen .tab {
+    height: 62px;
+    padding: 0 30px;
+    margin: 0;
+    border-radius: 0;
+    border-width: 0;
+    border-right-width: 1px;
+    border-color: var(--panel-border);
+}
+
+/* The player's speciality, or the button to choose one. */
+.speciality {
+    flex-direction: row;
+    align-items: center;
+}
+
+.speciality > .icon {
+    margin-right: 8px;
+    -unity-background-image-tint-color: var(--accent);
+}
+
+.speciality-name {
+    font-size: 19px;
+    color: var(--text);
+    margin: 0 14px 0 0;
+    padding: 0;
+}
+
+.speciality-choose {
+    height: 44px;
+    padding: 0 20px;
+    font-size: 18px;
+}
+
+.inventory-body {
+    flex-direction: row;
+    flex-grow: 1;
+    padding: 18px 22px 0 22px;
+}
+
+.column-title {
+    font-size: 22px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text);
+    margin: 0 0 12px 0;
+    padding: 0;
+}
+
+/* Categories down the left. */
+.categories {
+    width: 240px;
+    flex-shrink: 0;
+    margin-right: 20px;
+    padding-right: 16px;
+    border-right-width: 1px;
+    border-color: var(--panel-border);
+}
+
+.category {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    height: 50px;
+    padding: 0 14px;
+    margin: 0 0 6px 0;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-radius: 8px;
+}
+
+.category:hover {
+    background-color: var(--hover);
+}
+
+.category--selected,
+.category--selected:hover {
+    background-color: var(--selected);
+}
+
+.category-name {
+    font-size: 19px;
+    color: var(--text);
+    margin: 0;
+    padding: 0;
+}
+
+.category--selected > .category-name {
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+}
+
+.category-count {
+    font-size: 16px;
+    color: var(--text-muted);
+    margin: 0;
+    padding: 0;
+}
+
+/* The grid of items in the middle. */
+.items {
+    flex-grow: 1;
+    margin-right: 20px;
+}
+
+.items-heading {
+    flex-direction: row;
+    align-items: flex-end;
+}
+
+.items-total {
+    font-size: 17px;
+    color: var(--text-muted);
+    margin: 0 0 14px 12px;
+    padding: 0;
+}
+
+.item-search {
+    margin: 0 0 14px 0;
+}
+
+.item-search > .unity-base-text-field__input,
+.item-search > .unity-text-field__input {
+    height: 44px;
+    padding: 0 14px;
+    font-size: 19px;
+    color: var(--text);
+    background-color: var(--well);
+    border-width: 1px;
+    border-color: #4c463d;
+    border-radius: 8px;
+    --unity-cursor-color: var(--text);
+}
+
+.item-search:focus > .unity-base-text-field__input,
+.item-search:focus > .unity-text-field__input {
+    border-color: var(--accent);
+}
+
+.item-grid {
+    flex-grow: 1;
+    flex-basis: 0;
+}
+
+.item-slot {
+    width: 128px;
+    height: 148px;
+    margin: 0 10px 10px 0;
+    padding: 8px 6px 6px 6px;
+    align-items: center;
+    background-color: var(--inv-card);
+    border-width: 2px;
+    border-top-color: var(--inv-card-top);
+    border-left-color: var(--inv-card-top);
+    border-right-color: var(--inv-card-border);
+    border-bottom-color: var(--inv-card-border);
+    border-radius: 8px;
+}
+
+.item-slot:hover {
+    background-color: #d4c5a6;
+}
+
+.item-slot--selected,
+.item-slot--selected:hover {
+    background-color: #e2d5b8;
+    border-color: var(--accent);
+    border-width: 3px;
+}
+
+.item-icon {
+    width: 84px;
+    height: 84px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.item-name {
+    font-size: 15px;
+    color: var(--inv-card-text);
+    -unity-text-align: middle-center;
+    white-space: normal;
+    margin: 4px 0 0 0;
+    padding: 0;
+    overflow: hidden;
+    max-height: 38px;
+}
+
+.item-count {
+    position: absolute;
+    right: 8px;
+    top: 6px;
+    font-size: 16px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--inv-card-text);
+    margin: 0;
+    padding: 0;
+}
+
+.items-empty {
+    font-size: 19px;
+    color: var(--text-muted);
+    white-space: normal;
+    margin: 16px 0 0 0;
+}
+
+/* The chosen item, on the right: a cream sheet. */
+.details {
+    width: 380px;
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-bottom: 18px;
+    padding: 20px;
+    background-color: var(--inv-sheet);
+    border-width: 1px;
+    border-color: var(--inv-sheet-line);
+    border-radius: 10px;
+}
+
+.details-head {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.details-icon {
+    width: 104px;
+    height: 104px;
+    flex-shrink: 0;
+    margin-right: 14px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.details-titles {
+    flex-shrink: 1;
+}
+
+.details-name {
+    font-size: 25px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--inv-sheet-text);
+    white-space: normal;
+    margin: 0 0 4px 0;
+    padding: 0;
+}
+
+.details-kind {
+    font-size: 17px;
+    color: var(--inv-sheet-muted);
+    margin: 0;
+    padding: 0;
+}
+
+.details-description {
+    font-size: 18px;
+    color: var(--inv-sheet-text);
+    white-space: normal;
+    margin: 0 0 16px 0;
+    padding: 0;
+}
+
+.details-line {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-top-width: 1px;
+    border-color: var(--inv-sheet-line);
+}
+
+.details-line-label {
+    font-size: 18px;
+    color: var(--inv-sheet-muted);
+    margin: 0;
+    padding: 0;
+}
+
+.details-line-value {
+    font-size: 18px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--inv-sheet-text);
+    margin: 0;
+    padding: 0;
+}
+
+.details-nutrients {
+    flex-direction: row;
+    align-items: center;
+}
+
+.details-nutrient {
+    margin-right: 12px;
+}
+
+.inventory-footer {
+    flex-shrink: 0;
+    flex-direction: row;
+    justify-content: flex-end;
+    padding: 12px 22px 14px 22px;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-top-width: 1px;
+    border-color: var(--panel-border);
+}
+
+.inventory-last-key {
+    margin-right: 0;
+}
+
+/* The dragged item, under the pointer. */
+.drag-ghost {
+    position: absolute;
+    width: 72px;
+    height: 72px;
+    -unity-background-scale-mode: scale-to-fit;
+    opacity: 0.85;
+}

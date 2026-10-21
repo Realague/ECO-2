@@ -6,7 +6,7 @@ namespace Voxel.Client
 {
     // A round map in the corner of the screen, north up, centred on the local player: the world's
     // picture (WorldMap) slid and scaled under a round frame, the nearby animals, the other players
-    // and the local player's arrow. It is hidden while the full-screen map is open. The screen is
+    // and the local player's arrow. It is hidden while the full-screen map or the inventory is open. The screen is
     // Assets/UI/Minimap.uxml.
     public class Minimap : MonoBehaviour
     {
@@ -18,6 +18,7 @@ namespace Voxel.Client
         [SerializeField] private WorldMap worldMap;
         [SerializeField] private AppearanceMenu appearanceMenu;
         [SerializeField] private MapScreen mapScreen;
+        [SerializeField] private InventoryScreen inventoryScreen;
         [SerializeField] private UIDocument document;
 
         private VisualElement screen;
@@ -52,7 +53,7 @@ namespace Voxel.Client
         private void Update()
         {
             Texture2D texture = worldMap.Texture;
-            NetworkObject player = texture != null && networkManager.IsListening && !appearanceMenu.IsOpen && !mapScreen.IsOpen
+            NetworkObject player = texture != null && networkManager.IsListening && !appearanceMenu.IsOpen && !mapScreen.IsOpen && !inventoryScreen.IsOpen
                 ? networkManager.SpawnManager?.GetLocalPlayerObject()
                 : null;
             screen.style.display = player != null ? DisplayStyle.Flex : DisplayStyle.None;

@@ -12,7 +12,7 @@
     font-size: 20px;
     -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
     color: var(--text);
-    background-color: rgba(246, 244, 239, 0.9);
+    background-color: var(--veil);
     border-radius: 14px;
     border-width: 1px;
     border-color: var(--panel-border);
