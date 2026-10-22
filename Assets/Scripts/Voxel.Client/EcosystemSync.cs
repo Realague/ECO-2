@@ -10,13 +10,14 @@ using Voxel.Core;
 namespace Voxel.Client
 {
     // Runs the ecosystem on the server and shows it to players.
-    // Server: runs simulation steps at the clock's pace, validates player requests (felling a
-    // plant, setting the speed of time) and broadcasts changes. Client: keeps the received list of
-    // plants up to date. Every machine with a display draws the nearby plants.
+    // Server: runs simulation steps at the clock's pace, validates player requests (harvesting,
+    // setting the speed of time), finishes plants felled by hits (MiningSync: a tree falls, leaving
+    // its stump and its logs) and broadcasts changes. Client: keeps the received list of plants up to
+    // date. Every machine with a display draws the nearby plants.
     public class EcosystemSync : MonoBehaviour
     {
         private const string UpdateMessage = "Eco.Update";
-        private const string FellMessage = "Eco.Fell";
+        private const string FelledMessage = "Eco.Felled";
         private const string HarvestMessage = "Eco.Harvest";
         private const string CommandMessage = "Eco.Command";
         private const string AnimalsMessage = "Eco.Animals";
@@ -30,6 +31,13 @@ namespace Voxel.Client
 
         private const int UpdateHeaderSize = sizeof(long) + sizeof(float) + sizeof(bool) + 2 * sizeof(int);
         private const int PlantEntrySize = 4 * sizeof(int) + 2 * sizeof(byte);
+        private const int FelledSize = 4 * sizeof(int) + 3 * sizeof(byte) + sizeof(float);
+
+        // A falling tree's logs show up once it has hit the ground.
+        private const float LogsAppearAfter = PlantRenderer.FallSeconds + 0.2f;
+
+        // The first log lies this far from the tree's foot along its fall, past the stump.
+        private const float FirstLogDistance = PlantShape.StumpHeight + 0.6f;
 
         // A joining player receives the existing plants in batches, one per network tick, so as not to
         // flood their connection: 500 plants are about 9 KB.
@@ -59,6 +67,7 @@ namespace Voxel.Client
 
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private InventorySync inventorySync;
+        [SerializeField] private LogSync logSync;
 
         // The world of this machine, on which the display works out the way each animal walks.
         [SerializeField] private WorldSync worldSync;
@@ -81,7 +90,7 @@ namespace Voxel.Client
         private ItemWeights itemWeights;
         private World serverWorld;
 
-        // Server side: what a felling or a harvest being checked would give.
+        // Server side: what a felling or a harvest gives.
         private readonly List<(int item, int count)> rewards = new List<(int item, int count)>();
         private AnimalViews animalViews;
         private bool running;
@@ -239,7 +248,6 @@ namespace Voxel.Client
             // The host is a player too: it receives nearby animals like the others, without going through the network.
             if (networkManager.IsHost) animalFeeds[networkManager.LocalClientId] = new AnimalFeed();
 
-            Messaging.RegisterNamedMessageHandler(FellMessage, OnFellRequest);
             Messaging.RegisterNamedMessageHandler(HarvestMessage, OnHarvestRequest);
             Messaging.RegisterNamedMessageHandler(CommandMessage, OnCommand);
             Messaging.RegisterNamedMessageHandler(CensusRequestMessage, OnCensusRequest);
@@ -253,6 +261,7 @@ namespace Voxel.Client
         {
             running = true;
             Messaging.RegisterNamedMessageHandler(UpdateMessage, OnUpdate);
+            Messaging.RegisterNamedMessageHandler(FelledMessage, OnFelled);
             Messaging.RegisterNamedMessageHandler(AnimalsMessage, OnAnimals);
             Messaging.RegisterNamedMessageHandler(CensusMessage, OnCensus);
         }
@@ -303,36 +312,119 @@ namespace Voxel.Client
             }
         }
 
-        // Strikes what the local player is aiming at, at most maxDistance away, with the item they hold:
-        // fells the plant nearest along the ray if it is the right tool (an axe for a plant that gives
-        // wood, else a scythe). Animals are hunted with the bow, never struck. Returns false if the ray
-        // hits neither; missingTool is then, or when the strike did nothing, the tool it would have
-        // needed (Items.None when it was done). The direction must be normalized.
-        public bool TryStrike(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance, int held, out int missingTool)
+        // What a strike of the local player hits, at most maxDistance away, holding held: the plant
+        // nearest along the ray, to hit (plantId, at distance along the ray) if held is its tool (an
+        // axe for a plant that gives wood, a scythe for another, a shovel for a stump). Animals are
+        // hunted with the bow, never struck. Returns false if the ray hits neither; missingTool is
+        // then, or when the strike cannot hit, the tool it would have needed (Items.None when it can).
+        // The direction must be normalized.
+        public bool TryStrike(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance, int held, out int missingTool, out int plantId, out float distance)
         {
             missingTool = Items.None;
-            bool plantHit = TryPickPlant(origin, direction, maxDistance, out int plantId, out float plantDistance);
-            if (animalViews.TryPick(origin, direction, plantHit ? plantDistance : maxDistance, out _, out _))
+            bool plantHit = TryPickPlant(origin, direction, maxDistance, out plantId, out distance);
+            if (animalViews.TryPick(origin, direction, plantHit ? distance : maxDistance, out _, out _))
             {
                 missingTool = Items.Bow;
+                plantId = 0;
                 return true;
             }
 
             if (!plantHit) return false;
 
-            int tool = FellingTool(plants[plantId].SpeciesIndex);
+            int tool = ToolFor(plants[plantId]);
             if (held != tool)
             {
                 missingTool = tool;
-                return true;
+                plantId = 0;
             }
 
-            RequestFell(plantId);
             return true;
         }
 
         // The tool a plant of this species is felled with.
         private int FellingTool(int speciesIndex) => ToolRules.ToFell(speciesAssets[speciesIndex].WoodYield > 0);
+
+        // The tool a plant shown here is hit with: its felling tool, or a shovel to dig a stump out.
+        internal int ToolFor(PlantView view) => view.Stump ? Items.Shovel : FellingTool(view.SpeciesIndex);
+
+        internal bool TryGetView(int plantId, out PlantView view) => plants.TryGetValue(plantId, out view);
+
+        // A shown tree's trunk where its stump will be cut (PlantRenderer.TryGetTrunk), for the notch
+        // the axe cuts there. False for a stump, or a plant whose model leaves none.
+        internal bool TryGetTrunk(PlantView view, out Vector3 centre, out Vector2 halfSize, out Material cutMaterial)
+        {
+            centre = default;
+            halfSize = default;
+            cutMaterial = null;
+            return plantRenderer != null && !view.Stump && plantRenderer.TryGetTrunk(view, out centre, out halfSize, out cutMaterial);
+        }
+
+        // The wood a plant gives when felled, by its species and size.
+        private int WoodOf(int speciesIndex, int stage) => MiningRules.WoodOf(speciesAssets[speciesIndex].WoodYield, PlantShape.Scale(stage));
+
+        // Hits a plant takes: by the wood in a tree, one cut for a plant without wood, a few shovel
+        // hits for a stump.
+        internal int HitsNeeded(PlantView view) => view.Stump ? MiningRules.StumpHits : MiningRules.HitsToFell(WoodOf(view.SpeciesIndex, view.Stage));
+
+        // The calories of one hit on a plant.
+        internal float HitCalories(PlantView view)
+        {
+            if (view.Stump) return HungerRules.PerShovelHitOnStump;
+            return speciesAssets[view.SpeciesIndex].WoodYield > 0 ? HungerRules.PerAxeHit : HungerRules.PerScytheHit;
+        }
+
+        // The colour of the chips a hit on a plant of this species sends flying: its bark's.
+        internal Color ChipColour(int speciesIndex)
+        {
+            Material bark = (uint)speciesIndex < (uint)speciesAssets.Length ? speciesAssets[speciesIndex].BarkMaterial : null;
+            if (bark == null) return new Color(0.45f, 0.33f, 0.2f);
+
+            return bark.HasProperty("_BaseColor") ? bark.GetColor("_BaseColor") : bark.color;
+        }
+
+        // The aiming box of a plant shown here.
+        internal void BoundsOf(PlantView view, out Vector3 min, out Vector3 max)
+        {
+            PlantShape.GetBounds(species[view.SpeciesIndex], view.X, view.Y, view.Z, view.Stage, view.Stump, out System.Numerics.Vector3 low, out System.Numerics.Vector3 high);
+            min = low.ToUnity();
+            max = high.ToUnity();
+        }
+
+        // Client side: a plant the local player's last hit cuts (one cut, no fall), shown gone at once;
+        // the server sends it back (RestorePlantTo) if it refuses.
+        internal void PredictRemove(int plantId)
+        {
+            if (running && ecosystem == null) RemoveView(plantId);
+        }
+
+        // Server side: sends a plant as it is to a client that anticipated its removal wrongly.
+        internal void RestorePlantTo(ulong clientId, int plantId)
+        {
+            if (ecosystem == null || clientId == networkManager.LocalClientId || !ecosystem.TryGet(plantId, out Plant plant)) return;
+
+            outgoing.Clear();
+            outgoing.Add(plant);
+            SendUpdate(clientId, outgoing, null);
+        }
+
+        // Server side: whether a player's hit on a plant counts: it exists, it is within their reach,
+        // and they own the tool it takes (the server cannot see the one in hand). needed is the hits
+        // it takes, calories what a hit costs, min and max its aiming box.
+        internal bool CheckPlantHit(ulong clientId, int plantId, out int needed, out float calories, out Vector3 min, out Vector3 max)
+        {
+            needed = 0;
+            calories = 0f;
+            min = max = Vector3.zero;
+            if (ecosystem == null || !ecosystem.TryGet(plantId, out Plant plant) || !IsWithinReach(clientId, plant)) return false;
+
+            PlantView view = ViewOf(plant);
+            if (!inventorySync.Owns(clientId, ToolFor(view))) return false;
+
+            needed = HitsNeeded(view);
+            calories = HitCalories(view);
+            BoundsOf(view, out min, out max);
+            return true;
+        }
 
         // The tool a crop of this species is harvested with (Items.None: by hand).
         private int HarvestTool(int speciesIndex) => ToolRules.ToHarvest(speciesAssets[speciesIndex].Harvest == HarvestKind.Annual);
@@ -376,17 +468,19 @@ namespace Voxel.Client
             if (!plantHit) return false;
 
             PlantView plant = plants[plantId];
-            tool = FellingTool(plant.SpeciesIndex);
-            name = plant.Stage < Plant.StageCount - 1 ? youngPlantNames[plant.SpeciesIndex]
-                : ripePlantNames[plant.SpeciesIndex][Mathf.Clamp(plant.RipeStage, 0, Plant.RipeStageCount)];
+            tool = ToolFor(plant);
+            if (plant.Stump) name = plantNames[plant.SpeciesIndex] + " stump";
+            else if (plant.Stage < Plant.StageCount - 1) name = youngPlantNames[plant.SpeciesIndex];
+            else name = ripePlantNames[plant.SpeciesIndex][Mathf.Clamp(plant.RipeStage, 0, Plant.RipeStageCount)];
             return true;
         }
 
-        // Names shown when aiming, worked out once; a crop's name says how ripe it is.
-        private string[] animalNames;
-        private string[] plantNames;
-        private string[] youngPlantNames;
-        private string[][] ripePlantNames;
+        // Names shown when aiming, worked out once; a crop's name says how ripe it is. Not kept across
+        // a script reload: the Editor would keep the flat arrays but not the jagged one.
+        [NonSerialized] private string[] animalNames;
+        [NonSerialized] private string[] plantNames;
+        [NonSerialized] private string[] youngPlantNames;
+        [NonSerialized] private string[][] ripePlantNames;
 
         // The plant nearest along the ray. A plant's aiming box stays within its own column, so only
         // the columns the ray crosses are looked at, walked one after the other (Amanatides and Woo, in
@@ -413,7 +507,7 @@ namespace Voxel.Client
                 if (plantAtColumn.TryGetValue(ColumnKey(x, z), out int id) && plants.TryGetValue(id, out PlantView plant))
                 {
                     PlantShape.GetBounds(
-                        species[plant.SpeciesIndex], plant.X, plant.Y, plant.Z, plant.Stage,
+                        species[plant.SpeciesIndex], plant.X, plant.Y, plant.Z, plant.Stage, plant.Stump,
                         out System.Numerics.Vector3 min, out System.Numerics.Vector3 max);
 
                     float distance = PlantShape.RayDistance(origin, direction, min, max);
@@ -525,26 +619,6 @@ namespace Voxel.Client
             return text.ToString();
         }
 
-        // Felling requested by the local player. The server decides; a client removes the plant right
-        // away for responsiveness, and the server sends it back if it refuses.
-        public void RequestFell(int plantId)
-        {
-            if (!running) return;
-
-            if (ecosystem != null)
-            {
-                TryFell(networkManager.LocalClientId, plantId);
-                return;
-            }
-
-            RemoveView(plantId);
-            using (var writer = new FastBufferWriter(sizeof(int), Allocator.Temp))
-            {
-                writer.WriteValueSafe(plantId);
-                Messaging.SendNamedMessage(FellMessage, NetworkManager.ServerClientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
-            }
-        }
-
         // Right click: picks the crop of the plant aimed at, at most maxDistance away: an annual with a
         // scythe held, a perennial's fruit by hand. Returns false if the ray hits no ripe crop, the
         // click then using the held item; missingTool is the scythe when an annual was aimed at without it.
@@ -565,8 +639,8 @@ namespace Voxel.Client
             return true;
         }
 
-        // Harvest requested by the local player, on the same principle as felling: a client shows the
-        // result right away (an annual pulled up, a perennial without its fruit), and the server sends
+        // Harvest requested by the local player. The server decides; a client shows the result right
+        // away (an annual pulled up, a perennial without its fruit), and the server sends
         // the plant back if it refuses.
         public void RequestHarvest(int plantId)
         {
@@ -839,26 +913,107 @@ namespace Voxel.Client
             removedPlants.Add(plantId);
         }
 
-        private bool TryFell(ulong clientId, int plantId)
+        // Server side: the last hit on a plant (MiningSync). A stump is dug out, leaving a log. A
+        // tree falls (every machine plays its fall: Eco.Felled), leaving its stump, which sprouts again
+        // later, and its wood as logs along where it fell, to pick up; a plant without wood is cut. A
+        // seed if it was adult and its crop if it was ripe go to the player, what they can carry of it,
+        // so nothing is lost by felling rather than picking it.
+        internal void FinishPlant(ulong clientId, int plantId)
         {
-            if (!ecosystem.TryGet(plantId, out Plant plant) || !IsWithinReach(clientId, plant)) return false;
+            if (ecosystem == null || !ecosystem.TryGet(plantId, out Plant plant)) return;
 
-            // The server cannot know which tool is in hand (the hotbar's choice is the client's): the
-            // player must at least own the right one.
-            if (!inventorySync.Owns(clientId, FellingTool(plant.SpeciesIndex))) return false;
+            var foot = new Vector3(plant.X + 0.5f, plant.Y, plant.Z + 0.5f);
+            if (plant.IsStump)
+            {
+                ecosystem.Remove(plantId);
+                logSync.DropAt(foot, UnityEngine.Random.Range(0f, 2f * Mathf.PI), plant.SpeciesIndex);
+                return;
+            }
 
-            // Felling yields wood according to the plant's size, a seed if it was adult, and its
-            // crop if it was ripe, so nothing is lost by felling rather than picking it. A player who
-            // can carry none of it cannot fell it; otherwise they get what they can carry.
             SpeciesAsset asset = speciesAssets[plant.SpeciesIndex];
             rewards.Clear();
-            rewards.Add((Items.Wood, Mathf.RoundToInt(asset.WoodYield * PlantShape.Scale(plant.Stage))));
             if (plant.Growth >= 1f) rewards.Add((Items.Seed(plant.SpeciesIndex), 1));
             if (asset.Harvest != HarvestKind.None) AddCrop(plant.SpeciesIndex, plant.RipeStage, false);
-            if (!inventorySync.CanReceiveAny(clientId, rewards) || !ecosystem.Remove(plantId)) return false;
-
             GiveRewards(clientId);
-            return true;
+
+            int wood = WoodOf(plant.SpeciesIndex, plant.Stage);
+            if (wood <= 0)
+            {
+                ecosystem.Remove(plantId);
+                return;
+            }
+
+            // It falls away from the player.
+            Vector3 away = foot - PlayerPosition(clientId, foot);
+            away.y = 0f;
+            Vector3 direction = away.sqrMagnitude > 1e-4f ? away.normalized : Vector3.right;
+            float yaw = Mathf.Atan2(direction.x, direction.z);
+
+            PlantView view = ViewOf(plant);
+            bool stump = asset.HasStump;
+            BroadcastFelled(plantId, view, yaw, stump);
+            plantRenderer?.StartFall(view, yaw);
+            if (stump) ecosystem.CutToStump(plantId);
+            else ecosystem.Remove(plantId);
+
+            float length = Mathf.Max(FirstLogDistance, species[plant.SpeciesIndex].Height * PlantShape.Scale(plant.Stage));
+            logSync.DropAlongFall(foot, direction, FirstLogDistance, length, MiningRules.LogsOf(wood), plant.SpeciesIndex, LogsAppearAfter);
+        }
+
+        // Where a player stands, or fallback if they are gone.
+        private Vector3 PlayerPosition(ulong clientId, Vector3 fallback)
+        {
+            return networkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client) && client.PlayerObject != null
+                ? client.PlayerObject.transform.position
+                : fallback;
+        }
+
+        // Tells every other machine a tree fell, so that they play its fall before showing its stump.
+        private void BroadcastFelled(int plantId, PlantView view, float yaw, bool stump)
+        {
+            using (var writer = new FastBufferWriter(FelledSize, Allocator.Temp))
+            {
+                writer.WriteValueSafe(plantId);
+                writer.WriteValueSafe((byte)view.SpeciesIndex);
+                writer.WriteValueSafe(view.X);
+                writer.WriteValueSafe(view.Y);
+                writer.WriteValueSafe(view.Z);
+                writer.WriteValueSafe(PackStages(view.Stage, view.RipeStage, false));
+                writer.WriteValueSafe(yaw);
+                writer.WriteValueSafe(stump ? (byte)1 : (byte)0);
+                foreach (ulong clientId in networkManager.ConnectedClientsIds)
+                {
+                    if (clientId != networkManager.LocalClientId) Messaging.SendNamedMessage(FelledMessage, clientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
+                }
+            }
+        }
+
+        // A tree fell: its fall is played, and it is replaced at once by its stump (or nothing), which
+        // the next update confirms.
+        private void OnFelled(ulong senderId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out int plantId);
+            reader.ReadValueSafe(out byte speciesIndex);
+            reader.ReadValueSafe(out int x);
+            reader.ReadValueSafe(out int y);
+            reader.ReadValueSafe(out int z);
+            reader.ReadValueSafe(out byte stages);
+            reader.ReadValueSafe(out float yaw);
+            reader.ReadValueSafe(out byte stump);
+            if (speciesIndex >= species.Count || !float.IsFinite(yaw)) return;
+
+            PlantView view = UnpackView(speciesIndex, x, y, z, stages);
+            plantRenderer?.StartFall(view, yaw);
+            if (stump != 0)
+            {
+                view.Stump = true;
+                view.RipeStage = 0;
+                SetView(plantId, view);
+            }
+            else
+            {
+                RemoveView(plantId);
+            }
         }
 
         // Server side: a player picks a ripe crop. An annual is pulled up and gives seeds too.
@@ -904,7 +1059,7 @@ namespace Voxel.Client
 
             Vector3 eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;
             PlantShape.GetBounds(
-                species[plant.SpeciesIndex], plant.X, plant.Y, plant.Z, plant.Stage,
+                species[plant.SpeciesIndex], plant.X, plant.Y, plant.Z, plant.Stage, plant.IsStump,
                 out System.Numerics.Vector3 min, out System.Numerics.Vector3 max);
 
             float maxDistance = PlayerRules.Reach + BlockEditRules.ReachTolerance;
@@ -963,20 +1118,6 @@ namespace Voxel.Client
 
             int speciesIndex = Items.ProduceSpecies(item);
             return speciesIndex < speciesAssets.Length ? speciesAssets[speciesIndex].Food : default;
-        }
-
-        private void OnFellRequest(ulong senderId, FastBufferReader reader)
-        {
-            reader.ReadValueSafe(out int plantId);
-            if (TryFell(senderId, plantId)) return;
-
-            // Refusal: if the plant still exists, it is sent back to the requester, who had removed it in anticipation.
-            if (ecosystem.TryGet(plantId, out Plant plant))
-            {
-                outgoing.Clear();
-                outgoing.Add(plant);
-                SendUpdate(senderId, outgoing, null);
-            }
         }
 
         private void OnHarvestRequest(ulong senderId, FastBufferReader reader)
@@ -1267,7 +1408,7 @@ namespace Voxel.Client
                     writer.WriteValueSafe(plant.X);
                     writer.WriteValueSafe(plant.Y);
                     writer.WriteValueSafe(plant.Z);
-                    writer.WriteValueSafe(PackStages(plant.Stage, plant.RipeStage));
+                    writer.WriteValueSafe(PackStages(plant.Stage, plant.RipeStage, plant.IsStump));
                 }
 
                 writer.WriteValueSafe(removedCount);
@@ -1305,7 +1446,7 @@ namespace Voxel.Client
                 // A species unknown to this client cannot be displayed: it is ignored.
                 if (speciesIndex >= species.Count) continue;
 
-                SetView(plantId, new PlantView { SpeciesIndex = speciesIndex, X = x, Y = y, Z = z, Stage = stage & StageMask, RipeStage = stage >> RipeShift });
+                SetView(plantId, UnpackView(speciesIndex, x, y, z, stage));
             }
 
             reader.ReadValueSafe(out int removedCount);
@@ -1316,16 +1457,32 @@ namespace Voxel.Client
             }
         }
 
-        // A plant's growth stage (0 to Plant.StageCount - 1) and stage of ripeness (0 to
-        // Plant.RipeStageCount) travel in one byte: growth in the low bits, ripeness in the top two.
+        // A plant's growth stage (0 to Plant.StageCount - 1), whether it is a stump and its stage of
+        // ripeness (0 to Plant.RipeStageCount) travel in one byte: growth in the low three bits, the
+        // stump in the next, ripeness in the top two.
+        private const int StageBits = 3;
+        private const int StageMask = (1 << StageBits) - 1;
+        private const int StumpBit = 1 << StageBits;
         private const int RipeShift = 6;
-        private const int StageMask = (1 << RipeShift) - 1;
 
-        private static byte PackStages(int stage, int ripeStage) => (byte)(stage | (ripeStage << RipeShift));
+        private static byte PackStages(int stage, int ripeStage, bool stump) => (byte)(stage | (stump ? StumpBit : 0) | (ripeStage << RipeShift));
+
+        private static PlantView UnpackView(int speciesIndex, int x, int y, int z, byte stages)
+        {
+            return new PlantView
+            {
+                SpeciesIndex = speciesIndex, X = x, Y = y, Z = z,
+                Stage = stages & StageMask, Stump = (stages & StumpBit) != 0, RipeStage = stages >> RipeShift
+            };
+        }
 
         private static PlantView ViewOf(Plant plant)
         {
-            return new PlantView { SpeciesIndex = plant.SpeciesIndex, X = plant.X, Y = plant.Y, Z = plant.Z, Stage = plant.Stage, RipeStage = plant.RipeStage };
+            return new PlantView
+            {
+                SpeciesIndex = plant.SpeciesIndex, X = plant.X, Y = plant.Y, Z = plant.Z,
+                Stage = plant.Stage, RipeStage = plant.RipeStage, Stump = plant.IsStump
+            };
         }
 
         private sealed class AnimalFeed

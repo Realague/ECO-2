@@ -11,7 +11,11 @@ namespace Eco.Sim
     public sealed partial class Ecosystem
     {
         private const uint Magic = 0x454F4345; // "ECOE"
-        private const int FormatVersion = 8;
+        private const int FormatVersion = 9;
+
+        // Last format without stumps (a plant's age may now be negative: Plant.IsStump). Same layout:
+        // it loads as is.
+        private const int FormatWithoutStumps = 8;
 
         // Last format without animals' wounds (Animal.Damage). It still loads, every animal unhurt.
         private const int FormatWithoutDamage = 7;
@@ -120,7 +124,7 @@ namespace Eco.Sim
                 }
 
                 int formatVersion = reader.ReadInt32();
-                if (formatVersion != FormatVersion && formatVersion != FormatWithoutDamage && formatVersion != FormatWithoutNutrients && formatVersion != FormatWithoutFruit && formatVersion != FormatWithoutCarriedSeeds && formatVersion != FormatWithoutCarrion && formatVersion != FormatWithoutAnimals)
+                if (formatVersion != FormatVersion && formatVersion != FormatWithoutStumps && formatVersion != FormatWithoutDamage && formatVersion != FormatWithoutNutrients && formatVersion != FormatWithoutFruit && formatVersion != FormatWithoutCarriedSeeds && formatVersion != FormatWithoutCarrion && formatVersion != FormatWithoutAnimals)
                 {
                     throw new InvalidDataException(
                         $"Unsupported ecosystem save format {formatVersion} (expected: {FormatVersion}).");
@@ -183,7 +187,8 @@ namespace Eco.Sim
                         && (uint)plant.X < (uint)world.SizeX
                         && (uint)plant.Z < (uint)world.SizeZ
                         && plant.Id > previousId
-                        && plant.Fruit >= 0f && plant.Fruit <= 1f;
+                        && plant.Fruit >= 0f && plant.Fruit <= 1f
+                        && plant.Age >= -StumpRegrowSteps;
                     if (!valid)
                     {
                         throw new InvalidDataException($"Invalid plant in the ecosystem save (id {plant.Id}).");

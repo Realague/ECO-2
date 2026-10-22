@@ -1,10 +1,9 @@
 namespace Voxel.Core
 {
-    // How heavy each item is, in kg, for the carrying limit. Blocks weigh nothing here: they are
-    // counted apart (CarryLimits.MaxBlocks). A crop's weight comes from its species, given by index.
+    // How heavy each item is, in kg, for the carrying limit. Blocks and wood weigh nothing here: they
+    // are counted apart (CarryLimits.MaxBlocks). A crop's weight comes from its species, given by index.
     public sealed class ItemWeights
     {
-        public const float Wood = 1f;
         public const float Straw = 0.3f;
         public const float Seed = 0.01f;
         public const float Arrow = 0.05f;
@@ -18,7 +17,6 @@ namespace Voxel.Core
 
         public float Of(int item)
         {
-            if (item == Items.Wood) return Wood;
             if (item == Items.Straw) return Straw;
             if (item == Items.Arrow) return Arrow;
             if (Items.IsSeed(item)) return Seed;

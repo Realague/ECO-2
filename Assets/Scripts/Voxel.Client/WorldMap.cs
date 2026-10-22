@@ -161,6 +161,13 @@ namespace Voxel.Client
 
         private void OnPlantShown(int plantId, PlantView plant)
         {
+            // A stump has no crown to see from above.
+            if (plant.Stump)
+            {
+                OnPlantHidden(plantId, plant);
+                return;
+            }
+
             TileAt(plant.X >> TileBits, plant.Z >> TileBits).Plants[plantId] = plant;
             MarkDirty(plant.X - plantReach, plant.Z - plantReach, plant.X + plantReach, plant.Z + plantReach);
         }

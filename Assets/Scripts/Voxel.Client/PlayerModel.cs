@@ -80,6 +80,18 @@ namespace Voxel.Client
         private readonly NetworkVariable<int> heldTool = new NetworkVariable<int>(
             Items.None, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
+        // The owner's swings so far (wrapping round): each new one plays a swing of the right arm and
+        // its tool on every machine.
+        private readonly NetworkVariable<byte> swingCount = new NetworkVariable<byte>(
+            0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
+        // A swing: the arm chops down to the hit (Impact), then comes back up past where it holds the
+        // tool and settles (MiningRules.SwingSeconds in all).
+        private const float SwingImpactSeconds = 0.06f;
+        private const float SwingChopDegrees = 30f;
+        private const float SwingRaiseDegrees = 60f;
+        private const float SwingElbowDegrees = 25f;
+
         // One mesh per tool, shared by every player: a submesh per material, the grip at the origin.
         private static readonly Dictionary<int, Mesh> ToolMeshes = new Dictionary<int, Mesh>();
 
@@ -122,6 +134,8 @@ namespace Voxel.Client
         private int ownTool;
         private int toolShown = -1;
         private GameObject toolObject;
+        private float swingStart = -10f;
+        private byte swingsSeen;
 
         private static VoxelWorld voxelWorld;
 
@@ -149,6 +163,14 @@ namespace Voxel.Client
         {
             ownTool = Items.IsTool(item) ? item : Items.None;
             if (IsSpawned && IsOwner && heldTool.Value != ownTool) heldTool.Value = ownTool;
+        }
+
+        // Called by the owner's controller when it swings its tool (MiningSync): the swing plays here at
+        // once and on the other machines when the count reaches them.
+        public void Swing()
+        {
+            swingStart = Time.time;
+            if (IsSpawned && IsOwner) swingCount.Value = (byte)(swingCount.Value + 1);
         }
 
         // True once the player has chosen an appearance (it is then the same on every machine).
@@ -205,6 +227,7 @@ namespace Voxel.Client
             ShowCode(appearanceCode.Value, true);
             if (IsOwner) SetHeadVisible(false);
             lastPosition = transform.position;
+            swingsSeen = swingCount.Value;
         }
 
         public override void OnNetworkDespawn()
@@ -330,6 +353,13 @@ namespace Voxel.Client
             int tool = IsSpawned && !IsOwner ? heldTool.Value : ownTool;
             if (tool != toolShown) ShowTool(tool);
 
+            // Another player swung: their arm swings here too.
+            if (IsSpawned && !IsOwner && swingCount.Value != swingsSeen)
+            {
+                swingsSeen = swingCount.Value;
+                swingStart = Time.time;
+            }
+
             ApplyPose(Time.time);
         }
 
@@ -362,9 +392,32 @@ namespace Voxel.Client
             // A tool in the right hand: that arm swings half as much and holds it in front.
             float holding = toolObject != null ? 1f : 0f;
             float rightSwing = swing * (1f - 0.5f * holding);
-            rightUpperArm.localRotation = Quaternion.Euler(rightSwing * ArmSwing - airborne * 35f - holding * HoldingArmRaise, 0f, sway + airborne * 40f);
+            SwingPose(time - swingStart, holding, out float chop, out float straighten);
+            rightUpperArm.localRotation = Quaternion.Euler(rightSwing * ArmSwing - airborne * 35f - holding * HoldingArmRaise + chop, 0f, sway + airborne * 40f);
             leftForearm.localRotation = Quaternion.Euler(-(10f + Mathf.Max(0f, swing) * ElbowBend + airborne * 25f), 0f, 0f);
-            rightForearm.localRotation = Quaternion.Euler(-(10f + holding * (HoldingElbowBend - 10f) + Mathf.Max(0f, -rightSwing) * ElbowBend + airborne * 25f), 0f, 0f);
+            rightForearm.localRotation = Quaternion.Euler(-(10f + holding * (HoldingElbowBend - 10f) + Mathf.Max(0f, -rightSwing) * ElbowBend + airborne * 25f) + straighten, 0f, 0f);
+        }
+
+        // A tool's swing, elapsed seconds after it started: the arm chops down to the hit, the forearm
+        // straightening, then comes back up past where it holds the tool and settles. Nothing without
+        // a tool in hand or once the swing is over.
+        private static void SwingPose(float elapsed, float holding, out float chop, out float straighten)
+        {
+            chop = 0f;
+            straighten = 0f;
+            if (holding <= 0f || elapsed < 0f || elapsed >= MiningRules.SwingSeconds) return;
+
+            if (elapsed < SwingImpactSeconds)
+            {
+                float u = elapsed / SwingImpactSeconds;
+                chop = SwingChopDegrees * u;
+                straighten = SwingElbowDegrees * u;
+                return;
+            }
+
+            float back = (elapsed - SwingImpactSeconds) / (MiningRules.SwingSeconds - SwingImpactSeconds);
+            chop = SwingChopDegrees * (1f - back) - SwingRaiseDegrees * Mathf.Sin(Mathf.PI * back);
+            straighten = SwingElbowDegrees * (1f - back);
         }
 
         // Out of the sky's reach (in a tunnel, under a roof) the body darkens like the blocks around

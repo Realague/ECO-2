@@ -496,7 +496,7 @@ namespace Eco.Sim
             if (speciesPlusOne == 0 || !eatsPlant[eaterSpecies * species.Length + speciesPlusOne - 1]) return false;
 
             Plant plant = plants[IndexOf(plantAtColumn[column])];
-            if (plant.Growth < MinEdibleGrowth) return false;
+            if (plant.IsStump || plant.Growth < MinEdibleGrowth) return false;
 
             // Ripe fruit is within reach of whoever eats it, however tall the tree: birds, deer under apple trees.
             if (plant.RipeStage >= 1 && species[plant.SpeciesIndex].Harvest == HarvestKind.Perennial) return true;

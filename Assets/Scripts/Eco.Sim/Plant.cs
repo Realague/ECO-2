@@ -16,6 +16,8 @@ namespace Eco.Sim
         public int Y;
         public int Z;
 
+        // Steps lived. Negative for a stump left by a felled tree (Ecosystem.CutToStump): it counts up
+        // to 0, when the stump sprouts again; int.MinValue marks a plant removed (Ecosystem.RemovedAge).
         public int Age;
 
         // From 0 (seed) to 1 (adult).
@@ -36,6 +38,10 @@ namespace Eco.Sim
         public int Stage => StageOf(Growth);
 
         public int RipeStage => RipeStageOf(Fruit);
+
+        // A stump waiting to sprout again: it keeps its column, but neither feeds, seeds, shades nor
+        // is eaten.
+        public bool IsStump => Age < 0 && Age != int.MinValue;
 
         public static int StageOf(float growth) => Math.Min(StageCount - 1, (int)(growth * StageCount));
 
@@ -64,13 +70,21 @@ namespace Eco.Sim
         private const float MinHalfWidth = 0.15f;
         private const float MinHeight = 0.3f;
 
+        // How high a stump stands, whatever the tree.
+        public const float StumpHeight = 0.6f;
+
         public static float Scale(int stage) => (stage + 1) / (float)Plant.StageCount;
 
         public static void GetBounds(Species species, int x, int y, int z, int stage, out Vector3 min, out Vector3 max)
         {
+            GetBounds(species, x, y, z, stage, false, out min, out max);
+        }
+
+        public static void GetBounds(Species species, int x, int y, int z, int stage, bool stump, out Vector3 min, out Vector3 max)
+        {
             float scale = Scale(stage);
             float halfWidth = Math.Max(MinHalfWidth, species.Width * scale * 0.5f);
-            float height = Math.Max(MinHeight, species.Height * scale);
+            float height = stump ? StumpHeight : Math.Max(MinHeight, species.Height * scale);
             min = new Vector3(x + 0.5f - halfWidth, y, z + 0.5f - halfWidth);
             max = new Vector3(x + 0.5f + halfWidth, y + height, z + 0.5f + halfWidth);
         }

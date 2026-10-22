@@ -7,14 +7,15 @@ namespace Eco.Sim
     // the simulation does.
     public sealed partial class Ecosystem
     {
-        // The number of plants of each species, young ones included, in the order of the species.
+        // The number of plants of each species, young ones included and stumps left out, in the order
+        // of the species.
         public int[] PlantCounts()
         {
             CompactRemoved();
             var counts = new int[species.Length];
             for (int i = 0; i < plantCount; i++)
             {
-                counts[plants[i].SpeciesIndex]++;
+                if (!plants[i].IsStump) counts[plants[i].SpeciesIndex]++;
             }
 
             return counts;
@@ -44,7 +45,7 @@ namespace Eco.Sim
             int cellsX = CensusCellsX(cellSize);
             for (int i = 0; i < plantCount; i++)
             {
-                if (plants[i].SpeciesIndex == speciesIndex) cells[plants[i].X / cellSize + cellsX * (plants[i].Z / cellSize)]++;
+                if (plants[i].SpeciesIndex == speciesIndex && !plants[i].IsStump) cells[plants[i].X / cellSize + cellsX * (plants[i].Z / cellSize)]++;
             }
 
             return cells;

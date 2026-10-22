@@ -23,14 +23,29 @@ namespace Voxel.Core.Tests
         public void Weight_IsShared_ByEverythingThatIsNotABlock()
         {
             var inventory = new Inventory();
-            inventory.Add(Items.Wood, 20);
+            inventory.Add(Items.Produce(1), 20);
             inventory.Add(Items.Produce(0), 10);
             inventory.Add(Items.Seed(3), 100);
 
             Assert.AreEqual(20f + 2f + 1f, CarryLimits.Weight(inventory, Weights), 1e-4f);
-            Assert.AreEqual(7, CarryLimits.Room(inventory, Items.Wood, Weights));
+            Assert.AreEqual(7, CarryLimits.Room(inventory, Items.Produce(1), Weights));
             Assert.AreEqual(35, CarryLimits.Room(inventory, Items.Produce(0), Weights), "7 kg of 0.2 kg crops");
             Assert.AreEqual(CarryLimits.MaxBlocks, CarryLimits.Room(inventory, Blocks.Stone, Weights), "blocks do not take weight");
+        }
+
+        [Test]
+        public void Wood_CountsAsBlocks_AndWeighsNothing()
+        {
+            var inventory = new Inventory();
+            inventory.Add(Blocks.Stone, 25);
+            inventory.Add(Items.Wood, 10);
+
+            Assert.IsTrue(CarryLimits.CountsAsBlock(Items.Wood));
+            Assert.IsFalse(Items.IsBlock(Items.Wood), "it is still not a block to place");
+            Assert.AreEqual(35, CarryLimits.BlockCount(inventory));
+            Assert.AreEqual(0f, CarryLimits.Weight(inventory, Weights));
+            Assert.AreEqual(5, CarryLimits.Room(inventory, Items.Wood, Weights));
+            Assert.AreEqual(5, CarryLimits.Room(inventory, Blocks.Dirt, Weights), "wood and blocks share the 40");
         }
 
         [Test]

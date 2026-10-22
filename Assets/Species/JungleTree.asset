@@ -37,7 +37,13 @@ MonoBehaviour:
   produceYield: 3
   seedYield: 2
   strawYield: 0
+  produceWeight: 0.2
   fruitDays: 3
+  calories: 0
+  carbs: 0
+  protein: 0
+  fat: 0
+  vitamins: 0
   height: 19.4
   width: 1
   models:
@@ -58,6 +64,17 @@ MonoBehaviour:
       scale: {x: 1, y: 1, z: 1}
       shadowMesh: {fileID: 0}
     fruits: []
+    stump:
+    - mesh: {fileID: 4300000, guid: 51ebdca56d9f46f41b76e347f068c1c6, type: 2}
+      material: {fileID: 2100000, guid: dc9fdae1262d4154f814b127a9c07d9a, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: 2921bcc5ed1de33488d37321631b70b8, type: 2}
+      material: {fileID: 2100000, guid: a5265f9b2e89b6145b3cde7c40adc3e8, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
   - parts:
     - mesh: {fileID: 4300000, guid: 57a4c07205645cd44bce426863da6abe, type: 2}
       material: {fileID: 2100000, guid: dc9fdae1262d4154f814b127a9c07d9a, type: 2}
@@ -75,3 +92,14 @@ MonoBehaviour:
       scale: {x: 1, y: 1, z: 1}
       shadowMesh: {fileID: 0}
     fruits: []
+    stump:
+    - mesh: {fileID: 4300000, guid: d7f12ee961f36fc4cb7d0f7cb27dc159, type: 2}
+      material: {fileID: 2100000, guid: dc9fdae1262d4154f814b127a9c07d9a, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: afaf2cf46a724f44e8a34f246ca4d0eb, type: 2}
+      material: {fileID: 2100000, guid: a5265f9b2e89b6145b3cde7c40adc3e8, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}

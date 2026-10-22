@@ -35,6 +35,9 @@ namespace Voxel.Client
         private static readonly Color UnderwaterFog = new Color(0.10f, 0.28f, 0.42f);
         private const float NightUnderwaterShare = 0.08f;
 
+        // A click during a swing is kept this long, and strikes as soon as the swing is over.
+        private const float StrikeQueueSeconds = 0.25f;
+
         [SerializeField] private float moveSpeed = 5f;
         [SerializeField] private float jumpHeight = 1.25f;
         [SerializeField] private float gravity = 25f;
@@ -45,6 +48,8 @@ namespace Voxel.Client
         private InventorySync inventorySync;
         private HungerSync hungerSync;
         private BowSync bowSync;
+        private MiningSync miningSync;
+        private LogSync logSync;
         private HotbarHud hotbar;
         private InventoryScreen inventoryScreen;
         private PlayerModel model;
@@ -57,6 +62,9 @@ namespace Voxel.Client
         private float pitch;
         private float faceZoom;
         private bool showsUnderwater;
+
+        // When the last click not yet struck came, or -1.
+        private float queuedStrike = -1f;
 
         // The last move was stopped by a block on the side.
         private bool againstWall;
@@ -77,6 +85,8 @@ namespace Voxel.Client
             inventorySync = FindAnyObjectByType<InventorySync>();
             hungerSync = FindAnyObjectByType<HungerSync>();
             bowSync = FindAnyObjectByType<BowSync>();
+            miningSync = FindAnyObjectByType<MiningSync>();
+            logSync = FindAnyObjectByType<LogSync>();
             hotbar = FindAnyObjectByType<HotbarHud>();
             inventoryScreen = FindAnyObjectByType<InventoryScreen>();
             model = GetComponent<PlayerModel>();
@@ -298,7 +308,11 @@ namespace Voxel.Client
                 bowSync.CancelDraw();
             }
 
-            bool strike = mouse.leftButton.wasPressedThisFrame && held != Items.Bow;
+            // A left click is one hit with the held tool, struck as soon as the last swing is over.
+            if (mouse.leftButton.wasPressedThisFrame && held != Items.Bow) queuedStrike = Time.time;
+            if (queuedStrike >= 0f && Time.time - queuedStrike > StrikeQueueSeconds) queuedStrike = -1f;
+
+            bool strike = queuedStrike >= 0f && miningSync.CanSwing;
             bool use = mouse.rightButton.wasPressedThisFrame;
             if (!strike && !use) return;
 
@@ -306,58 +320,32 @@ namespace Voxel.Client
             System.Numerics.Vector3 direction = cameraTransform.forward.ToNumerics();
             bool blockHit = VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, out VoxelHit hit);
 
-            // A left click strikes the targeted plant (or tells that animals need the bow) if it is in
-            // front of the targeted block; a right click picks the targeted crop if it is ripe, else
-            // picks up the arrow pointed at.
+            // What is in front of the targeted block counts first: a plant, an animal, a log, an arrow.
             float reachedDistance = blockHit ? hit.Distance : PlayerRules.Reach;
-            int missing;
-            if (strike && ecosystemSync.TryStrike(origin, direction, reachedDistance, held, out missing))
+            if (strike)
+            {
+                queuedStrike = -1f;
+                Strike(held, origin, direction, blockHit, hit, reachedDistance);
+                return;
+            }
+
+            // A right click picks the targeted crop if it is ripe, else picks up the log or arrow
+            // pointed at, else eats held food, else uses the held item.
+            if (ecosystemSync.TryHarvestAimed(origin, direction, reachedDistance, held, out int missing))
             {
                 TellMissing(missing);
                 return;
             }
 
-            if (use)
-            {
-                if (ecosystemSync.TryHarvestAimed(origin, direction, reachedDistance, held, out missing))
-                {
-                    TellMissing(missing);
-                    return;
-                }
+            if (TryPickUp(reachedDistance)) return;
 
-                if (bowSync.TryPickupAimed(cameraTransform.position, cameraTransform.forward, reachedDistance)) return;
-
-                // Food in hand is eaten, wherever the player looks.
-                if (TryEat(held)) return;
-            }
+            // Food in hand is eaten, wherever the player looks.
+            if (TryEat(held)) return;
 
             if (!blockHit) return;
 
             // The server has the last word: the request goes through WorldSync, never through World.SetBlock.
             ushort aimed = world.GetBlock(hit.Block);
-            if (strike)
-            {
-                if (!Blocks.IsBreakable(aimed)) return;
-
-                // A shovel for soft ground, a pickaxe for anything hard.
-                int tool = ToolRules.ToBreak(aimed);
-                if (held != tool)
-                {
-                    TellMissing(tool);
-                    return;
-                }
-
-                // A block the player cannot carry stays in place, and the server would refuse it anyway.
-                int drop = Items.DropOf(aimed);
-                if (inventorySync.LocalRoomFor(drop) <= 0)
-                {
-                    inventorySync.TellLocalFull(InventorySync.ReasonFor(drop));
-                    return;
-                }
-
-                worldSync.RequestSetBlock(hit.Block, Blocks.Air);
-                return;
-            }
 
             // A right click uses the held item: the hoe tills, a seed is sown on tilled soil, a block is placed.
             if (held == Items.Hoe)
@@ -387,6 +375,84 @@ namespace Voxel.Client
             {
                 worldSync.RequestSetBlock(target, Items.BlockOf(held));
             }
+        }
+
+        // One hit with the held tool on what the player aims at: the plant in front (or animals: the
+        // bow), else the block, if it is the right tool (a shovel for soft ground, a pickaxe for anything
+        // hard, an axe for wood, a scythe for the rest, a shovel for a stump). With the wrong one, the
+        // player is told which; with a tool and nothing to hit, it swings in the air.
+        private void Strike(int held, System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, bool blockHit, VoxelHit hit, float reachedDistance)
+        {
+            bool starving = hungerSync.Stomach.IsStarving;
+            if (ecosystemSync.TryStrike(origin, direction, reachedDistance, held, out int missing, out int plantId, out float distance))
+            {
+                if (missing != Items.None)
+                {
+                    TellMissing(missing);
+                    return;
+                }
+
+                if (miningSync.TryStartSwing(model, starving)) miningSync.HitPlant(plantId, (origin + direction * distance).ToUnity());
+                return;
+            }
+
+            if (blockHit)
+            {
+                ushort aimed = world.GetBlock(hit.Block);
+                if (Blocks.IsBreakable(aimed))
+                {
+                    int tool = ToolRules.ToBreak(aimed);
+                    if (held != tool)
+                    {
+                        TellMissing(tool);
+                        return;
+                    }
+
+                    // A block the player cannot carry stays in place, and the server would refuse it anyway.
+                    int drop = Items.DropOf(aimed);
+                    if (inventorySync.LocalRoomFor(drop) <= 0)
+                    {
+                        inventorySync.TellLocalFull(InventorySync.ReasonFor(drop));
+                        return;
+                    }
+
+                    if (miningSync.TryStartSwing(model, starving))
+                    {
+                        miningSync.HitBlock(hit.Block, aimed, FaceOf(hit.Normal), (origin + direction * hit.Distance).ToUnity());
+                    }
+
+                    return;
+                }
+            }
+
+            if (Items.IsTool(held)) miningSync.TryStartSwing(model, starving);
+        }
+
+        // Picks up the log or arrow pointed at, the nearer of the two. Returns false if there is none.
+        private bool TryPickUp(float maxDistance)
+        {
+            Vector3 origin = cameraTransform.position;
+            Vector3 forward = cameraTransform.forward;
+            bool log = logSync.TryAimed(origin, forward, maxDistance, out int logId, out float logDistance);
+            bool arrow = bowSync.TryAimed(origin, forward, maxDistance, out int arrowId, out float arrowDistance);
+            if (log && (!arrow || logDistance <= arrowDistance))
+            {
+                logSync.RequestPickup(logId);
+                return true;
+            }
+
+            if (!arrow) return false;
+
+            bowSync.RequestPickup(arrowId);
+            return true;
+        }
+
+        // The index of a block face (ChunkMesher.FaceNormals) from its normal.
+        private static int FaceOf(BlockPos normal)
+        {
+            if (normal.X != 0) return normal.X > 0 ? 0 : 1;
+            if (normal.Y != 0) return normal.Y > 0 ? 2 : 3;
+            return normal.Z > 0 ? 4 : 5;
         }
 
         private void Move(Keyboard keyboard, bool hasControl)

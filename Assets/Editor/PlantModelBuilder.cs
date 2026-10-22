@@ -89,6 +89,13 @@ namespace Voxel.EditorTools
         private const string CypressLeaves = "PlantCypress";
         private const string LilyPad = "PlantLily";
         private const string LilyFlower = "PlantLilyFlower";
+        private const string StumpCut = "PlantStumpCut";
+
+        // A felled tree's stump: the foot of its trunk cut at this height (PlantShape.StumpHeight).
+        private const float StumpHeight = 0.6f;
+
+        // The materials a trunk is made of, so that its stump can be found.
+        private static readonly HashSet<string> TrunkMaterials = new HashSet<string> { Bark, PaleBark, GreyBark, PalmTrunk, CypressBark, BananaTrunk };
 
         private static readonly MaterialLook[] Materials =
         {
@@ -115,6 +122,7 @@ namespace Voxel.EditorTools
             new MaterialLook { Name = CypressLeaves, Texture = "Leaves", Colour = new Color(0.26f, 0.42f, 0.2f), Smoothness = 0.1f },
             new MaterialLook { Name = LilyPad, Texture = "Leaves", Colour = new Color(0.24f, 0.52f, 0.2f), Smoothness = 0.4f },
             new MaterialLook { Name = LilyFlower, Texture = null, Colour = new Color(0.96f, 0.82f, 0.88f), Smoothness = 0.3f },
+            new MaterialLook { Name = StumpCut, Texture = null, Colour = new Color(0.82f, 0.68f, 0.47f), Smoothness = 0.1f },
         };
 
         // Faces of different boxes of one model never lie in the same plane: they would flicker where they overlap.
@@ -1160,6 +1168,10 @@ namespace Voxel.EditorTools
             SerializedProperty modelList = serialized.FindProperty("models");
             modelList.arraySize = models.Length;
 
+            // Only a tree giving some wood leaves a stump.
+            SerializedProperty woodYield = serialized.FindProperty("woodYield");
+            bool leavesStump = woodYield != null && woodYield.intValue >= 2;
+
             for (int m = 0; m < models.Length; m++)
             {
                 SerializedProperty model = modelList.GetArrayElementAtIndex(m);
@@ -1187,10 +1199,63 @@ namespace Voxel.EditorTools
                         WritePart(fruitParts.GetArrayElementAtIndex(p), $"{models[m].Name}_{fruit[p].Material}_Ripe{stage + 1}", fruit[p].Material, boxes);
                     }
                 }
+
+                // The stump it leaves when felled.
+                Part[] stump = leavesStump ? StumpOf(models[m]) : null;
+                SerializedProperty stumpParts = model.FindPropertyRelative("stump");
+                stumpParts.arraySize = stump?.Length ?? 0;
+                for (int p = 0; p < stumpParts.arraySize; p++)
+                {
+                    WritePart(stumpParts.GetArrayElementAtIndex(p), $"{models[m].Name}_Stump_{stump[p].Material}", stump[p].Material, stump[p].Boxes);
+                }
             }
 
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(species);
+        }
+
+        // A model's stump: the upright boxes of its trunk that start below StumpHeight, cut there
+        // (the others, like a lower root flare, kept whole), with a disc of pale wood over the cut. Each
+        // cut box stops a little lower than the last, so that no two tops lie in one plane. Null for a
+        // model with no trunk standing on the ground.
+        private static Part[] StumpOf(Model model)
+        {
+            Part trunk = System.Array.Find(model.Parts, part => TrunkMaterials.Contains(part.Material));
+            if (trunk == null) return null;
+
+            var boxes = new List<Box>();
+            Box widest = default;
+            bool found = false;
+            int cuts = 0;
+            foreach (Box box in trunk.Boxes)
+            {
+                float bottom = box.Centre.y - box.Size.y * 0.5f;
+                float top = box.Centre.y + box.Size.y * 0.5f;
+                if (box.Tilt != Vector2.zero || bottom >= StumpHeight - 0.05f) continue;
+
+                if (top > StumpHeight)
+                {
+                    top = StumpHeight - 0.013f * cuts++;
+                    if (!found || box.Size.x * box.Size.z > widest.Size.x * widest.Size.z)
+                    {
+                        widest = box;
+                        found = true;
+                    }
+                }
+
+                if (top <= bottom) continue;
+
+                boxes.Add(new Box(box.Centre.x, (bottom + top) * 0.5f, box.Centre.z, box.Size.x, top - bottom, box.Size.z));
+            }
+
+            if (!found) return null;
+
+            var cut = new Box(widest.Centre.x, StumpHeight - 0.025f, widest.Centre.z, widest.Size.x * 0.92f, 0.11f, widest.Size.z * 0.92f);
+            return new[]
+            {
+                new Part { Material = trunk.Material, Boxes = boxes.ToArray() },
+                new Part { Material = StumpCut, Boxes = new[] { cut } }
+            };
         }
 
         // The size of each fruit at each stage of ripeness, from the first.

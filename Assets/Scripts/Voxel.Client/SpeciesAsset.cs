@@ -107,12 +107,14 @@ namespace Voxel.Client
 
         // One look of the species. Each plant shows one of the models, picked from its column. A
         // crop's fruit are drawn over it once ripe: fruits[0] at the first stage of ripeness, then
-        // the next, each fruit larger (PlantModelBuilder makes them).
+        // the next, each fruit larger (PlantModelBuilder makes them). A tree's stump is what stays of
+        // the model once felled: the foot of its trunk, cut (none for a plant that leaves no stump).
         [Serializable]
         public struct Model
         {
             public Part[] parts;
             public FruitLook[] fruits;
+            public Part[] stump;
         }
 
         [Serializable]
@@ -151,6 +153,25 @@ namespace Voxel.Client
             if (fruits == null || ripeStage < 1 || ripeStage > fruits.Length) return Array.Empty<Part>();
 
             return fruits[ripeStage - 1].parts ?? Array.Empty<Part>();
+        }
+
+        // The stump a model leaves when felled; none if it leaves none.
+        public IReadOnlyList<Part> StumpPartsOf(int model) => models[model].stump ?? Array.Empty<Part>();
+
+        // A felled tree of this species leaves a stump, which sprouts again (Ecosystem.CutToStump).
+        public bool HasStump => woodYield > 0 && models.Length > 0 && models[0].stump != null && models[0].stump.Length > 0;
+
+        // The material of its bark, for its logs and the chips a hit sends flying: its stump's first
+        // part, else its first model's.
+        public Material BarkMaterial
+        {
+            get
+            {
+                if (models.Length == 0) return null;
+                if (models[0].stump != null && models[0].stump.Length > 0) return models[0].stump[0].material;
+
+                return models[0].parts != null && models[0].parts.Length > 0 ? models[0].parts[0].material : null;
+            }
         }
 
         public int WoodYield => woodYield;

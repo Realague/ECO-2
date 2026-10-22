@@ -12,7 +12,16 @@ namespace Voxel.Core
 
         public const float PerBlockClimbed = 1f;
 
-        public const float PerBlockBroken = 2f;
+        // Each hit on a block costs more the harder the block (MiningRules.HitsToBreak): 0.75 kcal on
+        // dirt, 1.5 on granite (6 for the block), 2 on gold (12).
+        public const float PerHitBase = 0.5f;
+        public const float PerHitPerHardness = 0.25f;
+
+        public const float PerAxeHit = 1.5f;
+        public const float PerScytheHit = 0.5f;
+        public const float PerShovelHitOnStump = 1f;
+
+        public const float PerTill = 2f;
 
         public const float PerBlockPlaced = 1f;
 
@@ -24,5 +33,8 @@ namespace Voxel.Core
         public const float StarvingSpeedShare = 0.5f;
 
         public const float StarvingJumpHeight = 1.05f;
+
+        // The calories of one hit on a block that takes hardness hits to break.
+        public static float PerHit(int hardness) => PerHitBase + PerHitPerHardness * hardness;
     }
 }

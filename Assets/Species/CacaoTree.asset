@@ -77,6 +77,17 @@ MonoBehaviour:
         offset: {x: 0, y: 0, z: 0}
         scale: {x: 1, y: 1, z: 1}
         shadowMesh: {fileID: 0}
+    stump:
+    - mesh: {fileID: 4300000, guid: 22ec9bccab2a1494ba150a26b39baca2, type: 2}
+      material: {fileID: 2100000, guid: 60782fd049d31344187602bbf82bee87, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: eba6a1ce9a2ee6c4ea34ca46cf2cef70, type: 2}
+      material: {fileID: 2100000, guid: a5265f9b2e89b6145b3cde7c40adc3e8, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
   - parts:
     - mesh: {fileID: 4300000, guid: e1097c2ebc9ce464ea6e9436dee5d823, type: 2}
       material: {fileID: 2100000, guid: 60782fd049d31344187602bbf82bee87, type: 2}
@@ -107,3 +118,14 @@ MonoBehaviour:
         offset: {x: 0, y: 0, z: 0}
         scale: {x: 1, y: 1, z: 1}
         shadowMesh: {fileID: 0}
+    stump:
+    - mesh: {fileID: 4300000, guid: 5ff01ab73f4229f4fa4337535dea2185, type: 2}
+      material: {fileID: 2100000, guid: 60782fd049d31344187602bbf82bee87, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}
+    - mesh: {fileID: 4300000, guid: c7ed12454dfbeb1458fc826cb263f67f, type: 2}
+      material: {fileID: 2100000, guid: a5265f9b2e89b6145b3cde7c40adc3e8, type: 2}
+      offset: {x: 0, y: 0, z: 0}
+      scale: {x: 1, y: 1, z: 1}
+      shadowMesh: {fileID: 0}

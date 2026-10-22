@@ -57,7 +57,7 @@ namespace Voxel.Client
         public int LocalRoomFor(int item) => CarryLimits.Room(Inventory, item, ecosystemSync.ItemWeights);
 
         // Which limit an item runs into: blocks are counted, everything else weighed.
-        public static FullReason ReasonFor(int item) => Items.IsBlock(item) ? FullReason.Blocks : FullReason.Weight;
+        public static FullReason ReasonFor(int item) => CarryLimits.CountsAsBlock(item) ? FullReason.Blocks : FullReason.Weight;
 
         // Tells the local player at once, without asking the server (an action checked beforehand).
         public void TellLocalFull(FullReason reason) => Refused?.Invoke(reason);

@@ -77,6 +77,7 @@ MonoBehaviour:
         offset: {x: 0, y: 0, z: 0}
         scale: {x: 1, y: 1, z: 1}
         shadowMesh: {fileID: 0}
+    stump: []
   - parts:
     - mesh: {fileID: 4300000, guid: 278b191a5f6e9c44c8215364ae4771d0, type: 2}
       material: {fileID: 2100000, guid: 60782fd049d31344187602bbf82bee87, type: 2}
@@ -107,3 +108,4 @@ MonoBehaviour:
         offset: {x: 0, y: 0, z: 0}
         scale: {x: 1, y: 1, z: 1}
         shadowMesh: {fileID: 0}
+    stump: []

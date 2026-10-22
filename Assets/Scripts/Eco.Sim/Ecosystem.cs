@@ -48,6 +48,9 @@ namespace Eco.Sim
         // the array must skip it. IndexOf does not find it.
         private const int RemovedAge = int.MinValue;
         private int removedCount;
+
+        // A felled tree's stump sprouts again after this long (CutToStump).
+        public const int StumpRegrowSteps = 3 * SimClock.StepsPerDay;
         private bool stepping;
 
         // For each block column, the id of the plant standing there, or 0, and its species plus one
@@ -216,7 +219,7 @@ namespace Eco.Sim
 
             Plant plant = plants[index];
             Species kind = species[plant.SpeciesIndex];
-            if (!kind.BearsCrop || plant.RipeStage < 1) return false;
+            if (!kind.BearsCrop || plant.IsStump || plant.RipeStage < 1) return false;
 
             ripeStage = plant.RipeStage;
             if (kind.Harvest == HarvestKind.Annual) return Remove(plantId);
@@ -239,6 +242,20 @@ namespace Eco.Sim
             plants[index].Age = RemovedAge;
             removedCount++;
             Forget(plant);
+            return true;
+        }
+
+        // Fells a tree to a stump, as a player with an axe: it keeps its id, column and size (so it is
+        // drawn as the stump of that tree) and sprouts again after StumpRegrowSteps. Returns false if
+        // the plant does not exist or is a stump already. Never called during a step.
+        public bool CutToStump(int plantId)
+        {
+            int index = IndexOf(plantId);
+            if (index < 0 || plants[index].IsStump) return false;
+
+            plants[index].Age = -StumpRegrowSteps;
+            plants[index].Fruit = 0f;
+            PlantChanged?.Invoke(plants[index]);
             return true;
         }
 
@@ -284,6 +301,21 @@ namespace Eco.Sim
             Species kind = species[plant.SpeciesIndex];
 
             plant.Age++;
+
+            // A stump only waits, drawing nothing at random, then sprouts a sapling of its tree, which
+            // lives a whole life from there.
+            if (plant.Age <= 0)
+            {
+                if (plant.Age == 0)
+                {
+                    plant.Growth = 1f / Plant.StageCount;
+                    plant.Fruit = 0f;
+                    PlantChanged?.Invoke(plant);
+                }
+
+                return true;
+            }
+
             if (plant.Age > kind.LifespanSteps) return false;
 
             int cell = CellIndex(plant.X, plant.Z);
@@ -498,7 +530,8 @@ namespace Eco.Sim
                     int speciesPlusOne = plantSpeciesAtColumn[column];
                     if (speciesPlusOne == 0 || !shadingSpecies[speciesPlusOne - 1]) continue;
 
-                    if (plants[IndexOf(plantAtColumn[column])].Growth >= 1f) return true;
+                    Plant shading = plants[IndexOf(plantAtColumn[column])];
+                    if (shading.Growth >= 1f && !shading.IsStump) return true;
                 }
             }
 

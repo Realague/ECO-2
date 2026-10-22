@@ -20,7 +20,7 @@ namespace Eco.Sim.Tests
 
         private static readonly ulong[] Expected =
         {
-            0xBF3FD9DE81CDABCFUL, 0x9E8DF731E93AAC45UL, 0xC4A6BECF5B92ACCEUL, 0xBB1609D681402186UL, 0x69F4E95587D6ADBCUL, 0x0F43370E69A79598UL
+            0xCFDDBA29E75A9F70UL, 0xB3CC002C7A13A036UL, 0xFB0954027FDA80AFUL, 0x81C32843E6A94DAEUL, 0xDA93FC43BB1668F9UL, 0xE411E23235271FF4UL
         };
 
         [Test]
@@ -62,13 +62,26 @@ namespace Eco.Sim.Tests
         }
 
         // Player actions at fixed steps, between two steps as on the server: felling, harvesting an
-        // annual, killing an animal, a block placed under a plant, plants and animals placed by command.
+        // annual, killing an animal, a block placed under a plant, plants and animals placed by command,
+        // trees felled to stumps (one sprouting again before the reload, one kept across it).
         private static void Act(Ecosystem ecosystem, World world, int step)
         {
             switch (step)
             {
                 case 300:
                     ecosystem.Remove(ecosystem.Plants[ecosystem.Plants.Count / 2].Id);
+                    break;
+                case 350:
+                case 800:
+                    foreach (Plant plant in ecosystem.Plants)
+                    {
+                        if (plant.SpeciesIndex == 0 && plant.Growth >= 1f && !plant.IsStump)
+                        {
+                            ecosystem.CutToStump(plant.Id);
+                            break;
+                        }
+                    }
+
                     break;
                 case 400:
                     foreach (Plant plant in ecosystem.Plants)
@@ -160,7 +173,7 @@ namespace Eco.Sim.Tests
             private void Add(ulong kind, Plant plant)
             {
                 Hash = Fnv(Hash, kind);
-                Hash = Fnv(Hash, (ulong)(uint)plant.Id | (ulong)plant.Stage << 32 | (ulong)plant.RipeStage << 40);
+                Hash = Fnv(Hash, (ulong)(uint)plant.Id | (ulong)plant.Stage << 32 | (ulong)plant.RipeStage << 40 | (plant.IsStump ? 1UL << 48 : 0UL));
             }
         }
     }

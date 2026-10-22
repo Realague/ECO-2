@@ -577,6 +577,8 @@ GameObject:
   - component: {fileID: 490447453}
   - component: {fileID: 490447454}
   - component: {fileID: 490447455}
+  - component: {fileID: 490447457}
+  - component: {fileID: 490447456}
   m_Layer: 0
   m_Name: GameSession
   m_TagString: Untagged
@@ -603,6 +605,8 @@ MonoBehaviour:
   inventorySync: {fileID: 490447450}
   hungerSync: {fileID: 490447454}
   bowSync: {fileID: 490447455}
+  miningSync: {fileID: 490447457}
+  logSync: {fileID: 490447456}
   appearanceSync: {fileID: 490447452}
   commandSync: {fileID: 490447453}
   appearanceMenu: {fileID: 490447451}
@@ -656,6 +660,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.EcosystemSync
   networkManager: {fileID: 947039382}
   inventorySync: {fileID: 490447450}
+  logSync: {fileID: 490447456}
   worldSync: {fileID: 490447447}
   speciesAssets:
   - {fileID: 11400000, guid: 6ea61faa421995f4a9a4b6f892bf2dd4, type: 2}
@@ -817,6 +822,42 @@ MonoBehaviour:
   shaftMaterial: {fileID: 2100000, guid: 17965ac439377474abca152ff17c9021, type: 2}
   headMaterial: {fileID: 2100000, guid: 582f92c22b627724db3f3da36c5b3b4f, type: 2}
   fletchingMaterial: {fileID: 2100000, guid: cf00dee74e18ee74db74157f58d7f614, type: 2}
+--- !u!114 &490447456
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 490447444}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c6445d2fb583944a9247082ba6b48ca, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.LogSync
+  networkManager: {fileID: 947039382}
+  inventorySync: {fileID: 490447450}
+  ecosystemSync: {fileID: 490447448}
+  worldSync: {fileID: 490447447}
+  cutMaterial: {fileID: 2100000, guid: a5265f9b2e89b6145b3cde7c40adc3e8, type: 2}
+--- !u!114 &490447457
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 490447444}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7fe82a26d5042494180ff998946514e0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.MiningSync
+  networkManager: {fileID: 947039382}
+  worldSync: {fileID: 490447447}
+  ecosystemSync: {fileID: 490447448}
+  inventorySync: {fileID: 490447450}
+  hungerSync: {fileID: 490447454}
+  crackMaterial: {fileID: 2100000, guid: 341a025f25f71654d9010b1edd2ff0be, type: 2}
+  chipMaterial: {fileID: 2100000, guid: 97d107f19ba5224459f56d2911206ee9, type: 2}
 --- !u!1 &822296571
 GameObject:
   m_ObjectHideFlags: 0

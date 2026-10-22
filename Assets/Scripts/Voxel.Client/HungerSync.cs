@@ -148,11 +148,24 @@ namespace Voxel.Client
             }
         }
 
-        private void OnEditApplied(ulong clientId, bool broke)
+        // Placing and tilling cost calories here; breaking costs nothing more than the hits it took
+        // (BurnEffort, from MiningSync).
+        private void OnEditApplied(ulong clientId, EditKind kind)
         {
-            if (!registry.TryGetState(clientId, out PlayerState state)) return;
+            if (kind == EditKind.Placed) BurnEffort(clientId, HungerRules.PerBlockPlaced);
+            else if (kind == EditKind.Tilled) BurnEffort(clientId, HungerRules.PerTill);
+        }
 
-            state.Stomach.Burn(broke ? HungerRules.PerBlockBroken : HungerRules.PerBlockPlaced);
+        // Server side: a player's effort (a hit with a tool) burns calories.
+        internal void BurnEffort(ulong clientId, float calories)
+        {
+            if (registry != null && registry.TryGetState(clientId, out PlayerState state)) state.Stomach.Burn(calories);
+        }
+
+        // Server side: whether a player's stomach is empty (they then swing at half pace).
+        internal bool IsStarving(ulong clientId)
+        {
+            return registry != null && registry.TryGetState(clientId, out PlayerState state) && state.Stomach.IsStarving;
         }
 
         private void Eat(ulong clientId, int item)

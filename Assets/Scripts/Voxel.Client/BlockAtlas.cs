@@ -104,6 +104,20 @@ namespace Voxel.Client
             }
         }
 
+        // Colour of the chips a hit on this face of a block sends flying (ChipBursts): the mean of the
+        // face's tile; grass is green on top and earth elsewhere (its sides' green band is tinted by the
+        // climate, so its tile alone is grey).
+        public static Color ChipColour(ushort block, int face)
+        {
+            if (Blocks.TypeOf(block) == Blocks.Grass)
+            {
+                if (face == ChunkMesher.TopFace) return Grass;
+                return meanColours != null ? meanColours[DirtTile] : Unknown;
+            }
+
+            return meanColours != null ? meanColours[TileFor(block, face)] : Unknown;
+        }
+
         // The atlas with its mipmaps, each level made tile by tile (a pixel averages the 2 × 2 under it
         // within its own tile), down to tiles of MipTileSize: blocks stay sharp up close (point
         // filtering), do not shimmer far away, and no colour ever bleeds from one tile into the next.

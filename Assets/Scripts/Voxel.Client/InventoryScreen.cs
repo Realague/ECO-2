@@ -515,7 +515,7 @@ namespace Voxel.Client
             detailsSlot.text = slot >= 0 ? $"Hotbar slot {SlotLabel(slot)}" : "";
             detailsSlot.style.display = slot >= 0 ? DisplayStyle.Flex : DisplayStyle.None;
 
-            float weight = Items.IsBlock(item) ? 0f : ecosystemSync.ItemWeights.Of(item);
+            float weight = CarryLimits.CountsAsBlock(item) ? 0f : ecosystemSync.ItemWeights.Of(item);
             detailsWeightLine.style.display = weight > 0f ? DisplayStyle.Flex : DisplayStyle.None;
             detailsWeight.text = weight.ToString("0.###", CultureInfo.InvariantCulture) + " kg each";
 

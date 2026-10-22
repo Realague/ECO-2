@@ -193,9 +193,9 @@ namespace Voxel.Client
             }
         }
 
-        // Right click: picks up the arrow the local player points at, at most maxDistance away.
-        // Returns false if they point at none.
-        public bool TryPickupAimed(Vector3 origin, Vector3 direction, float maxDistance)
+        // The arrow the local player points at, at most maxDistance away (distance along the ray), to
+        // pick up with a right click (RequestPickup).
+        public bool TryAimed(Vector3 origin, Vector3 direction, float maxDistance, out int arrowId, out float distance)
         {
             int best = 0;
             float nearest = maxDistance;
@@ -206,29 +206,35 @@ namespace Voxel.Client
                 Vector3 middle = arrow.Position.ToUnity() + back * (ArrowViews.Length * 0.4f);
                 var min = (middle - Vector3.one * PickRadius).ToNumerics();
                 var max = (middle + Vector3.one * PickRadius).ToNumerics();
-                float distance = ArrowFlight.SegmentEntry(origin.ToNumerics(), (origin + direction * maxDistance).ToNumerics(), min, max);
-                if (distance >= 0f && distance < nearest)
+                float along = ArrowFlight.SegmentEntry(origin.ToNumerics(), (origin + direction * maxDistance).ToNumerics(), min, max);
+                if (along >= 0f && along < nearest)
                 {
-                    nearest = distance;
+                    nearest = along;
                     best = arrow.Id;
                 }
             }
 
-            if (best == 0) return false;
+            arrowId = best;
+            distance = nearest;
+            return best != 0;
+        }
+
+        // The local player picks up an arrow: the server decides, and says when it is gone.
+        public void RequestPickup(int arrowId)
+        {
+            if (!running) return;
 
             if (IsServer)
             {
-                Pickup(networkManager.LocalClientId, best);
-                return true;
+                Pickup(networkManager.LocalClientId, arrowId);
+                return;
             }
 
             using (var writer = new FastBufferWriter(sizeof(int), Allocator.Temp))
             {
-                writer.WriteValueSafe(best);
+                writer.WriteValueSafe(arrowId);
                 Messaging.SendNamedMessage(PickupMessage, NetworkManager.ServerClientId, writer, NetworkDelivery.ReliableSequenced);
             }
-
-            return true;
         }
 
         private void Update()

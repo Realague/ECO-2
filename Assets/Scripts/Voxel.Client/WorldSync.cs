@@ -8,9 +8,19 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
+    // What a player's accepted edit did (WorldSync.EditApplied).
+    public enum EditKind
+    {
+        Placed,
+        Broken,
+        Tilled
+    }
+
     // Synchronises the world between the server and the clients with named messages.
     // Server: sends the modified chunks to each joining client, validates block edit requests
     // and broadcasts every change. Client: rebuilds the received world and applies the changes.
+    // Blocks are placed through edit requests here; they are broken only by hits (MiningSync), whose
+    // last one calls TryBreak.
     public class WorldSync : MonoBehaviour
     {
         private const string WorldInfoMessage = "World.Info";
@@ -44,8 +54,8 @@ namespace Voxel.Client
         private int expectedChunkCount;
         private int receivedChunkCount;
 
-        // Server side: a player's edit was accepted (their client id, and true if they broke a block).
-        public event Action<ulong, bool> EditApplied;
+        // Server side: a player's edit was accepted (their client id, and what it did).
+        public event Action<ulong, EditKind> EditApplied;
 
         // The world of the game, or null until it is fully available on this machine.
         public World World => ready ? voxelWorld.World : null;
@@ -105,11 +115,11 @@ namespace Voxel.Client
             receivedChunkCount = 0;
         }
 
-        // Edit requested by the local player. The server decides; a client applies it right away
+        // A block placed by the local player. The server decides; a client applies it right away
         // for responsiveness, and the server corrects it if it refuses.
         public void RequestSetBlock(BlockPos pos, ushort block)
         {
-            if (!ready) return;
+            if (!ready || !Blocks.IsSolid(block)) return;
 
             if (serverWorld != null)
             {
@@ -121,44 +131,64 @@ namespace Voxel.Client
             SendBlock(SetBlockRequestMessage, NetworkManager.ServerClientId, pos, block);
         }
 
+        // Placing only: a block is broken by hits (MiningSync), never by a request to set air.
         private bool TryApplyEdit(ulong clientId, BlockPos pos, ushort block)
         {
-            if (!IsEditAllowed(clientId, pos, block)) return false;
+            if (!Blocks.IsSolid(block) || !IsEditAllowed(clientId, pos, block)) return false;
 
-            // Placing a block takes it from the player's inventory; breaking one gives it to them, so
-            // a player who cannot carry it cannot break it.
-            bool placing = Blocks.IsSolid(block);
+            // Placing a block takes it from the player's inventory.
+            if (!inventorySync.TryConsume(clientId, Items.OfBlock(block))) return false;
+
+            serverWorld.SetBlock(pos, block);
+            EditApplied?.Invoke(clientId, EditKind.Placed);
+            return true;
+        }
+
+        // Server side: the last hit on a block breaks it (MiningSync). It goes to the player's
+        // inventory, so a player who cannot carry it cannot break it; and it needs the right tool,
+        // which the server cannot see in hand (the hotbar's choice is the client's): the player must
+        // at least own it.
+        internal bool TryBreak(ulong clientId, BlockPos pos)
+        {
+            if (serverWorld == null || !IsEditAllowed(clientId, pos, Blocks.Air)) return false;
+
             ushort previous = serverWorld.GetBlock(pos);
+            if (!inventorySync.Owns(clientId, ToolRules.ToBreak(previous))) return false;
 
-            // Breaking needs the right tool. The server cannot know which one is in hand (the hotbar's
-            // choice is the client's): the player must at least own it.
-            if (!placing && !inventorySync.Owns(clientId, ToolRules.ToBreak(previous))) return false;
-
-            if (!placing && inventorySync.RoomFor(clientId, Items.DropOf(previous)) <= 0)
+            int drop = Items.DropOf(previous);
+            if (inventorySync.RoomFor(clientId, drop) <= 0)
             {
-                inventorySync.TellFull(clientId, InventorySync.ReasonFor(Items.DropOf(previous)));
+                inventorySync.TellFull(clientId, InventorySync.ReasonFor(drop));
                 return false;
             }
 
-            if (placing && !inventorySync.TryConsume(clientId, Items.OfBlock(block))) return false;
+            serverWorld.SetBlock(pos, Blocks.Air);
+            inventorySync.Give(clientId, drop, 1);
 
-            serverWorld.SetBlock(pos, block);
-            if (!placing)
+            // Next to water, the hole fills up to the water's level.
+            if (WaterFill.Find(serverWorld, pos, fill))
             {
-                inventorySync.Give(clientId, Items.DropOf(previous), 1);
-
-                // Next to water, the hole fills up to the water's level.
-                if (WaterFill.Find(serverWorld, pos, fill))
+                foreach (BlockPos wet in fill)
                 {
-                    foreach (BlockPos wet in fill)
-                    {
-                        pendingWater.Enqueue(wet);
-                    }
+                    pendingWater.Enqueue(wet);
                 }
             }
 
-            EditApplied?.Invoke(clientId, !placing);
+            EditApplied?.Invoke(clientId, EditKind.Broken);
             return true;
+        }
+
+        // Client side: a block the local player's last hit should break, shown broken at once; the
+        // server sends it back (SendRealBlock) if it disagrees.
+        internal void PredictBreak(BlockPos pos)
+        {
+            if (ready && serverWorld == null) voxelWorld.World.SetBlock(pos, Blocks.Air);
+        }
+
+        // Server side: tells a client the real state of a block, undoing a break it anticipated.
+        internal void SendRealBlock(ulong clientId, BlockPos pos)
+        {
+            if (serverWorld != null && clientId != networkManager.LocalClientId) SendBlock(BlockChangedMessage, clientId, pos, serverWorld.GetBlock(pos));
         }
 
         // The local player tills a block with their hoe: grass, dirt, mud or clay becomes tilled soil,
@@ -192,7 +222,7 @@ namespace Voxel.Client
             if (!inventorySync.Owns(clientId, Items.Hoe)) return false;
 
             serverWorld.SetBlock(pos, Blocks.TilledSoil);
-            EditApplied?.Invoke(clientId, true);
+            EditApplied?.Invoke(clientId, EditKind.Tilled);
             return true;
         }
 

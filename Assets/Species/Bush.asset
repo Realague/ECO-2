@@ -37,7 +37,13 @@ MonoBehaviour:
   produceYield: 3
   seedYield: 2
   strawYield: 0
+  produceWeight: 0.2
   fruitDays: 3
+  calories: 0
+  carbs: 0
+  protein: 0
+  fat: 0
+  vitamins: 0
   height: 1.25
   width: 0.9
   models:
@@ -53,6 +59,7 @@ MonoBehaviour:
       scale: {x: 1, y: 1, z: 1}
       shadowMesh: {fileID: 0}
     fruits: []
+    stump: []
   - parts:
     - mesh: {fileID: 4300000, guid: c60e23421e56f684f924f8f6bed4d24b, type: 2}
       material: {fileID: 2100000, guid: 22013bf578bba4940aced4a4c8fb79f7, type: 2}
@@ -65,6 +72,7 @@ MonoBehaviour:
       scale: {x: 1, y: 1, z: 1}
       shadowMesh: {fileID: 0}
     fruits: []
+    stump: []
   - parts:
     - mesh: {fileID: 4300000, guid: 832a52e82f4e4d14ba1c921b14be093c, type: 2}
       material: {fileID: 2100000, guid: 22013bf578bba4940aced4a4c8fb79f7, type: 2}
@@ -77,3 +85,4 @@ MonoBehaviour:
       scale: {x: 1, y: 1, z: 1}
       shadowMesh: {fileID: 0}
     fruits: []
+    stump: []

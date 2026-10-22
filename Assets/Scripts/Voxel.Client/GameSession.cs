@@ -49,6 +49,8 @@ namespace Voxel.Client
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private HungerSync hungerSync;
         [SerializeField] private BowSync bowSync;
+        [SerializeField] private MiningSync miningSync;
+        [SerializeField] private LogSync logSync;
         [SerializeField] private AppearanceSync appearanceSync;
         [SerializeField] private CommandSync commandSync;
         [SerializeField] private AppearanceMenu appearanceMenu;
@@ -293,6 +295,8 @@ namespace Voxel.Client
             inventorySync.StartClient();
             hungerSync.StartClient();
             bowSync.StartClient();
+            miningSync.StartClient();
+            logSync.StartClient();
             appearanceSync.StartClient();
             commandSync.StartClient();
             sessionActive = true;
@@ -337,6 +341,8 @@ namespace Voxel.Client
             inventorySync.StartServer(registry);
             hungerSync.StartServer(registry);
             bowSync.StartServer(worldDirectory);
+            logSync.StartServer(worldDirectory);
+            miningSync.StartServer();
             appearanceSync.StartServer(registry);
             commandSync.StartServer();
             sessionActive = true;
@@ -409,6 +415,7 @@ namespace Voxel.Client
             voxelWorld.Save();
             ecosystemSync.Save();
             bowSync.Save();
+            logSync.Save();
         }
 
         // The host is admin of its own game; on a dedicated server, admins are the players
@@ -440,10 +447,13 @@ namespace Voxel.Client
             // stop before SaveSession has been called: so we save here too.
             ecosystemSync.Save();
             bowSync.Save();
+            logSync.Save();
             ecosystemSync.Stop();
             inventorySync.Stop();
             hungerSync.Stop();
             bowSync.Stop();
+            miningSync.Stop();
+            logSync.Stop();
             appearanceSync.Stop();
             commandSync.Stop();
             worldSync.Stop();

@@ -4,15 +4,18 @@ using UnityEngine;
 namespace Voxel.Client
 {
     // A flat-shaded mesh of axis-aligned boxes (centre, size), one submesh per list, so that each list
-    // can take its own material: arrows (ArrowViews) and the tools in players' hands (PlayerModel).
+    // can take its own material: arrows (ArrowViews), the tools in players' hands (PlayerModel), logs
+    // (LogViews) and cracks (CrackViews). With uvs, each face's texture coordinates are its position
+    // in blocks along its two axes, so a texture made of one tile per block runs on across faces.
     internal static class BoxMesh
     {
         private static readonly Vector3[] Directions = { Vector3.right, Vector3.left, Vector3.up, Vector3.down, Vector3.forward, Vector3.back };
 
-        public static Mesh Build(string name, IReadOnlyList<IReadOnlyList<(Vector3 centre, Vector3 size)>> submeshes)
+        public static Mesh Build(string name, IReadOnlyList<IReadOnlyList<(Vector3 centre, Vector3 size)>> submeshes, bool uvs = false)
         {
             var vertices = new List<Vector3>();
             var normals = new List<Vector3>();
+            var coordinates = new List<Vector2>();
             var triangles = new List<int>[submeshes.Count];
             for (int s = 0; s < submeshes.Count; s++)
             {
@@ -34,7 +37,12 @@ namespace Voxel.Client
                         vertices.Add(middle - du + dv);
                         vertices.Add(middle + du + dv);
                         vertices.Add(middle + du - dv);
-                        for (int k = 0; k < 4; k++) normals.Add(normal);
+                        for (int k = 0; k < 4; k++)
+                        {
+                            normals.Add(normal);
+                            Vector3 corner = vertices[first + k];
+                            coordinates.Add(new Vector2(Vector3.Dot(corner, u), Vector3.Dot(corner, v)));
+                        }
                         triangles[s].AddRange(new[] { first, first + 2, first + 1, first, first + 3, first + 2 });
                     }
                 }
@@ -43,6 +51,7 @@ namespace Voxel.Client
             var mesh = new Mesh { name = name, subMeshCount = submeshes.Count };
             mesh.SetVertices(vertices);
             mesh.SetNormals(normals);
+            if (uvs) mesh.SetUVs(0, coordinates);
             for (int s = 0; s < submeshes.Count; s++)
             {
                 mesh.SetTriangles(triangles[s], s);
