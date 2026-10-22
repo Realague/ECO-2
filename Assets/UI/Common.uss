@@ -1,32 +1,32 @@
-/* Shared look of the game's screens, a dark wooden theme: dark brown panels with cream text, a
-   lighter brown for what is chosen, gold for focus and selection frames, slate green actions and
-   tan tabs. */
+/* Shared look of the game's screens, in the colours of the user's mockup: charcoal panels with
+   near-white text, tan for the chosen tab and category, a pale gold frame around what is selected,
+   slate green actions and cream sheets. */
 
 :root {
-    --panel: #27241f;
+    --panel: #27292b;
     --panel-border: rgba(255, 255, 255, 0.08);
-    --veil: rgba(39, 36, 32, 0.92);
-    --well: rgba(25, 23, 20, 0.55);
-    --text: #f1eadc;
-    --text-body: #e2d9c7;
-    --text-muted: #b3a994;
+    --veil: rgba(30, 31, 30, 0.9);
+    --well: rgba(16, 17, 18, 0.55);
+    --text: #f6f5f2;
+    --text-body: #e4e2dd;
+    --text-muted: #aaa8a3;
     --line: rgba(255, 255, 255, 0.12);
-    --control: #3a362f;
-    --control-border: #23201c;
-    --control-hover: #48433a;
+    --control: #46484a;
+    --control-border: #1d1f20;
+    --control-hover: #535557;
     --hover: rgba(255, 255, 255, 0.06);
-    --selected: #6a604f;
-    --accent: #e6c06a;
+    --selected: #a4917a;
+    --accent: #f3dfae;
     --danger: #ee927a;
     --carbs: #d9664a;
     --protein: #e3963f;
     --fat: #e8cc5a;
     --vitamins: #84b65a;
-    --action: #3f5f59;
-    --action-hover: #4a6e67;
-    --action-dark: #2b4440;
-    --tab-selected: #d7c7a6;
-    --tab-selected-text: #2c251c;
+    --action: #35504e;
+    --action-hover: #41615e;
+    --action-dark: #233837;
+    --tab-selected: #dcc8ae;
+    --tab-selected-text: #1e1711;
 }
 
 .screen {
@@ -84,6 +84,18 @@
 .icon--plus { background-image: url("Icons/Plus.png"); }
 .icon--sign-out { background-image: url("Icons/SignOut.png"); }
 .icon--warning { background-image: url("Icons/WarningCircle.png"); }
+.icon--backpack { background-image: url("Icons/Backpack.png"); }
+/* The inventory's tab and categories: solid glyphs cut from the user's mockup (the seeds' drawn by Eco > Write category icons). */
+.icon--category-all { background-image: url("Icons/CategoryAll.png"); }
+.icon--category-tools { background-image: url("Icons/CategoryTools.png"); }
+.icon--category-blocks { background-image: url("Icons/CategoryBlocks.png"); }
+.icon--category-seeds { background-image: url("Icons/CategorySeeds.png"); }
+.icon--category-food { background-image: url("Icons/CategoryFood.png"); }
+.icon--category-materials { background-image: url("Icons/CategoryMaterials.png"); }
+.icon--tab-inventory { background-image: url("Icons/TabInventory.png"); }
+.icon--fire { background-image: url("Icons/Fire.png"); }
+.icon--scales { background-image: url("Icons/Scales.png"); }
+.icon--search { background-image: url("Icons/MagnifyingGlass.png"); }
 
 .button {
     flex-direction: row;
@@ -313,6 +325,38 @@
 .stomach-dot--protein { background-color: var(--protein); }
 .stomach-dot--fat { background-color: var(--fat); }
 .stomach-dot--vitamins { background-color: var(--vitamins); }
+
+/* A carrying gauge (40 blocks, 30 kg of the rest), in the inventory and beside the hotbar: a
+   label over a thin bar, gold when nearly full and red when full (CarryHud.ShowGauge). */
+.carry-text {
+    font-size: 15px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    margin: 0 0 4px 0;
+    padding: 0;
+}
+
+.carry-bar {
+    height: 6px;
+    background-color: var(--well);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.carry-fill {
+    height: 100%;
+    width: 0;
+    background-color: var(--action-hover);
+    border-radius: 3px;
+}
+
+.carry-fill--high {
+    background-color: var(--accent);
+}
+
+.carry-fill--full {
+    background-color: var(--danger);
+}
 
 .hidden {
     display: none;

@@ -44,6 +44,7 @@ namespace Voxel.Client
         private EcosystemSync ecosystemSync;
         private InventorySync inventorySync;
         private HungerSync hungerSync;
+        private BowSync bowSync;
         private HotbarHud hotbar;
         private InventoryScreen inventoryScreen;
         private PlayerModel model;
@@ -75,6 +76,7 @@ namespace Voxel.Client
             ecosystemSync = FindAnyObjectByType<EcosystemSync>();
             inventorySync = FindAnyObjectByType<InventorySync>();
             hungerSync = FindAnyObjectByType<HungerSync>();
+            bowSync = FindAnyObjectByType<BowSync>();
             hotbar = FindAnyObjectByType<HotbarHud>();
             inventoryScreen = FindAnyObjectByType<InventoryScreen>();
             model = GetComponent<PlayerModel>();
@@ -123,6 +125,9 @@ namespace Voxel.Client
             world = worldSync.World;
             if (world == null) return;
 
+            // The tool in hand shows in the body's right hand, for everyone.
+            model.SetHeldItem(hotbar.SelectedItem);
+
             Keyboard keyboard = Keyboard.current;
             Mouse mouse = Mouse.current;
             bool hasDevices = keyboard != null && mouse != null;
@@ -140,6 +145,7 @@ namespace Voxel.Client
             // The full-screen map, the inventory or the command line has the keyboard: the player stands where they are.
             if ((mapScreen != null && mapScreen.HoldsInput) || (inventoryScreen != null && inventoryScreen.HoldsInput) || CommandConsole.HoldsInput)
             {
+                bowSync.CancelDraw();
                 Move(keyboard, false);
                 PlaceCamera();
                 return;
@@ -164,7 +170,12 @@ namespace Voxel.Client
             {
                 Interact(mouse);
             }
-            else if (hasDevices && mouse.leftButton.wasPressedThisFrame)
+            else
+            {
+                bowSync.CancelDraw();
+            }
+
+            if (!hasControl && hasDevices && mouse.leftButton.wasPressedThisFrame)
             {
                 // The first click captures the mouse, without breaking a block.
                 Cursor.lockState = CursorLockMode.Locked;
@@ -251,38 +262,118 @@ namespace Voxel.Client
             return true;
         }
 
+        // Tells the player which tool they lacked (Items.None: nothing to tell).
+        private void TellMissing(int tool)
+        {
+            if (tool != Items.None) hotbar.ShowMessage(MissingToolMessage(tool));
+        }
+
+        internal static string MissingToolMessage(int tool)
+        {
+            if (tool == Items.Bow) return "You need a bow to hunt";
+
+            string name = Items.NameOf(tool).ToLowerInvariant();
+            return ("aeiou".IndexOf(name[0]) >= 0 ? "You need an " : "You need a ") + name;
+        }
+
         private void Interact(Mouse mouse)
         {
-            bool breakBlock = mouse.leftButton.wasPressedThisFrame;
-            bool placeBlock = mouse.rightButton.wasPressedThisFrame;
-            if (!breakBlock && !placeBlock) return;
+            int held = hotbar.SelectedItem;
+
+            // The bow: holding the left button draws it, letting go shoots.
+            if (held == Items.Bow)
+            {
+                if (mouse.leftButton.wasPressedThisFrame)
+                {
+                    if (inventorySync.Inventory.Has(Items.Arrow)) bowSync.BeginDraw();
+                    else hotbar.ShowMessage("No arrows left");
+                }
+                else if (mouse.leftButton.wasReleasedThisFrame)
+                {
+                    bowSync.Release(cameraTransform.position, cameraTransform.forward);
+                }
+            }
+            else
+            {
+                bowSync.CancelDraw();
+            }
+
+            bool strike = mouse.leftButton.wasPressedThisFrame && held != Items.Bow;
+            bool use = mouse.rightButton.wasPressedThisFrame;
+            if (!strike && !use) return;
 
             System.Numerics.Vector3 origin = cameraTransform.position.ToNumerics();
             System.Numerics.Vector3 direction = cameraTransform.forward.ToNumerics();
             bool blockHit = VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, out VoxelHit hit);
 
-            // A left click strikes the targeted animal or plant if it is in front of the targeted
-            // block; a right click picks the targeted crop if it is ripe.
+            // A left click strikes the targeted plant (or tells that animals need the bow) if it is in
+            // front of the targeted block; a right click picks the targeted crop if it is ripe, else
+            // picks up the arrow pointed at.
             float reachedDistance = blockHit ? hit.Distance : PlayerRules.Reach;
-            if (breakBlock && ecosystemSync.TryStrike(origin, direction, reachedDistance)) return;
-            if (placeBlock && ecosystemSync.TryHarvestAimed(origin, direction, reachedDistance)) return;
+            int missing;
+            if (strike && ecosystemSync.TryStrike(origin, direction, reachedDistance, held, out missing))
+            {
+                TellMissing(missing);
+                return;
+            }
 
-            // A right click with food in hand eats it, wherever the player looks.
-            if (placeBlock && TryEat(hotbar.SelectedItem)) return;
+            if (use)
+            {
+                if (ecosystemSync.TryHarvestAimed(origin, direction, reachedDistance, held, out missing))
+                {
+                    TellMissing(missing);
+                    return;
+                }
+
+                if (bowSync.TryPickupAimed(cameraTransform.position, cameraTransform.forward, reachedDistance)) return;
+
+                // Food in hand is eaten, wherever the player looks.
+                if (TryEat(held)) return;
+            }
 
             if (!blockHit) return;
 
             // The server has the last word: the request goes through WorldSync, never through World.SetBlock.
-            if (breakBlock)
+            ushort aimed = world.GetBlock(hit.Block);
+            if (strike)
             {
+                if (!Blocks.IsBreakable(aimed)) return;
+
+                // A shovel for soft ground, a pickaxe for anything hard.
+                int tool = ToolRules.ToBreak(aimed);
+                if (held != tool)
+                {
+                    TellMissing(tool);
+                    return;
+                }
+
+                // A block the player cannot carry stays in place, and the server would refuse it anyway.
+                int drop = Items.DropOf(aimed);
+                if (inventorySync.LocalRoomFor(drop) <= 0)
+                {
+                    inventorySync.TellLocalFull(InventorySync.ReasonFor(drop));
+                    return;
+                }
+
                 worldSync.RequestSetBlock(hit.Block, Blocks.Air);
                 return;
             }
 
-            // A right click uses the held item: a seed is planted in the targeted column, a block is placed.
-            int held = hotbar.SelectedItem;
+            // A right click uses the held item: the hoe tills, a seed is sown on tilled soil, a block is placed.
+            if (held == Items.Hoe)
+            {
+                if (ToolRules.CanTill(aimed) && !world.IsSolid(hit.Block.X, hit.Block.Y + 1, hit.Block.Z)) worldSync.RequestTill(hit.Block);
+                return;
+            }
+
             if (Items.IsSeed(held))
             {
+                if (!EcosystemSync.IsTilled(world, hit.Block.X, hit.Block.Z))
+                {
+                    hotbar.ShowMessage("Seeds only grow on tilled soil: use a hoe");
+                    return;
+                }
+
                 inventorySync.RequestPlant(held, hit.Block.X, hit.Block.Z);
                 return;
             }

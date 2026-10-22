@@ -133,6 +133,8 @@ namespace Voxel.Core.Tests
             PlayerState alice = original.GetOrAdd("alice");
             alice.Stomach.Burn(1000f);
             alice.Stomach.Eat(new Nutrition(200f, 2f, 10f, 1f, 2f));
+            alice.ReceivedTools = true;
+            original.GetOrAdd("bob");
             var stream = new MemoryStream();
             original.Write(stream);
             stream.Position = 0;
@@ -141,6 +143,9 @@ namespace Voxel.Core.Tests
 
             Assert.IsTrue(loaded.TryGet("alice", out PlayerState state));
             Assert.AreEqual(alice.Stomach.Calories, state.Stomach.Calories);
+            Assert.IsTrue(state.ReceivedTools);
+            Assert.IsTrue(loaded.TryGet("bob", out PlayerState bob));
+            Assert.IsFalse(bob.ReceivedTools);
             for (int i = 0; i < Nutrition.NutrientCount; i++)
             {
                 Assert.AreEqual(alice.Stomach.Nutrient(i), state.Stomach.Nutrient(i));
@@ -179,6 +184,7 @@ namespace Voxel.Core.Tests
             Assert.AreEqual((int)Blocks.Stone, state.Hotbar[0]);
             Assert.AreEqual(Stomach.StartingCalories, state.Stomach.Calories);
             Assert.AreEqual(0.25f, state.Stomach.Share(0), 1e-6f);
+            Assert.IsFalse(state.ReceivedTools, "they get their tools at their next connection");
         }
 
         // A save from before the hotbar (format 3): everything else is kept, the hotbar starts empty.
@@ -286,9 +292,9 @@ namespace Voxel.Core.Tests
             store.Write(stream);
             byte[] data = stream.ToArray();
 
-            // The appearance code comes just before the hotbar (10 ints) and the stomach (5 floats), low
-            // byte first: a chosen code with hair style 7, which does not exist.
-            int appearance = data.Length - Hotbar.SlotCount * 4 - (1 + Nutrition.NutrientCount) * 4 - 2;
+            // The appearance code comes just before the hotbar (10 ints), the stomach (5 floats) and
+            // the tools flag (1 byte), low byte first: a chosen code with hair style 7, which does not exist.
+            int appearance = data.Length - Hotbar.SlotCount * 4 - (1 + Nutrition.NutrientCount) * 4 - 1 - 2;
             data[appearance] = 0x70;
             data[appearance + 1] = 0x80;
 

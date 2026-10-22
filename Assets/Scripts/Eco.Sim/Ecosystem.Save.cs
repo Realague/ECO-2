@@ -11,7 +11,10 @@ namespace Eco.Sim
     public sealed partial class Ecosystem
     {
         private const uint Magic = 0x454F4345; // "ECOE"
-        private const int FormatVersion = 7;
+        private const int FormatVersion = 8;
+
+        // Last format without animals' wounds (Animal.Damage). It still loads, every animal unhurt.
+        private const int FormatWithoutDamage = 7;
 
         // Last format with a single fertility per cell instead of the soil's three nutrients. It still
         // loads: each nutrient starts as far below its capacity as the fertility was below its own.
@@ -93,6 +96,7 @@ namespace Eco.Sim
                     writer.Write(animal.Age);
                     writer.Write(animal.Hunger);
                     writer.Write(animal.CarriedSeed);
+                    writer.Write(animal.Damage);
                 }
 
                 WriteCarrion(writer);
@@ -116,7 +120,7 @@ namespace Eco.Sim
                 }
 
                 int formatVersion = reader.ReadInt32();
-                if (formatVersion != FormatVersion && formatVersion != FormatWithoutNutrients && formatVersion != FormatWithoutFruit && formatVersion != FormatWithoutCarriedSeeds && formatVersion != FormatWithoutCarrion && formatVersion != FormatWithoutAnimals)
+                if (formatVersion != FormatVersion && formatVersion != FormatWithoutDamage && formatVersion != FormatWithoutNutrients && formatVersion != FormatWithoutFruit && formatVersion != FormatWithoutCarriedSeeds && formatVersion != FormatWithoutCarrion && formatVersion != FormatWithoutAnimals)
                 {
                     throw new InvalidDataException(
                         $"Unsupported ecosystem save format {formatVersion} (expected: {FormatVersion}).");
@@ -190,7 +194,7 @@ namespace Eco.Sim
                     ecosystem.Append(plant);
                 }
 
-                if (formatVersion != FormatWithoutAnimals) ecosystem.ReadAnimals(reader, formatVersion > FormatWithoutCarriedSeeds);
+                if (formatVersion != FormatWithoutAnimals) ecosystem.ReadAnimals(reader, formatVersion > FormatWithoutCarriedSeeds, formatVersion > FormatWithoutDamage);
                 if (formatVersion >= FormatWithoutCarriedSeeds) ecosystem.ReadCarrion(reader);
                 return ecosystem;
             }
@@ -242,7 +246,7 @@ namespace Eco.Sim
             }
         }
 
-        private void ReadAnimals(BinaryReader reader, bool withCarriedSeeds)
+        private void ReadAnimals(BinaryReader reader, bool withCarriedSeeds, bool withDamage)
         {
             // As for plants, species may have been added at the end of the list since the save.
             int speciesCount = reader.ReadInt32();
@@ -274,6 +278,7 @@ namespace Eco.Sim
                 int age = reader.ReadInt32();
                 float hunger = reader.ReadSingle();
                 int carriedSeed = withCarriedSeeds ? reader.ReadInt32() : 0;
+                float damage = withDamage ? reader.ReadSingle() : 0f;
 
                 bool valid = (uint)speciesIndex < (uint)animalSpecies.Length
                     && (uint)x < (uint)world.SizeX
@@ -281,7 +286,8 @@ namespace Eco.Sim
                     && id > previousId
                     && age >= 0
                     && animalAtColumn[ColumnIndex(x, z)] == 0
-                    && carriedSeed >= 0 && carriedSeed <= species.Length;
+                    && carriedSeed >= 0 && carriedSeed <= species.Length
+                    && damage >= 0f && damage < float.MaxValue;
                 if (!valid)
                 {
                     throw new InvalidDataException($"Invalid animal in the ecosystem save (id {id}).");
@@ -290,6 +296,8 @@ namespace Eco.Sim
                 previousId = id;
                 AddAnimal(id, speciesIndex, x, y, z, age, hunger);
                 animals[animalCount - 1].CarriedSeed = carriedSeed;
+                // A species given fewer hit points since the save does not kill its wounded on loading.
+                animals[animalCount - 1].Damage = Math.Min(damage, animalSpecies[speciesIndex].Health * 0.99f);
             }
         }
     }

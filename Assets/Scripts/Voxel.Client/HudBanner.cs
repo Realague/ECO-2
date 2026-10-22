@@ -26,6 +26,7 @@ namespace Voxel.Client
         [SerializeField] private AppearanceMenu appearanceMenu;
         [SerializeField] private MapScreen mapScreen;
         [SerializeField] private InventoryScreen inventoryScreen;
+        [SerializeField] private BowSync bowSync;
 
         private VisualElement screen;
         private VisualElement hints;
@@ -35,6 +36,8 @@ namespace Voxel.Client
         private Label speed;
         private Label place;
         private Label mapKey;
+        private VisualElement draw;
+        private VisualElement drawFill;
         private World landscapeWorld;
         private Landscape landscape;
         private float nextPlace;
@@ -56,6 +59,8 @@ namespace Voxel.Client
             speed = root.Q<Label>("speed");
             place = root.Q<Label>("place");
             mapKey = root.Q<Label>("map-key");
+            draw = root.Q("draw");
+            drawFill = root.Q("draw-fill");
             screen.style.display = DisplayStyle.None;
         }
 
@@ -70,12 +75,24 @@ namespace Voxel.Client
 
             hints.style.display = inventoryScreen.IsOpen ? DisplayStyle.None : DisplayStyle.Flex;
             ShowClock();
+            ShowDraw();
 
             if (Time.unscaledTime >= nextPlace)
             {
                 nextPlace = Time.unscaledTime + PlaceInterval;
                 ShowPlace(world, player.transform.position);
             }
+        }
+
+        // The bow's draw, while the left button is held with it (BowSync.DrawPower).
+        private void ShowDraw()
+        {
+            float power = bowSync.DrawPower;
+            draw.EnableInClassList("hidden", power < 0f);
+            if (power < 0f) return;
+
+            drawFill.style.width = Length.Percent(power * 100f);
+            drawFill.EnableInClassList("hud-draw-fill--full", power >= 1f);
         }
 
         private void ShowClock()

@@ -121,3 +121,27 @@
     margin: 0;
     padding: 0;
 }
+
+/* How far the bow is drawn: a short bar above the crosshair (the aiming label is under it), gold
+   once fully drawn. */
+.hud-draw {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 96px;
+    height: 7px;
+    translate: -50% -34px;
+    background-color: var(--veil);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.hud-draw-fill {
+    height: 100%;
+    width: 0;
+    background-color: var(--text-body);
+}
+
+.hud-draw-fill--full {
+    background-color: var(--accent);
+}

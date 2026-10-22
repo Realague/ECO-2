@@ -16,6 +16,7 @@ namespace Voxel.Client
         private const string WorldInfoMessage = "World.Info";
         private const string ChunksMessage = "World.Chunks";
         private const string SetBlockRequestMessage = "World.SetBlockRequest";
+        private const string TillRequestMessage = "World.Till";
         private const string BlockChangedMessage = "World.BlockChanged";
 
         // One batch of chunks per client and per network tick, so as not to flood the connection.
@@ -67,6 +68,7 @@ namespace Voxel.Client
             serverWorld.BlockChanged += BroadcastBlockChange;
 
             Messaging.RegisterNamedMessageHandler(SetBlockRequestMessage, OnSetBlockRequest);
+            Messaging.RegisterNamedMessageHandler(TillRequestMessage, OnTillRequest);
             networkManager.OnClientConnectedCallback += OnClientConnected;
             networkManager.OnClientDisconnectCallback += OnClientDisconnected;
             networkManager.NetworkTickSystem.Tick += SendChunkBatches;
@@ -123,11 +125,23 @@ namespace Voxel.Client
         {
             if (!IsEditAllowed(clientId, pos, block)) return false;
 
-            // Placing a block takes it from the player's inventory; breaking one gives it to them.
+            // Placing a block takes it from the player's inventory; breaking one gives it to them, so
+            // a player who cannot carry it cannot break it.
             bool placing = Blocks.IsSolid(block);
+            ushort previous = serverWorld.GetBlock(pos);
+
+            // Breaking needs the right tool. The server cannot know which one is in hand (the hotbar's
+            // choice is the client's): the player must at least own it.
+            if (!placing && !inventorySync.Owns(clientId, ToolRules.ToBreak(previous))) return false;
+
+            if (!placing && inventorySync.RoomFor(clientId, Items.DropOf(previous)) <= 0)
+            {
+                inventorySync.TellFull(clientId, InventorySync.ReasonFor(Items.DropOf(previous)));
+                return false;
+            }
+
             if (placing && !inventorySync.TryConsume(clientId, Items.OfBlock(block))) return false;
 
-            ushort previous = serverWorld.GetBlock(pos);
             serverWorld.SetBlock(pos, block);
             if (!placing)
             {
@@ -145,6 +159,49 @@ namespace Voxel.Client
 
             EditApplied?.Invoke(clientId, !placing);
             return true;
+        }
+
+        // The local player tills a block with their hoe: grass, dirt, mud or clay becomes tilled soil,
+        // the only ground where seeds can be sown. Shown at once on a client, as for any edit.
+        public void RequestTill(BlockPos pos)
+        {
+            if (!ready) return;
+
+            if (serverWorld != null)
+            {
+                TryTill(networkManager.LocalClientId, pos);
+                return;
+            }
+
+            voxelWorld.World.SetBlock(pos, Blocks.TilledSoil);
+            SendBlock(TillRequestMessage, NetworkManager.ServerClientId, pos, Blocks.TilledSoil);
+        }
+
+        // Within reach, with a hoe, on tillable ground with nothing solid on it.
+        private bool TryTill(ulong clientId, BlockPos pos)
+        {
+            if (!networkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client) || client.PlayerObject == null) return false;
+
+            Vector3 eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;
+            var centre = new Vector3(pos.X + 0.5f, pos.Y + 0.5f, pos.Z + 0.5f);
+            float reach = PlayerRules.Reach + BlockEditRules.ReachTolerance + 0.87f;
+            if ((centre - eyes).sqrMagnitude > reach * reach) return false;
+
+            if (!ToolRules.CanTill(serverWorld.GetBlock(pos))) return false;
+            if (Blocks.IsSolid(serverWorld.GetBlock(pos.X, pos.Y + 1, pos.Z))) return false;
+            if (!inventorySync.Owns(clientId, Items.Hoe)) return false;
+
+            serverWorld.SetBlock(pos, Blocks.TilledSoil);
+            EditApplied?.Invoke(clientId, true);
+            return true;
+        }
+
+        private void OnTillRequest(ulong senderId, FastBufferReader reader)
+        {
+            ReadBlock(reader, out BlockPos pos, out _);
+
+            // Refusal: the real block goes back to the requester, as for any edit.
+            if (!TryTill(senderId, pos)) SendBlock(BlockChangedMessage, senderId, pos, serverWorld.GetBlock(pos));
         }
 
         private void Update()

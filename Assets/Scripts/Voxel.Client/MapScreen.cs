@@ -105,9 +105,6 @@ namespace Voxel.Client
             speciesPanel.SelectionChanged += OnSpeciesChosen;
             speciesLayer.style.display = DisplayStyle.None;
 
-            Button inventoryTab = root.Q<Button>("tab-inventory");
-            inventoryTab.focusable = false;
-            inventoryTab.clicked += OpenInventory;
             root.Q<Button>("tab-map").focusable = false;
 
             view.RegisterCallback<WheelEvent>(OnWheel);
@@ -213,12 +210,6 @@ namespace Voxel.Client
             Cursor.lockState = CursorLockMode.None;
         }
 
-        private void OpenInventory()
-        {
-            Close(false);
-            inventoryScreen.Open();
-        }
-
         // relock: back to the game, the mouse steers the player again.
         private void Close(bool relock)
         {
@@ -294,12 +285,14 @@ namespace Voxel.Client
         // The climate layer's name, then the chosen species and how many there are.
         private void ShowLayerName()
         {
-            string climateName = LayerNames[(int)layer];
-            layerName.text = speciesPanel == null || speciesPanel.SelectedName == null
-                ? climateName
+            // The plain terrain goes unnamed: only a climate layer laid over it is.
+            string climateName = layer == Layer.Terrain ? "" : LayerNames[(int)layer];
+            string speciesName = speciesPanel == null || speciesPanel.SelectedName == null
+                ? ""
                 : speciesPanel.SelectedKind == SpeciesCensus.Kind.Soil
-                    ? $"{climateName}   ·   {speciesPanel.SelectedName} in the soil: {speciesPanel.SelectedCount} on average, deeper where richer"
-                    : $"{climateName}   ·   {speciesPanel.SelectedName}: {speciesPanel.SelectedCount}, yellow where they are most";
+                    ? $"{speciesPanel.SelectedName} in the soil: {speciesPanel.SelectedCount} on average, deeper where richer"
+                    : $"{speciesPanel.SelectedName}: {speciesPanel.SelectedCount}, yellow where they are most";
+            layerName.text = climateName.Length > 0 && speciesName.Length > 0 ? $"{climateName}   ·   {speciesName}" : climateName + speciesName;
         }
 
         // When a new census has come: the counts in the list, and the chosen species' layer if the

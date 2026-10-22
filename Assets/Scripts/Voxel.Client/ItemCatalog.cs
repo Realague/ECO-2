@@ -10,7 +10,8 @@ namespace Voxel.Client
         Blocks,
         Seeds,
         Food,
-        Materials
+        Materials,
+        Tools
     }
 
     // What the screens show of an item: its name, kind, description and icon. Icons are the images
@@ -21,13 +22,14 @@ namespace Voxel.Client
     {
         private const string IconFolder = "ItemIcons";
 
-        public static readonly ItemCategory[] Categories = { ItemCategory.Blocks, ItemCategory.Seeds, ItemCategory.Food, ItemCategory.Materials };
+        public static readonly ItemCategory[] Categories = { ItemCategory.Tools, ItemCategory.Blocks, ItemCategory.Seeds, ItemCategory.Food, ItemCategory.Materials };
 
         private static readonly Dictionary<int, Texture2D> Icons = new Dictionary<int, Texture2D>();
         private static readonly Dictionary<ItemCategory, Texture2D> MissingIcons = new Dictionary<ItemCategory, Texture2D>();
 
         public static ItemCategory CategoryOf(int item)
         {
+            if (Items.IsTool(item) || item == Items.Arrow) return ItemCategory.Tools;
             if (Items.IsSeed(item)) return ItemCategory.Seeds;
             if (Items.IsProduce(item)) return ItemCategory.Food;
             return item == Items.Wood || item == Items.Straw ? ItemCategory.Materials : ItemCategory.Blocks;
@@ -40,6 +42,7 @@ namespace Voxel.Client
                 case ItemCategory.Seeds: return "Seeds";
                 case ItemCategory.Food: return "Food";
                 case ItemCategory.Materials: return "Materials";
+                case ItemCategory.Tools: return "Tools";
                 default: return "Blocks";
             }
         }
@@ -52,6 +55,7 @@ namespace Voxel.Client
                 case ItemCategory.Seeds: return "Seed";
                 case ItemCategory.Food: return "Food";
                 case ItemCategory.Materials: return "Material";
+                case ItemCategory.Tools: return item == Items.Arrow ? "Ammunition" : "Tool";
                 default: return "Block";
             }
         }
@@ -74,6 +78,17 @@ namespace Voxel.Client
             {
                 string harvested = $"Harvested from {PlantName(Items.ProduceSpecies(item), ecosystemSync).ToLowerInvariant()} plants when they are ripe.";
                 return ecosystemSync.FoodOf(item).IsFood ? harvested + " Right click it here, or hold it and right click, to eat it." : harvested + " It cannot be eaten.";
+            }
+
+            switch (item)
+            {
+                case Items.Shovel: return "Digs soft ground: dirt, grass, sand, gravel, clay, snow and mud. Hold it and left click.";
+                case Items.Pickaxe: return "Breaks hard blocks: rock, ores and ice. Hold it and left click.";
+                case Items.Axe: return "Fells trees and every plant that gives wood. Hold it and left click.";
+                case Items.Scythe: return "Cuts grass, reeds and ferns, and harvests cereals and vegetables (right click on a ripe one). Fruit is picked by hand.";
+                case Items.Hoe: return "Tills grass, dirt, mud or clay (right click): seeds only grow on tilled soil.";
+                case Items.Bow: return "Hunts animals. Hold the left button to draw, let go to shoot; a shot in the head does double damage.";
+                case Items.Arrow: return "Shot with the bow. An arrow lies where it lands: right click on it to pick it up.";
             }
 
             if (item == Items.Wood) return "Felled from trees and shrubs: the bigger the plant, the more wood.";
@@ -102,6 +117,8 @@ namespace Voxel.Client
             if (Items.IsProduce(item)) return $"Produce_{ecosystemSync.PlantName(Items.ProduceSpecies(item))}";
             if (item == Items.Wood) return "Wood";
             if (item == Items.Straw) return "Straw";
+            if (item == Items.Arrow) return "Arrow";
+            if (Items.IsTool(item)) return $"Tool_{Items.NameOf(item)}";
             return $"Block_{item}";
         }
 
@@ -119,7 +136,8 @@ namespace Voxel.Client
         {
             if (MissingIcons.TryGetValue(category, out Texture2D icon) && icon != null) return icon;
 
-            Color colour = category == ItemCategory.Seeds ? new Color(0.62f, 0.5f, 0.32f)
+            Color colour = category == ItemCategory.Tools ? new Color(0.45f, 0.47f, 0.5f)
+                : category == ItemCategory.Seeds ? new Color(0.62f, 0.5f, 0.32f)
                 : category == ItemCategory.Food ? new Color(0.78f, 0.36f, 0.3f)
                 : category == ItemCategory.Materials ? new Color(0.55f, 0.4f, 0.26f)
                 : new Color(0.5f, 0.52f, 0.55f);

@@ -14,7 +14,7 @@ namespace Voxel.Client.Tests
         // It changes with what the terrain generator produces (TerrainGenerator.Version, like the
         // terrain fingerprints) or with the mesher's output (faces, light, atlas tiles): then copy the
         // new value from the failure message, saying why.
-        private const ulong ExpectedWorldMeshes = 0x50515FEF937E8BAEUL;
+        private const ulong ExpectedWorldMeshes = 0x1E8222675C291800UL;
 
         [Test]
         public void TheReferenceWorld_GivesTheRecordedMeshes()

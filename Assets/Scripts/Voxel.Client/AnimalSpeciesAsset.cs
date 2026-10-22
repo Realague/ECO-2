@@ -49,12 +49,39 @@ namespace Voxel.Client
         [Tooltip("How far past those ranges it still lives, less and less well.")]
         [SerializeField] private float climateTolerance = 0.1f;
 
+        [Header("Health")]
+        [Tooltip("Hit points: a fully drawn arrow does 10 (20 in the head). A wound heals in a day.")]
+        [SerializeField] private float health = 10f;
+
         [Header("Appearance and aiming")]
         [SerializeField] private float height = 0.6f;
         [SerializeField] private float width = 0.6f;
         [SerializeField] private SpeciesAsset.Part[] parts;
 
+        // The head, for arrows (worked out from the parts the first time it is asked for).
+        [NonSerialized] private bool headReady;
+        [NonSerialized] private Bounds head;
+
         public IReadOnlyList<SpeciesAsset.Part> Parts => parts;
+
+        public float Health => Mathf.Max(1f, health);
+
+        // Where the head is, in the animal's own space (facing +z, feet at 0): the front three tenths
+        // of the model, above the lower 45 % of its height, across its middle. An arrow there does
+        // double damage.
+        public Bounds HeadBox
+        {
+            get
+            {
+                if (!headReady)
+                {
+                    head = WorkOutHead();
+                    headReady = true;
+                }
+
+                return head;
+            }
+        }
 
         public enum Gait { Glide, Hop, Trot, Fly }
 
@@ -139,6 +166,7 @@ namespace Voxel.Client
                 MinDensity = minPerTenThousandColumns,
                 Height = height,
                 Width = width,
+                Health = Health,
                 ReachHeight = reachHeight,
                 Herd = herd,
                 WarmthMin = idealWarmth.x,
@@ -147,6 +175,33 @@ namespace Voxel.Client
                 WetnessMax = idealWetness.y,
                 ClimateTolerance = climateTolerance
             };
+        }
+
+        private Bounds WorkOutHead()
+        {
+            if (parts == null || parts.Length == 0) return new Bounds(new Vector3(0f, height * 0.75f, width * 0.5f), new Vector3(width, height * 0.5f, width * 0.5f));
+
+            var boxes = new Bounds[parts.Length];
+            Bounds model = default;
+            for (int i = 0; i < parts.Length; i++)
+            {
+                Bounds mesh = parts[i].mesh != null ? parts[i].mesh.bounds : new Bounds(Vector3.zero, Vector3.one);
+                Vector3 scale = parts[i].scale;
+                var size = new Vector3(Mathf.Abs(mesh.size.x * scale.x), Mathf.Abs(mesh.size.y * scale.y), Mathf.Abs(mesh.size.z * scale.z));
+                boxes[i] = new Bounds(parts[i].offset + Vector3.Scale(mesh.center, scale), size);
+                if (i == 0) model = boxes[i];
+                else model.Encapsulate(boxes[i]);
+            }
+
+            // The sculpted models (fox, deer) have their head in the body's mesh, so parts cannot tell
+            // it apart: the head is taken as the front, upper corner of the whole model, across its
+            // middle (ears and antlers are part of it, which a hunter would not mind).
+            float front = model.max.z - 0.3f * model.size.z;
+            float low = model.min.y + 0.45f * model.size.y;
+            float half = Mathf.Min(model.extents.x, Mathf.Max(0.15f, model.size.x * 0.3f));
+            var corner = new Bounds();
+            corner.SetMinMax(new Vector3(model.center.x - half, low, front), new Vector3(model.center.x + half, model.max.y, model.max.z));
+            return corner;
         }
 
         private static int[] IndicesOf<T>(T[] chosen, T[] all) where T : UnityEngine.Object

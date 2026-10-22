@@ -109,6 +109,12 @@ namespace Voxel.EditorTools
                 case ClayTile:
                     // Smooth, with faint horizontal streaks.
                     return Noise(tile + 400, x / 16, y / 2) > 0.8f ? Clay * 0.94f : Clay;
+                case TilledSoilTopTile:
+                    // Furrows: eight ridges across the block, lit on their upper side, dark and moist in
+                    // the hollow between, with the dirt's crumbs over all.
+                    int row = y % 8;
+                    float shade = row < 2 ? 0.72f : row < 4 ? 1.12f : row < 6 ? 0.98f : 0.85f;
+                    return DirtAt(crumb, pebble) * shade * 0.92f;
                 default:
                     return PaintedColour(tile, x, y);
             }

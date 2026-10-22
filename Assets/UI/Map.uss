@@ -85,7 +85,7 @@
 .map-view {
     flex-grow: 1;
     overflow: hidden;
-    background-color: #1b1916;
+    background-color: #1c1e1f;
     border-radius: 14px;
 }
 

@@ -10,10 +10,6 @@
             <ui:VisualElement class="map-header">
                 <ui:VisualElement class="map-heading">
                     <ui:VisualElement class="tabs">
-                        <ui:Button name="tab-inventory" class="tab">
-                            <ui:VisualElement class="icon icon--house" />
-                            <ui:Label text="Inventory" class="tab-text" />
-                        </ui:Button>
                         <ui:Button name="tab-map" class="tab tab--selected">
                             <ui:VisualElement class="icon icon--globe" />
                             <ui:Label text="Map" class="tab-text" />

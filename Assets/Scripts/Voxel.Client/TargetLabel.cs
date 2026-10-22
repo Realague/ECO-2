@@ -6,7 +6,8 @@ using Voxel.Core;
 namespace Voxel.Client
 {
     // A small label under the crosshair naming what the local player aims at within reach: the animal
-    // or plant a strike would hit (EcosystemSync.TryAim), otherwise the block. Display only. It is
+    // or plant a strike would hit (EcosystemSync.TryAim), otherwise the block, with the tool it needs
+    // when that is not the one in hand. Display only. It is
     // hidden in the menu, while character creation or the full-screen map is open, and when nothing
     // is in reach. The screen is Assets/UI/Target.uxml.
     public class TargetLabel : MonoBehaviour
@@ -17,6 +18,7 @@ namespace Voxel.Client
         [SerializeField] private AppearanceMenu appearanceMenu;
         [SerializeField] private MapScreen mapScreen;
         [SerializeField] private InventoryScreen inventoryScreen;
+        [SerializeField] private HotbarHud hotbar;
         [SerializeField] private UIDocument document;
 
         private VisualElement screen;
@@ -51,9 +53,20 @@ namespace Voxel.Client
             System.Numerics.Vector3 origin = eye.transform.position.ToNumerics();
             System.Numerics.Vector3 direction = eye.transform.forward.ToNumerics();
             bool blockHit = VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, out VoxelHit hit);
-            if (ecosystemSync.TryAim(origin, direction, blockHit ? hit.Distance : PlayerRules.Reach, out string name)) return name;
+            if (ecosystemSync.TryAim(origin, direction, blockHit ? hit.Distance : PlayerRules.Reach, out string name, out int tool)) return WithTool(name, tool);
+            if (!blockHit) return null;
 
-            return blockHit ? Items.NameOf(Blocks.TypeOf(world.GetBlock(hit.Block))) : null;
+            ushort block = world.GetBlock(hit.Block);
+            return WithTool(Items.NameOf(Blocks.TypeOf(block)), ToolRules.ToBreak(block));
+        }
+
+        // The tool a click would need, when it is not the one in hand: "Granite · needs a pickaxe".
+        private string WithTool(string name, int tool)
+        {
+            if (name == null || tool == Items.None || hotbar.SelectedItem == tool) return name;
+
+            string toolName = Items.NameOf(tool).ToLowerInvariant();
+            return $"{name} · needs {("aeiou".IndexOf(toolName[0]) >= 0 ? "an" : "a")} {toolName}";
         }
 
         private void Show(string name)

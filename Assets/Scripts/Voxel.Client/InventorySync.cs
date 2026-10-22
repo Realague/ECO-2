@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -5,11 +7,26 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
+    // Why a player could not take more (CarryLimits): too many blocks, too heavy, or the player they
+    // were giving to is full.
+    public enum FullReason : byte
+    {
+        Blocks,
+        Weight,
+        Receiver
+    }
+
     // Players' inventory, hotbar and speciality. The server holds them (in each player's saved state)
     // and decides everything: choosing a speciality, giving, planting, arranging the hotbar. Each
-    // client only knows its own, which the server sends back at every change.
+    // client only knows its own, which the server sends back at every change. What a player can carry
+    // is limited (CarryLimits: 40 blocks, 30 kg of the rest): items are only given while they fit, and
+    // an action that would give nothing that fits is refused, the player being told why (Refused).
     public class InventorySync : MonoBehaviour
     {
+        private const string FullMessage = "Inv.Full";
+
+        // Arrows in the starting kit, with the tools.
+        private const int StartingArrows = 20;
         private const string StateMessage = "Inv.State";
         private const string SpecialityMessage = "Inv.Speciality";
         private const string GiveMessage = "Inv.Give";
@@ -33,6 +50,18 @@ namespace Voxel.Client
 
         public Speciality Speciality => TryGetLocalState(out PlayerState state) ? state.Speciality : receivedSpeciality;
 
+        // The local player could not take more, and why.
+        public event Action<FullReason> Refused;
+
+        // How many more of an item the local player can carry.
+        public int LocalRoomFor(int item) => CarryLimits.Room(Inventory, item, ecosystemSync.ItemWeights);
+
+        // Which limit an item runs into: blocks are counted, everything else weighed.
+        public static FullReason ReasonFor(int item) => Items.IsBlock(item) ? FullReason.Blocks : FullReason.Weight;
+
+        // Tells the local player at once, without asking the server (an action checked beforehand).
+        public void TellLocalFull(FullReason reason) => Refused?.Invoke(reason);
+
         private CustomMessagingManager Messaging => networkManager.CustomMessagingManager;
 
         // To call right after the server or host has started.
@@ -45,6 +74,12 @@ namespace Voxel.Client
             Messaging.RegisterNamedMessageHandler(PlantMessage, OnPlant);
             Messaging.RegisterNamedMessageHandler(HotbarMessage, OnHotbar);
             networkManager.OnClientConnectedCallback += OnClientConnected;
+
+            // The host's own player connected before this was listening.
+            foreach (ulong clientId in networkManager.ConnectedClientsIds)
+            {
+                OnClientConnected(clientId);
+            }
         }
 
         // To call right after a client's connection has been launched.
@@ -52,6 +87,7 @@ namespace Voxel.Client
         {
             running = true;
             Messaging.RegisterNamedMessageHandler(StateMessage, OnState);
+            Messaging.RegisterNamedMessageHandler(FullMessage, OnFull);
         }
 
         public void Stop()
@@ -77,14 +113,65 @@ namespace Voxel.Client
             return true;
         }
 
-        // Server side: gives items to a player.
-        public void Give(ulong clientId, int item, int count)
+        // Server side: gives items to a player, as many as they can carry. Returns how many were given.
+        public int Give(ulong clientId, int item, int count)
         {
-            if (item == Items.None || count <= 0) return;
-            if (registry == null || !registry.TryGetState(clientId, out PlayerState state)) return;
+            if (item == Items.None || count <= 0) return 0;
+            if (registry == null || !registry.TryGetState(clientId, out PlayerState state)) return 0;
 
-            Receive(state, item, count);
-            Publish(clientId);
+            int given = Receive(state, item, count);
+            if (given > 0) Publish(clientId);
+            return given;
+        }
+
+        // Server side: whether a player has at least one of an item (Items.None: always true, bare hands).
+        public bool Owns(ulong clientId, int item)
+        {
+            if (item == Items.None) return true;
+
+            return registry != null && registry.TryGetState(clientId, out PlayerState state) && state.Inventory.Has(item);
+        }
+
+        // Server side: how many more of an item a player can carry.
+        public int RoomFor(ulong clientId, int item)
+        {
+            if (registry == null || !registry.TryGetState(clientId, out PlayerState state)) return 0;
+
+            return CarryLimits.Room(state.Inventory, item, ecosystemSync.ItemWeights);
+        }
+
+        // Server side: whether an action giving these rewards may go ahead. One giving nothing at all
+        // may; one giving something of which nothing fits may not, and the player is told why.
+        public bool CanReceiveAny(ulong clientId, IReadOnlyList<(int item, int count)> rewards)
+        {
+            int firstFull = Items.None;
+            foreach ((int item, int count) in rewards)
+            {
+                if (item == Items.None || count <= 0) continue;
+                if (RoomFor(clientId, item) > 0) return true;
+                if (firstFull == Items.None) firstFull = item;
+            }
+
+            if (firstFull == Items.None) return true;
+
+            TellFull(clientId, ReasonFor(firstFull));
+            return false;
+        }
+
+        // Server side: tells a player they could not take more.
+        public void TellFull(ulong clientId, FullReason reason)
+        {
+            if (clientId == networkManager.LocalClientId)
+            {
+                Refused?.Invoke(reason);
+                return;
+            }
+
+            using (var writer = new FastBufferWriter(sizeof(byte), Allocator.Temp))
+            {
+                writer.WriteValueSafe((byte)reason);
+                Messaging.SendNamedMessage(FullMessage, clientId, writer, NetworkDelivery.ReliableSequenced);
+            }
         }
 
         // Puts an item in one of the local player's hotbar slots (Items.None empties it). A client
@@ -169,19 +256,32 @@ namespace Voxel.Client
             }
 
             if (!found || !registry.TryGetState(nearestId, out PlayerState receiver)) return;
-            if (!giver.Inventory.TryRemove(item, count)) return;
 
-            Receive(receiver, item, count);
+            // The receiver only takes what they can carry, and the giver only loses that.
+            int given = Math.Min(Math.Min(count, giver.Inventory.Count(item)), CarryLimits.Room(receiver.Inventory, item, ecosystemSync.ItemWeights));
+            if (given <= 0)
+            {
+                if (giver.Inventory.Has(item)) TellFull(clientId, FullReason.Receiver);
+                return;
+            }
+
+            giver.Inventory.TryRemove(item, given);
+            Receive(receiver, item, given);
             Publish(clientId);
             Publish(nearestId);
         }
 
-        // Adds items to a player's inventory; an item they did not have takes an empty hotbar slot.
-        private static void Receive(PlayerState state, int item, int count)
+        // Adds items to a player's inventory, as many as they can carry, and returns how many; an
+        // item they did not have takes an empty hotbar slot.
+        private int Receive(PlayerState state, int item, int count)
         {
+            int given = Math.Min(count, CarryLimits.Room(state.Inventory, item, ecosystemSync.ItemWeights));
+            if (given <= 0) return 0;
+
             bool had = state.Inventory.Has(item);
-            state.Inventory.Add(item, count);
+            state.Inventory.Add(item, given);
             if (!had) state.Hotbar.Place(item);
+            return given;
         }
 
         private void SetHotbarSlot(ulong clientId, int slot, int item)
@@ -192,10 +292,28 @@ namespace Voxel.Client
             Publish(clientId);
         }
 
-        // A player whose save had no hotbar gets one filled with what they own.
+        // A player gets their starting tools once (there is no crafting to make them), and one whose
+        // save had no hotbar gets one filled with what they own.
         private void OnClientConnected(ulong clientId)
         {
-            if (registry.TryGetState(clientId, out PlayerState state) && state.Hotbar.IsEmpty) state.Hotbar.FillFrom(state.Inventory);
+            if (registry.TryGetState(clientId, out PlayerState state))
+            {
+                // Whatever they carry already: without tools a player can do nothing.
+                if (!state.ReceivedTools)
+                {
+                    foreach (int tool in Items.Tools)
+                    {
+                        if (!state.Inventory.Has(tool)) state.Hotbar.Place(tool);
+                        state.Inventory.Add(tool, 1);
+                    }
+
+                    if (!state.Inventory.Has(Items.Arrow)) state.Hotbar.Place(Items.Arrow);
+                    state.Inventory.Add(Items.Arrow, StartingArrows);
+                    state.ReceivedTools = true;
+                }
+
+                if (state.Hotbar.IsEmpty) state.Hotbar.FillFrom(state.Inventory);
+            }
 
             Publish(clientId);
         }
@@ -282,6 +400,12 @@ namespace Voxel.Client
                 reader.ReadValueSafe(out int item);
                 receivedHotbar.Set(slot, item);
             }
+        }
+
+        private void OnFull(ulong senderId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out byte reason);
+            if (reason <= (byte)FullReason.Receiver) Refused?.Invoke((FullReason)reason);
         }
 
         private void Send(string message, params int[] values)

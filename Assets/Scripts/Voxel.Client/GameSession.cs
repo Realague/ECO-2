@@ -48,6 +48,7 @@ namespace Voxel.Client
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private HungerSync hungerSync;
+        [SerializeField] private BowSync bowSync;
         [SerializeField] private AppearanceSync appearanceSync;
         [SerializeField] private CommandSync commandSync;
         [SerializeField] private AppearanceMenu appearanceMenu;
@@ -291,6 +292,7 @@ namespace Voxel.Client
             ecosystemSync.StartClient();
             inventorySync.StartClient();
             hungerSync.StartClient();
+            bowSync.StartClient();
             appearanceSync.StartClient();
             commandSync.StartClient();
             sessionActive = true;
@@ -334,6 +336,7 @@ namespace Voxel.Client
             ecosystemSync.StartServer(voxelWorld.World, worldDirectory, startTimeScale, IsAdmin);
             inventorySync.StartServer(registry);
             hungerSync.StartServer(registry);
+            bowSync.StartServer(worldDirectory);
             appearanceSync.StartServer(registry);
             commandSync.StartServer();
             sessionActive = true;
@@ -405,6 +408,7 @@ namespace Voxel.Client
             registry.Save();
             voxelWorld.Save();
             ecosystemSync.Save();
+            bowSync.Save();
         }
 
         // The host is admin of its own game; on a dedicated server, admins are the players
@@ -435,9 +439,11 @@ namespace Voxel.Client
             // Last moment when the state of the game still exists. When the game closes, the network can
             // stop before SaveSession has been called: so we save here too.
             ecosystemSync.Save();
+            bowSync.Save();
             ecosystemSync.Stop();
             inventorySync.Stop();
             hungerSync.Stop();
+            bowSync.Stop();
             appearanceSync.Stop();
             commandSync.Stop();
             worldSync.Stop();

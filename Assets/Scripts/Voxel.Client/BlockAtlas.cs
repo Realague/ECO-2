@@ -42,15 +42,16 @@ namespace Voxel.Client
         public const int FlintTile = 20;
         public const int BedrockTile = 21;
         public const int MudTile = 22;
+        public const int TilledSoilTopTile = 23;
 
-        public const int TileCount = 23;
+        public const int TileCount = 24;
 
         // The file of each tile, in tile order.
         public static readonly string[] TileNames =
         {
             "Granite", "Dirt", "GrassTop", "GrassSide", "Ice", "Basalt", "Limestone", "Marble", "Sandstone",
             "Slate", "Sand", "Snow", "Gravel", "Clay", "CoalOre", "IronOre", "CopperOre", "TinOre", "GoldOre",
-            "RockSalt", "Flint", "Bedrock", "Mud"
+            "RockSalt", "Flint", "Bedrock", "Mud", "TilledSoilTop"
         };
 
         // The tile of each block type for all its faces; grass is handled apart.
@@ -78,6 +79,9 @@ namespace Voxel.Client
                 if (face == ChunkMesher.TopFace) return GrassTopTile;
                 return face == ChunkMesher.BottomFace ? DirtTile : GrassSideTile;
             }
+
+            // Tilled soil shows its furrows on top, dirt elsewhere.
+            if (type == Blocks.TilledSoil) return face == ChunkMesher.TopFace ? TilledSoilTopTile : DirtTile;
 
             return type < TypeTiles.Length ? TypeTiles[type] : GraniteTile;
         }
@@ -245,6 +249,7 @@ namespace Voxel.Client
             tiles[Blocks.Flint] = FlintTile;
             tiles[Blocks.Bedrock] = BedrockTile;
             tiles[Blocks.Mud] = MudTile;
+            tiles[Blocks.TilledSoil] = DirtTile;
             return tiles;
         }
     }

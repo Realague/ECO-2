@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -9,17 +10,28 @@ using Voxel.Core;
 namespace Voxel.Client
 {
     // The inventory (Assets/UI/Inventory.uxml), opened and closed with Tab, closed with Escape:
-    // categories, a grid of the items the player owns (searchable, sorted by kind then name), the
-    // chosen item's details (what it is, how many, its hotbar slot, a food's nutrition) and the
-    // speciality (chosen once, here). Items go into the hotbar, which stays shown below, by dragging
+    // categories, a grid of slots holding the items the player owns (searchable, sorted by kind then
+    // name, empty slots after them), the details of the item under the pointer or else the chosen one
+    // (what it is, how many, its hotbar slot, a food's nutrition) and the speciality (chosen once, here). Items go into the hotbar, which stays shown below, by dragging
     // them onto a slot, by clicking a slot with an item chosen, or with the digits 1-0; a right click
-    // empties a slot. A right click on a food in the grid eats one. The Map tab opens the full-screen map, whose Inventory tab comes back here.
+    // empties a slot. A right click on a food in the grid eats one. M goes to the full-screen map.
     // While it is open the mouse is free and the player stands still (HoldsInput).
     public class InventoryScreen : MonoBehaviour
     {
         private const string SelectedItemClass = "item-slot--selected";
         private const string SelectedCategoryClass = "category--selected";
         private const float DragThreshold = 8f;
+
+        // The grid is filled out with empty slots to whole rows, and at least this many rows.
+        private const int MinimumRows = 5;
+
+        // Slots are about this wide, as many columns as fit, then widened to fill the well; the gap is
+        // their margin (Inventory.uss, .item-slot).
+        private const float TargetSlot = 124f;
+        private const float SlotGap = 12f;
+
+        // Nutrient points a food bar shows full (foods have 0 to about 15, as in Eco).
+        private const float FullNutrient = 15f;
 
         [SerializeField] private UIDocument document;
         [SerializeField] private NetworkManager networkManager;
@@ -32,10 +44,15 @@ namespace Voxel.Client
         [SerializeField] private HotbarHud hotbar;
 
         private VisualElement screen;
-        private VisualElement grid;
-        private Label total;
+        private ScrollView grid;
+        private Label carryBlocks;
+        private Label carryWeight;
         private Label empty;
         private TextField search;
+        private VisualElement searchBox;
+        private VisualElement searchHint;
+        private int gridColumns;
+        private float slotSize;
         private VisualElement details;
         private VisualElement detailsIcon;
         private Label detailsName;
@@ -43,16 +60,18 @@ namespace Voxel.Client
         private Label detailsDescription;
         private Label detailsCount;
         private Label detailsSlot;
+        private VisualElement detailsWeightLine;
+        private Label detailsWeight;
         private VisualElement detailsFood;
         private Label detailsCalories;
         private readonly Label[] detailsNutrients = new Label[Nutrition.NutrientCount];
+        private readonly VisualElement[] detailsNutrientBars = new VisualElement[Nutrition.NutrientCount];
         private Label specialityName;
         private Button specialityChoose;
         private VisualElement ghost;
 
         // Categories down the left: null is "All".
         private readonly List<Button> categoryButtons = new List<Button>();
-        private readonly List<Label> categoryCounts = new List<Label>();
         private readonly List<ItemCategory?> categoryKinds = new List<ItemCategory?>();
         private ItemCategory? category;
 
@@ -79,15 +98,25 @@ namespace Voxel.Client
         {
             VisualElement root = document.rootVisualElement;
             screen = root.Q("screen");
-            var gridView = root.Q<ScrollView>("item-grid");
-            grid = gridView;
+            grid = root.Q<ScrollView>("item-grid");
 
-            // Items flow in rows that wrap, inside the scrolled content.
-            gridView.contentContainer.style.flexDirection = FlexDirection.Row;
-            gridView.contentContainer.style.flexWrap = Wrap.Wrap;
-            total = root.Q<Label>("item-total");
+            // Items flow in rows that wrap, inside the scrolled content; the well's width decides how
+            // many columns and how wide the slots are, so the grid is laid out again when it changes.
+            grid.contentContainer.style.flexDirection = FlexDirection.Row;
+            grid.contentContainer.style.flexWrap = Wrap.Wrap;
+            // A scroll bar always shown, as in the mockup: one coming and going would change the width.
+            grid.verticalScrollerVisibility = ScrollerVisibility.AlwaysVisible;
+            grid.contentViewport.RegisterCallback<GeometryChangedEvent>(_ =>
+            {
+                SlotLayout(out int columns, out float size);
+                if (columns != gridColumns || !Mathf.Approximately(size, slotSize)) shownSearch = null;
+            });
+            carryBlocks = root.Q<Label>("carry-blocks");
+            carryWeight = root.Q<Label>("carry-weight");
             empty = root.Q<Label>("item-empty");
             search = root.Q<TextField>("item-search");
+            searchBox = root.Q(className: "item-search-box");
+            searchHint = root.Q("item-search-hint");
             details = root.Q("details");
             detailsIcon = root.Q("details-icon");
             detailsName = root.Q<Label>("details-name");
@@ -95,11 +124,14 @@ namespace Voxel.Client
             detailsDescription = root.Q<Label>("details-description");
             detailsCount = root.Q<Label>("details-count");
             detailsSlot = root.Q<Label>("details-slot");
+            detailsWeightLine = root.Q("details-weight-line");
+            detailsWeight = root.Q<Label>("details-weight");
             detailsFood = root.Q("details-food");
             detailsCalories = root.Q<Label>("details-calories");
             for (int i = 0; i < detailsNutrients.Length; i++)
             {
                 detailsNutrients[i] = root.Q<Label>($"details-nutrient-{i}");
+                detailsNutrientBars[i] = root.Q($"details-nutrient-bar-{i}");
             }
             specialityName = root.Q<Label>("speciality-name");
             specialityChoose = root.Q<Button>("speciality-choose");
@@ -121,10 +153,15 @@ namespace Voxel.Client
             }
 
             Connect(root.Q<Button>("tab-inventory"), () => { });
-            Connect(root.Q<Button>("tab-map"), OpenMap);
             Connect(specialityChoose, () => inventorySync.RequestSpeciality(Specialities.Choices[0]));
 
-            search.RegisterValueChangedCallback(_ => shownSearch = null);
+            search.RegisterValueChangedCallback(e =>
+            {
+                shownSearch = null;
+                searchHint.style.display = string.IsNullOrEmpty(e.newValue) ? DisplayStyle.Flex : DisplayStyle.None;
+            });
+            search.RegisterCallback<FocusInEvent>(_ => searchBox.AddToClassList("item-search-box--focused"));
+            search.RegisterCallback<FocusOutEvent>(_ => searchBox.RemoveFromClassList("item-search-box--focused"));
             hotbar.SlotClicked += OnHotbarSlotClicked;
 
             screen.style.display = DisplayStyle.None;
@@ -203,22 +240,17 @@ namespace Voxel.Client
             if (relock) UnityEngine.Cursor.lockState = CursorLockMode.Locked;
         }
 
-        private void OpenMap()
-        {
-            Close(false);
-            mapScreen.Open();
-        }
-
         private void AddCategory(ScrollView list, ItemCategory? kind)
         {
             var button = new Button { focusable = false };
             button.AddToClassList("category");
+            var icon = new VisualElement();
+            icon.AddToClassList("icon");
+            icon.AddToClassList(CategoryIcon(kind));
             var name = new Label(kind.HasValue ? ItemCatalog.CategoryName(kind.Value) : "All");
             name.AddToClassList("category-name");
-            var count = new Label();
-            count.AddToClassList("category-count");
+            button.Add(icon);
             button.Add(name);
-            button.Add(count);
             button.clicked += () =>
             {
                 category = kind;
@@ -227,8 +259,31 @@ namespace Voxel.Client
 
             list.Add(button);
             categoryButtons.Add(button);
-            categoryCounts.Add(count);
             categoryKinds.Add(kind);
+        }
+
+        // The icon class (Common.uss) of a category; null is "All".
+        private static string CategoryIcon(ItemCategory? kind)
+        {
+            switch (kind)
+            {
+                case ItemCategory.Tools: return "icon--category-tools";
+                case ItemCategory.Blocks: return "icon--category-blocks";
+                case ItemCategory.Seeds: return "icon--category-seeds";
+                case ItemCategory.Food: return "icon--category-food";
+                case ItemCategory.Materials: return "icon--category-materials";
+                default: return "icon--category-all";
+            }
+        }
+
+        // How many slots fit across the well and how wide they are, so that whole columns fill it
+        // (five of the target size before it is laid out).
+        private void SlotLayout(out int columns, out float size)
+        {
+            float width = grid.contentViewport.layout.width;
+            if (float.IsNaN(width) || width < TargetSlot + SlotGap) width = 5f * (TargetSlot + SlotGap);
+            columns = Mathf.Max(1, Mathf.FloorToInt(width / (TargetSlot + SlotGap)));
+            size = Mathf.Floor(width / columns - SlotGap);
         }
 
         private static void Connect(Button button, Action action)
@@ -264,13 +319,6 @@ namespace Voxel.Client
 
             for (int c = 0; c < categoryButtons.Count; c++)
             {
-                int count = 0;
-                foreach (KeyValuePair<int, int> entry in shownEntries)
-                {
-                    if (!categoryKinds[c].HasValue || ItemCatalog.CategoryOf(entry.Key) == categoryKinds[c].Value) count++;
-                }
-
-                categoryCounts[c].text = count.ToString();
                 categoryButtons[c].EnableInClassList(SelectedCategoryClass, categoryKinds[c] == category);
             }
 
@@ -289,6 +337,7 @@ namespace Voxel.Client
                 return byKind != 0 ? byKind : string.Compare(ItemCatalog.NameOf(a, ecosystemSync), ItemCatalog.NameOf(b, ecosystemSync), StringComparison.OrdinalIgnoreCase);
             });
 
+            SlotLayout(out gridColumns, out slotSize);
             grid.Clear();
             itemSlots.Clear();
             foreach (int item in sorted)
@@ -298,31 +347,62 @@ namespace Voxel.Client
                 itemSlots[item] = slot;
             }
 
+            int slots = Mathf.Max(MinimumRows, (sorted.Count + gridColumns - 1) / gridColumns) * gridColumns;
+            for (int i = sorted.Count; i < slots; i++)
+            {
+                var emptySlot = new VisualElement { pickingMode = PickingMode.Ignore };
+                emptySlot.AddToClassList("item-slot");
+                emptySlot.AddToClassList("item-slot--empty");
+                Size(emptySlot);
+                grid.Add(emptySlot);
+            }
+
             if (!inventory.Has(selectedItem)) selectedItem = sorted.Count > 0 ? sorted[0] : Items.None;
             if (itemSlots.TryGetValue(selectedItem, out VisualElement selectedSlot)) selectedSlot.AddToClassList(SelectedItemClass);
 
-            int owned = 0;
-            foreach (KeyValuePair<int, int> entry in shownEntries) owned += entry.Value;
-            total.text = shownEntries.Count == 0 ? "" : $"{shownEntries.Count} kinds, {owned} in all";
+            ShowCarry(inventory);
             empty.style.display = sorted.Count == 0 ? DisplayStyle.Flex : DisplayStyle.None;
             empty.text = shownEntries.Count == 0
                 ? "Nothing here yet: break blocks, fell trees and harvest ripe crops."
                 : "No item matches.";
         }
 
+        // How much of the carrying limits is used, as counts: blocks out of 40, the rest's weight out of
+        // 30 kg, gold when nearly full and red when full (CarryHud draws the same as gauges in game).
+        private void ShowCarry(Inventory inventory)
+        {
+            int blocks = CarryLimits.BlockCount(inventory);
+            float weight = CarryLimits.Weight(inventory, ecosystemSync.ItemWeights);
+            carryBlocks.text = $"{blocks} / {CarryLimits.MaxBlocks}";
+            carryWeight.text = $"{weight.ToString("0.0", CultureInfo.InvariantCulture)} / {CarryLimits.MaxWeight:0} kg";
+            ShowCarryShare(carryBlocks, (float)blocks / CarryLimits.MaxBlocks);
+            ShowCarryShare(carryWeight, weight / CarryLimits.MaxWeight);
+        }
+
+        private static void ShowCarryShare(Label label, float share)
+        {
+            bool full = share >= 0.9999f;
+            label.EnableInClassList("carry-count-text--high", share >= CarryHud.HighShare && !full);
+            label.EnableInClassList("carry-count-text--full", full);
+        }
+
+        private void Size(VisualElement slot)
+        {
+            slot.style.width = slotSize;
+            slot.style.height = slotSize;
+        }
+
         private VisualElement MakeItemSlot(int item, int count)
         {
             var slot = new VisualElement { userData = item };
             slot.AddToClassList("item-slot");
+            Size(slot);
             var icon = new VisualElement { pickingMode = PickingMode.Ignore };
             icon.AddToClassList("item-icon");
             icon.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(item, ecosystemSync));
-            var name = new Label(ItemCatalog.NameOf(item, ecosystemSync)) { pickingMode = PickingMode.Ignore };
-            name.AddToClassList("item-name");
             var amount = new Label(count.ToString()) { pickingMode = PickingMode.Ignore };
             amount.AddToClassList("item-count");
             slot.Add(icon);
-            slot.Add(name);
             slot.Add(amount);
 
             slot.RegisterCallback<PointerEnterEvent>(_ => hoveredItem = item);
@@ -419,9 +499,10 @@ namespace Voxel.Client
             hotbar.Select(slot);
         }
 
+        // The item under the pointer, else the chosen one (the slots show no names).
         private void ShowDetails()
         {
-            int item = selectedItem;
+            int item = hoveredItem != Items.None && !dragging && inventorySync.Inventory.Has(hoveredItem) ? hoveredItem : selectedItem;
             details.style.visibility = item == Items.None ? Visibility.Hidden : Visibility.Visible;
             if (item == Items.None) return;
 
@@ -431,7 +512,12 @@ namespace Voxel.Client
             detailsDescription.text = ItemCatalog.DescriptionOf(item, ecosystemSync);
             detailsCount.text = inventorySync.Inventory.Count(item).ToString();
             int slot = inventorySync.Hotbar.SlotOf(item);
-            detailsSlot.text = slot >= 0 ? $"slot {SlotLabel(slot)}" : "not in it";
+            detailsSlot.text = slot >= 0 ? $"Hotbar slot {SlotLabel(slot)}" : "";
+            detailsSlot.style.display = slot >= 0 ? DisplayStyle.Flex : DisplayStyle.None;
+
+            float weight = Items.IsBlock(item) ? 0f : ecosystemSync.ItemWeights.Of(item);
+            detailsWeightLine.style.display = weight > 0f ? DisplayStyle.Flex : DisplayStyle.None;
+            detailsWeight.text = weight.ToString("0.###", CultureInfo.InvariantCulture) + " kg each";
 
             Nutrition food = ecosystemSync.FoodOf(item);
             detailsFood.style.display = food.IsFood ? DisplayStyle.Flex : DisplayStyle.None;
@@ -440,7 +526,9 @@ namespace Voxel.Client
             detailsCalories.text = $"{food.Calories:0} kcal";
             for (int i = 0; i < Nutrition.NutrientCount; i++)
             {
-                detailsNutrients[i].text = food.Nutrient(i).ToString("0");
+                float points = food.Nutrient(i);
+                detailsNutrients[i].text = points.ToString("0");
+                detailsNutrientBars[i].style.width = Length.Percent(Mathf.Clamp01(points / FullNutrient) * 100f);
             }
         }
 

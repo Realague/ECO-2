@@ -8,6 +8,22 @@ namespace Voxel.Core
         public const int Wood = 100;
         public const int Straw = 101;
 
+        // Shot with the bow; a shot arrow sticks where it lands and can be picked up again.
+        public const int Arrow = 102;
+
+        // Tools: each player gets one of each at their first connection (there is no crafting), and
+        // breaking, felling, harvesting annuals, tilling and hunting each need theirs (ToolRules).
+        public const int Shovel = 110;
+        public const int Pickaxe = 111;
+        public const int Axe = 112;
+        public const int Scythe = 113;
+        public const int Hoe = 114;
+        public const int Bow = 115;
+        private const int FirstTool = Shovel;
+        private const int LastTool = Bow;
+
+        public static readonly int[] Tools = { Shovel, Pickaxe, Axe, Scythe, Hoe, Bow };
+
         // One seed per plant species: FirstSeed + index of the species.
         public const int MaxSeedSpecies = 100;
         private const int FirstSeed = 200;
@@ -39,13 +55,16 @@ namespace Voxel.Core
 
         public static int ProduceSpecies(int item) => item - FirstProduce;
 
-        public static bool IsValid(int item) => IsBlock(item) || item == Wood || item == Straw || IsSeed(item) || IsProduce(item);
+        public static bool IsTool(int item) => item >= FirstTool && item <= LastTool;
 
-        // What a broken block yields. Grass cannot be picked up: it gives dirt.
+        public static bool IsValid(int item) =>
+            IsBlock(item) || item == Wood || item == Straw || item == Arrow || IsTool(item) || IsSeed(item) || IsProduce(item);
+
+        // What a broken block yields. Grass and tilled soil cannot be picked up: they give dirt.
         public static int DropOf(ushort block)
         {
             ushort type = Blocks.TypeOf(block);
-            return type == Blocks.Grass ? Blocks.Dirt : type;
+            return type == Blocks.Grass || type == Blocks.TilledSoil ? Blocks.Dirt : type;
         }
 
         // Display name. A seed also carries the name of its species, which only the ecosystem knows.
@@ -76,8 +95,16 @@ namespace Voxel.Core
                 case Blocks.Flint: return "Flint";
                 case Blocks.Bedrock: return "Bedrock";
                 case Blocks.Mud: return "Mud";
+                case Blocks.TilledSoil: return "Tilled soil";
                 case Wood: return "Wood";
                 case Straw: return "Straw";
+                case Arrow: return "Arrow";
+                case Shovel: return "Shovel";
+                case Pickaxe: return "Pickaxe";
+                case Axe: return "Axe";
+                case Scythe: return "Scythe";
+                case Hoe: return "Hoe";
+                case Bow: return "Bow";
                 default: return IsSeed(item) ? "Seed" : IsProduce(item) ? "Crop" : "Unknown item";
             }
         }

@@ -39,6 +39,7 @@ MonoBehaviour:
   idealWarmth: {x: 0.6, y: 1}
   idealWetness: {x: 0.6, y: 1}
   climateTolerance: 0.12
+  health: 20
   height: 1.13
   width: 0.8
   parts:

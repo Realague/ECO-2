@@ -32,10 +32,10 @@
     width: 76px;
     height: 76px;
     margin: 0 4px;
-    background-color: rgba(72, 66, 57, 0.85);
+    background-color: rgba(33, 34, 34, 0.9);
     border-radius: 9px;
     border-width: 2px;
-    border-color: var(--control-border);
+    border-color: #4a4c4d;
     align-items: center;
     justify-content: center;
     transition-property: border-color, scale;
@@ -45,12 +45,12 @@
 .hotbar-slot--selected {
     border-width: 3px;
     border-color: var(--accent);
-    background-color: rgba(106, 96, 79, 0.95);
+    background-color: rgba(52, 54, 52, 0.95);
     scale: 1.06 1.06;
 }
 
 .hotbar-slot--empty {
-    background-color: rgba(52, 48, 42, 0.7);
+    background-color: rgba(30, 31, 31, 0.7);
 }
 
 /* An item the player ran out of keeps its slot, greyed. */
@@ -91,12 +91,14 @@
 }
 
 /* The stomach, hanging at the bar's left (outside it, so the bar stays centred): its pie, the
-   calories under it and each nutrient's share beside it. */
+   calories under it and each nutrient's share beside it. Its size is fixed, so it never moves as
+   the calories or the shares change. */
 .stomach {
     position: absolute;
     right: 100%;
     top: -1px;
     bottom: -1px;
+    width: 232px;
     flex-direction: row;
     align-items: center;
     margin-right: 12px;
@@ -107,9 +109,12 @@
     border-color: var(--panel-border);
 }
 
+/* As wide as "3,000 kcal", whatever the calories. */
 .stomach-gauge {
+    width: 80px;
+    flex-shrink: 0;
     align-items: center;
-    margin-right: 12px;
+    margin-right: 10px;
 }
 
 .stomach-pie {
@@ -120,12 +125,14 @@
     --fat-colour: var(--fat);
     --vitamins-colour: var(--vitamins);
     --pie-back: rgba(0, 0, 0, 0.35);
-    --pie-rim: rgba(230, 192, 106, 0.55);
+    --pie-rim: rgba(243, 223, 174, 0.55);
 }
 
 .stomach-kcal {
+    width: 100%;
     font-size: 14px;
     color: var(--text);
+    -unity-text-align: middle-center;
     white-space: nowrap;
     margin: 2px 0 0 0;
     padding: 0;
@@ -136,7 +143,9 @@
 }
 
 .stomach-legend {
-    width: 108px;
+    width: 112px;
+    flex-shrink: 0;
+    overflow: hidden;
 }
 
 .stomach-row {
@@ -156,7 +165,8 @@
 /* An empty stomach has no balance to show: a warning takes the legend's place. */
 .stomach-starving {
     display: none;
-    width: 108px;
+    width: 112px;
+    flex-shrink: 0;
     font-size: 15px;
     color: var(--danger);
     white-space: normal;
@@ -170,4 +180,29 @@
 
 .stomach--starving > .stomach-starving {
     display: flex;
+}
+
+/* What the player carries, hanging at the bar's right like the stomach at its left. */
+.hotbar-carry {
+    position: absolute;
+    left: 100%;
+    top: -1px;
+    bottom: -1px;
+    width: 190px;
+    justify-content: center;
+    margin-left: 12px;
+    padding: 8px 14px;
+    background-color: var(--veil);
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: var(--panel-border);
+}
+
+.hotbar-carry .carry-text {
+    font-size: 14px;
+    color: var(--text-body);
+}
+
+.hotbar-carry-second {
+    margin-top: 10px;
 }

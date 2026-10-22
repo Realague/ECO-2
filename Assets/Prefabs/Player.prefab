@@ -139,3 +139,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.PlayerModel
   ShowTopMostFoldoutHeaderGroup: 1
   material: {fileID: 2100000, guid: 7a340ee2b0db49a448c5ec1c117567d3, type: 2}
+  toolWood: {fileID: 2100000, guid: 17965ac439377474abca152ff17c9021, type: 2}
+  toolIron: {fileID: 2100000, guid: 582f92c22b627724db3f3da36c5b3b4f, type: 2}
+  toolLight: {fileID: 2100000, guid: cf00dee74e18ee74db74157f58d7f614, type: 2}

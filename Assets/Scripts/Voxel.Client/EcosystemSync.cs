@@ -20,7 +20,6 @@ namespace Voxel.Client
         private const string HarvestMessage = "Eco.Harvest";
         private const string CommandMessage = "Eco.Command";
         private const string AnimalsMessage = "Eco.Animals";
-        private const string KillMessage = "Eco.Kill";
         private const string CensusRequestMessage = "Eco.CensusRequest";
         private const string CensusMessage = "Eco.Census";
         private const string SaveFileName = "ecosystem.dat";
@@ -79,6 +78,11 @@ namespace Voxel.Client
         private List<Species> species;
         private List<AnimalSpecies> animalSpecies;
         private PlantRenderer plantRenderer;
+        private ItemWeights itemWeights;
+        private World serverWorld;
+
+        // Server side: what a felling or a harvest being checked would give.
+        private readonly List<(int item, int count)> rewards = new List<(int item, int count)>();
         private AnimalViews animalViews;
         private bool running;
 
@@ -155,6 +159,9 @@ namespace Voxel.Client
 
         private CustomMessagingManager Messaging => networkManager.CustomMessagingManager;
 
+        // Items' weights for the carrying limit, crops' from their species.
+        public ItemWeights ItemWeights => itemWeights ??= new ItemWeights(Array.ConvertAll(speciesAssets, asset => asset.ProduceWeight));
+
         private void Awake()
         {
             species = new List<Species>(speciesAssets.Length);
@@ -216,6 +223,7 @@ namespace Voxel.Client
             running = true;
             this.isAdmin = isAdmin;
             savePath = Path.Combine(directory, SaveFileName);
+            serverWorld = world;
             ecosystem = LoadOrCreate(world);
             clock = new SimClock { Multiplier = startMultiplier };
 
@@ -233,7 +241,6 @@ namespace Voxel.Client
 
             Messaging.RegisterNamedMessageHandler(FellMessage, OnFellRequest);
             Messaging.RegisterNamedMessageHandler(HarvestMessage, OnHarvestRequest);
-            Messaging.RegisterNamedMessageHandler(KillMessage, OnKillRequest);
             Messaging.RegisterNamedMessageHandler(CommandMessage, OnCommand);
             Messaging.RegisterNamedMessageHandler(CensusRequestMessage, OnCensusRequest);
             networkManager.OnClientConnectedCallback += OnClientConnected;
@@ -262,6 +269,7 @@ namespace Voxel.Client
             }
 
             ecosystem = null;
+            serverWorld = null;
             clock = null;
             plants.Clear();
             plantAtColumn.Clear();
@@ -295,28 +303,56 @@ namespace Voxel.Client
             }
         }
 
-        // Strikes what the local player is aiming at, at most maxDistance away: kills the animal or fells
-        // the plant nearest along the ray. Returns false if the ray hits neither. The direction
-        // must be normalized.
-        public bool TryStrike(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance)
+        // Strikes what the local player is aiming at, at most maxDistance away, with the item they hold:
+        // fells the plant nearest along the ray if it is the right tool (an axe for a plant that gives
+        // wood, else a scythe). Animals are hunted with the bow, never struck. Returns false if the ray
+        // hits neither; missingTool is then, or when the strike did nothing, the tool it would have
+        // needed (Items.None when it was done). The direction must be normalized.
+        public bool TryStrike(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance, int held, out int missingTool)
         {
+            missingTool = Items.None;
             bool plantHit = TryPickPlant(origin, direction, maxDistance, out int plantId, out float plantDistance);
-            if (animalViews.TryPick(origin, direction, plantHit ? plantDistance : maxDistance, out int animalId, out _))
+            if (animalViews.TryPick(origin, direction, plantHit ? plantDistance : maxDistance, out _, out _))
             {
-                RequestKill(animalId);
+                missingTool = Items.Bow;
                 return true;
             }
 
-            if (plantHit) RequestFell(plantId);
-            return plantHit;
+            if (!plantHit) return false;
+
+            int tool = FellingTool(plants[plantId].SpeciesIndex);
+            if (held != tool)
+            {
+                missingTool = tool;
+                return true;
+            }
+
+            RequestFell(plantId);
+            return true;
+        }
+
+        // The tool a plant of this species is felled with.
+        private int FellingTool(int speciesIndex) => ToolRules.ToFell(speciesAssets[speciesIndex].WoodYield > 0);
+
+        // The tool a crop of this species is harvested with (Items.None: by hand).
+        private int HarvestTool(int speciesIndex) => ToolRules.ToHarvest(speciesAssets[speciesIndex].Harvest == HarvestKind.Annual);
+
+        // Which shown animal a flying arrow's segment hits first (AnimalViews.TryHitArrow).
+        internal bool TryHitArrow(Vector3 a, Vector3 b, out int animalId, out bool inHead, out float distance)
+        {
+            animalId = 0;
+            inHead = false;
+            distance = 0f;
+            return animalViews != null && animalViews.TryHitArrow(a, b, out animalId, out inHead, out distance);
         }
 
         // What the local player is aiming at, at most maxDistance away: the name of the animal or plant
         // nearest along the ray, the one a strike would hit. Returns false if there is neither. Cheap
         // enough to run every frame.
-        internal bool TryAim(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance, out string name)
+        internal bool TryAim(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance, out string name, out int tool)
         {
             name = null;
+            tool = Items.None;
             if (animalNames == null)
             {
                 animalNames = Array.ConvertAll(animalAssets, asset => DisplayName(asset.name));
@@ -333,12 +369,14 @@ namespace Voxel.Client
             {
                 int kind = animalViews.SpeciesOf(animalId);
                 if (kind >= 0) name = animalNames[kind];
+                tool = Items.Bow;
                 return name != null;
             }
 
             if (!plantHit) return false;
 
             PlantView plant = plants[plantId];
+            tool = FellingTool(plant.SpeciesIndex);
             name = plant.Stage < Plant.StageCount - 1 ? youngPlantNames[plant.SpeciesIndex]
                 : ripePlantNames[plant.SpeciesIndex][Mathf.Clamp(plant.RipeStage, 0, Plant.RipeStageCount)];
             return true;
@@ -507,12 +545,21 @@ namespace Voxel.Client
             }
         }
 
-        // Right click: picks the crop of the plant aimed at, at most maxDistance away. Returns false
-        // if the ray hits no ripe crop, the click then using the held item.
-        public bool TryHarvestAimed(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance)
+        // Right click: picks the crop of the plant aimed at, at most maxDistance away: an annual with a
+        // scythe held, a perennial's fruit by hand. Returns false if the ray hits no ripe crop, the
+        // click then using the held item; missingTool is the scythe when an annual was aimed at without it.
+        public bool TryHarvestAimed(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, float maxDistance, int held, out int missingTool)
         {
+            missingTool = Items.None;
             if (!TryPickPlant(origin, direction, maxDistance, out int plantId, out _)) return false;
             if (plants[plantId].RipeStage < 1 || speciesAssets[plants[plantId].SpeciesIndex].Harvest == HarvestKind.None) return false;
+
+            int tool = HarvestTool(plants[plantId].SpeciesIndex);
+            if (tool != Items.None && held != tool)
+            {
+                missingTool = tool;
+                return true;
+            }
 
             RequestHarvest(plantId);
             return true;
@@ -702,25 +749,6 @@ namespace Voxel.Client
             return counts;
         }
 
-        // Kill requested by the local player, on the same principle as felling.
-        public void RequestKill(int animalId)
-        {
-            if (!running) return;
-
-            if (ecosystem != null)
-            {
-                TryKill(networkManager.LocalClientId, animalId);
-                return;
-            }
-
-            animalViews.Remove(animalId);
-            using (var writer = new FastBufferWriter(sizeof(int), Allocator.Temp))
-            {
-                writer.WriteValueSafe(animalId);
-                Messaging.SendNamedMessage(KillMessage, NetworkManager.ServerClientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
-            }
-        }
-
         // Admins only: the server ignores the request from other players.
         public void RequestMultiplier(float value)
         {
@@ -814,15 +842,22 @@ namespace Voxel.Client
         private bool TryFell(ulong clientId, int plantId)
         {
             if (!ecosystem.TryGet(plantId, out Plant plant) || !IsWithinReach(clientId, plant)) return false;
-            if (!ecosystem.Remove(plantId)) return false;
+
+            // The server cannot know which tool is in hand (the hotbar's choice is the client's): the
+            // player must at least own the right one.
+            if (!inventorySync.Owns(clientId, FellingTool(plant.SpeciesIndex))) return false;
 
             // Felling yields wood according to the plant's size, a seed if it was adult, and its
-            // crop if it was ripe, so nothing is lost by felling rather than picking it.
+            // crop if it was ripe, so nothing is lost by felling rather than picking it. A player who
+            // can carry none of it cannot fell it; otherwise they get what they can carry.
             SpeciesAsset asset = speciesAssets[plant.SpeciesIndex];
-            int wood = Mathf.RoundToInt(asset.WoodYield * PlantShape.Scale(plant.Stage));
-            inventorySync.Give(clientId, Items.Wood, wood);
-            if (plant.Growth >= 1f) inventorySync.Give(clientId, Items.Seed(plant.SpeciesIndex), 1);
-            if (asset.Harvest != HarvestKind.None) GiveCrop(clientId, plant.SpeciesIndex, plant.RipeStage, false);
+            rewards.Clear();
+            rewards.Add((Items.Wood, Mathf.RoundToInt(asset.WoodYield * PlantShape.Scale(plant.Stage))));
+            if (plant.Growth >= 1f) rewards.Add((Items.Seed(plant.SpeciesIndex), 1));
+            if (asset.Harvest != HarvestKind.None) AddCrop(plant.SpeciesIndex, plant.RipeStage, false);
+            if (!inventorySync.CanReceiveAny(clientId, rewards) || !ecosystem.Remove(plantId)) return false;
+
+            GiveRewards(clientId);
             return true;
         }
 
@@ -830,20 +865,35 @@ namespace Voxel.Client
         private bool TryHarvest(ulong clientId, int plantId)
         {
             if (!ecosystem.TryGet(plantId, out Plant plant) || !IsWithinReach(clientId, plant)) return false;
-            if (!ecosystem.TryHarvest(plantId, out int ripeStage)) return false;
 
-            GiveCrop(clientId, plant.SpeciesIndex, ripeStage, speciesAssets[plant.SpeciesIndex].Harvest == HarvestKind.Annual);
+            int tool = HarvestTool(plant.SpeciesIndex);
+            if (tool != Items.None && !inventorySync.Owns(clientId, tool)) return false;
+
+            rewards.Clear();
+            AddCrop(plant.SpeciesIndex, plant.RipeStage, speciesAssets[plant.SpeciesIndex].Harvest == HarvestKind.Annual);
+            if (!inventorySync.CanReceiveAny(clientId, rewards) || !ecosystem.TryHarvest(plantId, out _)) return false;
+
+            GiveRewards(clientId);
             return true;
         }
 
         // What a harvest at this stage of ripeness gives: a share of the crop and of the straw, and,
         // with seeds, a share of an annual's seeds (none when picked unripe).
-        private void GiveCrop(ulong clientId, int speciesIndex, int ripeStage, bool withSeeds)
+        private void AddCrop(int speciesIndex, int ripeStage, bool withSeeds)
         {
             SpeciesAsset asset = speciesAssets[speciesIndex];
-            inventorySync.Give(clientId, Items.Produce(speciesIndex), CropYield.Share(asset.ProduceYield, ripeStage));
-            inventorySync.Give(clientId, Items.Straw, CropYield.Share(asset.StrawYield, ripeStage));
-            if (withSeeds) inventorySync.Give(clientId, Items.Seed(speciesIndex), CropYield.Seeds(asset.SeedYield, ripeStage));
+            rewards.Add((Items.Produce(speciesIndex), CropYield.Share(asset.ProduceYield, ripeStage)));
+            rewards.Add((Items.Straw, CropYield.Share(asset.StrawYield, ripeStage)));
+            if (withSeeds) rewards.Add((Items.Seed(speciesIndex), CropYield.Seeds(asset.SeedYield, ripeStage)));
+        }
+
+        // Gives what fits; the rest is left behind.
+        private void GiveRewards(ulong clientId)
+        {
+            foreach ((int item, int count) in rewards)
+            {
+                inventorySync.Give(clientId, item, count);
+            }
         }
 
         // Whether a player's eyes are within reach of a plant, with the same tolerance as for blocks.
@@ -875,7 +925,17 @@ namespace Voxel.Client
             float maxDistance = PlayerRules.Reach + BlockEditRules.ReachTolerance;
             if (dx * dx + dz * dz > maxDistance * maxDistance) return false;
 
+            // A player sows only on soil they tilled (the bed, for a plant rooted in shallow water).
+            if (!IsTilled(serverWorld, x, z)) return false;
+
             return ecosystem.TryPlant(speciesIndex, x, z);
+        }
+
+        // Whether the topmost solid block of a column is tilled soil.
+        internal static bool IsTilled(World world, int x, int z)
+        {
+            int surface = world.GetSurfaceHeight(x, z);
+            return surface > 0 && Blocks.TypeOf(world.GetBlock(x, surface - 1, z)) == Blocks.TilledSoil;
         }
 
         // Server side: whether an animal's body takes up this block, which then cannot be built on.
@@ -969,34 +1029,25 @@ namespace Voxel.Client
             animalFeeds.Remove(clientId);
         }
 
-        private bool TryKill(ulong clientId, int animalId)
+        // Server side: an arrow whose flight followed this path says it hit an animal. The animal must
+        // be near the path (it may have moved one step since the shooter saw it, plus a block); it then
+        // takes the damage, and dies once its health is spent, leaving its carcass. feet is where the
+        // arrow falls, at the animal's feet. Returns false, changing nothing, if the hit is not plausible.
+        internal bool TryWoundAnimal(int animalId, IReadOnlyList<System.Numerics.Vector3> path, float damage, out Vector3 feet)
         {
-            if (!ecosystem.TryGetAnimal(animalId, out Animal animal)) return false;
-            if (!networkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client)) return false;
-            if (client.PlayerObject == null) return false;
+            feet = default;
+            if (ecosystem == null || !ecosystem.TryGetAnimal(animalId, out Animal animal)) return false;
 
             AnimalSpecies kind = animalSpecies[animal.SpeciesIndex];
-            Vector3 eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;
             float half = kind.Width * 0.5f;
             var min = new System.Numerics.Vector3(animal.X + 0.5f - half, animal.Y, animal.Z + 0.5f - half);
             var max = new System.Numerics.Vector3(animal.X + 0.5f + half, animal.Y + kind.Height, animal.Z + 0.5f + half);
+            if (ArrowFlight.DistanceToBox(path, min, max) > kind.MoveRange + 1f) return false;
 
-            // The animal may have moved one step since what the player saw.
-            float maxDistance = PlayerRules.Reach + BlockEditRules.ReachTolerance + kind.MoveRange;
-            if (PlantShape.DistanceSquared(eyes.ToNumerics(), min, max) > maxDistance * maxDistance) return false;
-
-            ecosystem.RemoveAnimal(animalId);
+            feet = new Vector3(animal.X + 0.5f, animal.Y, animal.Z + 0.5f);
+            ecosystem.Damage(animalId, damage);
             animalRevision++;
             return true;
-        }
-
-        private void OnKillRequest(ulong senderId, FastBufferReader reader)
-        {
-            reader.ReadValueSafe(out int animalId);
-            if (TryKill(senderId, animalId)) return;
-
-            // Refusal: the next animal list sent to this player will give back the one they removed in anticipation.
-            if (animalFeeds.TryGetValue(senderId, out AnimalFeed feed)) feed.Revision = -1;
         }
 
         // Sends each player the list of the animals around them, when it may have changed: a simulation

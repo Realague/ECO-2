@@ -32,6 +32,21 @@
                 </ui:VisualElement>
                 <ui:Label text="Starving: slower" class="stomach-starving strong" picking-mode="Ignore" />
             </ui:VisualElement>
+            <!-- CarryHud fills what the player carries, at the bar's right. -->
+            <ui:VisualElement name="carry" class="hotbar-carry" picking-mode="Ignore">
+                <ui:VisualElement class="carry-gauge" picking-mode="Ignore">
+                    <ui:Label name="carry-blocks" class="carry-text" picking-mode="Ignore" />
+                    <ui:VisualElement class="carry-bar" picking-mode="Ignore">
+                        <ui:VisualElement name="carry-blocks-fill" class="carry-fill" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+                <ui:VisualElement class="carry-gauge hotbar-carry-second" picking-mode="Ignore">
+                    <ui:Label name="carry-weight" class="carry-text" picking-mode="Ignore" />
+                    <ui:VisualElement class="carry-bar" picking-mode="Ignore">
+                        <ui:VisualElement name="carry-weight-fill" class="carry-fill" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
             <ui:VisualElement name="slot-0" class="hotbar-slot">
                 <ui:VisualElement class="hotbar-icon" picking-mode="Ignore" />
                 <ui:Label text="1" class="hotbar-number strong" picking-mode="Ignore" />

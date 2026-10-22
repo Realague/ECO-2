@@ -16,7 +16,8 @@ using Voxel.Core;
 //   rendered by a camera in a preview scene, on black then on white to recover the transparency;
 // - a seed (Seed_<species>.png) is a pouch tinted like the plant with the plant in front of it;
 // - a crop (Produce_<species>.png) is a pile of fruit of its model's last stage, or the plant;
-// - wood and straw (Wood.png, Straw.png) are a log and a sheaf made of a few shapes.
+// - wood and straw (Wood.png, Straw.png) are a log and a sheaf made of a few shapes;
+// - tools and the arrow (Tool_<name>.png, Arrow.png) are painted as illustrations (ToolIconPainter).
 // Species are found by asset in Assets/Species and named after the asset, so the icons do not depend
 // on the order of species. Every file is written again; rerun the menu after adding a species.
 public static class ItemIconBuilder
@@ -72,6 +73,19 @@ public static class ItemIconBuilder
             Write("Straw", straw);
             UnityEngine.Object.DestroyImmediate(straw);
             written += 2;
+
+            foreach (int tool in Items.Tools)
+            {
+                Texture2D icon = ToolIconPainter.Paint(tool);
+                Write($"Tool_{Items.NameOf(tool)}", icon);
+                UnityEngine.Object.DestroyImmediate(icon);
+                written++;
+            }
+
+            Texture2D arrow = ToolIconPainter.Paint(Items.Arrow);
+            Write("Arrow", arrow);
+            UnityEngine.Object.DestroyImmediate(arrow);
+            written++;
         }
         finally
         {

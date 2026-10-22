@@ -371,6 +371,52 @@ namespace Voxel.Client
             return found;
         }
 
+        // Which shown animal a flying arrow's segment from a to b hits first, if any: its distance along
+        // the segment, and whether it hit the head (the species' HeadBox, turned as the animal faces)
+        // rather than the body (the aiming box). An arrow through the head no further in than it
+        // enters the body counts as in the head, so a shot from the front or the side may be one, a
+        // shot through the rump not.
+        public bool TryHitArrow(Vector3 a, Vector3 b, out int animalId, out bool inHead, out float distance)
+        {
+            const float HeadAllowance = 0.35f;
+            animalId = 0;
+            inHead = false;
+            distance = float.MaxValue;
+            float now = Time.time;
+            foreach (KeyValuePair<int, View> entry in views)
+            {
+                View view = entry.Value;
+                AnimalSpecies kind = species[view.SpeciesIndex];
+                Vector3 position = view.PositionAt(now);
+                if (assets != null) position.y += view.LiftAt(now, assets[view.SpeciesIndex]);
+
+                float half = kind.Width * 0.5f;
+                float body = ArrowFlight.SegmentEntry(a.ToNumerics(), b.ToNumerics(),
+                    new System.Numerics.Vector3(position.x - half, position.y, position.z - half),
+                    new System.Numerics.Vector3(position.x + half, position.y + kind.Height, position.z + half));
+
+                float headEntry = -1f;
+                if (assets != null)
+                {
+                    Quaternion facing = Quaternion.Inverse(Quaternion.Euler(0f, view.FacingAt(now), 0f));
+                    Vector3 localA = facing * (a - position);
+                    Vector3 localB = facing * (b - position);
+                    Bounds headBox = assets[view.SpeciesIndex].HeadBox;
+                    headEntry = ArrowFlight.SegmentEntry(localA.ToNumerics(), localB.ToNumerics(), headBox.min.ToNumerics(), headBox.max.ToNumerics());
+                }
+
+                bool head = headEntry >= 0f && (body < 0f || headEntry <= body + HeadAllowance);
+                float hitAt = head ? (body >= 0f ? Mathf.Min(body, headEntry) : headEntry) : body;
+                if (hitAt < 0f || hitAt >= distance) continue;
+
+                distance = hitAt;
+                animalId = entry.Key;
+                inHead = head;
+            }
+
+            return animalId != 0;
+        }
+
         // To call every frame.
         public void Render()
         {

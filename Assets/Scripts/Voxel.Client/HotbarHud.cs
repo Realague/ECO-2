@@ -103,6 +103,28 @@ namespace Voxel.Client
             }
 
             screen.style.display = DisplayStyle.None;
+            inventorySync.Refused += OnRefused;
+        }
+
+        private void OnDestroy()
+        {
+            if (inventorySync != null) inventorySync.Refused -= OnRefused;
+        }
+
+        private void OnRefused(FullReason reason)
+        {
+            switch (reason)
+            {
+                case FullReason.Blocks:
+                    ShowMessage($"Can't carry more than {CarryLimits.MaxBlocks} blocks");
+                    break;
+                case FullReason.Weight:
+                    ShowMessage($"Too heavy ({CarryLimits.MaxWeight:0} kg)");
+                    break;
+                default:
+                    ShowMessage("They can't carry that");
+                    break;
+            }
         }
 
         private void Update()

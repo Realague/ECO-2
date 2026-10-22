@@ -91,6 +91,8 @@ namespace Voxel.Client
         [SerializeField] private int seedYield = 2;
         [Tooltip("Straw given by a fully ripe harvest (wheat).")]
         [SerializeField] private int strawYield;
+        [Tooltip("Weight of one crop item in kg, for the 30 kg a player can carry besides blocks.")]
+        [SerializeField] private float produceWeight = 0.2f;
         [Tooltip("Days for an adult plant to go from unripe to fully ripe, on rich soil in a climate that suits it (and to ripen again once picked).")]
         [SerializeField] private float fruitDays = 3f;
 
@@ -163,6 +165,8 @@ namespace Voxel.Client
 
         public int StrawYield => strawYield;
 
+        public float ProduceWeight => produceWeight;
+
         // What eating one crop item gives (nothing for a plant that is not a crop).
         public Nutrition Food => harvest == HarvestKind.None ? default : new Nutrition(calories, carbs, protein, fat, vitamins);
 
@@ -204,7 +208,13 @@ namespace Voxel.Client
         {
             var blocks = new List<ushort>();
             if ((grounds & Ground.Grass) != 0) blocks.Add(Blocks.Grass);
-            if ((grounds & Ground.Dirt) != 0) blocks.Add(Blocks.Dirt);
+            if ((grounds & Ground.Dirt) != 0)
+            {
+                // What grows on dirt grows on soil a player has tilled.
+                blocks.Add(Blocks.Dirt);
+                blocks.Add(Blocks.TilledSoil);
+            }
+
             if ((grounds & Ground.Sand) != 0) blocks.Add(Blocks.Sand);
             if ((grounds & Ground.Snow) != 0) blocks.Add(Blocks.Snow);
             if ((grounds & Ground.Clay) != 0) blocks.Add(Blocks.Clay);

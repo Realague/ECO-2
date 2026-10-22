@@ -25,21 +25,26 @@ namespace Voxel.Core
 
         // What they have eaten (format 5).
         public Stomach Stomach { get; } = new Stomach();
+
+        // Whether they were given their starting tools (format 6): once only, even if they lose them.
+        public bool ReceivedTools;
     }
 
     // The state of every player known to the server, by player id.
     public sealed class PlayerStore
     {
         private const uint Magic = 0x504F4345; // "ECOP"
-        private const int FormatVersion = 5;
+        private const int FormatVersion = 6;
 
         // Older formats still load. Without inventory, the player keeps their position; without
         // appearance, they choose one at their next connection; without a hotbar, theirs starts empty
-        // (the server fills it with what they own); without a stomach, theirs starts half full.
+        // (the server fills it with what they own); without a stomach, theirs starts half full;
+        // without tools, they get them at their next connection.
         private const int FormatWithoutInventory = 1;
         private const int FormatWithoutAppearance = 2;
         private const int FormatWithoutHotbar = 3;
         private const int FormatWithoutStomach = 4;
+        private const int FormatWithoutTools = 5;
 
         private readonly Dictionary<string, PlayerState> players = new Dictionary<string, PlayerState>();
 
@@ -81,6 +86,7 @@ namespace Voxel.Core
                     writer.Write(state.Appearance?.Encode() ?? Appearance.NotChosen);
                     state.Hotbar.Write(writer);
                     state.Stomach.Write(writer);
+                    writer.Write(state.ReceivedTools);
                 }
             }
         }
@@ -142,7 +148,8 @@ namespace Voxel.Core
                     }
 
                     if (formatVersion >= FormatWithoutStomach) state.Hotbar.Read(reader);
-                    if (formatVersion >= FormatVersion) state.Stomach.Read(reader);
+                    if (formatVersion >= FormatWithoutTools) state.Stomach.Read(reader);
+                    if (formatVersion >= FormatVersion) state.ReceivedTools = reader.ReadBoolean();
 
                     store.Set(playerId, state);
                 }

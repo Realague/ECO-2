@@ -37,6 +37,7 @@ MonoBehaviour:
   produceYield: 6
   seedYield: 0
   strawYield: 0
+  produceWeight: 0.02
   fruitDays: 4
   calories: 140
   carbs: 14

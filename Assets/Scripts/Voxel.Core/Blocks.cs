@@ -47,7 +47,11 @@ namespace Voxel.Core
         // The wet ground of marshes: the bed of their pools and what lies under their grass.
         public const ushort Mud = 32;
 
-        public const ushort LastType = Mud;
+        // Soil a player has worked with a hoe: the only ground where they can plant seeds. Never
+        // generated; broken, it gives dirt.
+        public const ushort TilledSoil = 33;
+
+        public const ushort LastType = TilledSoil;
 
         // Types that existed in earlier versions and no longer do: two gaps.
         private const ushort FirstRetiredGap = 4;

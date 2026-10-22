@@ -18,6 +18,11 @@
             </ui:VisualElement>
         </ui:VisualElement>
 
+        <!-- How far the bow is drawn, above the crosshair while the left button is held. -->
+        <ui:VisualElement name="draw" class="hud-draw hidden" picking-mode="Ignore">
+            <ui:VisualElement name="draw-fill" class="hud-draw-fill" picking-mode="Ignore" />
+        </ui:VisualElement>
+
         <ui:VisualElement name="hints" class="hud-hints" picking-mode="Ignore">
             <ui:VisualElement class="hud-hint" picking-mode="Ignore">
                 <ui:VisualElement class="key"><ui:Label text="Tab" class="key-text" /></ui:VisualElement>

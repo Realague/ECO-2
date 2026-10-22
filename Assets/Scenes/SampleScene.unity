@@ -338,6 +338,7 @@ GameObject:
   - component: {fileID: 408005231}
   - component: {fileID: 408005230}
   - component: {fileID: 408005233}
+  - component: {fileID: 408005234}
   m_Layer: 0
   m_Name: HotbarUI
   m_TagString: Untagged
@@ -416,6 +417,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.StomachHud
   document: {fileID: 408005231}
   hungerSync: {fileID: 490447454}
+--- !u!114 &408005234
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 408005229}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 859e38a5c42bafd41b4f9b61101675b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.CarryHud
+  document: {fileID: 408005231}
+  inventorySync: {fileID: 490447450}
+  ecosystemSync: {fileID: 490447448}
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -560,6 +576,7 @@ GameObject:
   - component: {fileID: 490447451}
   - component: {fileID: 490447453}
   - component: {fileID: 490447454}
+  - component: {fileID: 490447455}
   m_Layer: 0
   m_Name: GameSession
   m_TagString: Untagged
@@ -585,6 +602,7 @@ MonoBehaviour:
   ecosystemSync: {fileID: 490447448}
   inventorySync: {fileID: 490447450}
   hungerSync: {fileID: 490447454}
+  bowSync: {fileID: 490447455}
   appearanceSync: {fileID: 490447452}
   commandSync: {fileID: 490447453}
   appearanceMenu: {fileID: 490447451}
@@ -780,6 +798,25 @@ MonoBehaviour:
   inventorySync: {fileID: 490447450}
   ecosystemSync: {fileID: 490447448}
   worldSync: {fileID: 490447447}
+--- !u!114 &490447455
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 490447444}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f8989e87c8080b44c80c03a84da78c21, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.BowSync
+  networkManager: {fileID: 947039382}
+  inventorySync: {fileID: 490447450}
+  ecosystemSync: {fileID: 490447448}
+  worldSync: {fileID: 490447447}
+  shaftMaterial: {fileID: 2100000, guid: 17965ac439377474abca152ff17c9021, type: 2}
+  headMaterial: {fileID: 2100000, guid: 582f92c22b627724db3f3da36c5b3b4f, type: 2}
+  fletchingMaterial: {fileID: 2100000, guid: cf00dee74e18ee74db74157f58d7f614, type: 2}
 --- !u!1 &822296571
 GameObject:
   m_ObjectHideFlags: 0
@@ -1408,6 +1445,7 @@ MonoBehaviour:
   appearanceMenu: {fileID: 490447451}
   mapScreen: {fileID: 822296572}
   inventoryScreen: {fileID: 1141440427}
+  bowSync: {fileID: 490447455}
 --- !u!114 &1863226320
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1682,6 +1720,7 @@ MonoBehaviour:
   appearanceMenu: {fileID: 490447451}
   mapScreen: {fileID: 822296572}
   inventoryScreen: {fileID: 1141440427}
+  hotbar: {fileID: 408005230}
   document: {fileID: 2081992071}
 --- !u!114 &2081992071
 MonoBehaviour:

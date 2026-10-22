@@ -123,6 +123,21 @@ namespace Eco.Sim
             return true;
         }
 
+        // Wounds an animal (an arrow). Returns true if that kills it: it then leaves a carcass, like any
+        // animal a player kills. Not to be called during a step.
+        public bool Damage(int animalId, float amount)
+        {
+            int index = AnimalIndexOf(animalId);
+            if (index < 0 || amount <= 0f) return false;
+
+            animals[index].Damage += amount;
+            if (animals[index].Damage < animalSpecies[animals[index].SpeciesIndex].Health) return false;
+
+            Kill(index, 1f);
+            CompactAnimals();
+            return true;
+        }
+
         // Places an adult in the given column, if it is walkable and free.
         public bool TryPlaceAnimal(int speciesIndex, int x, int z)
         {
@@ -246,6 +261,9 @@ namespace Eco.Sim
 
             animal.Age++;
             if (animal.Age > kind.LifespanSteps) return false;
+
+            // A wound heals in a day.
+            if (animal.Damage > 0f) animal.Damage = Math.Max(0f, animal.Damage - kind.Health / SimClock.StepsPerDay);
 
             // A species that eats nothing the simulation knows (fish feed on what it does not model) never gets hungry.
             if (kind.EatsSomething) animal.Hunger += kind.HungerPerStep;

@@ -11,7 +11,8 @@ namespace Voxel.Client
     // spine, neck, shoulders, elbows, thighs, knees) is a pivot carrying one mesh made of the boxes it
     // moves. The animation is driven by how the player object moves, so it works the same for the
     // owner and for the copies that follow the NetworkTransform. The only thing sent for it is the
-    // pitch of the gaze (the NetworkTransform already carries the yaw), which the head follows.
+    // pitch of the gaze (the NetworkTransform already carries the yaw), which the head follows, and
+    // the tool in hand, drawn in the right fist (ToolShapes).
     // The owner's camera sits at the eyes of this head (EyeOffset), so the owner sees its own body
     // when looking down; only its head is hidden, keeping its shadow.
     //
@@ -59,7 +60,28 @@ namespace Voxel.Client
         private const float ChestLightHeight = 1.2f;
         private const float ShadeSmoothing = 6f;
 
+        // A tool in the right hand points forward from the fist, scaled down from ToolShapes' size, the
+        // forearm raised to hold it in front.
+        private const float ToolScale = 0.7f;
+        private const float HoldingElbowBend = 45f;
+        private const float HoldingArmRaise = 15f;
+        private const float ToolTilt = 110f;
+        private const float ShovelGripHeight = 1.05f;
+        private static readonly Vector3 HandInForearm = new Vector3(0f, -0.3f, 0.005f);
+
         [SerializeField] private Material material;
+
+        [Header("Tools in hand (wood, iron, string and feathers)")]
+        [SerializeField] private Material toolWood;
+        [SerializeField] private Material toolIron;
+        [SerializeField] private Material toolLight;
+
+        // The tool the owner holds (Items.Shovel...), or Items.None: what everyone sees in its right hand.
+        private readonly NetworkVariable<int> heldTool = new NetworkVariable<int>(
+            Items.None, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
+        // One mesh per tool, shared by every player: a submesh per material, the grip at the origin.
+        private static readonly Dictionary<int, Mesh> ToolMeshes = new Dictionary<int, Mesh>();
 
         // Pitch of the owner's gaze in whole degrees, positive downwards: one byte, sent only when it changes.
         private readonly NetworkVariable<sbyte> lookPitch = new NetworkVariable<sbyte>(
@@ -97,6 +119,9 @@ namespace Voxel.Client
         private float pitch;
         private float ownPitch;
         private float skyShade = 1f;
+        private int ownTool;
+        private int toolShown = -1;
+        private GameObject toolObject;
 
         private static VoxelWorld voxelWorld;
 
@@ -116,6 +141,14 @@ namespace Voxel.Client
             ownPitch = degrees;
             var whole = (sbyte)Mathf.Clamp(Mathf.RoundToInt(degrees), sbyte.MinValue, sbyte.MaxValue);
             if (IsSpawned && IsOwner && lookPitch.Value != whole) lookPitch.Value = whole;
+        }
+
+        // Called by the owner's controller with the item in its hand: a tool shows in the right hand
+        // of its body, on every machine (one int, sent only when it changes); anything else shows nothing.
+        public void SetHeldItem(int item)
+        {
+            ownTool = Items.IsTool(item) ? item : Items.None;
+            if (IsSpawned && IsOwner && heldTool.Value != ownTool) heldTool.Value = ownTool;
         }
 
         // True once the player has chosen an appearance (it is then the same on every machine).
@@ -217,6 +250,56 @@ namespace Voxel.Client
             renderers.Clear();
             if (model != null) Destroy(model.gameObject);
             model = null;
+
+            // The tool went with the hand: it is put back by the next LateUpdate.
+            toolObject = null;
+            toolShown = -1;
+        }
+
+        // Puts a tool in the right hand (Items.None: empties it).
+        private void ShowTool(int tool)
+        {
+            toolShown = tool;
+            if (toolObject != null) Destroy(toolObject);
+            toolObject = null;
+            if (tool == Items.None || rightForearm == null || toolWood == null) return;
+
+            toolObject = new GameObject("Tool");
+            Transform held = toolObject.transform;
+            held.SetParent(rightForearm, false);
+            held.localPosition = HandInForearm;
+            // The raised forearm points forward and up: tipped past its axis, the tool points ahead and up, about 40°.
+            held.localRotation = Quaternion.Euler(ToolTilt, 0f, 0f) * Quaternion.Euler(0f, TurnInHand(tool), 0f);
+            held.localScale = Vector3.one * ToolScale;
+            toolObject.AddComponent<MeshFilter>().sharedMesh = ToolMesh(tool);
+            toolObject.AddComponent<MeshRenderer>().sharedMaterials = new[] { toolWood, toolIron, toolLight };
+        }
+
+        // The turn about the handle that brings a tool's head into the plane of its swing: the axe's blade
+        // (ToolShapes' +x) faces down and ahead, the bow's string (-x) faces the player.
+        private static float TurnInHand(int tool)
+        {
+            return tool == Items.Axe || tool == Items.Pickaxe || tool == Items.Bow ? -90f : 0f;
+        }
+
+        private static Mesh ToolMesh(int tool)
+        {
+            if (ToolMeshes.TryGetValue(tool, out Mesh mesh) && mesh != null) return mesh;
+
+            // A shovel is held near the top of its handle, blade ahead: turned end over end about the grip.
+            bool byTheTop = tool == Items.Shovel;
+            float grip = byTheTop ? ShovelGripHeight : ToolShapes.GripHeight;
+            var submeshes = new List<(Vector3, Vector3)>[] { new List<(Vector3, Vector3)>(), new List<(Vector3, Vector3)>(), new List<(Vector3, Vector3)>() };
+            foreach (ToolShapes.Box box in ToolShapes.Of(tool))
+            {
+                Vector3 centre = box.Centre - new Vector3(0f, grip, 0f);
+                if (byTheTop) centre = new Vector3(-centre.x, -centre.y, centre.z);
+                submeshes[(int)box.Stuff].Add((centre, box.Size));
+            }
+
+            mesh = BoxMesh.Build("Tool " + Items.NameOf(tool), submeshes);
+            ToolMeshes[tool] = mesh;
+            return mesh;
         }
 
         private void LateUpdate()
@@ -243,6 +326,9 @@ namespace Voxel.Client
             // The owner follows its own gaze exactly; the others smooth the whole degrees they receive.
             float targetPitch = IsSpawned && !IsOwner ? lookPitch.Value : ownPitch;
             pitch = IsSpawned && !IsOwner ? Mathf.Lerp(pitch, targetPitch, follow) : targetPitch;
+
+            int tool = IsSpawned && !IsOwner ? heldTool.Value : ownTool;
+            if (tool != toolShown) ShowTool(tool);
 
             ApplyPose(Time.time);
         }
@@ -273,9 +359,12 @@ namespace Voxel.Client
             rightShin.localRotation = Quaternion.Euler(Mathf.Max(0f, stride) * KneeBend + airborne * 25f, 0f, 0f);
 
             leftUpperArm.localRotation = Quaternion.Euler(-swing * ArmSwing - airborne * 35f, 0f, -sway - airborne * 40f);
-            rightUpperArm.localRotation = Quaternion.Euler(swing * ArmSwing - airborne * 35f, 0f, sway + airborne * 40f);
+            // A tool in the right hand: that arm swings half as much and holds it in front.
+            float holding = toolObject != null ? 1f : 0f;
+            float rightSwing = swing * (1f - 0.5f * holding);
+            rightUpperArm.localRotation = Quaternion.Euler(rightSwing * ArmSwing - airborne * 35f - holding * HoldingArmRaise, 0f, sway + airborne * 40f);
             leftForearm.localRotation = Quaternion.Euler(-(10f + Mathf.Max(0f, swing) * ElbowBend + airborne * 25f), 0f, 0f);
-            rightForearm.localRotation = Quaternion.Euler(-(10f + Mathf.Max(0f, -swing) * ElbowBend + airborne * 25f), 0f, 0f);
+            rightForearm.localRotation = Quaternion.Euler(-(10f + holding * (HoldingElbowBend - 10f) + Mathf.Max(0f, -rightSwing) * ElbowBend + airborne * 25f), 0f, 0f);
         }
 
         // Out of the sky's reach (in a tunnel, under a roof) the body darkens like the blocks around

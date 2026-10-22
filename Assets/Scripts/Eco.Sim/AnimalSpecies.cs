@@ -57,6 +57,9 @@ namespace Eco.Sim
         public float Height { get; set; }
         public float Width { get; set; }
 
+        // Hit points: the damage (arrows) it takes before dying. A wounded animal heals all of it in a day.
+        public float Health { get; set; } = 10f;
+
         // Plants it can reach, in blocks: taller ones are out of its reach (a deer browses young trees,
         // not grown ones). The height of a plant is its species' times its growth stage.
         public float ReachHeight { get; set; } = float.MaxValue;
@@ -103,5 +106,8 @@ namespace Eco.Sim
 
         // The seed of a plant it ate, as that plant's species index plus one, or 0 (AnimalSpecies.SpreadsSeeds).
         public int CarriedSeed;
+
+        // Damage taken and not yet healed, from 0 (unhurt) up to its species' Health (dead).
+        public float Damage;
     }
 }

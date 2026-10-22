@@ -1,55 +1,107 @@
-/* The inventory screen, in the game's dark wooden look: a dark panel with cream text, light tan item
-   cards, a cream details card and a slate green action. Sizes are for the 1920 x 1080 reference
-   resolution; the bottom is left free for the hotbar, which takes dragged items. */
+/* The inventory screen, after the user's mockup: tabs along the top of a charcoal panel holding the
+   categories (a darker column, the chosen one tan) and a well of dark item slots, five or so across
+   (InventoryScreen sizes them to fill it), and beside it a dark frame holding the chosen item's cream
+   sheet. Sizes are for the 1920 x 1080 reference resolution; the bottom is left free for the hotbar,
+   which takes dragged items. */
 
 .inventory-screen {
-    --inv-card-top: #ddd0b5;
-    --inv-card: #cbbb9b;
-    --inv-card-border: #a8977a;
-    --inv-card-text: #3a3226;
-    --inv-sheet: #ebe3d1;
-    --inv-sheet-line: #d3c7af;
-    --inv-sheet-text: #2c271f;
-    --inv-sheet-muted: #6f6656;
-    padding: 124px 150px 150px 150px;
+    --inv-strip: #25292e;
+    --inv-column: #252626;
+    --inv-main: #2a2c2c;
+    --inv-slot: #242625;
+    --inv-slot-border: #47494a;
+    --inv-slot-hover: #2f3131;
+    --inv-slot-selected: #2b2d2c;
+    --inv-category-selected: #a4917a;
+    --inv-sheet: #ddd0bb;
+    --inv-sheet-line: #c9baa6;
+    --inv-sheet-text: #1e1711;
+    --inv-sheet-muted: #54493e;
+    --inv-sheet-well: #c9b9a5;
+    padding: 118px 150px 146px 150px;
     background-color: rgba(10, 10, 10, 0.35);
 }
 
-.inventory-panel {
+.inventory-frame {
     flex-grow: 1;
-    padding: 0;
-    background-color: var(--panel);
-    border-color: var(--panel-border);
-    border-radius: 14px;
-    overflow: hidden;
+    flex-direction: row;
 }
 
-.inventory-header {
+.inventory-left {
+    flex-grow: 1;
+}
+
+/* The tab bar, as in the mockup: a bar of its own over about four fifths of the width, above both
+   panels, charcoal with a light line along its top and a lighter one along its bottom; the chosen tab
+   a tan block set in it, outlined dark and lit along its top, its text dark and bold. */
+.inventory-tabs {
     flex-shrink: 0;
     flex-direction: row;
-    justify-content: space-between;
     align-items: center;
-    padding: 0 22px 0 0;
-    background-color: rgba(0, 0, 0, 0.25);
-    border-bottom-width: 1px;
-    border-color: var(--panel-border);
+    width: 80%;
+    height: 68px;
+    margin-bottom: 6px;
+    padding: 3px 18px 3px 3px;
+    background-color: var(--inv-strip);
+    border-width: 1px;
+    border-top-color: #3b4148;
+    border-left-color: #33373c;
+    border-right-color: #33373c;
+    border-bottom-color: #4a4b4e;
+    border-radius: 6px;
 }
 
-/* Tabs flush along the top of the panel (their colours are the shared ones). */
-.inventory-screen .tabs {
+.inventory-tab {
+    flex-direction: row;
+    align-items: center;
+    height: 100%;
+    padding: 0 36px 0 30px;
+    margin: 0;
     background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-right-width: 1px;
+    border-right-color: #505154;
     border-radius: 0;
+}
+
+.inventory-tab:hover {
+    background-color: var(--hover);
+}
+
+.inventory-tab--selected,
+.inventory-tab--selected:hover {
+    background-color: #d8c4ab;
+    border-width: 1px;
+    border-color: #0c0c0d;
+    border-top-color: #e5d8c5;
+    border-radius: 4px;
+}
+
+.inventory-tab-icon {
+    width: 28px;
+    height: 28px;
+    margin-right: 14px;
+    -unity-background-image-tint-color: var(--text);
+}
+
+.inventory-tab--selected > .inventory-tab-icon {
+    -unity-background-image-tint-color: var(--tab-selected-text);
+}
+
+.inventory-tab-text {
+    font-size: 22px;
+    color: var(--text);
+    margin: 0;
     padding: 0;
 }
 
-.inventory-screen .tab {
-    height: 62px;
-    padding: 0 30px;
-    margin: 0;
-    border-radius: 0;
-    border-width: 0;
-    border-right-width: 1px;
-    border-color: var(--panel-border);
+.inventory-tab--selected > .inventory-tab-text {
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--tab-selected-text);
+}
+
+.inventory-tabs-space {
+    flex-grow: 1;
 }
 
 /* The player's speciality, or the button to choose one. */
@@ -64,52 +116,59 @@
 }
 
 .speciality-name {
-    font-size: 19px;
-    color: var(--text);
+    font-size: 18px;
+    color: var(--text-muted);
     margin: 0 14px 0 0;
     padding: 0;
 }
 
 .speciality-choose {
-    height: 44px;
-    padding: 0 20px;
-    font-size: 18px;
+    height: 42px;
+    padding: 0 18px;
+    font-size: 17px;
 }
 
-.inventory-body {
-    flex-direction: row;
+.inventory-main {
     flex-grow: 1;
-    padding: 18px 22px 0 22px;
+    flex-direction: row;
+    background-color: var(--inv-main);
+    border-width: 1px;
+    border-color: var(--panel-border);
+    border-radius: 6px;
+    overflow: hidden;
 }
 
 .column-title {
     font-size: 22px;
     -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
     color: var(--text);
-    margin: 0 0 12px 0;
+    margin: 0 0 16px 0;
     padding: 0;
 }
 
-/* Categories down the left. */
+/* Categories down the left, on a darker column. */
 .categories {
-    width: 240px;
+    width: 270px;
     flex-shrink: 0;
-    margin-right: 20px;
-    padding-right: 16px;
+    padding: 22px 12px 12px 12px;
+    background-color: var(--inv-column);
     border-right-width: 1px;
     border-color: var(--panel-border);
+}
+
+.categories > .column-title {
+    margin-left: 10px;
 }
 
 .category {
     flex-direction: row;
     align-items: center;
-    justify-content: space-between;
-    height: 50px;
-    padding: 0 14px;
+    height: 54px;
+    padding: 0 16px;
     margin: 0 0 6px 0;
     background-color: rgba(0, 0, 0, 0);
     border-width: 0;
-    border-radius: 8px;
+    border-radius: 6px;
 }
 
 .category:hover {
@@ -118,11 +177,24 @@
 
 .category--selected,
 .category--selected:hover {
-    background-color: var(--selected);
+    background-color: var(--inv-category-selected);
+}
+
+.category > .icon {
+    width: 30px;
+    height: 30px;
+    margin-right: 16px;
+    -unity-background-image-tint-color: var(--text-body);
+}
+
+.category--selected > .icon {
+    -unity-background-image-tint-color: var(--tab-selected-text);
 }
 
 .category-name {
-    font-size: 19px;
+    flex-grow: 1;
+    -unity-text-align: middle-left;
+    font-size: 20px;
     color: var(--text);
     margin: 0;
     padding: 0;
@@ -130,53 +202,115 @@
 
 .category--selected > .category-name {
     -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--tab-selected-text);
 }
 
-.category-count {
-    font-size: 16px;
+/* The items in the middle: a heading, then the well of slots. */
+.items {
+    flex-grow: 1;
+    padding: 18px 20px 20px 20px;
+}
+
+.items-heading {
+    flex-direction: row;
+    align-items: center;
+    height: 44px;
+    margin-bottom: 14px;
+}
+
+.items-title {
+    flex-grow: 1;
+    margin: 0;
+}
+
+/* What the player carries, as the mockup's count: an icon and a figure, gold when nearly full, red
+   when full (InventoryScreen.ShowCarry). */
+.carry-count {
+    flex-direction: row;
+    align-items: center;
+    margin-left: 22px;
+}
+
+.carry-count-icon {
+    width: 26px;
+    height: 26px;
+    margin-right: 8px;
+    -unity-background-image-tint-color: var(--text-muted);
+}
+
+.carry-count-text {
+    font-size: 19px;
+    color: var(--text-body);
+    margin: 0;
+    padding: 0;
+}
+
+.carry-count-text--high {
+    color: var(--accent);
+}
+
+.carry-count-text--full {
+    color: var(--danger);
+}
+
+/* The search, a small dark well with a magnifier and a hint while it is empty. */
+.item-search-box {
+    flex-direction: row;
+    align-items: center;
+    width: 240px;
+    height: 40px;
+    margin: 0;
+    padding-left: 12px;
+    background-color: var(--well);
+    border-width: 1px;
+    border-color: var(--inv-slot-border);
+    border-radius: 6px;
+}
+
+.item-search-box--focused {
+    border-color: var(--accent);
+}
+
+.item-search-icon {
+    width: 20px;
+    height: 20px;
+    -unity-background-image-tint-color: var(--text-muted);
+}
+
+.item-search {
+    flex-grow: 1;
+    margin: 0;
+}
+
+.item-search > .unity-base-text-field__input,
+.item-search > .unity-text-field__input {
+    height: 38px;
+    padding: 0 10px;
+    font-size: 18px;
+    color: var(--text);
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    --unity-cursor-color: var(--text);
+}
+
+.item-search-hint {
+    position: absolute;
+    left: 44px;
+    top: 8px;
+    font-size: 18px;
     color: var(--text-muted);
     margin: 0;
     padding: 0;
 }
 
-/* The grid of items in the middle. */
-.items {
+/* The slots' well: a darker inset with a thin border, the scroll bar along its right. */
+.item-well {
     flex-grow: 1;
-    margin-right: 20px;
-}
-
-.items-heading {
-    flex-direction: row;
-    align-items: flex-end;
-}
-
-.items-total {
-    font-size: 17px;
-    color: var(--text-muted);
-    margin: 0 0 14px 12px;
-    padding: 0;
-}
-
-.item-search {
-    margin: 0 0 14px 0;
-}
-
-.item-search > .unity-base-text-field__input,
-.item-search > .unity-text-field__input {
-    height: 44px;
-    padding: 0 14px;
-    font-size: 19px;
-    color: var(--text);
-    background-color: var(--well);
+    padding: 12px 6px 0 12px;
+    background-color: #212322;
     border-width: 1px;
-    border-color: #4c463d;
-    border-radius: 8px;
-    --unity-cursor-color: var(--text);
-}
-
-.item-search:focus > .unity-base-text-field__input,
-.item-search:focus > .unity-text-field__input {
-    border-color: var(--accent);
+    border-color: #3a3c3d;
+    border-radius: 6px;
 }
 
 .item-grid {
@@ -184,56 +318,52 @@
     flex-basis: 0;
 }
 
+/* An item: its icon on a dark slot, how many at the bottom right. Empty slots fill the grid out.
+   Their size is set by InventoryScreen.LayOutSlots, so that whole columns fill the well. */
 .item-slot {
-    width: 128px;
-    height: 148px;
-    margin: 0 10px 10px 0;
-    padding: 8px 6px 6px 6px;
+    width: 120px;
+    height: 120px;
+    margin: 0 12px 12px 0;
     align-items: center;
-    background-color: var(--inv-card);
-    border-width: 2px;
-    border-top-color: var(--inv-card-top);
-    border-left-color: var(--inv-card-top);
-    border-right-color: var(--inv-card-border);
-    border-bottom-color: var(--inv-card-border);
-    border-radius: 8px;
+    justify-content: center;
+    background-color: var(--inv-slot);
+    border-width: 1px;
+    border-color: var(--inv-slot-border);
+    border-radius: 5px;
 }
 
 .item-slot:hover {
-    background-color: #d4c5a6;
+    background-color: var(--inv-slot-hover);
+    border-color: #6b6d6e;
 }
 
 .item-slot--selected,
 .item-slot--selected:hover {
-    background-color: #e2d5b8;
+    background-color: var(--inv-slot-selected);
     border-color: var(--accent);
     border-width: 3px;
 }
 
-.item-icon {
-    width: 84px;
-    height: 84px;
-    -unity-background-scale-mode: scale-to-fit;
+.item-slot--empty,
+.item-slot--empty:hover {
+    background-color: #232524;
+    border-color: #363839;
 }
 
-.item-name {
-    font-size: 15px;
-    color: var(--inv-card-text);
-    -unity-text-align: middle-center;
-    white-space: normal;
-    margin: 4px 0 0 0;
-    padding: 0;
-    overflow: hidden;
-    max-height: 38px;
+.item-icon {
+    width: 68%;
+    height: 68%;
+    -unity-background-scale-mode: scale-to-fit;
 }
 
 .item-count {
     position: absolute;
     right: 8px;
-    top: 6px;
-    font-size: 16px;
+    bottom: 4px;
+    font-size: 20px;
     -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
-    color: var(--inv-card-text);
+    color: #ffffff;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9);
     margin: 0;
     padding: 0;
 }
@@ -242,42 +372,66 @@
     font-size: 19px;
     color: var(--text-muted);
     white-space: normal;
-    margin: 16px 0 0 0;
+    margin: 0 6px 12px 0;
 }
 
-/* The chosen item, on the right: a cream sheet. */
-.details {
-    width: 380px;
+/* The chosen item, on the right: a cream sheet in a dark frame. */
+.inventory-side {
+    width: 560px;
     flex-shrink: 0;
-    align-self: flex-start;
-    margin-bottom: 18px;
-    padding: 20px;
+    margin: 0 0 0 12px;
+    padding: 14px;
+    background-color: var(--panel);
+    border-width: 1px;
+    border-color: var(--panel-border);
+    border-radius: 6px;
+}
+
+.details {
+    flex-grow: 1;
+    padding: 24px 26px 22px 26px;
     background-color: var(--inv-sheet);
     border-width: 1px;
     border-color: var(--inv-sheet-line);
-    border-radius: 10px;
+    border-radius: 6px;
 }
 
 .details-head {
     flex-direction: row;
     align-items: center;
-    margin-bottom: 14px;
+    padding-bottom: 18px;
+    margin-bottom: 18px;
+    border-bottom-width: 1px;
+    border-color: var(--inv-sheet-line);
+}
+
+/* The item's picture, in a frame of its own on the sheet. */
+.details-icon-frame {
+    width: 136px;
+    height: 136px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    margin-right: 22px;
+    background-color: #e8dfcf;
+    border-width: 1px;
+    border-color: #bba98f;
+    border-radius: 4px;
 }
 
 .details-icon {
-    width: 104px;
-    height: 104px;
-    flex-shrink: 0;
-    margin-right: 14px;
+    width: 112px;
+    height: 112px;
     -unity-background-scale-mode: scale-to-fit;
 }
 
 .details-titles {
     flex-shrink: 1;
+    align-items: flex-start;
 }
 
 .details-name {
-    font-size: 25px;
+    font-size: 28px;
     -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
     color: var(--inv-sheet-text);
     white-space: normal;
@@ -286,31 +440,50 @@
 }
 
 .details-kind {
-    font-size: 17px;
+    font-size: 18px;
     color: var(--inv-sheet-muted);
-    margin: 0;
+    margin: 0 0 10px 0;
     padding: 0;
+}
+
+/* A small tag under the kind: the item's hotbar slot. */
+.details-pill {
+    font-size: 15px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--inv-sheet-text);
+    background-color: var(--inv-sheet-well);
+    border-radius: 4px;
+    padding: 3px 10px;
+    margin: 0;
 }
 
 .details-description {
     font-size: 18px;
     color: var(--inv-sheet-text);
     white-space: normal;
-    margin: 0 0 16px 0;
+    margin: 0 0 18px 0;
     padding: 0;
 }
 
 .details-line {
     flex-direction: row;
-    justify-content: space-between;
-    padding: 10px 0;
+    align-items: center;
+    padding: 11px 0;
     border-top-width: 1px;
     border-color: var(--inv-sheet-line);
 }
 
+.details-line-icon {
+    width: 22px;
+    height: 22px;
+    margin-right: 14px;
+    -unity-background-image-tint-color: var(--inv-sheet-text);
+}
+
 .details-line-label {
+    flex-grow: 1;
     font-size: 18px;
-    color: var(--inv-sheet-muted);
+    color: var(--inv-sheet-text);
     margin: 0;
     padding: 0;
 }
@@ -323,27 +496,100 @@
     padding: 0;
 }
 
-.details-nutrients {
+.details-section {
+    font-size: 20px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--inv-sheet-text);
+    margin: 0;
+    padding: 16px 0 10px 0;
+    border-top-width: 1px;
+    border-color: var(--inv-sheet-line);
+}
+
+/* A nutrient: its colour and name, a bar of how rich the food is in it, its points. */
+.nutrient {
     flex-direction: row;
     align-items: center;
+    margin-bottom: 9px;
 }
 
-.details-nutrient {
-    margin-right: 12px;
+.nutrient-name {
+    width: 86px;
+    font-size: 17px;
+    color: var(--inv-sheet-text);
+    margin: 0;
+    padding: 0;
 }
 
-.inventory-footer {
-    flex-shrink: 0;
-    flex-direction: row;
-    justify-content: flex-end;
-    padding: 12px 22px 14px 22px;
-    background-color: rgba(0, 0, 0, 0.2);
+.nutrient-bar {
+    flex-grow: 1;
+    height: 12px;
+    margin: 0 14px 0 4px;
+    background-color: var(--inv-sheet-well);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.nutrient-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 6px;
+}
+
+.nutrient-value {
+    width: 30px;
+    font-size: 17px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--inv-sheet-text);
+    -unity-text-align: middle-right;
+    margin: 0;
+    padding: 0;
+}
+
+.details-space {
+    flex-grow: 1;
+}
+
+/* What can be done with items, keycaps drawn light on the sheet. */
+.details-hints {
+    padding-top: 14px;
     border-top-width: 1px;
-    border-color: var(--panel-border);
+    border-color: var(--inv-sheet-line);
 }
 
-.inventory-last-key {
-    margin-right: 0;
+.details-hint {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.sheet-key {
+    align-items: center;
+    justify-content: center;
+    min-width: 104px;
+    height: 30px;
+    padding: 0 10px;
+    margin-right: 12px;
+    background-color: var(--inv-sheet-well);
+    border-width: 1px;
+    border-bottom-width: 3px;
+    border-color: #ae9d87;
+    border-radius: 5px;
+}
+
+.sheet-key-text {
+    font-size: 15px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--inv-sheet-text);
+    margin: 0;
+    padding: 0;
+}
+
+.details-hint-text {
+    font-size: 16px;
+    color: var(--inv-sheet-muted);
+    margin: 0;
+    padding: 0;
 }
 
 /* The dragged item, under the pointer. */
