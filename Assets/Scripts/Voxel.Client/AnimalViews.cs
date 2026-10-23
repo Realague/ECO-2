@@ -60,6 +60,9 @@ namespace Voxel.Client
         private const int MaxDetours = 8;
         private const float MinDetour = 1f;
 
+        // An animal running off from a player goes at this many times its pace, without pausing.
+        private const float FleeSpeed = 1.6f;
+
         // Legs swing out and settle back over this time when an animal sets off or stops.
         private const float StrideEaseSeconds = 0.25f;
 
@@ -102,6 +105,9 @@ namespace Voxel.Client
             public int SpeciesIndex;
             public Vector3 Position;
             public Quaternion Facing;
+
+            // What is left of it, 0 to 1 (rotting and scavengers take it).
+            public float Meat;
         }
 
         // Animals are not drawn without a display: assets is then null.
@@ -176,7 +182,8 @@ namespace Voxel.Client
 
         // position: where the animal now stands (centre of its column, on the ground). world: this
         // machine's world, or null if it has none yet. listSeconds: about how long until the next list.
-        public void Add(int animalId, int speciesIndex, Vector3 position, World world, float listSeconds)
+        // fleeing: it has just run off from a player (EcosystemSync.MakeFlee).
+        public void Add(int animalId, int speciesIndex, Vector3 position, World world, float listSeconds, bool fleeing = false)
         {
             if (speciesIndex >= species.Count) return;
 
@@ -185,11 +192,17 @@ namespace Voxel.Client
             if (views.TryGetValue(animalId, out View view))
             {
                 // A new trip when the animal has moved, or when it stayed put and its trip is nearly
-                // over, so that it wanders on rather than standing still until the next list.
+                // over, so that it wanders on rather than standing still until the next list; a
+                // flight goes straight there at a run, and is not cut short by wandering.
                 bool moved = position != view.To;
                 AnimalSpeciesAsset asset = assets?[speciesIndex];
                 float wander = asset != null && world != null ? WanderLength(asset, listSeconds) : 0f;
-                if (moved || (wander > 0f && view.RemainingSeconds(now) < listSeconds * 0.5f))
+                if (moved && fleeing)
+                {
+                    Vector3[] route = Route(world, species[speciesIndex], view.PositionAt(now), position, 0f, 0);
+                    view.SetTrip(route, now, asset, listSeconds, animalId, FleeSpeed);
+                }
+                else if (moved || (wander > 0f && !view.IsRunning(now) && view.RemainingSeconds(now) < listSeconds * 0.5f))
                 {
                     Vector3[] route = Route(world, species[speciesIndex], view.PositionAt(now), position, wander, animalId + stamp * 7919);
                     view.SetTrip(route, now, asset, listSeconds, animalId);
@@ -321,12 +334,73 @@ namespace Voxel.Client
             carcasses.Clear();
         }
 
-        public void AddCarcass(int speciesIndex, Vector3 position)
+        public void AddCarcass(int speciesIndex, Vector3 position, float meat)
         {
             if (speciesIndex >= species.Count) return;
 
             int yaw = (Mathf.FloorToInt(position.x) * 73 + Mathf.FloorToInt(position.z) * 151) % 360;
-            carcasses.Add(new CarcassView { SpeciesIndex = speciesIndex, Position = position, Facing = Quaternion.Euler(0f, yaw, 0f) });
+            carcasses.Add(new CarcassView { SpeciesIndex = speciesIndex, Position = position, Facing = Quaternion.Euler(0f, yaw, 0f), Meat = meat });
+        }
+
+        // The carcass the local player points at, at most maxDistance away (distance along the ray): its
+        // column, species and what is left of it. Its box: as wide as the animal is long or high, as
+        // high as it is wide, lying in its column.
+        public bool TryAimedCarcass(Vector3 origin, Vector3 direction, float maxDistance, out int x, out int z, out int speciesIndex, out float meat, out float distance)
+        {
+            x = z = speciesIndex = 0;
+            meat = 0f;
+            distance = maxDistance;
+            bool found = false;
+            System.Numerics.Vector3 from = origin.ToNumerics();
+            System.Numerics.Vector3 to = (origin + direction * maxDistance).ToNumerics();
+            foreach (CarcassView carcass in carcasses)
+            {
+                AnimalSpecies kind = species[carcass.SpeciesIndex];
+                float half = Mathf.Clamp(Mathf.Max(kind.Width, kind.Height) * 0.5f, 0.2f, 0.5f);
+                float height = Mathf.Max(0.25f, kind.Width);
+                Vector3 p = carcass.Position;
+                float along = ArrowFlight.SegmentEntry(from, to,
+                    new System.Numerics.Vector3(p.x - half, p.y, p.z - half),
+                    new System.Numerics.Vector3(p.x + half, p.y + height, p.z + half));
+                if (along < 0f || along >= distance) continue;
+
+                found = true;
+                distance = along;
+                x = Mathf.FloorToInt(p.x);
+                z = Mathf.FloorToInt(p.z);
+                speciesIndex = carcass.SpeciesIndex;
+                meat = carcass.Meat;
+            }
+
+            return found;
+        }
+
+        // The meshes of the carcass lying in a column, placed as drawn (for PickupHalo).
+        public void CollectCarcassParts(int x, int z, List<(Mesh mesh, Matrix4x4 matrix)> into)
+        {
+            if (assets == null) return;
+
+            foreach (CarcassView carcass in carcasses)
+            {
+                if (Mathf.FloorToInt(carcass.Position.x) != x || Mathf.FloorToInt(carcass.Position.z) != z) continue;
+
+                IReadOnlyList<SpeciesAsset.Part> parts = assets[carcass.SpeciesIndex].Parts;
+                Matrix4x4 lying = LyingPose(carcass);
+                foreach (SpeciesAsset.Part part in parts)
+                {
+                    into.Add((part.mesh, lying * Matrix4x4.TRS(part.offset, Quaternion.identity, part.scale)));
+                }
+
+                return;
+            }
+        }
+
+        // A carcass: the animal rolled onto its side about its body's centre, resting on the ground.
+        private Matrix4x4 LyingPose(CarcassView carcass)
+        {
+            int s = carcass.SpeciesIndex;
+            return Matrix4x4.TRS(carcass.Position + Vector3.up * bodyHalfWidths[s], carcass.Facing, Vector3.one)
+                * Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, 90f)) * Matrix4x4.Translate(new Vector3(0f, -bodyHeights[s], 0f));
         }
 
         // Where each animal is now, with its species index.
@@ -375,11 +449,12 @@ namespace Voxel.Client
         // the segment, and whether it hit the head (the species' HeadBox, turned as the animal faces)
         // rather than the body (the aiming box). An arrow through the head no further in than it
         // enters the body counts as in the head, so a shot from the front or the side may be one, a
-        // shot through the rump not.
-        public bool TryHitArrow(Vector3 a, Vector3 b, out int animalId, out bool inHead, out float distance)
+        // shot through the rump not. feet: where the animal was shown, which is where it falls if killed.
+        public bool TryHitArrow(Vector3 a, Vector3 b, out int animalId, out bool inHead, out float distance, out Vector3 feet)
         {
             const float HeadAllowance = 0.35f;
             animalId = 0;
+            feet = default;
             inHead = false;
             distance = float.MaxValue;
             float now = Time.time;
@@ -411,6 +486,7 @@ namespace Voxel.Client
 
                 distance = hitAt;
                 animalId = entry.Key;
+                feet = view.PositionAt(now);
                 inHead = head;
             }
 
@@ -491,8 +567,7 @@ namespace Voxel.Client
             {
                 int s = carcass.SpeciesIndex;
                 IReadOnlyList<SpeciesAsset.Part> parts = assets[s].Parts;
-                Matrix4x4 lying = Matrix4x4.TRS(carcass.Position + Vector3.up * bodyHalfWidths[s], carcass.Facing, Vector3.one)
-                    * Matrix4x4.Rotate(Quaternion.Euler(0f, 0f, 90f)) * Matrix4x4.Translate(new Vector3(0f, -bodyHeights[s], 0f));
+                Matrix4x4 lying = LyingPose(carcass);
                 for (int p = 0; p < parts.Count; p++)
                 {
                     matrices[s][p][counts[s]] = lying * Matrix4x4.TRS(parts[p].offset, Quaternion.identity, parts[p].scale);
@@ -735,12 +810,18 @@ namespace Voxel.Client
             // moving, so a bird stays up at its end.
             private bool continuous;
 
+            // A flight from a player (run at a fixed pace) ends at this time; 0 for any other trip.
+            private float runEnd;
+
             public Vector3 To => points[points.Length - 1];
+
+            public bool IsRunning(float now) => now < runEnd;
 
             // Each leg takes the species' own time; the whole trip is quickened to fit in about the time
             // until the next list, or, with time to spare, slowed down and spread over it with pauses.
             // seed varies the pauses from one animal to the next, so that a herd does not move as one.
-            public void SetTrip(Vector3[] route, float now, AnimalSpeciesAsset asset, float listSeconds, int seed)
+            // With a runSpeed, it is a flight instead: at runSpeed times the species' pace, without pauses.
+            public void SetTrip(Vector3[] route, float now, AnimalSpeciesAsset asset, float listSeconds, int seed, float runSpeed = 0f)
             {
                 startYaw = FacingAt(now);
                 GetStride(now, out float cycles, out float swing);
@@ -781,10 +862,11 @@ namespace Voxel.Client
 
                 // Quickened, at the species' pace, or slowed down with pauses.
                 float maxSeconds = listSeconds * TravelMargin;
-                continuous = natural > maxSeconds && natural > 0f;
-                float timeScale = continuous ? maxSeconds / natural : 1f;
+                bool run = runSpeed > 0f;
+                continuous = !run && natural > maxSeconds && natural > 0f;
+                float timeScale = run ? 1f / runSpeed : continuous ? maxSeconds / natural : 1f;
                 var pauses = new float[Mathf.Max(0, legs)];
-                if (!continuous && legs > 0 && asset != null && gait != AnimalSpeciesAsset.Gait.Fly)
+                if (!run && !continuous && legs > 0 && asset != null && gait != AnimalSpeciesAsset.Gait.Fly)
                 {
                     float fill = listSeconds;
                     if (gait != AnimalSpeciesAsset.Gait.Hop)
@@ -805,6 +887,8 @@ namespace Voxel.Client
                     time = departures[leg] + moveSeconds[leg] * timeScale;
                     arrivals[leg + 1] = time;
                 }
+
+                runEnd = run ? now + time : 0f;
 
                 // A corner stays within the column of its point (CornerRadius < 0.5), so no wall is
                 // cut; where the animal pauses, it stands on the point itself.

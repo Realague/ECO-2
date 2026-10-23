@@ -81,6 +81,30 @@ namespace Eco.Sim.Tests
         }
 
         [Test]
+        public void Player_TakesAWholeCarcass_ButNotWhatIsLeftOfACatch()
+        {
+            Ecosystem whole = CreateEcosystem(Rabbit(), Fox());
+            whole.TryPlaceAnimal(RabbitIndex, 10, 10);
+            whole.RemoveAnimal(whole.Animals[0].Id);
+            Carcass lying = whole.Carcasses[0];
+
+            Assert.IsFalse(whole.TryTakeCarcass(lying.X + 1, lying.Z, 0.5f, out _), "nothing lies there");
+            Assert.IsTrue(whole.TryTakeCarcass(lying.X, lying.Z, 0.5f, out Carcass taken));
+            Assert.AreEqual(RabbitIndex, taken.SpeciesIndex);
+            Assert.AreEqual(0, whole.Carcasses.Count);
+            Assert.IsFalse(whole.TryTakeCarcass(lying.X, lying.Z, 0.5f, out _), "it is gone");
+
+            Ecosystem eaten = CreateEcosystem(Rabbit(), Fox(hungerPerStep: 0.2f, catchChance: 1f));
+            eaten.TryPlaceAnimal(RabbitIndex, 10, 10);
+            eaten.TryPlaceAnimal(FoxIndex, 12, 10);
+            Run(eaten, 3);
+            Carcass remains = eaten.Carcasses[0];
+
+            Assert.IsFalse(eaten.TryTakeCarcass(remains.X, remains.Z, remains.Meat + 0.01f, out _));
+            Assert.AreEqual(1, eaten.Carcasses.Count, "a refused carcass stays");
+        }
+
+        [Test]
         public void PlayerKill_LeavesAWholeCarcass()
         {
             Ecosystem ecosystem = CreateEcosystem(Rabbit(), Fox());

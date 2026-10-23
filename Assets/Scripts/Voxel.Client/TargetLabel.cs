@@ -56,7 +56,11 @@ namespace Voxel.Client
             bool blockHit = VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, out VoxelHit hit);
             float reached = blockHit ? hit.Distance : PlayerRules.Reach;
             bool storageHit = storageSync.TryAimed(eye.transform.position, eye.transform.forward, reached, out int storageId, out float storageDistance);
-            if (ecosystemSync.TryAim(origin, direction, storageHit ? storageDistance : reached, out string name, out int tool)) return WithTool(name, tool);
+            if (storageHit) reached = storageDistance;
+            bool carcassHit = ecosystemSync.TryAimedCarcass(eye.transform.position, eye.transform.forward, reached, out _, out _, out int carcassSpecies, out float meat, out float carcassDistance);
+            if (carcassHit) reached = carcassDistance;
+            if (ecosystemSync.TryAim(origin, direction, reached, out string name, out int tool)) return WithTool(name, tool);
+            if (carcassHit) return CarcassName(carcassSpecies, meat);
             if (storageHit) return StorageName(storageId);
             if (!blockHit) return null;
 
@@ -73,6 +77,13 @@ namespace Voxel.Client
             return kind == StorageKind.Chest
                 ? $"Chest · {whose}"
                 : $"Stockpile · {whose} ({blocks} / {StorageRules.StockpileCapacity})";
+        }
+
+        // A carcass, and whether enough of it is left to take: "Deer carcass · too far gone".
+        private string CarcassName(int speciesIndex, float meat)
+        {
+            string name = $"{EcosystemSync.DisplayName(ecosystemSync.AnimalName(speciesIndex))} carcass";
+            return meat < EcosystemSync.CarcassMinMeat ? name + " · too far gone" : name;
         }
 
         // The tool a click would need, when it is not the one in hand: "Granite · needs a pickaxe".

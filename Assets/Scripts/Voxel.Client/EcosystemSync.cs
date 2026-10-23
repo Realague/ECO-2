@@ -14,11 +14,12 @@ namespace Voxel.Client
     // setting the speed of time), finishes plants felled by hits (MiningSync: a tree falls, leaving
     // its stump and its logs) and broadcasts changes. Client: keeps the received list of plants up to
     // date. Every machine with a display draws the nearby plants.
-    public class EcosystemSync : MonoBehaviour
+    public class EcosystemSync : MonoBehaviour, ICollisionObstacles
     {
         private const string UpdateMessage = "Eco.Update";
         private const string FelledMessage = "Eco.Felled";
         private const string HarvestMessage = "Eco.Harvest";
+        private const string TakeCarcassMessage = "Eco.TakeCarcass";
         private const string CommandMessage = "Eco.Command";
         private const string AnimalsMessage = "Eco.Animals";
         private const string CensusRequestMessage = "Eco.CensusRequest";
@@ -54,11 +55,26 @@ namespace Voxel.Client
 
         // Each player receives, at most twice a second, the full list of the animals around them,
         // a little beyond what they see. The cost therefore does not depend on the size of the world.
-        private const int AnimalEntrySize = 4 * sizeof(int) + sizeof(byte);
-        private const int CarcassEntrySize = 3 * sizeof(int) + sizeof(byte);
+        private const int AnimalEntrySize = 4 * sizeof(int) + 2 * sizeof(byte);
+        private const int CarcassEntrySize = 3 * sizeof(int) + 2 * sizeof(byte);
         private const float AnimalFeedInterval = 0.5f;
         private const float AnimalInterestMargin = 32f;
         private const float AnimalFeedMoveThreshold = 8f;
+
+        // Animals run from players: a wounded one WoundFleeSteps columns away from the shooter, one
+        // that hunts no other animal ScareSteps away from a player coming within ScareRadius (checked
+        // every ScareInterval, at most once per ScareCooldownSeconds per animal). For FleeFlagSeconds
+        // after a flight the lists mark the animal as fleeing, and clients show its move as a run.
+        private const int WoundFleeSteps = 10;
+        private const int ScareSteps = 6;
+        private const float ScareRadius = 6f;
+        private const float ScareInterval = 0.25f;
+        private const float ScareCooldownSeconds = 1f;
+        private const float FleeFlagSeconds = 1f;
+
+        // Longest a client may still be showing a flight under way (AnimalViews runs it at
+        // FleeSpeed times the species' pace): hits are accepted that far back along it.
+        private const float RunShownSeconds = 4f;
 
         // The map asks for a census every 2 s while it is open; a player asking faster is ignored, and a
         // census grid larger than this many cells (a world of 8,192 columns a side) is refused.
@@ -116,6 +132,13 @@ namespace Voxel.Client
         private readonly List<Carcass> nearbyCarcasses = new List<Carcass>();
         private int animalRevision;
 
+        // Server side: when each animal last fled (real time), and the animals to scare off this check.
+        private readonly Dictionary<int, float> fledAt = new Dictionary<int, float>();
+        private readonly List<(int animalId, Vector3 from)> scared = new List<(int, Vector3)>();
+        private readonly List<int> expiredFlights = new List<int>();
+        private float nextScare;
+        private float nextFledCleanup;
+
         // Simulation clock as this machine knows it.
         private long stepCount;
         private float multiplier = 1f;
@@ -169,7 +192,9 @@ namespace Voxel.Client
         private CustomMessagingManager Messaging => networkManager.CustomMessagingManager;
 
         // Items' weights for the carrying limit, crops' from their species.
-        public ItemWeights ItemWeights => itemWeights ??= new ItemWeights(Array.ConvertAll(speciesAssets, asset => asset.ProduceWeight));
+        public ItemWeights ItemWeights => itemWeights ??= new ItemWeights(
+            Array.ConvertAll(speciesAssets, asset => asset.ProduceWeight),
+            Array.ConvertAll(animalAssets, asset => ItemWeights.CarcassWeightFor(asset.Health)));
 
         private void Awake()
         {
@@ -206,6 +231,8 @@ namespace Voxel.Client
                     break;
                 }
             }
+
+            ScareAnimals();
 
             if (stepCount != ecosystem.StepCount || multiplier != clock.Multiplier || behind != clock.IsBehind)
             {
@@ -249,6 +276,7 @@ namespace Voxel.Client
             if (networkManager.IsHost) animalFeeds[networkManager.LocalClientId] = new AnimalFeed();
 
             Messaging.RegisterNamedMessageHandler(HarvestMessage, OnHarvestRequest);
+            Messaging.RegisterNamedMessageHandler(TakeCarcassMessage, OnTakeCarcass);
             Messaging.RegisterNamedMessageHandler(CommandMessage, OnCommand);
             Messaging.RegisterNamedMessageHandler(CensusRequestMessage, OnCensusRequest);
             networkManager.OnClientConnectedCallback += OnClientConnected;
@@ -289,6 +317,7 @@ namespace Voxel.Client
             removedPlants.Clear();
             snapshots.Clear();
             animalFeeds.Clear();
+            fledAt.Clear();
             lastCensus.Clear();
             Census = new SpeciesCensus();
             running = false;
@@ -430,12 +459,13 @@ namespace Voxel.Client
         private int HarvestTool(int speciesIndex) => ToolRules.ToHarvest(speciesAssets[speciesIndex].Harvest == HarvestKind.Annual);
 
         // Which shown animal a flying arrow's segment hits first (AnimalViews.TryHitArrow).
-        internal bool TryHitArrow(Vector3 a, Vector3 b, out int animalId, out bool inHead, out float distance)
+        internal bool TryHitArrow(Vector3 a, Vector3 b, out int animalId, out bool inHead, out float distance, out Vector3 feet)
         {
             animalId = 0;
             inHead = false;
             distance = 0f;
-            return animalViews != null && animalViews.TryHitArrow(a, b, out animalId, out inHead, out distance);
+            feet = default;
+            return animalViews != null && animalViews.TryHitArrow(a, b, out animalId, out inHead, out distance, out feet);
         }
 
         // What the local player is aiming at, at most maxDistance away: the name of the animal or plant
@@ -670,6 +700,83 @@ namespace Voxel.Client
                 writer.WriteValueSafe(plantId);
                 Messaging.SendNamedMessage(HarvestMessage, NetworkManager.ServerClientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
             }
+        }
+
+        // A carcass is worth taking while at least this much of it is left.
+        public const float CarcassMinMeat = 0.5f;
+
+        // The carcass the local player points at (AnimalViews.TryAimedCarcass).
+        internal bool TryAimedCarcass(Vector3 origin, Vector3 direction, float maxDistance, out int x, out int z, out int speciesIndex, out float meat, out float distance)
+        {
+            x = z = speciesIndex = 0;
+            meat = 0f;
+            distance = maxDistance;
+            return animalViews != null && animalViews.TryAimedCarcass(origin, direction, maxDistance, out x, out z, out speciesIndex, out meat, out distance);
+        }
+
+        // The meshes of the carcass lying in a column, placed as drawn (for PickupHalo).
+        internal void CollectCarcassParts(int x, int z, List<(Mesh mesh, Matrix4x4 matrix)> into)
+        {
+            animalViews?.CollectCarcassParts(x, z, into);
+        }
+
+        // The local player picks up the carcass lying in a column: the server decides, and the carcass
+        // goes from the next list of animals.
+        public void RequestTakeCarcass(int x, int z)
+        {
+            if (!running) return;
+
+            if (ecosystem != null)
+            {
+                TakeCarcass(networkManager.LocalClientId, x, z);
+                return;
+            }
+
+            using (var writer = new FastBufferWriter(2 * sizeof(int), Allocator.Temp))
+            {
+                writer.WriteValueSafe(x);
+                writer.WriteValueSafe(z);
+                Messaging.SendNamedMessage(TakeCarcassMessage, NetworkManager.ServerClientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
+            }
+        }
+
+        // Server side: a carcass within reach, still worth taking, goes into the player's bag as its
+        // species' carcass, if they can carry it.
+        private void TakeCarcass(ulong clientId, int x, int z)
+        {
+            if (ecosystem == null || !networkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client) || client.PlayerObject == null) return;
+
+            int species = -1;
+            foreach (Carcass carcass in ecosystem.Carcasses)
+            {
+                if (carcass.X == x && carcass.Z == z) species = carcass.SpeciesIndex;
+            }
+
+            if (species < 0) return;
+
+            Vector3 eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;
+            var centre = new Vector3(x + 0.5f, eyes.y, z + 0.5f);
+            float reach = PlayerRules.Reach + BlockEditRules.ReachTolerance + 1f;
+            if ((centre - eyes).sqrMagnitude > reach * reach) return;
+
+            int item = Items.Carcass(species);
+            if (inventorySync.RoomFor(clientId, item) <= 0)
+            {
+                inventorySync.TellFull(clientId, InventorySync.ReasonFor(item));
+                return;
+            }
+
+            if (!ecosystem.TryTakeCarcass(x, z, CarcassMinMeat, out _)) return;
+
+            inventorySync.Give(clientId, item, 1);
+            animalRevision++;
+        }
+
+        private void OnTakeCarcass(ulong senderId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out int x);
+            reader.ReadValueSafe(out int z);
+            TakeCarcass(senderId, x, z);
         }
 
         // The last census received (SpeciesCensus), for the map's species layers.
@@ -1115,6 +1222,47 @@ namespace Voxel.Client
         // Whether a plant (or a stump) stands in a column, as this machine shows it.
         internal bool IsPlantAt(int x, int z) => plantAtColumn.ContainsKey(ColumnKey(x, z));
 
+        // The trunks standing in these columns, which stop the local player (VoxelCollision.Move).
+        public void Collect(int minX, int maxX, int minZ, int maxZ, List<(System.Numerics.Vector3 min, System.Numerics.Vector3 max)> into)
+        {
+            for (int z = minZ; z <= maxZ; z++)
+            {
+                for (int x = minX; x <= maxX; x++)
+                {
+                    if (!plantAtColumn.TryGetValue(ColumnKey(x, z), out int plantId) || !plants.TryGetValue(plantId, out PlantView view)) continue;
+                    if (TryGetTrunkBox(view, out System.Numerics.Vector3 min, out System.Numerics.Vector3 max)) into.Add((min, max));
+                }
+            }
+        }
+
+        // The solid part of a plant: the trunk of a plant that gives wood (a tree, a cactus), as wide
+        // as its stump's cut (PlantRenderer.TryGetTrunk; a third of its width for a species without a
+        // stump) and as high as its aiming box; a stump up to its cut. A sapling too small to give
+        // wood, and every plant without wood, is passed through. Kept within the plant's column.
+        private bool TryGetTrunkBox(PlantView view, out System.Numerics.Vector3 min, out System.Numerics.Vector3 max)
+        {
+            min = max = default;
+            SpeciesAsset asset = speciesAssets[view.SpeciesIndex];
+            float size = PlantShape.Scale(view.Stage);
+            if (asset.WoodYield <= 0 || (!view.Stump && MiningRules.WoodOf(asset.WoodYield, size) < 1)) return false;
+
+            Vector3 centre;
+            Vector2 half;
+            PlantView standing = view;
+            standing.Stump = false;
+            if (plantRenderer == null || !plantRenderer.TryGetTrunk(standing, out centre, out half, out _))
+            {
+                float halfWidth = Mathf.Max(0.1f, species[view.SpeciesIndex].Width * size / 6f);
+                centre = new Vector3(view.X + 0.5f, view.Y, view.Z + 0.5f);
+                half = new Vector2(halfWidth, halfWidth);
+            }
+
+            float top = view.Stump ? PlantShape.StumpHeight * size : Mathf.Max(PlantShape.StumpHeight, species[view.SpeciesIndex].Height * size);
+            min = new System.Numerics.Vector3(Mathf.Max(view.X, centre.x - half.x), view.Y, Mathf.Max(view.Z, centre.z - half.y));
+            max = new System.Numerics.Vector3(Mathf.Min(view.X + 1f, centre.x + half.x), view.Y + top, Mathf.Min(view.Z + 1f, centre.z + half.y));
+            return max.X > min.X && max.Z > min.Z;
+        }
+
         // Server side: a column where nothing may sprout, because storage stands there, or no longer.
         internal void BlockColumn(int x, int z, bool blocked)
         {
@@ -1125,6 +1273,12 @@ namespace Voxel.Client
         public string PlantName(int speciesIndex)
         {
             return speciesIndex >= 0 && speciesIndex < speciesAssets.Length ? speciesAssets[speciesIndex].name : "?";
+        }
+
+        // Name of an animal species, for display (for instance that of a carcass).
+        public string AnimalName(int speciesIndex)
+        {
+            return speciesIndex >= 0 && speciesIndex < animalAssets.Length ? animalAssets[speciesIndex].name : "?";
         }
 
         // Name of what a plant species' harvest gives (Items.Produce), for display.
@@ -1194,23 +1348,91 @@ namespace Voxel.Client
 
         // Server side: an arrow whose flight followed this path says it hit an animal. The animal must
         // be near the path (it may have moved one step since the shooter saw it, plus a block); it then
-        // takes the damage, and dies once its health is spent, leaving its carcass. feet is where the
-        // arrow falls, at the animal's feet. Returns false, changing nothing, if the hit is not plausible.
-        internal bool TryWoundAnimal(int animalId, IReadOnlyList<System.Numerics.Vector3> path, float damage, out Vector3 feet)
+        // takes the damage, and dies once its health is spent, leaving its carcass, or else runs away
+        // from where the arrow came from. Returns false, changing nothing, if the hit is not plausible.
+        internal bool TryWoundAnimal(int animalId, IReadOnlyList<System.Numerics.Vector3> path, float damage, int shownX, int shownZ, out bool killed)
         {
-            feet = default;
-            if (ecosystem == null || !ecosystem.TryGetAnimal(animalId, out Animal animal)) return false;
+            killed = false;
+            if (ecosystem == null || path.Count == 0 || !ecosystem.TryGetAnimal(animalId, out Animal animal)) return false;
 
             AnimalSpecies kind = animalSpecies[animal.SpeciesIndex];
             float half = kind.Width * 0.5f;
             var min = new System.Numerics.Vector3(animal.X + 0.5f - half, animal.Y, animal.Z + 0.5f - half);
             var max = new System.Numerics.Vector3(animal.X + 0.5f + half, animal.Y + kind.Height, animal.Z + 0.5f + half);
-            if (ArrowFlight.DistanceToBox(path, min, max) > kind.MoveRange + 1f) return false;
+            // While it is still shown running off (the server has it at the end of its flight), the
+            // shooter may see it as far back as the flight was long.
+            int allowance = kind.MoveRange + 1;
+            if (fledAt.TryGetValue(animalId, out float fled) && Time.unscaledTime - fled < RunShownSeconds) allowance = Mathf.Max(allowance, WoundFleeSteps + 1);
+            if (ArrowFlight.DistanceToBox(path, min, max) > allowance) return false;
 
-            feet = new Vector3(animal.X + 0.5f, animal.Y, animal.Z + 0.5f);
-            ecosystem.Damage(animalId, damage);
+            // The shooter saw it a little away from its column (clients show animals wandering about
+            // where they stand): where it was hit counts, within the same allowance as the hit itself,
+            // so that it falls where it was seen.
+            bool near = Mathf.Abs(shownX - animal.X) <= allowance && Mathf.Abs(shownZ - animal.Z) <= allowance;
+            int x = near ? shownX : animal.X;
+            int z = near ? shownZ : animal.Z;
+            killed = ecosystem.Damage(animalId, damage, x, z, allowance);
+            if (!killed) MakeFlee(animalId, new Vector3(path[0].X, path[0].Y, path[0].Z), WoundFleeSteps);
             animalRevision++;
             return true;
+        }
+
+        // Server side: an animal runs off from a threat (a wound, a player coming near). It is marked
+        // as fleeing for a moment, so that the lists tell clients to show the move as a run.
+        private void MakeFlee(int animalId, Vector3 from, int steps)
+        {
+            if (!ecosystem.Flee(animalId, from.x, from.z, steps)) return;
+
+            fledAt[animalId] = Time.unscaledTime;
+            animalRevision++;
+        }
+
+        private bool IsFleeing(int animalId) => fledAt.TryGetValue(animalId, out float at) && Time.unscaledTime - at < FleeFlagSeconds;
+
+        // Server side, a few times a second: animals that hunt no other animal keep away from players.
+        // One within ScareRadius of a player runs ScareSteps columns off, unless it has just fled.
+        private void ScareAnimals()
+        {
+            float now = Time.unscaledTime;
+            if (now < nextScare) return;
+
+            nextScare = now + ScareInterval;
+            scared.Clear();
+            foreach (NetworkClient client in networkManager.ConnectedClientsList)
+            {
+                if (client.PlayerObject == null) continue;
+
+                Vector3 player = client.PlayerObject.transform.position;
+                foreach (Animal animal in ecosystem.Animals)
+                {
+                    float dx = animal.X + 0.5f - player.x;
+                    float dz = animal.Z + 0.5f - player.z;
+                    if (dx * dx + dz * dz > ScareRadius * ScareRadius) continue;
+                    if (animalSpecies[animal.SpeciesIndex].EatsAnimals.Length > 0) continue;
+                    if (fledAt.TryGetValue(animal.Id, out float at) && now - at < ScareCooldownSeconds) continue;
+
+                    scared.Add((animal.Id, player));
+                }
+            }
+
+            // After the loop: a flight changes the list of animals.
+            foreach ((int animalId, Vector3 player) in scared)
+            {
+                MakeFlee(animalId, player, ScareSteps);
+            }
+
+            // Forgets flights long over (and animals since gone).
+            if (fledAt.Count > 0 && now >= nextFledCleanup)
+            {
+                nextFledCleanup = now + 10f;
+                expiredFlights.Clear();
+                foreach (KeyValuePair<int, float> entry in fledAt)
+                {
+                    if (now - entry.Value > RunShownSeconds) expiredFlights.Add(entry.Key);
+                }
+
+                foreach (int animalId in expiredFlights) fledAt.Remove(animalId);
+            }
         }
 
         // Sends each player the list of the animals around them, when it may have changed: a simulation
@@ -1262,7 +1484,7 @@ namespace Voxel.Client
             animalViews.BeginList();
             foreach (Animal animal in nearbyAnimals)
             {
-                animalViews.Add(animal.Id, animal.SpeciesIndex, new Vector3(animal.X + 0.5f, animal.Y, animal.Z + 0.5f), worldSync.World, AnimalListSeconds());
+                animalViews.Add(animal.Id, animal.SpeciesIndex, new Vector3(animal.X + 0.5f, animal.Y, animal.Z + 0.5f), worldSync.World, AnimalListSeconds(), IsFleeing(animal.Id));
             }
 
             animalViews.EndList();
@@ -1270,7 +1492,7 @@ namespace Voxel.Client
             animalViews.BeginCarcasses();
             foreach (Carcass carcass in nearbyCarcasses)
             {
-                animalViews.AddCarcass(carcass.SpeciesIndex, new Vector3(carcass.X + 0.5f, carcass.Y, carcass.Z + 0.5f));
+                animalViews.AddCarcass(carcass.SpeciesIndex, new Vector3(carcass.X + 0.5f, carcass.Y, carcass.Z + 0.5f), carcass.Meat);
             }
         }
 
@@ -1286,6 +1508,7 @@ namespace Voxel.Client
                     writer.WriteValueSafe(animal.X);
                     writer.WriteValueSafe(animal.Y);
                     writer.WriteValueSafe(animal.Z);
+                    writer.WriteValueSafe((byte)(IsFleeing(animal.Id) ? 1 : 0));
                 }
 
                 writer.WriteValueSafe(nearbyCarcasses.Count);
@@ -1295,6 +1518,7 @@ namespace Voxel.Client
                     writer.WriteValueSafe(carcass.X);
                     writer.WriteValueSafe(carcass.Y);
                     writer.WriteValueSafe(carcass.Z);
+                    writer.WriteValueSafe((byte)Mathf.Clamp(Mathf.RoundToInt(carcass.Meat * 255f), 0, 255));
                 }
 
                 Messaging.SendNamedMessage(AnimalsMessage, clientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
@@ -1314,7 +1538,8 @@ namespace Voxel.Client
                 reader.ReadValueSafe(out int x);
                 reader.ReadValueSafe(out int y);
                 reader.ReadValueSafe(out int z);
-                animalViews.Add(animalId, speciesIndex, new Vector3(x + 0.5f, y, z + 0.5f), worldSync.World, listSeconds);
+                reader.ReadValueSafe(out byte flags);
+                animalViews.Add(animalId, speciesIndex, new Vector3(x + 0.5f, y, z + 0.5f), worldSync.World, listSeconds, (flags & 1) != 0);
             }
 
             animalViews.EndList();
@@ -1327,7 +1552,8 @@ namespace Voxel.Client
                 reader.ReadValueSafe(out int x);
                 reader.ReadValueSafe(out int y);
                 reader.ReadValueSafe(out int z);
-                animalViews.AddCarcass(speciesIndex, new Vector3(x + 0.5f, y, z + 0.5f));
+                reader.ReadValueSafe(out byte meat);
+                animalViews.AddCarcass(speciesIndex, new Vector3(x + 0.5f, y, z + 0.5f), meat / 255f);
             }
         }
 

@@ -129,6 +129,16 @@ namespace Voxel.Client
             return given;
         }
 
+        // Server side: whether a player's stomach is empty. A starving player does nothing that takes
+        // effort (hits, placing, tilling, planting, shooting); eating, harvesting and picking up still work.
+        public bool IsStarving(ulong clientId)
+        {
+            return registry != null && registry.TryGetState(clientId, out PlayerState state) && state.Stomach.IsStarving;
+        }
+
+        // What a starving player is told when they try something that takes effort.
+        public const string TooHungryMessage = "Too hungry: eat something";
+
         // Server side: whether a player has at least one of an item (Items.None: always true, bare hands).
         public bool Owns(ulong clientId, int item)
         {
@@ -339,6 +349,7 @@ namespace Voxel.Client
         {
             if (!registry.TryGetState(clientId, out PlayerState state)) return;
             if (!Items.IsSeed(seed) || !state.Inventory.Has(seed)) return;
+            if (state.Stomach.IsStarving) return;
 
             // Anyone plants a tree; only gardeners plant crops.
             int species = Items.SeedSpecies(seed);

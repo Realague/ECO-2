@@ -135,6 +135,8 @@ namespace Voxel.Client
         // Placing only: a block is broken by hits (MiningSync), never by a request to set air.
         private bool TryApplyEdit(ulong clientId, BlockPos pos, ushort block)
         {
+            if (inventorySync.IsStarving(clientId)) return false;
+
             if (!Blocks.IsSolid(block) || !IsEditAllowed(clientId, pos, block)) return false;
 
             // Placing a block takes it from the player's inventory.
@@ -211,6 +213,7 @@ namespace Voxel.Client
         // Within reach, with a hoe, on tillable ground with nothing solid on it.
         private bool TryTill(ulong clientId, BlockPos pos)
         {
+            if (inventorySync.IsStarving(clientId)) return false;
             if (!networkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client) || client.PlayerObject == null) return false;
 
             Vector3 eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;

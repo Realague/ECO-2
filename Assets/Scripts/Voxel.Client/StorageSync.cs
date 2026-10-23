@@ -17,7 +17,8 @@ namespace Voxel.Client
         PlantInTheWay = 4,
         ChestFull = 5,
         StockpileFull = 6,
-        NotAccepted = 7
+        NotAccepted = 7,
+        TooHungry = 8
     }
 
     // Chests and stockpiles placed in the world (StorageRules, Storages). The server keeps them and
@@ -142,6 +143,7 @@ namespace Voxel.Client
                 case StorageRefusal.ChestFull: return $"Chest is full ({StorageRules.ChestMaxWeight:0} kg)";
                 case StorageRefusal.StockpileFull: return "No room on the stockpile";
                 case StorageRefusal.NotAccepted: return "It doesn't go in there";
+                case StorageRefusal.TooHungry: return InventorySync.TooHungryMessage;
                 default: return "No room here";
             }
         }
@@ -466,6 +468,11 @@ namespace Voxel.Client
 
             int item = StorageRules.ItemOf(kind);
             if (!inventorySync.Owns(clientId, item) || facing < 0 || facing > 3) return;
+            if (inventorySync.IsStarving(clientId))
+            {
+                Refuse(clientId, StorageRefusal.TooHungry);
+                return;
+            }
 
             var target3 = new Vector3(target.X + 0.5f, target.Y + 0.5f, target.Z + 0.5f);
             float reach = PlayerRules.Reach + BlockEditRules.ReachTolerance + 1f;

@@ -49,8 +49,9 @@ namespace Voxel.Client
             cube = BoxMesh.Build("Chip", new[] { new[] { (Vector3.zero, Vector3.one) } });
         }
 
-        // count chips at point, thrown out along normal (and up), of colour.
-        public void Spawn(Vector3 point, Vector3 normal, Color colour, int count)
+        // count chips at point, thrown out along normal (and up), of colour; scale shrinks or grows
+        // them (a broken arrow's splinters are smaller than a block's chips).
+        public void Spawn(Vector3 point, Vector3 normal, Color colour, int count, float scale = 1f)
         {
             if (material == null) return;
 
@@ -67,7 +68,7 @@ namespace Voxel.Client
                     Position = point + normal * 0.05f + Random.insideUnitSphere * 0.08f,
                     Velocity = normal * Random.Range(1f, 2.5f) + sideways + Vector3.up * 2f,
                     Spin = Random.rotation,
-                    Size = Random.Range(0.06f, 0.12f),
+                    Size = Random.Range(0.06f, 0.12f) * scale,
                     Life = Random.Range(0.6f, 0.9f)
                 });
             }

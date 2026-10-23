@@ -48,6 +48,11 @@ namespace Voxel.Core
         private const int FirstWood = 400;
         public const int OakSpecies = 0;
 
+        // One carcass per animal species, what a player picks up where an animal died: FirstCarcass +
+        // index of the animal species, named after it ("Deer carcass"). Not yet of any use (butchering will come).
+        public const int MaxCarcassSpecies = 100;
+        private const int FirstCarcass = 500;
+
         public static int OfBlock(ushort block) => Blocks.TypeOf(block);
 
         public static bool IsBlock(int item) => item > Blocks.Air && item <= Blocks.LastType && !Blocks.IsRetired((ushort)item);
@@ -76,13 +81,19 @@ namespace Voxel.Core
 
         public static int WoodSpecies(int item) => item - FirstWood;
 
+        public static int Carcass(int animalSpecies) => FirstCarcass + animalSpecies;
+
+        public static bool IsCarcass(int item) => item >= FirstCarcass && item < FirstCarcass + MaxCarcassSpecies;
+
+        public static int CarcassSpecies(int item) => item - FirstCarcass;
+
         // What an item read from a save of an earlier version is now (the one wood became oak wood).
         public static int Upgrade(int item) => item == LegacyWood ? WoodOf(OakSpecies) : item;
 
         public static bool IsTool(int item) => item >= FirstTool && item <= LastTool;
 
         public static bool IsValid(int item) =>
-            IsBlock(item) || IsWood(item) || item == Straw || item == Arrow || IsStorage(item) || IsTool(item) || IsSeed(item) || IsProduce(item);
+            IsBlock(item) || IsWood(item) || item == Straw || item == Arrow || IsStorage(item) || IsTool(item) || IsSeed(item) || IsProduce(item) || IsCarcass(item);
 
         // What a broken block yields. Grass and tilled soil cannot be picked up: they give dirt.
         public static int DropOf(ushort block)
@@ -130,7 +141,7 @@ namespace Voxel.Core
                 case Scythe: return "Scythe";
                 case Hoe: return "Hoe";
                 case Bow: return "Bow";
-                default: return IsSeed(item) ? "Seed" : IsProduce(item) ? "Crop" : IsWood(item) ? "Wood" : "Unknown item";
+                default: return IsSeed(item) ? "Seed" : IsProduce(item) ? "Crop" : IsWood(item) ? "Wood" : IsCarcass(item) ? "Carcass" : "Unknown item";
             }
         }
     }

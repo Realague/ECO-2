@@ -145,3 +145,57 @@
 .hud-draw-fill--full {
     background-color: var(--accent);
 }
+
+/* The damage an arrow dealt, placed every frame over where it hit (HudBanner.ShowDamage), rising
+   and fading: light red, gold and larger for a head shot, red for the killing one. */
+.damage-numbers {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.damage-number {
+    position: absolute;
+    font-size: 30px;
+    -unity-font-style: bold;
+    color: #ff8a73;
+    -unity-text-outline-width: 1.5px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.75);
+    white-space: nowrap;
+    margin: 0;
+    padding: 0;
+    translate: -50% -100%;
+}
+
+.damage-number--head {
+    font-size: 38px;
+    color: var(--accent);
+}
+
+.damage-number--kill {
+    color: #ff4f3d;
+}
+
+/* The other players' names over their heads (Nameplates), placed every frame by the point above
+   the head: the pill's bottom centre sits on it. */
+.nameplates {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.nameplate {
+    position: absolute;
+    font-size: 18px;
+    color: var(--text);
+    background-color: var(--veil);
+    border-radius: 9px;
+    padding: 2px 10px 3px 10px;
+    margin: 0;
+    white-space: nowrap;
+    translate: -50% -100%;
+}

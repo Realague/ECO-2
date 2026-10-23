@@ -6,7 +6,7 @@ using Voxel.Core;
 namespace Voxel.Client
 {
     // The stomach beside the hotbar (Assets/UI/Hotbar.uxml, the "stomach" box): its pie, the calories
-    // and each nutrient's share; "Starving: slower" in place of the shares when it is empty. Shown
+    // and each nutrient's share; "Starving: eat now" in place of the shares when it is empty (a starving player can do nothing that takes effort). Shown
     // with the hotbar, whose document it shares; redrawn only when a figure shown changes.
     public class StomachHud : MonoBehaviour
     {

@@ -28,16 +28,20 @@
 
 /* A stockpile's piles, three by three as they stand on the ground. */
 .pile-grid {
-    flex-direction: row;
-    flex-wrap: wrap;
-    width: 420px;
+    flex-direction: column;
     align-self: center;
     margin-top: 12px;
+}
+
+.pile-row {
+    flex-direction: row;
+    flex-shrink: 0;
 }
 
 .pile-slot {
     width: 128px;
     height: 128px;
+    flex-shrink: 0;
 }
 
 .pile-count {

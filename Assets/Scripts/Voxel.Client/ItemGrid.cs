@@ -15,6 +15,7 @@ namespace Voxel.Client
     {
         private const float TargetSlot = 124f;
         private const float SlotGap = 12f;
+        private const float FitSlack = 2f;
 
         private readonly ScrollView view;
         private readonly EcosystemSync ecosystemSync;
@@ -120,7 +121,8 @@ namespace Voxel.Client
             float width = view.contentViewport.layout.width;
             if (float.IsNaN(width) || width < TargetSlot + SlotGap) width = 4f * (TargetSlot + SlotGap);
             columnCount = Mathf.Max(1, Mathf.FloorToInt(width / (TargetSlot + SlotGap)));
-            slotSize = Mathf.Floor(width / columnCount - SlotGap);
+            // A little slack: slots filling the width exactly can wrap once the panel scales to the screen.
+            slotSize = Mathf.Floor((width - FitSlack) / columnCount - SlotGap);
         }
 
         private VisualElement MakeSlot(int item, int count, bool dimmed)

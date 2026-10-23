@@ -309,7 +309,16 @@ namespace Voxel.Client
                 });
                 slot.RegisterCallback<PointerMoveEvent>(OnPointerMove);
                 slot.RegisterCallback<PointerUpEvent>(OnPointerUp);
-                pileGrid.Add(slot);
+
+                // A row per z, three piles each, as they stand on the ground: never wrapped by the width.
+                if (pile % StorageRules.StockpileSide == 0)
+                {
+                    var row = new VisualElement { pickingMode = PickingMode.Ignore };
+                    row.AddToClassList("pile-row");
+                    pileGrid.Add(row);
+                }
+
+                pileGrid[pileGrid.childCount - 1].Add(slot);
                 piles[pile] = slot;
                 pileIcons[pile] = icon;
                 pileCounts[pile] = count;
@@ -348,7 +357,7 @@ namespace Voxel.Client
                 state.AddToClassList("access-state");
                 var toggle = new Button { focusable = false };
                 toggle.AddToClassList("button");
-                toggle.AddToClassList(entry.Allowed ? "button--secondary" : "button--primary");
+                toggle.AddToClassList(entry.Allowed ? "button--danger" : "button--primary");
                 toggle.AddToClassList("access-toggle");
                 var text = new Label(entry.Allowed ? "Remove" : "Allow");
                 text.AddToClassList("button-text");

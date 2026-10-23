@@ -101,6 +101,22 @@ namespace Eco.Sim
             if (carcass.Meat <= 0f) RemoveEmptyCarcasses();
         }
 
+        // A player takes the carcass lying in a column, if at least minMeat of it is left: it is gone
+        // from the world. A player action, between steps; draws nothing at random.
+        public bool TryTakeCarcass(int x, int z, float minMeat, out Carcass taken)
+        {
+            taken = default;
+            if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ || !carcassAtColumn[ColumnIndex(x, z)]) return false;
+
+            int index = CarcassIndexAt(x, z);
+            if (index < 0 || carcasses[index].Meat < minMeat) return false;
+
+            taken = carcasses[index];
+            carcasses.RemoveAt(index);
+            carcassAtColumn[ColumnIndex(x, z)] = false;
+            return true;
+        }
+
         private int CarcassIndexAt(int x, int z)
         {
             for (int i = 0; i < carcasses.Count; i++)

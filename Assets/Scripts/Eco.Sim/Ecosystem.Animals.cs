@@ -128,14 +128,68 @@ namespace Eco.Sim
         public bool Damage(int animalId, float amount)
         {
             int index = AnimalIndexOf(animalId);
+            return index >= 0 && Damage(animalId, amount, animals[index].X, animals[index].Z);
+        }
+
+        // The same, the animal having been hit in another column (where the shooter saw it, which a
+        // client shows up to its MoveRange from where it stands, farther while it runs off): killed,
+        // it falls there, if that is within fallRange columns (by default its MoveRange and one more)
+        // and a carcass can lie there; else in its own column.
+        public bool Damage(int animalId, float amount, int fallX, int fallZ, int fallRange = -1)
+        {
+            int index = AnimalIndexOf(animalId);
             if (index < 0 || amount <= 0f) return false;
 
             animals[index].Damage += amount;
-            if (animals[index].Damage < animalSpecies[animals[index].SpeciesIndex].Health) return false;
+            Animal animal = animals[index];
+            AnimalSpecies kind = animalSpecies[animal.SpeciesIndex];
+            if (animal.Damage < kind.Health) return false;
 
-            Kill(index, 1f);
+            if (fallRange < 0) fallRange = kind.MoveRange + 1;
+            bool near = Math.Abs(fallX - animal.X) <= fallRange && Math.Abs(fallZ - animal.Z) <= fallRange;
+            bool inWorld = (uint)fallX < (uint)world.SizeX && (uint)fallZ < (uint)world.SizeZ;
+            if (near && inWorld && SurfaceAt(fallX, fallZ) >= 0)
+            {
+                Animal fallen = animal;
+                fallen.X = fallX;
+                fallen.Z = fallZ;
+                LeaveCarcass(fallen, 1f);
+                Kill(index, 0f);
+            }
+            else
+            {
+                Kill(index, 1f);
+            }
+
             CompactAnimals();
             return true;
+        }
+
+        // Makes an animal run from a threat (a player): it walks up to `steps` columns straight away
+        // from (fromX, fromZ), going round what is in its way as in any walk. A player action, between
+        // steps; draws nothing at random. Returns false if it does not exist or could not move.
+        public bool Flee(int animalId, float fromX, float fromZ, int steps)
+        {
+            int index = AnimalIndexOf(animalId);
+            if (index < 0 || steps <= 0) return false;
+
+            Animal animal = animals[index];
+            float dx = animal.X + 0.5f - fromX;
+            float dz = animal.Z + 0.5f - fromZ;
+            float length = (float)Math.Sqrt(dx * dx + dz * dz);
+            if (length < 0.01f)
+            {
+                dx = 1f;
+                dz = 0f;
+                length = 1f;
+            }
+
+            // Aimed beyond where it will stop, so that the walk keeps its heading all the way.
+            int targetX = Math.Max(0, Math.Min(world.SizeX - 1, animal.X + (int)Math.Round(dx / length * steps * 2)));
+            int targetZ = Math.Max(0, Math.Min(world.SizeZ - 1, animal.Z + (int)Math.Round(dz / length * steps * 2)));
+            bool moved = WalkToward(ref animal, targetX, targetZ, steps, false);
+            animals[index] = animal;
+            return moved;
         }
 
         // Places an adult in the given column, if it is walkable and free.

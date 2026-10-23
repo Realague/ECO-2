@@ -17,6 +17,7 @@ using Voxel.Core;
 // - a seed (Seed_<species>.png) is a pouch tinted like the plant with the plant in front of it;
 // - a crop (Produce_<species>.png) is a pile of fruit of its model's last stage, or the plant;
 // - each tree's wood (Wood_<asset>.png) is a pile of logs in its bark, straw (Straw.png) a sheaf;
+// - an animal's carcass (Carcass_<asset>.png) is its model lying on its side;
 // - tools and the arrow (Tool_<name>.png, Arrow.png) are painted as illustrations (ToolIconPainter).
 // Species are found by asset in Assets/Species and named after the asset, so the icons do not depend
 // on the order of species. Every file is written again; rerun the menu after adding a species.
@@ -72,6 +73,19 @@ public static class ItemIconBuilder
                 if (produce != null) UnityEngine.Object.DestroyImmediate(produce);
                 UnityEngine.Object.DestroyImmediate(plant);
                 written += 3;
+            }
+
+            // A carcass: the animal rolled onto its side as AnimalViews draws it, legs up, head to the left.
+            Quaternion lying = Quaternion.Euler(0f, -125f, 0f) * Quaternion.Euler(0f, 0f, 90f);
+            foreach (string guid in AssetDatabase.FindAssets("t:AnimalSpeciesAsset", new[] { "Assets/Species" }))
+            {
+                var asset = AssetDatabase.LoadAssetAtPath<AnimalSpeciesAsset>(AssetDatabase.GUIDToAssetPath(guid));
+                if (asset == null || asset.Parts == null || asset.Parts.Count == 0) continue;
+
+                Texture2D carcass = renderer.Render(asset.Parts, 35f, 0.95f, lying);
+                Write($"Carcass_{asset.name}", carcass);
+                UnityEngine.Object.DestroyImmediate(carcass);
+                written++;
             }
 
             Texture2D straw = renderer.Render(SheafParts(), 20f, 1.1f);
@@ -518,10 +532,18 @@ public static class ItemIconBuilder
 
         public Texture2D Render(IReadOnlyList<SpeciesAsset.Part> parts, float pitch, float margin)
         {
+            return Render(parts, pitch, margin, Quaternion.identity);
+        }
+
+        // The same, with the parts turned together by turn first.
+        public Texture2D Render(IReadOnlyList<SpeciesAsset.Part> parts, float pitch, float margin, Quaternion turn)
+        {
             for (int i = root.transform.childCount - 1; i >= 0; i--)
             {
                 UnityEngine.Object.DestroyImmediate(root.transform.GetChild(i).gameObject);
             }
+
+            root.transform.rotation = turn;
 
             var bounds = new Bounds();
             bool first = true;

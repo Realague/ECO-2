@@ -46,6 +46,14 @@ namespace Voxel.Client
             matrices.Add(Matrix4x4.TRS(point, Quaternion.LookRotation(direction), Vector3.one));
         }
 
+        // The meshes of one arrow, placed as Add would draw it (for PickupHalo).
+        public void CollectParts(Vector3 point, Vector3 direction, List<(Mesh mesh, Matrix4x4 matrix)> into)
+        {
+            if (direction.sqrMagnitude < 1e-8f) direction = Vector3.forward;
+            Matrix4x4 placed = Matrix4x4.TRS(point, Quaternion.LookRotation(direction), Vector3.one);
+            foreach (Mesh mesh in meshes) into.Add((mesh, placed));
+        }
+
         // Draws the arrows added since the last call.
         public void Render()
         {

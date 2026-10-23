@@ -32,7 +32,7 @@ namespace Voxel.Client
             if (Items.IsTool(item) || item == Items.Arrow || Items.IsStorage(item)) return ItemCategory.Tools;
             if (Items.IsSeed(item)) return ItemCategory.Seeds;
             if (Items.IsProduce(item)) return ItemCategory.Food;
-            return Items.IsWood(item) || item == Items.Straw ? ItemCategory.Materials : ItemCategory.Blocks;
+            return Items.IsWood(item) || Items.IsCarcass(item) || item == Items.Straw ? ItemCategory.Materials : ItemCategory.Blocks;
         }
 
         public static string CategoryName(ItemCategory category)
@@ -54,7 +54,7 @@ namespace Voxel.Client
             {
                 case ItemCategory.Seeds: return "Seed";
                 case ItemCategory.Food: return "Food";
-                case ItemCategory.Materials: return "Material";
+                case ItemCategory.Materials: return Items.IsCarcass(item) ? "Carcass" : "Material";
                 case ItemCategory.Tools: return item == Items.Arrow ? "Ammunition" : Items.IsStorage(item) ? "Storage" : "Tool";
                 default: return "Block";
             }
@@ -65,6 +65,7 @@ namespace Voxel.Client
             if (Items.IsSeed(item)) return $"{PlantName(Items.SeedSpecies(item), ecosystemSync)} seeds";
             if (Items.IsProduce(item)) return EcosystemSync.DisplayName(ecosystemSync.ProduceName(Items.ProduceSpecies(item)));
             if (Items.IsWood(item)) return $"{PlantName(Items.WoodSpecies(item), ecosystemSync)} wood";
+            if (Items.IsCarcass(item)) return $"{AnimalName(Items.CarcassSpecies(item), ecosystemSync)} carcass";
             return Items.NameOf(item);
         }
 
@@ -99,6 +100,7 @@ namespace Voxel.Client
             }
 
             if (Items.IsWood(item)) return $"From {Article(PlantName(Items.WoodSpecies(item), ecosystemSync).ToLowerInvariant())} once felled: each log on the ground gives one. Counted with the blocks, and kept on a stockpile.";
+            if (Items.IsCarcass(item)) return $"The body of {Article(AnimalName(Items.CarcassSpecies(item), ecosystemSync).ToLowerInvariant())}, taken from the ground while at least half of it was left. Of no use yet: it will be butchered later.";
             if (item == Items.Straw) return "Left over when wheat is harvested.";
             return "A building block. Hold it and right click to place it.";
         }
@@ -123,6 +125,7 @@ namespace Voxel.Client
             if (Items.IsSeed(item)) return $"Seed_{ecosystemSync.PlantName(Items.SeedSpecies(item))}";
             if (Items.IsProduce(item)) return $"Produce_{ecosystemSync.PlantName(Items.ProduceSpecies(item))}";
             if (Items.IsWood(item)) return $"Wood_{ecosystemSync.PlantName(Items.WoodSpecies(item))}";
+            if (Items.IsCarcass(item)) return $"Carcass_{ecosystemSync.AnimalName(Items.CarcassSpecies(item))}";
             if (item == Items.Straw) return "Straw";
             if (item == Items.Arrow) return "Arrow";
             if (item == Items.Chest) return "Chest";
@@ -132,6 +135,8 @@ namespace Voxel.Client
         }
 
         private static string PlantName(int species, EcosystemSync ecosystemSync) => EcosystemSync.DisplayName(ecosystemSync.PlantName(species));
+
+        private static string AnimalName(int species, EcosystemSync ecosystemSync) => EcosystemSync.DisplayName(ecosystemSync.AnimalName(species));
 
         private static string Article(string noun)
         {

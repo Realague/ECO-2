@@ -57,6 +57,7 @@ namespace Voxel.Client
         private PlayerModel model;
         private AppearanceMenu appearanceMenu;
         private MapScreen mapScreen;
+        private PickupHalo pickupHalo;
         private World world;
         private Transform cameraTransform;
         private Vector3 velocity;
@@ -96,6 +97,7 @@ namespace Voxel.Client
             model = GetComponent<PlayerModel>();
             appearanceMenu = FindAnyObjectByType<AppearanceMenu>();
             mapScreen = FindAnyObjectByType<MapScreen>();
+            pickupHalo = FindAnyObjectByType<PickupHalo>();
             cameraTransform = Camera.main.transform;
             enabled = true;
         }
@@ -184,6 +186,7 @@ namespace Voxel.Client
             {
                 Interact(mouse);
                 PreviewStorage();
+                HighlightPickup();
             }
             else
             {
@@ -300,7 +303,8 @@ namespace Voxel.Client
             {
                 if (mouse.leftButton.wasPressedThisFrame)
                 {
-                    if (inventorySync.Inventory.Has(Items.Arrow)) bowSync.BeginDraw();
+                    if (hungerSync.Stomach.IsStarving) hotbar.ShowMessage(InventorySync.TooHungryMessage);
+                    else if (inventorySync.Inventory.Has(Items.Arrow)) bowSync.BeginDraw();
                     else hotbar.ShowMessage("No arrows left");
                 }
                 else if (mouse.leftButton.wasReleasedThisFrame)
@@ -348,6 +352,13 @@ namespace Voxel.Client
             if (TryEat(held)) return;
 
             if (!blockHit) return;
+
+            // Nor to till, sow or build: only eating, harvesting and picking up are left to them.
+            if (hungerSync.Stomach.IsStarving && (held == Items.Hoe || Items.IsSeed(held) || Items.IsStorage(held) || Items.IsBlock(held)))
+            {
+                hotbar.ShowMessage(InventorySync.TooHungryMessage);
+                return;
+            }
 
             // The server has the last word: the request goes through WorldSync, never through World.SetBlock.
             ushort aimed = world.GetBlock(hit.Block);
@@ -413,7 +424,13 @@ namespace Voxel.Client
         // player is told which; with a tool and nothing to hit, it swings in the air.
         private void Strike(int held, System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, bool blockHit, VoxelHit hit, float reachedDistance)
         {
-            bool starving = hungerSync.Stomach.IsStarving;
+            // A starving player has no strength left to swing anything.
+            if (hungerSync.Stomach.IsStarving)
+            {
+                if (Items.IsTool(held)) hotbar.ShowMessage(InventorySync.TooHungryMessage);
+                return;
+            }
+
             if (ecosystemSync.TryStrike(origin, direction, reachedDistance, held, out int missing, out int plantId, out float distance))
             {
                 if (missing != Items.None)
@@ -422,7 +439,7 @@ namespace Voxel.Client
                     return;
                 }
 
-                if (miningSync.TryStartSwing(model, starving)) miningSync.HitPlant(plantId, (origin + direction * distance).ToUnity());
+                if (miningSync.TryStartSwing(model, false)) miningSync.HitPlant(plantId, (origin + direction * distance).ToUnity());
                 return;
             }
 
@@ -452,7 +469,7 @@ namespace Voxel.Client
                         return;
                     }
 
-                    if (miningSync.TryStartSwing(model, starving))
+                    if (miningSync.TryStartSwing(model, false))
                     {
                         miningSync.HitBlock(hit.Block, aimed, FaceOf(hit.Normal), (origin + direction * hit.Distance).ToUnity());
                     }
@@ -461,38 +478,90 @@ namespace Voxel.Client
                 }
             }
 
-            if (Items.IsTool(held)) miningSync.TryStartSwing(model, starving);
+            if (Items.IsTool(held)) miningSync.TryStartSwing(model, false);
         }
 
-        // Opens the storage, or picks up the log or arrow, pointed at: the nearest. Returns false if
-        // there is none.
-        private bool TryPickUp(float maxDistance)
+        private enum PickupKind { None, Storage, Log, Arrow, Carcass }
+
+        // What a right click would open or pick up: the storage, log or arrow by its id, a carcass by
+        // its column and what is left of it.
+        private struct Pickup
+        {
+            public PickupKind Kind;
+            public int Id;
+            public int X;
+            public int Z;
+            public float Meat;
+        }
+
+        // The storage, log, arrow or carcass pointed at, the nearest, at most maxDistance away.
+        private Pickup AimedPickup(float maxDistance)
         {
             Vector3 origin = cameraTransform.position;
             Vector3 forward = cameraTransform.forward;
-            if (storageSync.TryAimed(origin, forward, maxDistance, out int storageId, out float storageDistance))
+            float nearest = maxDistance;
+            var pickup = new Pickup();
+            if (storageSync.TryAimed(origin, forward, nearest, out int storageId, out float storageDistance))
             {
-                maxDistance = storageDistance;
+                nearest = storageDistance;
+                pickup = new Pickup { Kind = PickupKind.Storage, Id = storageId };
             }
 
-            bool log = logSync.TryAimed(origin, forward, maxDistance, out int logId, out float logDistance);
-            bool arrow = bowSync.TryAimed(origin, forward, maxDistance, out int arrowId, out float arrowDistance);
-            if (storageId != 0 && !log && !arrow)
+            if (logSync.TryAimed(origin, forward, nearest, out int logId, out float logDistance))
             {
-                storageScreen.Open(storageId);
-                return true;
+                nearest = logDistance;
+                pickup = new Pickup { Kind = PickupKind.Log, Id = logId };
             }
 
-            if (log && (!arrow || logDistance <= arrowDistance))
+            if (bowSync.TryAimed(origin, forward, nearest, out int arrowId, out float arrowDistance) && arrowDistance < nearest)
             {
-                logSync.RequestPickup(logId);
-                return true;
+                nearest = arrowDistance;
+                pickup = new Pickup { Kind = PickupKind.Arrow, Id = arrowId };
             }
 
-            if (!arrow) return false;
+            if (ecosystemSync.TryAimedCarcass(origin, forward, nearest, out int carcassX, out int carcassZ, out _, out float meat, out float carcassDistance) && carcassDistance < nearest)
+            {
+                pickup = new Pickup { Kind = PickupKind.Carcass, X = carcassX, Z = carcassZ, Meat = meat };
+            }
 
-            bowSync.RequestPickup(arrowId);
-            return true;
+            return pickup;
+        }
+
+        // Opens the storage, or picks up the log, arrow or carcass, pointed at: the nearest. Returns
+        // false if there is none.
+        private bool TryPickUp(float maxDistance)
+        {
+            Pickup pickup = AimedPickup(maxDistance);
+            switch (pickup.Kind)
+            {
+                case PickupKind.Storage:
+                    storageScreen.Open(pickup.Id);
+                    return true;
+                case PickupKind.Log:
+                    logSync.RequestPickup(pickup.Id);
+                    return true;
+                case PickupKind.Arrow:
+                    bowSync.RequestPickup(pickup.Id);
+                    return true;
+                case PickupKind.Carcass:
+                    if (pickup.Meat < EcosystemSync.CarcassMinMeat) hotbar.ShowMessage("Too far gone to take");
+                    else ecosystemSync.RequestTakeCarcass(pickup.X, pickup.Z);
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        // A green halo around the arrow or the carcass a right click would pick up (not a carcass too
+        // far gone to take), within the same reach and in front of the same block as the click.
+        private void HighlightPickup()
+        {
+            if (pickupHalo == null) return;
+
+            bool blockHit = VoxelRaycast.Cast(world, cameraTransform.position.ToNumerics(), cameraTransform.forward.ToNumerics(), PlayerRules.Reach, out VoxelHit hit);
+            Pickup pickup = AimedPickup(blockHit ? hit.Distance : PlayerRules.Reach);
+            if (pickup.Kind == PickupKind.Arrow) bowSync.CollectArrowParts(pickup.Id, pickupHalo.Parts);
+            else if (pickup.Kind == PickupKind.Carcass && pickup.Meat >= EcosystemSync.CarcassMinMeat) ecosystemSync.CollectCarcassParts(pickup.X, pickup.Z, pickupHalo.Parts);
         }
 
         // While a chest or a stockpile is in hand, where it would go over the aimed block: green, or
@@ -573,7 +642,8 @@ namespace Voxel.Client
                 PlayerRules.HalfWidth,
                 PlayerRules.Height,
                 displacement.ToNumerics(),
-                storageSync != null ? storageSync.IsSolid : (System.Func<int, int, int, bool>)null);
+                storageSync != null ? storageSync.IsSolid : (System.Func<int, int, int, bool>)null,
+                ecosystemSync);
 
             transform.position = result.Position.ToUnity();
             grounded = result.Grounded;

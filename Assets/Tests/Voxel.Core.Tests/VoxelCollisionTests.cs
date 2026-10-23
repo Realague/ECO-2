@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Numerics;
 using NUnit.Framework;
 
@@ -79,6 +81,56 @@ namespace Voxel.Core.Tests
             Assert.IsTrue(landed.Grounded);
             Assert.AreEqual(ground + 1f, landed.Position.Y, Tolerance);
             Assert.IsFalse(without.HitWall, "nothing extra without the predicate");
+        }
+
+        // Thin boxes besides the blocks (tree trunks), given by column.
+        private sealed class Trunks : ICollisionObstacles
+        {
+            public readonly List<(Vector3 min, Vector3 max)> Boxes = new List<(Vector3, Vector3)>();
+
+            public void Collect(int minX, int maxX, int minZ, int maxZ, List<(Vector3 min, Vector3 max)> into)
+            {
+                foreach ((Vector3 min, Vector3 max) box in Boxes)
+                {
+                    int x = (int)MathF.Floor(box.min.X);
+                    int z = (int)MathF.Floor(box.min.Z);
+                    if (x >= minX && x <= maxX && z >= minZ && z <= maxZ) into.Add(box);
+                }
+            }
+        }
+
+        [Test]
+        public void Move_IntoATrunk_StopsAtItsFace_NotAtTheCell()
+        {
+            World world = FlatGenerator.CreateWorld();
+            int ground = FlatGenerator.GroundHeight;
+            var trunks = new Trunks();
+            trunks.Boxes.Add((new Vector3(12.3f, ground, 8.3f), new Vector3(12.7f, ground + 5f, 8.7f)));
+            var start = new Vector3(8.5f, ground + 0.001f, 8.5f);
+
+            MoveResult walked = VoxelCollision.Move(world, start, HalfWidth, Height, new Vector3(6f, 0f, 0f), null, trunks);
+            MoveResult beside = VoxelCollision.Move(world, new Vector3(8.5f, ground + 0.001f, 9.2f), HalfWidth, Height, new Vector3(6f, 0f, 0f), null, trunks);
+
+            Assert.IsTrue(walked.HitWall);
+            Assert.AreEqual(12.3f - HalfWidth, walked.Position.X, Tolerance);
+            Assert.IsFalse(beside.HitWall, "a trunk only takes its own width: the player passes beside it in its column");
+            Assert.AreEqual(14.5f, beside.Position.X, Tolerance);
+        }
+
+        [Test]
+        public void Move_OntoAStump_StandsOnIt_AndOutOfATrunkItWasIn()
+        {
+            World world = FlatGenerator.CreateWorld();
+            int ground = FlatGenerator.GroundHeight;
+            var trunks = new Trunks();
+            trunks.Boxes.Add((new Vector3(10.2f, ground, 10.2f), new Vector3(10.8f, ground + 0.6f, 10.8f)));
+
+            MoveResult landed = VoxelCollision.Move(world, new Vector3(10.5f, ground + 1.5f, 10.5f), HalfWidth, Height, new Vector3(0f, -1f, 0f), null, trunks);
+            MoveResult left = VoxelCollision.Move(world, new Vector3(10.5f, ground + 0.001f, 10.5f), HalfWidth, Height, new Vector3(2f, 0f, 0f), null, trunks);
+
+            Assert.IsTrue(landed.Grounded);
+            Assert.AreEqual(ground + 0.6f, landed.Position.Y, Tolerance);
+            Assert.AreEqual(12.5f, left.Position.X, Tolerance, "a tree grown where the player stood does not hold them");
         }
 
         [Test]

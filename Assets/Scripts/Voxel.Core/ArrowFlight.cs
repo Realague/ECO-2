@@ -41,6 +41,13 @@ namespace Voxel.Core
         // point is added to path when one is given (with origin first), for hit checks.
         public static bool Trace(World world, Vector3 origin, Vector3 velocity, out Vector3 landing, out float time, List<Vector3> path = null)
         {
+            return Trace(world, origin, velocity, out landing, out time, out _, path);
+        }
+
+        // The same, with the block that stopped it (when it returns true).
+        public static bool Trace(World world, Vector3 origin, Vector3 velocity, out Vector3 landing, out float time, out VoxelHit stoppedBy, List<Vector3> path = null)
+        {
+            stoppedBy = default;
             path?.Add(origin);
             Vector3 from = origin;
             for (int step = 1; step * TimeStep <= MaxTime + 1e-4f; step++)
@@ -51,6 +58,7 @@ namespace Voxel.Core
                 float length = segment.Length();
                 if (length > 1e-6f && VoxelRaycast.Cast(world, from, segment, length, out VoxelHit hit))
                 {
+                    stoppedBy = hit;
                     landing = from + segment / length * hit.Distance;
                     time = t - TimeStep + TimeStep * hit.Distance / length;
                     path?.Add(landing);

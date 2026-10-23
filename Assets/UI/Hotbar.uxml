@@ -30,7 +30,7 @@
                         <ui:Label name="stomach-nutrient-3" class="stomach-nutrient" picking-mode="Ignore" />
                     </ui:VisualElement>
                 </ui:VisualElement>
-                <ui:Label text="Starving: slower" class="stomach-starving strong" picking-mode="Ignore" />
+                <ui:Label text="Starving: eat now" class="stomach-starving strong" picking-mode="Ignore" />
             </ui:VisualElement>
             <!-- CarryHud fills what the player carries, at the bar's right. -->
             <ui:VisualElement name="carry" class="hotbar-carry" picking-mode="Ignore">

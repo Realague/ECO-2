@@ -825,6 +825,8 @@ MonoBehaviour:
   shaftMaterial: {fileID: 2100000, guid: 17965ac439377474abca152ff17c9021, type: 2}
   headMaterial: {fileID: 2100000, guid: 582f92c22b627724db3f3da36c5b3b4f, type: 2}
   fletchingMaterial: {fileID: 2100000, guid: cf00dee74e18ee74db74157f58d7f614, type: 2}
+  chipMaterial: {fileID: 2100000, guid: 97d107f19ba5224459f56d2911206ee9, type: 2}
+  previewMaterial: {fileID: 2100000, guid: 670836e5799375743855bb1edbfd4aff, type: 2}
 --- !u!114 &490447456
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -882,6 +884,55 @@ MonoBehaviour:
   woodMaterial: {fileID: 2100000, guid: 17965ac439377474abca152ff17c9021, type: 2}
   ironMaterial: {fileID: 2100000, guid: 582f92c22b627724db3f3da36c5b3b4f, type: 2}
   voxelWorld: {fileID: 1566503039}
+--- !u!1 &593756662
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 593756664}
+  - component: {fileID: 593756663}
+  m_Layer: 0
+  m_Name: PickupHalo
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &593756663
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 593756662}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 355828fabd631124aa53f06886b62139, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.PickupHalo
+  haloMaterial: {fileID: 2100000, guid: 8f0a47817ea1e0d4a88449844dd6d8a6, type: 2}
+  colour: {r: 0.35, g: 1, b: 0.4, a: 1}
+  rimWidth: 0.018
+  glowWidth: 0.055
+  glowAlpha: 0.3
+--- !u!4 &593756664
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 593756662}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &632794196
 GameObject:
   m_ObjectHideFlags: 0
@@ -1926,3 +1977,4 @@ SceneRoots:
   - {fileID: 1141440429}
   - {fileID: 1863226321}
   - {fileID: 632794199}
+  - {fileID: 593756664}

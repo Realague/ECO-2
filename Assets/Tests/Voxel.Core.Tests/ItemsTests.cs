@@ -61,6 +61,41 @@ namespace Voxel.Core.Tests
         }
 
         [Test]
+        public void Carcass_KeepsItsSpecies_AndIsNeitherABlockNorFood()
+        {
+            int carcass = Items.Carcass(3);
+
+            Assert.IsTrue(Items.IsCarcass(carcass));
+            Assert.IsTrue(Items.IsValid(carcass));
+            Assert.AreEqual(3, Items.CarcassSpecies(carcass));
+            Assert.IsFalse(Items.IsBlock(carcass));
+            Assert.IsFalse(Items.IsProduce(carcass));
+            Assert.IsFalse(Items.IsWood(carcass));
+            Assert.IsFalse(CarryLimits.CountsAsBlock(carcass), "it weighs, like every item that is not a block");
+            Assert.IsTrue(StorageRules.AcceptsInChest(carcass));
+            Assert.IsFalse(Items.IsCarcass(Items.Carcass(Items.MaxCarcassSpecies - 1) + 1));
+        }
+
+        [Test]
+        public void CarcassWeight_GoesWithTheAnimalsSize_AndAlwaysFitsInABag()
+        {
+            var weights = new ItemWeights(new float[0], new[] { ItemWeights.CarcassWeightFor(30f), ItemWeights.CarcassWeightFor(60f), ItemWeights.CarcassWeightFor(100f) });
+
+            Assert.Less(weights.Of(Items.Carcass(0)), weights.Of(Items.Carcass(1)));
+            Assert.Less(weights.Of(Items.Carcass(1)), weights.Of(Items.Carcass(2)));
+            Assert.AreEqual(ItemWeights.HeaviestCarcass, weights.Of(Items.Carcass(2)));
+
+            // Even the heaviest fits beside what every player is given at first.
+            var bag = new Inventory();
+            foreach (int tool in Items.Tools) bag.Add(tool, 1);
+            bag.Add(Items.Arrow, 20);
+            bag.Add(Items.Chest, 1);
+            bag.Add(Items.Stockpile, 1);
+            Assert.Greater(CarryLimits.Room(bag, Items.Carcass(2), weights), 0, "a bear's carcass fits beside the starting kit");
+            Assert.Greater(weights.Of(Items.Carcass(7)), 0f, "a species the table does not know still weighs");
+        }
+
+        [Test]
         public void Straw_IsAnItemOfItsOwn()
         {
             Assert.IsTrue(Items.IsValid(Items.Straw));

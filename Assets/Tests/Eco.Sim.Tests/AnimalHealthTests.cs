@@ -26,6 +26,25 @@ namespace Eco.Sim.Tests
             Assert.IsFalse(ecosystem.Damage(id, 10f), "nothing left to hit");
         }
 
+        // Clients show animals a little away from their column: one killed falls where it was hit, if
+        // that is within its MoveRange and a block of its column, else in its own column.
+        [Test]
+        public void AKilledAnimal_FallsWhereItWasHit_WhenThatIsNearEnough()
+        {
+            Ecosystem ecosystem = CreateEcosystem();
+            ecosystem.TryPlaceAnimal(0, 10, 10);
+            ecosystem.TryPlaceAnimal(0, 20, 20);
+            int near = ecosystem.Animals[0].Id;
+            int far = ecosystem.Animals[1].Id;
+
+            Assert.IsTrue(ecosystem.Damage(near, 20f, 11, 9));
+            Assert.IsTrue(ecosystem.Damage(far, 20f, 25, 20));
+
+            Assert.AreEqual(2, ecosystem.Carcasses.Count);
+            Assert.AreEqual((11, 9), (ecosystem.Carcasses[0].X, ecosystem.Carcasses[0].Z), "where the shooter saw it");
+            Assert.AreEqual((20, 20), (ecosystem.Carcasses[1].X, ecosystem.Carcasses[1].Z), "too far from where it stood: its own column");
+        }
+
         [Test]
         public void AWound_HealsInADay()
         {
@@ -38,6 +57,23 @@ namespace Eco.Sim.Tests
 
             Run(ecosystem, SimClock.StepsPerDay / 2);
             Assert.AreEqual(0f, ecosystem.Animals[0].Damage);
+        }
+
+        [Test]
+        public void AFleeingAnimal_RunsStraightAwayFromTheThreat()
+        {
+            Ecosystem ecosystem = CreateEcosystem();
+            ecosystem.TryPlaceAnimal(0, 10, 10);
+            int id = ecosystem.Animals[0].Id;
+
+            Assert.IsTrue(ecosystem.Flee(id, 8.5f, 10.5f, 6));
+            Assert.AreEqual((16, 10), (ecosystem.Animals[0].X, ecosystem.Animals[0].Z), "six columns on, away from the threat");
+            Assert.IsTrue(ecosystem.IsAnimalInside(16, ecosystem.Animals[0].Y, 10), "its column follows it");
+            Assert.IsFalse(ecosystem.IsAnimalInside(10, ecosystem.Animals[0].Y, 10));
+
+            Assert.IsTrue(ecosystem.Flee(id, 16.5f, 4.5f, 30));
+            Assert.AreEqual(31, ecosystem.Animals[0].Z, "it stops at the edge of the world");
+            Assert.IsFalse(ecosystem.Flee(id + 1, 0f, 0f, 6), "no such animal");
         }
 
         [Test]

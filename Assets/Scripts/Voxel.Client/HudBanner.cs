@@ -19,6 +19,21 @@ namespace Voxel.Client
         private const int DawnMinute = 6 * 60;
         private const int DuskMinute = 20 * 60;
 
+        // A damage number rises this many blocks over its life, pops in over PopSeconds from PopScale
+        // and fades out over the last FadeSeconds.
+        private const float DamageSeconds = 1.2f;
+        private const float DamageRise = 0.8f;
+        private const float PopSeconds = 0.15f;
+        private const float PopScale = 1.4f;
+        private const float FadeSeconds = 0.5f;
+
+        private struct DamageNumber
+        {
+            public Label Label;
+            public Vector3 Point;
+            public float Start;
+        }
+
         [SerializeField] private UIDocument document;
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private WorldSync worldSync;
@@ -38,6 +53,9 @@ namespace Voxel.Client
         private Label mapKey;
         private VisualElement draw;
         private VisualElement drawFill;
+        private VisualElement damageLayer;
+        private Nameplates nameplates;
+        private readonly System.Collections.Generic.List<DamageNumber> damageNumbers = new System.Collections.Generic.List<DamageNumber>();
         private World landscapeWorld;
         private Landscape landscape;
         private float nextPlace;
@@ -61,7 +79,58 @@ namespace Voxel.Client
             mapKey = root.Q<Label>("map-key");
             draw = root.Q("draw");
             drawFill = root.Q("draw-fill");
+            damageLayer = root.Q("damage-numbers");
+            nameplates = new Nameplates(root.Q("nameplates"));
             screen.style.display = DisplayStyle.None;
+        }
+
+        // The damage an arrow of the local player dealt, shown rising from point (where it hit):
+        // gold and larger for a head shot, red and saying so when it killed.
+        public void ShowDamage(Vector3 point, float damage, bool head, bool killed)
+        {
+            if (damageLayer == null) return;
+
+            string text = $"-{Mathf.Max(1, Mathf.RoundToInt(damage))}";
+            if (head) text += " Head";
+            if (killed) text += " · Killed";
+            var label = new Label(text) { pickingMode = PickingMode.Ignore };
+            label.AddToClassList("damage-number");
+            label.EnableInClassList("damage-number--head", head);
+            label.EnableInClassList("damage-number--kill", killed);
+            damageLayer.Add(label);
+            damageNumbers.Add(new DamageNumber { Label = label, Point = point, Start = Time.time });
+            PlaceDamageNumbers();
+        }
+
+        // Each number over its point (hidden behind the camera), rising, popping in, then fading.
+        private void PlaceDamageNumbers()
+        {
+            Camera eye = Camera.main;
+            IPanel panel = damageLayer.panel;
+            float now = Time.time;
+            for (int i = damageNumbers.Count - 1; i >= 0; i--)
+            {
+                DamageNumber number = damageNumbers[i];
+                float age = now - number.Start;
+                if (age >= DamageSeconds || eye == null || panel == null)
+                {
+                    number.Label.RemoveFromHierarchy();
+                    damageNumbers.RemoveAt(i);
+                    continue;
+                }
+
+                Vector3 point = number.Point + Vector3.up * (DamageRise * age / DamageSeconds);
+                bool inFront = Vector3.Dot(point - eye.transform.position, eye.transform.forward) > 0.1f;
+                number.Label.style.display = inFront ? DisplayStyle.Flex : DisplayStyle.None;
+                if (!inFront) continue;
+
+                Vector2 onPanel = RuntimePanelUtils.CameraTransformWorldToPanel(panel, point, eye);
+                number.Label.style.left = onPanel.x;
+                number.Label.style.top = onPanel.y;
+                float pop = Mathf.Lerp(PopScale, 1f, Mathf.Clamp01(age / PopSeconds));
+                number.Label.style.scale = new Scale(new Vector3(pop, pop, 1f));
+                number.Label.style.opacity = Mathf.Clamp01((DamageSeconds - age) / FadeSeconds);
+            }
         }
 
         private void Update()
@@ -82,6 +151,13 @@ namespace Voxel.Client
                 nextPlace = Time.unscaledTime + PlaceInterval;
                 ShowPlace(world, player.transform.position);
             }
+        }
+
+        // Once the camera has moved for this frame (PlayerController places it in Update).
+        private void LateUpdate()
+        {
+            if (damageNumbers.Count > 0) PlaceDamageNumbers();
+            nameplates?.Place(networkManager, worldSync.World, Camera.main);
         }
 
         // The bow's draw, while the left button is held with it (BowSync.DrawPower).

@@ -7,7 +7,7 @@ using Voxel.Core;
 namespace Voxel.Client
 {
     // Mining and felling, a hit at a time. Each left click with the right tool is one hit, at most one
-    // a swing (MiningRules.SwingInterval: three a second, half that for a starving player); a block
+    // a swing (MiningRules.SwingInterval: three a second; a starving player cannot swing at all); a block
     // takes hits by its hardness, a tree by its wood, a stump a few shovel hits (MiningRules).
     //
     // The hitter's machine shows each hit at once (the swing, chips, the block's cracks, and a block's
@@ -275,7 +275,7 @@ namespace Voxel.Client
 
             double now = Now;
             pacers.TryGetValue(clientId, out HitPacer pacer);
-            bool paced = pacer.TryHit(now, MiningRules.SwingInterval(hungerSync.IsStarving(clientId)) * 0.9);
+            bool paced = pacer.TryHit(now, MiningRules.SwingInterval(false) * 0.9);
             pacers[clientId] = pacer;
 
             int needed;
@@ -295,7 +295,8 @@ namespace Voxel.Client
                 if (valid && ecosystemSync.TryGetView(plantId, out PlantView view)) type = (ushort)view.SpeciesIndex;
             }
 
-            if (!paced || !valid)
+            // A starving player swings at nothing: what they predicted comes back.
+            if (!paced || !valid || hungerSync.IsStarving(clientId))
             {
                 Refuse(clientId, kind, pos, plantId, now);
                 return;

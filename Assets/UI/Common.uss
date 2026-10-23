@@ -18,6 +18,9 @@
     --selected: #a4917a;
     --accent: #f3dfae;
     --danger: #ee927a;
+    --danger-action: #a3443a;
+    --danger-action-hover: #b8544a;
+    --danger-action-dark: #6b2a24;
     --carbs: #d9664a;
     --protein: #e3963f;
     --fat: #e8cc5a;
@@ -140,6 +143,18 @@
 
 .button--secondary:hover {
     background-color: var(--control-hover);
+}
+
+/* A button that takes something away (Remove), in red. */
+.button--danger {
+    background-color: var(--danger-action);
+    border-bottom-width: 4px;
+    border-color: var(--danger-action-dark);
+    color: var(--text);
+}
+
+.button--danger:hover {
+    background-color: var(--danger-action-hover);
 }
 
 /* Text inside a button; it takes the button's colour, which text inherits. */

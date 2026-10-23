@@ -7,8 +7,8 @@ namespace Voxel.Client
 {
     // What a map draws over the world's picture, as elements kept from frame to frame: the nearby
     // animals (dots of their species' colour; the minimap only, the full-screen map passing no
-    // animal layer), the other players, and the local player's arrow. Each map says where a world
-    // position falls on it.
+    // animal layer), the other players (with their names), and the local player's arrow. Each map
+    // says where a world position falls on it.
     internal sealed class MapMarkers
     {
         // Where a world position falls in the map's frame, and whether it is on the map at all.
@@ -45,12 +45,24 @@ namespace Voxel.Client
 
             HideFrom(animalDots, shown);
 
+            // The other players, each with their name above their dot.
             shown = 0;
             foreach (NetworkObject other in networkManager.SpawnManager.SpawnedObjectsList)
             {
-                if (!other.IsPlayerObject || other.IsLocalPlayer || !project(other.transform.position, out Vector2 point)) continue;
+                if (other.IsLocalPlayer || !other.TryGetComponent(out PlayerModel model) || !project(other.transform.position, out Vector2 point)) continue;
 
-                Dot(playerDots, playerLayer, shown++, "map-player").style.translate = new Translate(point.x, point.y);
+                VisualElement dot = Dot(playerDots, playerLayer, shown++, "map-player");
+                dot.style.translate = new Translate(point.x, point.y);
+                if (dot.childCount == 0)
+                {
+                    var label = new Label { pickingMode = PickingMode.Ignore };
+                    label.AddToClassList("map-player-name");
+                    dot.Add(label);
+                }
+
+                var name = (Label)dot[0];
+                string text = model.PlayerName;
+                if (name.text != text) name.text = text;
             }
 
             HideFrom(playerDots, shown);

@@ -13,9 +13,10 @@ namespace Voxel.Client
     // it against the animals it shows, the head first (twice the damage); the server takes the
     // arrow from their inventory, works the same flight out on its world, shows it to the other
     // players and, once the shooter says what it hit, checks that the animal was near the flight
-    // and wounds it (Ecosystem.Damage, a carcass if that kills it). The arrow then lies where it
-    // stopped, or at the animal's feet, until a player picks it up with a right click; the server
-    // keeps those arrows (StuckArrows) and saves them with the world (arrows.dat).
+    // and wounds it (Ecosystem.Damage, a carcass if that kills it, else it runs off). An arrow that
+    // hit is lost in the animal; one that missed lies where it stopped (unless it broke there) until
+    // a player picks it up with a right click; the server keeps those arrows (StuckArrows) and saves
+    // them with the world (arrows.dat).
     public class BowSync : MonoBehaviour
     {
         private const string ShootMessage = "Bow.Shoot";
@@ -25,7 +26,14 @@ namespace Voxel.Client
         private const string AddedMessage = "Bow.Added";
         private const string RemovedMessage = "Bow.Removed";
         private const string PickupMessage = "Bow.Pickup";
+        private const string BrokeMessage = "Bow.Broke";
+        private const string HitMessage = "Bow.Hit";
         private const string SaveFileName = "arrows.dat";
+
+        // Splinters a broken arrow leaves, and their size against a block's chips.
+        private const int SplinterCount = 8;
+        private const float SplinterScale = 0.45f;
+        public const string BrokeText = "Your arrow broke";
 
         public const float FullDrawSeconds = 0.8f;
         public const float ArrowDamage = 10f;
@@ -47,6 +55,8 @@ namespace Voxel.Client
         [SerializeField] private Material shaftMaterial;
         [SerializeField] private Material headMaterial;
         [SerializeField] private Material fletchingMaterial;
+        [SerializeField] private Material chipMaterial;
+        [SerializeField] private Material previewMaterial;
 
         private sealed class Flight
         {
@@ -66,6 +76,8 @@ namespace Voxel.Client
             public readonly List<System.Numerics.Vector3> Path = new List<System.Numerics.Vector3>();
             public bool Stopped;
             public System.Numerics.Vector3 Landing;
+            public ushort StoppedBlock;
+            public Vector3 StoppedNormal;
             public float Time;
             public float Deadline;
         }
@@ -79,8 +91,17 @@ namespace Voxel.Client
         private readonly List<(ulong, int)> expired = new List<(ulong, int)>();
         private StuckArrows store;
         private string savePath;
+        private System.Random breakage;
 
         private ArrowViews views;
+        private ChipBursts splinters;
+        private ArrowPreview preview;
+        private HotbarHud hotbar;
+        private HudBanner hud;
+
+        // The shooter's machine: where each of its arrows was seen to hit an animal, until the
+        // server says what damage it dealt.
+        private readonly Dictionary<int, Vector3> hitPoints = new Dictionary<int, Vector3>();
         private float drawStart = -1f;
         private int nextShot = 1;
         private bool running;
@@ -95,6 +116,15 @@ namespace Voxel.Client
         private void Awake()
         {
             if (!Application.isBatchMode && shaftMaterial != null) views = new ArrowViews(shaftMaterial, headMaterial, fletchingMaterial);
+            if (!Application.isBatchMode && chipMaterial != null) splinters = new ChipBursts(chipMaterial);
+            if (!Application.isBatchMode && previewMaterial != null) preview = new ArrowPreview(previewMaterial);
+            hotbar = FindAnyObjectByType<HotbarHud>();
+            hud = FindAnyObjectByType<HudBanner>();
+        }
+
+        private void OnDestroy()
+        {
+            preview?.Destroy();
         }
 
         // To call right after the server or host has started, with the world's folder.
@@ -103,6 +133,7 @@ namespace Voxel.Client
             running = true;
             savePath = Path.Combine(directory, SaveFileName);
             store = Load(savePath);
+            breakage = new System.Random();
             foreach (StuckArrow arrow in store.All)
             {
                 shown[arrow.Id] = arrow;
@@ -122,6 +153,8 @@ namespace Voxel.Client
             Messaging.RegisterNamedMessageHandler(ArrowsMessage, OnArrows);
             Messaging.RegisterNamedMessageHandler(AddedMessage, OnAdded);
             Messaging.RegisterNamedMessageHandler(RemovedMessage, OnRemoved);
+            Messaging.RegisterNamedMessageHandler(BrokeMessage, OnBroke);
+            Messaging.RegisterNamedMessageHandler(HitMessage, OnHit);
         }
 
         public void Stop()
@@ -131,9 +164,13 @@ namespace Voxel.Client
             if (IsServer) networkManager.OnClientConnectedCallback -= OnClientConnected;
 
             store = null;
+            breakage = null;
             pending.Clear();
             shown.Clear();
             flights.Clear();
+            splinters?.Clear();
+            preview?.Hide();
+            hitPoints.Clear();
             drawStart = -1f;
             running = false;
         }
@@ -219,6 +256,12 @@ namespace Voxel.Client
             return best != 0;
         }
 
+        // The meshes of an arrow lying in the world, placed as drawn (for PickupHalo).
+        internal void CollectArrowParts(int arrowId, List<(Mesh mesh, Matrix4x4 matrix)> into)
+        {
+            if (views != null && shown.TryGetValue(arrowId, out StuckArrow arrow)) views.CollectParts(arrow.Position.ToUnity(), arrow.Direction.ToUnity(), into);
+        }
+
         // The local player picks up an arrow: the server decides, and says when it is gone.
         public void RequestPickup(int arrowId)
         {
@@ -249,6 +292,18 @@ namespace Voxel.Client
         {
             if (views == null || !running) return;
 
+            World world = worldSync.World;
+            if (splinters != null && world != null) splinters.Render(world, Time.deltaTime);
+
+            // While drawn: where the arrow would fly from the eye (the camera PlayerController shoots from).
+            Camera eye = Camera.main;
+            if (preview != null)
+            {
+                if (drawStart >= 0f && world != null && eye != null) preview.Show(world, eye.transform, DrawPower);
+                else preview.Hide();
+                preview.Render();
+            }
+
             foreach (StuckArrow arrow in shown.Values)
             {
                 views.Add(arrow.Position.ToUnity(), arrow.Direction.ToUnity());
@@ -275,9 +330,12 @@ namespace Voxel.Client
                 Flight flight = flights[i];
                 float t = Mathf.Min(now - flight.Start, flight.Duration);
                 Vector3 position = ArrowFlight.PositionAt(flight.Origin.ToNumerics(), flight.Velocity.ToNumerics(), t).ToUnity();
-                if (flight.Mine && ecosystemSync.TryHitArrow(flight.Last, position, out int animalId, out bool inHead, out _))
+                if (flight.Mine && ecosystemSync.TryHitArrow(flight.Last, position, out int animalId, out bool inHead, out _, out Vector3 feet))
                 {
-                    SendLanded(flight.Shot, animalId, inHead);
+                    // A refused hit leaves its point behind: forget them all past a few dozen.
+                    if (hitPoints.Count > 32) hitPoints.Clear();
+                    hitPoints[flight.Shot] = position;
+                    SendLanded(flight.Shot, animalId, inHead, Mathf.FloorToInt(feet.x), Mathf.FloorToInt(feet.z));
                     flights.RemoveAt(i);
                     continue;
                 }
@@ -285,7 +343,7 @@ namespace Voxel.Client
                 flight.Last = position;
                 if (now - flight.Start < flight.Duration) continue;
 
-                if (flight.Mine) SendLanded(flight.Shot, 0, false);
+                if (flight.Mine) SendLanded(flight.Shot, 0, false, 0, 0);
                 flights.RemoveAt(i);
             }
         }
@@ -298,19 +356,22 @@ namespace Voxel.Client
             flights.Add(new Flight { Origin = origin, Velocity = velocity, Start = Time.time, Duration = duration, Last = origin, Mine = mine, Shot = shot });
         }
 
-        private void SendLanded(int shot, int animalId, bool inHead)
+        // shownX, shownZ: the column where the hit animal was shown, where it falls if killed.
+        private void SendLanded(int shot, int animalId, bool inHead, int shownX, int shownZ)
         {
             if (IsServer)
             {
-                Land(networkManager.LocalClientId, shot, animalId, inHead);
+                Land(networkManager.LocalClientId, shot, animalId, inHead, shownX, shownZ);
                 return;
             }
 
-            using (var writer = new FastBufferWriter(2 * sizeof(int) + sizeof(byte), Allocator.Temp))
+            using (var writer = new FastBufferWriter(4 * sizeof(int) + sizeof(byte), Allocator.Temp))
             {
                 writer.WriteValueSafe(shot);
                 writer.WriteValueSafe(animalId);
                 writer.WriteValueSafe((byte)(inHead ? 1 : 0));
+                writer.WriteValueSafe(shownX);
+                writer.WriteValueSafe(shownZ);
                 Messaging.SendNamedMessage(LandedMessage, NetworkManager.ServerClientId, writer, NetworkDelivery.ReliableSequenced);
             }
         }
@@ -325,11 +386,18 @@ namespace Voxel.Client
             Vector3 eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;
             if ((origin - eyes).sqrMagnitude > OriginTolerance * OriginTolerance) return;
             if (pending.ContainsKey((clientId, shot)) || !inventorySync.Owns(clientId, Items.Bow)) return;
+            if (inventorySync.IsStarving(clientId)) return;
             if (!inventorySync.TryConsume(clientId, Items.Arrow)) return;
 
             World world = worldSync.World;
             var flight = new PendingShot { Velocity = ArrowFlight.VelocityOf(direction.ToNumerics(), power), Power = power };
-            flight.Stopped = ArrowFlight.Trace(world, origin.ToNumerics(), flight.Velocity, out flight.Landing, out flight.Time, flight.Path);
+            flight.Stopped = ArrowFlight.Trace(world, origin.ToNumerics(), flight.Velocity, out flight.Landing, out flight.Time, out VoxelHit stoppedBy, flight.Path);
+            if (flight.Stopped)
+            {
+                flight.StoppedBlock = world.GetBlock(stoppedBy.Block);
+                flight.StoppedNormal = new Vector3(stoppedBy.Normal.X, stoppedBy.Normal.Y, stoppedBy.Normal.Z);
+            }
+
             flight.Deadline = Time.unscaledTime + flight.Time + VerdictSeconds;
             pending[(clientId, shot)] = flight;
 
@@ -348,23 +416,83 @@ namespace Voxel.Client
             }
         }
 
-        // Server side: the shooter says what their arrow hit. A plausible hit wounds the animal and the
-        // arrow falls at its feet; otherwise it lies where the server's flight stopped.
-        private void Land(ulong clientId, int shot, int animalId, bool inHead)
+        // Server side: the shooter says what their arrow hit. A plausible hit wounds the animal (which
+        // runs off if it lives) and the arrow is lost in it; otherwise it lies where the server's
+        // flight stopped, unless it breaks there (ArrowBreakage, by how hard the block is).
+        private void Land(ulong clientId, int shot, int animalId, bool inHead, int shownX, int shownZ)
         {
             if (!pending.TryGetValue((clientId, shot), out PendingShot flight)) return;
 
             pending.Remove((clientId, shot));
             float damage = ArrowDamage * ArrowFlight.ClampPower(flight.Power) * (inHead ? HeadMultiplier : 1f);
-            if (animalId != 0 && ecosystemSync.TryWoundAnimal(animalId, flight.Path, damage, out Vector3 feet))
+            if (animalId != 0 && ecosystemSync.TryWoundAnimal(animalId, flight.Path, damage, shownX, shownZ, out bool killed))
             {
-                // On the ground at the animal's feet, pointing down the way it flew.
-                Vector3 along = new Vector3(flight.Velocity.X, 0f, flight.Velocity.Z).normalized;
-                AddArrow(feet + Vector3.up * 0.06f, along + Vector3.down * 0.25f);
+                SendHit(clientId, shot, damage, inHead, killed);
                 return;
             }
 
-            if (flight.Stopped) AddArrow(flight.Landing.ToUnity(), ArrowFlight.VelocityAt(flight.Velocity, flight.Time).ToUnity());
+            if (!flight.Stopped) return;
+
+            if (ArrowBreakage.Breaks(ArrowBreakage.ChanceOnBlock(flight.StoppedBlock), breakage.NextDouble()))
+            {
+                Broke(clientId, flight.Landing.ToUnity(), flight.StoppedNormal);
+                return;
+            }
+
+            AddArrow(flight.Landing.ToUnity(), ArrowFlight.VelocityAt(flight.Velocity, flight.Time).ToUnity());
+        }
+
+        // Server side: tells the shooter the damage their arrow dealt, once the hit is accepted.
+        private void SendHit(ulong shooter, int shot, float damage, bool head, bool killed)
+        {
+            if (shooter == networkManager.LocalClientId)
+            {
+                ShowHit(shot, damage, head, killed);
+                return;
+            }
+
+            using (var writer = new FastBufferWriter(sizeof(int) + sizeof(float) + sizeof(byte), Allocator.Temp))
+            {
+                writer.WriteValueSafe(shot);
+                writer.WriteValueSafe(damage);
+                writer.WriteValueSafe((byte)((head ? 1 : 0) | (killed ? 2 : 0)));
+                Messaging.SendNamedMessage(HitMessage, shooter, writer, NetworkDelivery.ReliableSequenced);
+            }
+        }
+
+        // The shooter's machine: the damage shows where its arrow was seen to hit.
+        private void ShowHit(int shot, float damage, bool head, bool killed)
+        {
+            if (!hitPoints.TryGetValue(shot, out Vector3 point)) return;
+
+            hitPoints.Remove(shot);
+            if (hud != null) hud.ShowDamage(point, damage, head, killed);
+        }
+
+        // Server side: an arrow broke where it landed. Every machine shows its splinters, and the
+        // shooter is told.
+        private void Broke(ulong shooter, Vector3 point, Vector3 normal)
+        {
+            if (networkManager.IsHost) ShowBroken(point, normal, shooter == networkManager.LocalClientId);
+            foreach (ulong clientId in networkManager.ConnectedClientsIds)
+            {
+                if (clientId == networkManager.LocalClientId) continue;
+
+                using (var writer = new FastBufferWriter(6 * sizeof(float) + sizeof(byte), Allocator.Temp))
+                {
+                    WriteVector(writer, point);
+                    WriteVector(writer, normal);
+                    writer.WriteValueSafe((byte)(clientId == shooter ? 1 : 0));
+                    Messaging.SendNamedMessage(BrokeMessage, clientId, writer, NetworkDelivery.ReliableSequenced);
+                }
+            }
+        }
+
+        // Splinters of the shaft's wood fly from where the arrow broke.
+        private void ShowBroken(Vector3 point, Vector3 normal, bool mine)
+        {
+            if (splinters != null && shaftMaterial != null) splinters.Spawn(point, normal, shaftMaterial.color, SplinterCount, SplinterScale);
+            if (mine && hotbar != null) hotbar.ShowMessage(BrokeText);
         }
 
         // Server side: shooters who never said what their arrow hit (gone, or their message lost).
@@ -378,7 +506,7 @@ namespace Voxel.Client
 
             foreach ((ulong clientId, int shot) in expired)
             {
-                Land(clientId, shot, 0, false);
+                Land(clientId, shot, 0, false, 0, 0);
             }
         }
 
@@ -460,7 +588,9 @@ namespace Voxel.Client
             reader.ReadValueSafe(out int shot);
             reader.ReadValueSafe(out int animalId);
             reader.ReadValueSafe(out byte inHead);
-            Land(senderId, shot, animalId, inHead != 0);
+            reader.ReadValueSafe(out int shownX);
+            reader.ReadValueSafe(out int shownZ);
+            Land(senderId, shot, animalId, inHead != 0, shownX, shownZ);
         }
 
         private void OnPickup(ulong senderId, FastBufferReader reader)
@@ -497,6 +627,22 @@ namespace Voxel.Client
         {
             reader.ReadValueSafe(out int arrowId);
             shown.Remove(arrowId);
+        }
+
+        private void OnHit(ulong senderId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out int shot);
+            reader.ReadValueSafe(out float damage);
+            reader.ReadValueSafe(out byte flags);
+            if (float.IsFinite(damage)) ShowHit(shot, damage, (flags & 1) != 0, (flags & 2) != 0);
+        }
+
+        private void OnBroke(ulong senderId, FastBufferReader reader)
+        {
+            Vector3 point = ReadVector(reader);
+            Vector3 normal = ReadVector(reader);
+            reader.ReadValueSafe(out byte mine);
+            if (IsFinite(point) && IsFinite(normal)) ShowBroken(point, normal, mine != 0);
         }
 
         private static StuckArrows Load(string path)

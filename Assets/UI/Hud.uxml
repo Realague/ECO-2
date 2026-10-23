@@ -4,6 +4,12 @@
 
     <!-- HudBanner fills in the day, the hour, the sun or the moon, the speed and the place under the player. -->
     <ui:VisualElement name="screen" class="screen hud-screen" picking-mode="Ignore">
+        <!-- The other players' names over their heads (Nameplates). -->
+        <ui:VisualElement name="nameplates" class="nameplates" picking-mode="Ignore" />
+
+        <!-- The damage an arrow dealt, rising from where it hit (HudBanner.ShowDamage). -->
+        <ui:VisualElement name="damage-numbers" class="damage-numbers" picking-mode="Ignore" />
+
         <ui:VisualElement name="banner" class="hud-banner" picking-mode="Ignore">
             <ui:VisualElement class="hud-row" picking-mode="Ignore">
                 <vc:HudGlyph name="sky" class="hud-glyph hud-sky" />

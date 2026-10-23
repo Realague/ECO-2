@@ -29,6 +29,7 @@ namespace Voxel.Client
         // their margin (Inventory.uss, .item-slot).
         private const float TargetSlot = 124f;
         private const float SlotGap = 12f;
+        private const float FitSlack = 2f;
 
         // Nutrient points a food bar shows full (foods have 0 to about 15, as in Eco).
         private const float FullNutrient = 15f;
@@ -283,7 +284,8 @@ namespace Voxel.Client
             float width = grid.contentViewport.layout.width;
             if (float.IsNaN(width) || width < TargetSlot + SlotGap) width = 5f * (TargetSlot + SlotGap);
             columns = Mathf.Max(1, Mathf.FloorToInt(width / (TargetSlot + SlotGap)));
-            size = Mathf.Floor(width / columns - SlotGap);
+            // A little slack: slots filling the width exactly can wrap once the panel scales to the screen.
+            size = Mathf.Floor((width - FitSlack) / columns - SlotGap);
         }
 
         private static void Connect(Button button, Action action)
