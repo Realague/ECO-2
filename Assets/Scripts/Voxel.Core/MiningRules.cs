@@ -93,5 +93,11 @@ namespace Voxel.Core
 
         // Felled wood lies on the ground as logs, one wood each.
         public static int LogsOf(int wood) => Math.Max(0, wood);
+
+        // A grown plant cut down gives one seed, and a second this often; a young one none.
+        public const float SecondSeedChance = 0.35f;
+
+        // The seeds a cut plant gives, from a roll between 0 and 1.
+        public static int SeedsFromFelling(bool grown, float roll) => !grown ? 0 : roll < SecondSeedChance ? 2 : 1;
     }
 }

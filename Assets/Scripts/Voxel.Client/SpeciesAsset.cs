@@ -80,6 +80,8 @@ namespace Voxel.Client
         [Header("Harvest")]
         [Tooltip("Wood obtained by felling an adult plant; a younger plant gives less.")]
         [SerializeField] private int woodYield;
+        [Tooltip("The colour of its wood (its item's icon, and its wood on stockpiles): its bark's grain tinted so.")]
+        [SerializeField] private Color woodColour = new Color(0.66f, 0.49f, 0.31f);
         [Tooltip("A crop: none, an annual (pulled up when harvested) or a perennial (picked again and again). " +
                  "Once adult it ripens through 3 stages, giving a third, two thirds and all of its harvest.")]
         [SerializeField] private HarvestKind harvest;
@@ -175,6 +177,29 @@ namespace Voxel.Client
         }
 
         public int WoodYield => woodYield;
+
+        public Color WoodColour => woodColour;
+
+        // Its wood as stacked or carried: the bark's material (and grain) in the wood's colour, made
+        // once. Null for a species without models.
+        public Material WoodMaterial
+        {
+            get
+            {
+                if (woodMaterial == null && BarkMaterial != null) woodMaterial = WoodMaterialFrom(BarkMaterial, woodColour);
+                return woodMaterial;
+            }
+        }
+
+        [NonSerialized] private Material woodMaterial;
+
+        public static Material WoodMaterialFrom(Material bark, Color colour)
+        {
+            var material = new Material(bark) { name = bark.name + " Wood" };
+            if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", colour);
+            material.color = colour;
+            return material;
+        }
 
         public HarvestKind Harvest => harvest;
 

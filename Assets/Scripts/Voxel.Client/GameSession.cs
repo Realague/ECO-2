@@ -51,6 +51,7 @@ namespace Voxel.Client
         [SerializeField] private BowSync bowSync;
         [SerializeField] private MiningSync miningSync;
         [SerializeField] private LogSync logSync;
+        [SerializeField] private StorageSync storageSync;
         [SerializeField] private AppearanceSync appearanceSync;
         [SerializeField] private CommandSync commandSync;
         [SerializeField] private AppearanceMenu appearanceMenu;
@@ -297,6 +298,7 @@ namespace Voxel.Client
             bowSync.StartClient();
             miningSync.StartClient();
             logSync.StartClient();
+            storageSync.StartClient();
             appearanceSync.StartClient();
             commandSync.StartClient();
             sessionActive = true;
@@ -342,6 +344,7 @@ namespace Voxel.Client
             hungerSync.StartServer(registry);
             bowSync.StartServer(worldDirectory);
             logSync.StartServer(worldDirectory);
+            storageSync.StartServer(worldDirectory, registry);
             miningSync.StartServer();
             appearanceSync.StartServer(registry);
             commandSync.StartServer();
@@ -416,6 +419,7 @@ namespace Voxel.Client
             ecosystemSync.Save();
             bowSync.Save();
             logSync.Save();
+            storageSync.Save();
         }
 
         // The host is admin of its own game; on a dedicated server, admins are the players
@@ -448,12 +452,14 @@ namespace Voxel.Client
             ecosystemSync.Save();
             bowSync.Save();
             logSync.Save();
+            storageSync.Save();
             ecosystemSync.Stop();
             inventorySync.Stop();
             hungerSync.Stop();
             bowSync.Stop();
             miningSync.Stop();
             logSync.Stop();
+            storageSync.Stop();
             appearanceSync.Stop();
             commandSync.Stop();
             worldSync.Stop();
@@ -556,7 +562,7 @@ namespace Voxel.Client
             // The main menu (with the connection and loading screens), the character creation
             // screen, the full-screen map and the inventory have the whole screen to themselves. The
             // day and the hour are on the HUD banner (HudBanner); this text stands under it.
-            if (appearanceMenu.IsOpen || mapScreen.IsOpen || inventoryScreen.IsOpen || InMenu || IsConnecting || IsLoading) return "";
+            if (appearanceMenu.IsOpen || mapScreen.IsOpen || inventoryScreen.IsOpen || StorageScreen.IsOpen || InMenu || IsConnecting || IsLoading) return "";
 
             if (Cursor.lockState != CursorLockMode.Locked)
             {

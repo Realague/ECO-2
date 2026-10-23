@@ -1,0 +1,107 @@
+using System;
+using System.Collections.Generic;
+
+namespace Voxel.Core
+{
+    public enum StorageKind : byte
+    {
+        Chest = 1,
+        Stockpile = 2
+    }
+
+    // What storage holds and where it may stand. A chest stands in one cell on top of a solid block
+    // and holds any item that is not a block, up to ChestMaxWeight kg in all; a stockpile covers
+    // StockpileSide x StockpileSide cells of flat ground and holds blocks (and wood), one pile per
+    // cell of one block type each, up to PileSize per pile. Facing is a quarter turn (0 toward +z,
+    // 1 toward +x, 2 toward -z, 3 toward -x), the way the player looked when placing it.
+    public static class StorageRules
+    {
+        public const float ChestMaxWeight = 150f;
+        public const int StockpileSide = 3;
+        public const int PileCount = StockpileSide * StockpileSide;
+
+        // A full pile is drawn as 3 x 3 x 3 small cubes: exactly one block's volume.
+        public const int PileSize = 27;
+        public const int StockpileCapacity = PileCount * PileSize;
+
+        public static bool IsKind(byte kind) => kind == (byte)StorageKind.Chest || kind == (byte)StorageKind.Stockpile;
+
+        public static int ItemOf(StorageKind kind) => kind == StorageKind.Chest ? Items.Chest : Items.Stockpile;
+
+        public static bool TryKindOf(int item, out StorageKind kind)
+        {
+            kind = item == Items.Chest ? StorageKind.Chest : StorageKind.Stockpile;
+            return Items.IsStorage(item);
+        }
+
+        public static bool AcceptsInChest(int item) => Items.IsValid(item) && !CarryLimits.CountsAsBlock(item);
+
+        public static bool AcceptsInStockpile(int item) => Items.IsValid(item) && CarryLimits.CountsAsBlock(item);
+
+        public static float ChestWeight(Inventory contents, ItemWeights weights)
+        {
+            float weight = 0f;
+            foreach (KeyValuePair<int, int> entry in contents.Entries)
+            {
+                weight += weights.Of(entry.Key) * entry.Value;
+            }
+
+            return weight;
+        }
+
+        // How many more of an item a chest can take (0 for what it does not hold).
+        public static int ChestRoom(Inventory contents, int item, ItemWeights weights)
+        {
+            if (!AcceptsInChest(item)) return 0;
+
+            float each = weights.Of(item);
+            if (each <= 0f) return int.MaxValue;
+
+            // A hair of slack, as for the carrying limit, so that float sums do not refuse what exactly fits.
+            float free = ChestMaxWeight - ChestWeight(contents, weights) + 1e-4f;
+            return free <= 0f ? 0 : (int)Math.Min(int.MaxValue, Math.Floor(free / each));
+        }
+
+        // The quarter turn a player looking along yaw (degrees, 0 toward +z, 90 toward +x) faces.
+        public static int FacingOf(float yawDegrees)
+        {
+            int quarter = (int)Math.Round(yawDegrees / 90.0);
+            return ((quarter % 4) + 4) % 4;
+        }
+
+        // The cell a chest goes into: on top of the solid block, free of blocks (air, not water).
+        public static bool CanPlaceChest(World world, BlockPos cell)
+        {
+            return world.InBounds(cell.X, cell.Y, cell.Z) && world.GetBlock(cell) == Blocks.Air && world.IsSolid(cell.X, cell.Y - 1, cell.Z);
+        }
+
+        // The corner (lowest x and z) of a stockpile placed by a player facing that way at target:
+        // target is the middle of the area's near edge, the area stretching away from the player.
+        public static BlockPos StockpileCorner(BlockPos target, int facing)
+        {
+            switch (facing)
+            {
+                case 1: return new BlockPos(target.X, target.Y, target.Z - 1);
+                case 2: return new BlockPos(target.X - 1, target.Y, target.Z - (StockpileSide - 1));
+                case 3: return new BlockPos(target.X - (StockpileSide - 1), target.Y, target.Z - 1);
+                default: return new BlockPos(target.X - 1, target.Y, target.Z);
+            }
+        }
+
+        // A stockpile's cells, from its corner: flat solid ground under each, air in each.
+        public static bool CanPlaceStockpile(World world, BlockPos corner)
+        {
+            for (int pile = 0; pile < PileCount; pile++)
+            {
+                BlockPos cell = PileCell(corner, pile);
+                if (!world.InBounds(cell.X, cell.Y, cell.Z) || world.GetBlock(cell) != Blocks.Air) return false;
+                if (!world.IsSolid(cell.X, cell.Y - 1, cell.Z) || world.IsWater(cell.X, cell.Y - 1, cell.Z)) return false;
+            }
+
+            return true;
+        }
+
+        // The cell of a stockpile's pile (0 to PileCount - 1), from its corner.
+        public static BlockPos PileCell(BlockPos corner, int pile) => new BlockPos(corner.X + pile % StockpileSide, corner.Y, corner.Z + pile / StockpileSide);
+    }
+}

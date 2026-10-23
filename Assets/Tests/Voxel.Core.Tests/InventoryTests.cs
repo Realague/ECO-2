@@ -12,10 +12,10 @@ namespace Voxel.Core.Tests
         {
             var inventory = new Inventory();
 
-            inventory.Add(Items.Wood, 2);
-            inventory.Add(Items.Wood, 3);
+            inventory.Add(Items.WoodOf(Items.OakSpecies), 2);
+            inventory.Add(Items.WoodOf(Items.OakSpecies), 3);
 
-            Assert.AreEqual(5, inventory.Count(Items.Wood));
+            Assert.AreEqual(5, inventory.Count(Items.WoodOf(Items.OakSpecies)));
             Assert.AreEqual(1, inventory.DistinctCount);
         }
 
@@ -25,8 +25,8 @@ namespace Voxel.Core.Tests
             var inventory = new Inventory();
 
             inventory.Add(Items.None, 4);
-            inventory.Add(Items.Wood, 0);
-            inventory.Add(Items.Wood, -2);
+            inventory.Add(Items.WoodOf(Items.OakSpecies), 0);
+            inventory.Add(Items.WoodOf(Items.OakSpecies), -2);
 
             Assert.AreEqual(0, inventory.DistinctCount);
         }
@@ -70,14 +70,14 @@ namespace Voxel.Core.Tests
         public void Entries_AreSortedByItem()
         {
             var inventory = new Inventory();
-            inventory.Add(Items.Wood, 1);
+            inventory.Add(Items.WoodOf(Items.OakSpecies), 1);
             inventory.Add(Blocks.Dirt, 1);
             inventory.Add(Items.Seed(0), 1);
             inventory.Add(Blocks.Stone, 1);
 
             int[] order = inventory.Entries.Select(entry => entry.Key).ToArray();
 
-            Assert.AreEqual(new[] { (int)Blocks.Stone, Blocks.Dirt, Items.Wood, Items.Seed(0) }, order);
+            Assert.AreEqual(new[] { (int)Blocks.Stone, Blocks.Dirt, Items.Seed(0), Items.WoodOf(Items.OakSpecies) }, order);
         }
 
         [Test]
@@ -112,14 +112,14 @@ namespace Voxel.Core.Tests
         {
             var original = new Inventory();
             original.Add(Blocks.Stone, 12);
-            original.Add(Items.Wood, 7);
+            original.Add(Items.WoodOf(Items.OakSpecies), 7);
             original.Add(Items.Seed(1), 3);
 
             Inventory loaded = Read(Write(original));
 
             Assert.AreEqual(3, loaded.DistinctCount);
             Assert.AreEqual(12, loaded.Count(Blocks.Stone));
-            Assert.AreEqual(7, loaded.Count(Items.Wood));
+            Assert.AreEqual(7, loaded.Count(Items.WoodOf(Items.OakSpecies)));
             Assert.AreEqual(3, loaded.Count(Items.Seed(1)));
         }
 
@@ -127,7 +127,7 @@ namespace Voxel.Core.Tests
         public void Read_ReplacesThePreviousContent()
         {
             var original = new Inventory();
-            original.Add(Items.Wood, 1);
+            original.Add(Items.WoodOf(Items.OakSpecies), 1);
             var target = new Inventory();
             target.Add(Blocks.Sand, 9);
 
@@ -137,13 +137,13 @@ namespace Voxel.Core.Tests
             }
 
             Assert.AreEqual(1, target.DistinctCount);
-            Assert.AreEqual(1, target.Count(Items.Wood));
+            Assert.AreEqual(1, target.Count(Items.WoodOf(Items.OakSpecies)));
         }
 
         [TestCase(999, 1)]
         [TestCase(Items.None, 1)]
-        [TestCase(Items.Wood, 0)]
-        [TestCase(Items.Wood, -4)]
+        [TestCase(Items.Straw, 0)]
+        [TestCase(Items.Straw, -4)]
         public void Read_UnknownItemOrInvalidQuantity_Throws(int item, int count)
         {
             byte[] data = WriteRaw(1, item, count);
@@ -154,7 +154,7 @@ namespace Voxel.Core.Tests
         [Test]
         public void Read_SameItemTwice_Throws()
         {
-            byte[] data = WriteRaw(2, Items.Wood, 1, Items.Wood, 2);
+            byte[] data = WriteRaw(2, Items.Straw, 1, Items.Straw, 2);
 
             Assert.Throws<InvalidDataException>(() => Read(data));
         }

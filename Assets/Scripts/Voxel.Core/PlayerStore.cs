@@ -28,23 +28,31 @@ namespace Voxel.Core
 
         // Whether they were given their starting tools (format 6): once only, even if they lose them.
         public bool ReceivedTools;
+
+        // The name they chose (format 7), shown to the others; empty until they have chosen one.
+        public string Name = "";
+
+        // Whether they were given their starting chest and stockpile (format 7): once only.
+        public bool ReceivedStorage;
     }
 
     // The state of every player known to the server, by player id.
     public sealed class PlayerStore
     {
         private const uint Magic = 0x504F4345; // "ECOP"
-        private const int FormatVersion = 6;
+        private const int FormatVersion = 7;
 
         // Older formats still load. Without inventory, the player keeps their position; without
         // appearance, they choose one at their next connection; without a hotbar, theirs starts empty
         // (the server fills it with what they own); without a stomach, theirs starts half full;
-        // without tools, they get them at their next connection.
+        // without tools, they get them at their next connection; without a name or storage, they choose
+        // a name and get a chest and a stockpile at their next connection.
         private const int FormatWithoutInventory = 1;
         private const int FormatWithoutAppearance = 2;
         private const int FormatWithoutHotbar = 3;
         private const int FormatWithoutStomach = 4;
         private const int FormatWithoutTools = 5;
+        private const int FormatWithoutName = 6;
 
         private readonly Dictionary<string, PlayerState> players = new Dictionary<string, PlayerState>();
 
@@ -53,6 +61,33 @@ namespace Voxel.Core
         public bool TryGet(string playerId, out PlayerState state) => players.TryGetValue(playerId, out state);
 
         public void Set(string playerId, PlayerState state) => players[playerId] = state;
+
+        // The player who chose this name (ignoring case).
+        public bool TryFindByName(string name, out string playerId)
+        {
+            foreach (KeyValuePair<string, PlayerState> player in players)
+            {
+                if (PlayerNames.SameName(player.Value.Name, name))
+                {
+                    playerId = player.Key;
+                    return true;
+                }
+            }
+
+            playerId = null;
+            return false;
+        }
+
+        // Whether a player other than playerId already has this name (ignoring case).
+        public bool IsNameTaken(string name, string playerId)
+        {
+            foreach (KeyValuePair<string, PlayerState> player in players)
+            {
+                if (player.Key != playerId && PlayerNames.SameName(player.Value.Name, name)) return true;
+            }
+
+            return false;
+        }
 
         // The player's state, created empty if they were not known yet.
         public PlayerState GetOrAdd(string playerId)
@@ -87,6 +122,8 @@ namespace Voxel.Core
                     state.Hotbar.Write(writer);
                     state.Stomach.Write(writer);
                     writer.Write(state.ReceivedTools);
+                    writer.Write(state.Name ?? "");
+                    writer.Write(state.ReceivedStorage);
                 }
             }
         }
@@ -149,7 +186,18 @@ namespace Voxel.Core
 
                     if (formatVersion >= FormatWithoutStomach) state.Hotbar.Read(reader);
                     if (formatVersion >= FormatWithoutTools) state.Stomach.Read(reader);
-                    if (formatVersion >= FormatVersion) state.ReceivedTools = reader.ReadBoolean();
+                    if (formatVersion >= FormatWithoutName) state.ReceivedTools = reader.ReadBoolean();
+                    if (formatVersion >= FormatVersion)
+                    {
+                        string name = reader.ReadString();
+                        if (name.Length > 0 && (!PlayerNames.TryNormalize(name, out string normal) || normal != name))
+                        {
+                            throw new InvalidDataException($"Invalid name for player {playerId}.");
+                        }
+
+                        state.Name = name;
+                        state.ReceivedStorage = reader.ReadBoolean();
+                    }
 
                     store.Set(playerId, state);
                 }

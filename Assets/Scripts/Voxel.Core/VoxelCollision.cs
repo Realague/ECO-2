@@ -21,7 +21,8 @@ namespace Voxel.Core
         // Each sub-step stays under one block, so as never to go through a wall.
         private const float MaxStep = 0.4f;
 
-        public static MoveResult Move(World world, Vector3 position, float halfWidth, float height, Vector3 delta)
+        // extraSolid, when given, names cells that are solid besides the blocks (placed storage).
+        public static MoveResult Move(World world, Vector3 position, float halfWidth, float height, Vector3 delta, Func<int, int, int, bool> extraSolid = null)
         {
             var result = new MoveResult { Position = position };
 
@@ -31,12 +32,12 @@ namespace Voxel.Core
 
             for (int i = 0; i < steps; i++)
             {
-                MoveY(world, ref result, halfWidth, height, step.Y);
-                MoveX(world, ref result, halfWidth, height, step.X);
-                MoveZ(world, ref result, halfWidth, height, step.Z);
+                MoveY(world, extraSolid, ref result, halfWidth, height, step.Y);
+                MoveX(world, extraSolid, ref result, halfWidth, height, step.X);
+                MoveZ(world, extraSolid, ref result, halfWidth, height, step.Z);
             }
 
-            result.Grounded = HasGroundBelow(world, result.Position, halfWidth);
+            result.Grounded = HasGroundBelow(world, extraSolid, result.Position, halfWidth);
             return result;
         }
 
@@ -44,6 +45,7 @@ namespace Voxel.Core
         {
             return AnySolid(
                 world,
+                null,
                 Floor(position.X - halfWidth), Floor(position.X + halfWidth),
                 Floor(position.Y), Floor(position.Y + height),
                 Floor(position.Z - halfWidth), Floor(position.Z + halfWidth));
@@ -68,7 +70,7 @@ namespace Voxel.Core
                 && position.Z + halfWidth > block.Z && position.Z - halfWidth < block.Z + 1;
         }
 
-        private static void MoveY(World world, ref MoveResult result, float halfWidth, float height, float delta)
+        private static void MoveY(World world, Func<int, int, int, bool> extraSolid, ref MoveResult result, float halfWidth, float height, float delta)
         {
             if (delta == 0f) return;
 
@@ -80,7 +82,7 @@ namespace Voxel.Core
             if (delta > 0f)
             {
                 int layer = Floor(p.Y + height);
-                if (AnySolid(world, minX, maxX, layer, layer, minZ, maxZ))
+                if (AnySolid(world, extraSolid, minX, maxX, layer, layer, minZ, maxZ))
                 {
                     p.Y = layer - height - Skin;
                     result.HitCeiling = true;
@@ -89,7 +91,7 @@ namespace Voxel.Core
             else
             {
                 int layer = Floor(p.Y);
-                if (AnySolid(world, minX, maxX, layer, layer, minZ, maxZ))
+                if (AnySolid(world, extraSolid, minX, maxX, layer, layer, minZ, maxZ))
                 {
                     p.Y = layer + 1 + Skin;
                 }
@@ -98,7 +100,7 @@ namespace Voxel.Core
             result.Position = p;
         }
 
-        private static void MoveX(World world, ref MoveResult result, float halfWidth, float height, float delta)
+        private static void MoveX(World world, Func<int, int, int, bool> extraSolid, ref MoveResult result, float halfWidth, float height, float delta)
         {
             if (delta == 0f) return;
 
@@ -108,7 +110,7 @@ namespace Voxel.Core
             int minZ = Floor(p.Z - halfWidth), maxZ = Floor(p.Z + halfWidth);
 
             int layer = Floor(delta > 0f ? p.X + halfWidth : p.X - halfWidth);
-            if (AnySolid(world, layer, layer, minY, maxY, minZ, maxZ))
+            if (AnySolid(world, extraSolid, layer, layer, minY, maxY, minZ, maxZ))
             {
                 p.X = delta > 0f ? layer - halfWidth - Skin : layer + 1 + halfWidth + Skin;
                 result.HitWall = true;
@@ -117,7 +119,7 @@ namespace Voxel.Core
             result.Position = p;
         }
 
-        private static void MoveZ(World world, ref MoveResult result, float halfWidth, float height, float delta)
+        private static void MoveZ(World world, Func<int, int, int, bool> extraSolid, ref MoveResult result, float halfWidth, float height, float delta)
         {
             if (delta == 0f) return;
 
@@ -127,7 +129,7 @@ namespace Voxel.Core
             int minY = Floor(p.Y), maxY = Floor(p.Y + height);
 
             int layer = Floor(delta > 0f ? p.Z + halfWidth : p.Z - halfWidth);
-            if (AnySolid(world, minX, maxX, minY, maxY, layer, layer))
+            if (AnySolid(world, extraSolid, minX, maxX, minY, maxY, layer, layer))
             {
                 p.Z = delta > 0f ? layer - halfWidth - Skin : layer + 1 + halfWidth + Skin;
                 result.HitWall = true;
@@ -136,17 +138,18 @@ namespace Voxel.Core
             result.Position = p;
         }
 
-        private static bool HasGroundBelow(World world, Vector3 position, float halfWidth)
+        private static bool HasGroundBelow(World world, Func<int, int, int, bool> extraSolid, Vector3 position, float halfWidth)
         {
             int layer = Floor(position.Y - GroundProbe);
             return AnySolid(
                 world,
+                extraSolid,
                 Floor(position.X - halfWidth), Floor(position.X + halfWidth),
                 layer, layer,
                 Floor(position.Z - halfWidth), Floor(position.Z + halfWidth));
         }
 
-        private static bool AnySolid(World world, int minX, int maxX, int minY, int maxY, int minZ, int maxZ)
+        private static bool AnySolid(World world, Func<int, int, int, bool> extraSolid, int minX, int maxX, int minY, int maxY, int minZ, int maxZ)
         {
             for (int y = minY; y <= maxY; y++)
             {
@@ -154,7 +157,7 @@ namespace Voxel.Core
                 {
                     for (int x = minX; x <= maxX; x++)
                     {
-                        if (world.IsSolid(x, y, z)) return true;
+                        if (world.IsSolid(x, y, z) || (extraSolid != null && extraSolid(x, y, z))) return true;
                     }
                 }
             }

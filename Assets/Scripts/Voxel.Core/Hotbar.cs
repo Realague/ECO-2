@@ -117,7 +117,7 @@ namespace Voxel.Core
             Clear();
             for (int slot = 0; slot < SlotCount; slot++)
             {
-                int item = reader.ReadInt32();
+                int item = Items.Upgrade(reader.ReadInt32());
                 if (item == Items.None || Items.IsRetired(item)) continue;
                 if (!Items.IsValid(item)) throw new InvalidDataException($"Invalid hotbar: item {item} in slot {slot}.");
 

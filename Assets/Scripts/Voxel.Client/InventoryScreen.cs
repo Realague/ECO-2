@@ -190,7 +190,7 @@ namespace Voxel.Client
                 // Letters typed in the search are not keys; Escape leaves it first.
                 if (keyboard.escapeKey.wasPressedThisFrame) search.Blur();
             }
-            else if (keyboard != null && !CommandConsole.HoldsInput && !mapScreen.HoldsInput)
+            else if (keyboard != null && !CommandConsole.HoldsInput && !mapScreen.HoldsInput && !StorageScreen.HoldsInput)
             {
                 if (keyboard.tabKey.wasPressedThisFrame)
                 {

@@ -29,10 +29,10 @@ namespace Voxel.Client
 
         public static ItemCategory CategoryOf(int item)
         {
-            if (Items.IsTool(item) || item == Items.Arrow) return ItemCategory.Tools;
+            if (Items.IsTool(item) || item == Items.Arrow || Items.IsStorage(item)) return ItemCategory.Tools;
             if (Items.IsSeed(item)) return ItemCategory.Seeds;
             if (Items.IsProduce(item)) return ItemCategory.Food;
-            return item == Items.Wood || item == Items.Straw ? ItemCategory.Materials : ItemCategory.Blocks;
+            return Items.IsWood(item) || item == Items.Straw ? ItemCategory.Materials : ItemCategory.Blocks;
         }
 
         public static string CategoryName(ItemCategory category)
@@ -55,7 +55,7 @@ namespace Voxel.Client
                 case ItemCategory.Seeds: return "Seed";
                 case ItemCategory.Food: return "Food";
                 case ItemCategory.Materials: return "Material";
-                case ItemCategory.Tools: return item == Items.Arrow ? "Ammunition" : "Tool";
+                case ItemCategory.Tools: return item == Items.Arrow ? "Ammunition" : Items.IsStorage(item) ? "Storage" : "Tool";
                 default: return "Block";
             }
         }
@@ -64,6 +64,7 @@ namespace Voxel.Client
         {
             if (Items.IsSeed(item)) return $"{PlantName(Items.SeedSpecies(item), ecosystemSync)} seeds";
             if (Items.IsProduce(item)) return EcosystemSync.DisplayName(ecosystemSync.ProduceName(Items.ProduceSpecies(item)));
+            if (Items.IsWood(item)) return $"{PlantName(Items.WoodSpecies(item), ecosystemSync)} wood";
             return Items.NameOf(item);
         }
 
@@ -71,7 +72,11 @@ namespace Voxel.Client
         {
             if (Items.IsSeed(item))
             {
-                return $"Plant it to grow {Article(PlantName(Items.SeedSpecies(item), ecosystemSync).ToLowerInvariant())}. Only gardeners can plant seeds.";
+                int species = Items.SeedSpecies(item);
+                string grow = $"Plant it to grow {Article(PlantName(species, ecosystemSync).ToLowerInvariant())}";
+                return ecosystemSync.IsTree(species)
+                    ? grow + ": hold it and right click on the ground where it grows. It needs a climate and soil that suit it, and room from others of its kind."
+                    : grow + ". Only gardeners plant crops, on tilled soil.";
             }
 
             if (Items.IsProduce(item))
@@ -89,9 +94,11 @@ namespace Voxel.Client
                 case Items.Hoe: return "Tills grass, dirt, mud or clay (right click): seeds only grow on tilled soil.";
                 case Items.Bow: return "Hunts animals. Hold the left button to draw, let go to shoot; a shot in the head does double damage.";
                 case Items.Arrow: return "Shot with the bow. An arrow lies where it lands: right click on it to pick it up.";
+                case Items.Chest: return "Holds tools, seeds, food and the like, up to 150 kg. Hold it and right click on the ground to place it; right click on it to open it. Only you and the players you allow can open it.";
+                case Items.Stockpile: return "Holds blocks and wood: nine piles of 27 on a patch of flat ground, 3 by 3. Hold it and right click to place it in front of you; right click on it to open it.";
             }
 
-            if (item == Items.Wood) return "Felled from trees and shrubs: the bigger the plant, the more wood.";
+            if (Items.IsWood(item)) return $"From {Article(PlantName(Items.WoodSpecies(item), ecosystemSync).ToLowerInvariant())} once felled: each log on the ground gives one. Counted with the blocks, and kept on a stockpile.";
             if (item == Items.Straw) return "Left over when wheat is harvested.";
             return "A building block. Hold it and right click to place it.";
         }
@@ -115,9 +122,11 @@ namespace Voxel.Client
         {
             if (Items.IsSeed(item)) return $"Seed_{ecosystemSync.PlantName(Items.SeedSpecies(item))}";
             if (Items.IsProduce(item)) return $"Produce_{ecosystemSync.PlantName(Items.ProduceSpecies(item))}";
-            if (item == Items.Wood) return "Wood";
+            if (Items.IsWood(item)) return $"Wood_{ecosystemSync.PlantName(Items.WoodSpecies(item))}";
             if (item == Items.Straw) return "Straw";
             if (item == Items.Arrow) return "Arrow";
+            if (item == Items.Chest) return "Chest";
+            if (item == Items.Stockpile) return "Stockpile";
             if (Items.IsTool(item)) return $"Tool_{Items.NameOf(item)}";
             return $"Block_{item}";
         }

@@ -73,7 +73,7 @@ namespace Voxel.Client
             screen.style.display = player != null ? DisplayStyle.Flex : DisplayStyle.None;
             if (player == null) return;
 
-            hints.style.display = inventoryScreen.IsOpen ? DisplayStyle.None : DisplayStyle.Flex;
+            hints.style.display = inventoryScreen.IsOpen || StorageScreen.IsOpen ? DisplayStyle.None : DisplayStyle.Flex;
             ShowClock();
             ShowDraw();
 

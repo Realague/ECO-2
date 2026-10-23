@@ -1,0 +1,137 @@
+/* The storage screen: the inventory's look (Inventory.uss), the player's bag on the left and the
+   storage on the right, or its access list. Sizes are for the 1920 x 1080 reference resolution; the
+   bottom is left free for the hotbar. */
+
+.storage-half {
+    flex-grow: 1;
+    flex-basis: 0;
+}
+
+.storage-half--right {
+    margin-left: 12px;
+}
+
+.storage-owner {
+    font-size: 19px;
+    color: var(--text-muted);
+    margin: 0;
+    padding: 0;
+}
+
+/* What the storage does not take, in the bag. */
+.item-slot--dimmed,
+.item-slot--dimmed:hover {
+    opacity: 0.32;
+    border-color: var(--inv-slot-border);
+    background-color: var(--inv-slot);
+}
+
+/* A stockpile's piles, three by three as they stand on the ground. */
+.pile-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 420px;
+    align-self: center;
+    margin-top: 12px;
+}
+
+.pile-slot {
+    width: 128px;
+    height: 128px;
+}
+
+.pile-count {
+    font-size: 17px;
+}
+
+.storage-footer {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 14px;
+}
+
+.storage-hint {
+    flex-grow: 1;
+    flex-direction: row;
+    align-items: center;
+}
+
+.storage-hint > .key {
+    margin-right: 8px;
+}
+
+.storage-hint-text {
+    font-size: 16px;
+    color: var(--text-muted);
+    margin: 0 18px 0 0;
+    padding: 0;
+}
+
+.storage-pickup {
+    height: 44px;
+    padding: 0 20px;
+}
+
+/* The access list: a row per player, their name, whether they are here, and a toggle. */
+.access-page {
+    flex-grow: 1;
+    width: 1100px;
+    align-self: flex-start;
+}
+
+.access-note {
+    font-size: 18px;
+    color: var(--text-muted);
+    white-space: normal;
+    margin: 0 0 18px 0;
+    padding: 0;
+}
+
+.access-list {
+    flex-grow: 1;
+}
+
+.access-row {
+    flex-direction: row;
+    align-items: center;
+    height: 64px;
+    padding: 0 16px;
+    margin-bottom: 8px;
+    background-color: var(--inv-slot);
+    border-width: 1px;
+    border-color: var(--inv-slot-border);
+    border-radius: 6px;
+}
+
+.access-dot {
+    width: 12px;
+    height: 12px;
+    margin-right: 14px;
+    border-radius: 6px;
+    background-color: var(--text-muted);
+}
+
+.access-dot--online {
+    background-color: var(--vitamins);
+}
+
+.access-name {
+    flex-grow: 1;
+    font-size: 21px;
+    color: var(--text);
+    margin: 0;
+    padding: 0;
+}
+
+.access-state {
+    font-size: 17px;
+    color: var(--text-muted);
+    margin: 0 18px 0 0;
+    padding: 0;
+}
+
+.access-toggle {
+    height: 42px;
+    min-width: 130px;
+    padding: 0 16px;
+}

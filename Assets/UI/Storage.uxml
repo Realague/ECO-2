@@ -1,0 +1,86 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="Common.uss" />
+    <Style src="Inventory.uss" />
+    <Style src="Storage.uss" />
+
+    <!-- StorageScreen fills both grids (the player's bag, the storage's items or piles), the weight or
+         fill of the storage, its access list for the owner, and moves the dragged item's ghost. -->
+    <ui:VisualElement name="screen" class="screen inventory-screen storage-screen">
+        <ui:VisualElement class="inventory-tabs">
+            <ui:Button name="tab-storage" class="inventory-tab inventory-tab--selected">
+                <ui:VisualElement class="icon icon--tab-inventory inventory-tab-icon" />
+                <ui:Label name="tab-storage-text" text="Chest" class="inventory-tab-text" />
+            </ui:Button>
+            <ui:Button name="tab-access" class="inventory-tab">
+                <ui:VisualElement class="icon icon--lock inventory-tab-icon" />
+                <ui:Label text="Access" class="inventory-tab-text" />
+            </ui:Button>
+            <ui:VisualElement class="inventory-tabs-space" />
+            <ui:Label name="storage-owner" class="storage-owner" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="storage-page" class="inventory-frame">
+            <!-- The player's bag: what the storage does not take is greyed. -->
+            <ui:VisualElement class="inventory-main storage-half">
+                <ui:VisualElement class="items">
+                    <ui:VisualElement class="items-heading">
+                        <ui:Label name="bag-title" text="Your bag" class="column-title items-title" />
+                        <ui:VisualElement class="carry-count" tooltip="Blocks carried (40 at most)">
+                            <ui:VisualElement class="icon icon--backpack carry-count-icon" />
+                            <ui:Label name="carry-blocks" class="carry-count-text" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="carry-count" tooltip="Weight of everything else (30 kg at most)">
+                            <ui:VisualElement class="icon icon--scales carry-count-icon" />
+                            <ui:Label name="carry-weight" class="carry-count-text" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="bag-well" class="item-well">
+                        <ui:ScrollView name="bag-grid" class="item-grid" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- The storage: a chest's items, or a stockpile's nine piles. -->
+            <ui:VisualElement class="inventory-main storage-half storage-half--right">
+                <ui:VisualElement class="items">
+                    <ui:VisualElement class="items-heading">
+                        <ui:Label name="store-title" text="In the chest" class="column-title items-title" />
+                        <ui:VisualElement class="carry-count">
+                            <ui:VisualElement name="store-fill-icon" class="icon icon--scales carry-count-icon" />
+                            <ui:Label name="store-fill" class="carry-count-text" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement name="store-well" class="item-well">
+                        <ui:ScrollView name="store-grid" class="item-grid" />
+                        <ui:VisualElement name="pile-grid" class="pile-grid" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="storage-footer">
+                        <ui:VisualElement class="storage-hint">
+                            <ui:VisualElement class="key"><ui:Label text="Drag" class="key-text" /></ui:VisualElement>
+                            <ui:Label text="move all" class="storage-hint-text" />
+                            <ui:VisualElement class="key"><ui:Label text="Shift + click" class="key-text" /></ui:VisualElement>
+                            <ui:Label text="move all" class="storage-hint-text" />
+                            <ui:VisualElement class="key"><ui:Label text="Right click" class="key-text" /></ui:VisualElement>
+                            <ui:Label text="move one" class="storage-hint-text" />
+                        </ui:VisualElement>
+                        <ui:Button name="pickup" class="button button--secondary storage-pickup">
+                            <ui:Label name="pickup-text" text="Pick up" class="button-text" />
+                        </ui:Button>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Who may open it, besides its owner: the players with a name. -->
+        <ui:VisualElement name="access-page" class="inventory-main access-page hidden">
+            <ui:VisualElement class="items">
+                <ui:Label text="Who may open it" class="column-title" />
+                <ui:Label text="Players you allow can take and put things in it. They cannot pick it up or allow others." class="access-note" />
+                <ui:Label name="access-empty" text="No other player with a name is connected." class="items-empty" />
+                <ui:ScrollView name="access-list" class="access-list" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="drag-ghost" class="drag-ghost hidden" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>

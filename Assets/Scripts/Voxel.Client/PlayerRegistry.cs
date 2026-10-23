@@ -49,6 +49,32 @@ namespace Voxel.Client
             return true;
         }
 
+        // The connected players: NGO client id and player id.
+        public IEnumerable<KeyValuePair<ulong, string>> Connected => connectedPlayers;
+
+        // The name a known player chose, connected or not (empty if none yet).
+        public string NameOf(string playerId) => store.TryGet(playerId, out PlayerState state) ? state.Name : "";
+
+        public bool IsNameTaken(string name, string playerId) => store.IsNameTaken(name, playerId);
+
+        // The player id of a known player by name (names are unique, ignoring case).
+        public bool TryFindByName(string name, out string playerId)
+        {
+            playerId = null;
+            foreach (KeyValuePair<ulong, string> player in connectedPlayers)
+            {
+                if (PlayerNames.SameName(NameOf(player.Value), name))
+                {
+                    playerId = player.Value;
+                    return true;
+                }
+            }
+
+            return store.TryFindByName(name, out playerId);
+        }
+
+        public bool IsConnected(string playerId) => connectedPlayers.ContainsValue(playerId);
+
         public void Close()
         {
             networkManager.ConnectionApprovalCallback = null;

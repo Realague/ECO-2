@@ -16,7 +16,7 @@ using Voxel.Core;
 //   rendered by a camera in a preview scene, on black then on white to recover the transparency;
 // - a seed (Seed_<species>.png) is a pouch tinted like the plant with the plant in front of it;
 // - a crop (Produce_<species>.png) is a pile of fruit of its model's last stage, or the plant;
-// - wood and straw (Wood.png, Straw.png) are a log and a sheaf made of a few shapes;
+// - each tree's wood (Wood_<asset>.png) is a pile of logs in its bark, straw (Straw.png) a sheaf;
 // - tools and the arrow (Tool_<name>.png, Arrow.png) are painted as illustrations (ToolIconPainter).
 // Species are found by asset in Assets/Species and named after the asset, so the icons do not depend
 // on the order of species. Every file is written again; rerun the menu after adding a species.
@@ -60,19 +60,24 @@ public static class ItemIconBuilder
                 Write($"Plant_{asset.name}", plant);
                 Write($"Seed_{asset.name}", seed);
                 Write($"Produce_{asset.name}", produce ?? plant);
+                if (asset.WoodYield > 0)
+                {
+                    Texture2D wood = renderer.Render(LogParts(asset.BarkMaterial != null ? SpeciesAsset.WoodMaterialFrom(asset.BarkMaterial, asset.WoodColour) : null), 20f, 1.1f);
+                    Write($"Wood_{asset.name}", wood);
+                    UnityEngine.Object.DestroyImmediate(wood);
+                    written++;
+                }
+
                 UnityEngine.Object.DestroyImmediate(seed);
                 if (produce != null) UnityEngine.Object.DestroyImmediate(produce);
                 UnityEngine.Object.DestroyImmediate(plant);
                 written += 3;
             }
 
-            Texture2D wood = renderer.Render(LogParts(), 20f, 1.1f);
-            Write("Wood", wood);
-            UnityEngine.Object.DestroyImmediate(wood);
             Texture2D straw = renderer.Render(SheafParts(), 20f, 1.1f);
             Write("Straw", straw);
             UnityEngine.Object.DestroyImmediate(straw);
-            written += 2;
+            written++;
 
             foreach (int tool in Items.Tools)
             {
@@ -86,6 +91,14 @@ public static class ItemIconBuilder
             Write("Arrow", arrow);
             UnityEngine.Object.DestroyImmediate(arrow);
             written++;
+
+            Texture2D chest = renderer.Render(ChestParts(), 22f, 1.0f);
+            Write("Chest", chest);
+            UnityEngine.Object.DestroyImmediate(chest);
+            Texture2D stockpile = renderer.Render(StockpileParts(), 32f, 0.95f);
+            Write("Stockpile", stockpile);
+            UnityEngine.Object.DestroyImmediate(stockpile);
+            written += 2;
         }
         finally
         {
@@ -346,10 +359,10 @@ public static class ItemIconBuilder
         return colour;
     }
 
-    // Three logs, stacked.
-    private static IReadOnlyList<SpeciesAsset.Part> LogParts()
+    // Three logs, stacked, in a tree's wood (its bark's grain in its wood's colour; the plain trunk's without one).
+    private static IReadOnlyList<SpeciesAsset.Part> LogParts(Material bark)
     {
-        var material = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/PlantTrunk.mat");
+        Material material = bark != null ? bark : AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/PlantTrunk.mat");
         Mesh cylinder = Resources.GetBuiltinResource<Mesh>("Cylinder.fbx");
         var parts = new List<SpeciesAsset.Part>();
         Vector3[] offsets = { new Vector3(-0.32f, 0f, 0f), new Vector3(0.32f, 0f, 0f), new Vector3(0f, 0.55f, 0f) };
@@ -359,6 +372,71 @@ public static class ItemIconBuilder
         }
 
         return parts;
+    }
+
+    // A closed chest, as placed chests are drawn (ChestShapes), its front toward the camera.
+    private static IReadOnlyList<SpeciesAsset.Part> ChestParts()
+    {
+        var wood = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/ArrowShaft.mat");
+        var iron = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/ArrowHead.mat");
+        var parts = new List<SpeciesAsset.Part>();
+        AddBoxes(parts, ChestShapes.BodyWood, Vector3.zero, wood);
+        AddBoxes(parts, ChestShapes.BodyIron, Vector3.zero, iron);
+        AddBoxes(parts, ChestShapes.LidWood, ChestShapes.Hinge, wood);
+        AddBoxes(parts, ChestShapes.LidIron, ChestShapes.Hinge, iron);
+        return parts;
+    }
+
+    // The camera looks toward +z: the chest is mirrored so that its front (+z) faces it.
+    private static void AddBoxes(List<SpeciesAsset.Part> parts, IEnumerable<(Vector3 centre, Vector3 size)> boxes, Vector3 origin, Material material)
+    {
+        Mesh cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+        foreach ((Vector3 centre, Vector3 size) in boxes)
+        {
+            Vector3 at = origin + centre;
+            parts.Add(new SpeciesAsset.Part { mesh = cube, material = material, offset = new Vector3(at.x, at.y, -at.z), scale = size });
+        }
+    }
+
+    // A stockpile: a frame of planks around nine cells, piles of small stone and dirt cubes on some.
+    private static IReadOnlyList<SpeciesAsset.Part> StockpileParts()
+    {
+        var plank = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/ArrowShaft.mat");
+        var stone = Tinted(new Color(0.55f, 0.55f, 0.57f));
+        var dirt = Tinted(new Color(0.47f, 0.33f, 0.22f));
+        Mesh cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+        var parts = new List<SpeciesAsset.Part>();
+        const float side = 3f;
+        const float thick = 0.12f;
+        parts.Add(new SpeciesAsset.Part { mesh = cube, material = plank, offset = new Vector3(side * 0.5f, 0.08f, -thick * 0.5f), scale = new Vector3(side + 2f * thick, 0.16f, thick) });
+        parts.Add(new SpeciesAsset.Part { mesh = cube, material = plank, offset = new Vector3(side * 0.5f, 0.08f, side + thick * 0.5f), scale = new Vector3(side + 2f * thick, 0.16f, thick) });
+        parts.Add(new SpeciesAsset.Part { mesh = cube, material = plank, offset = new Vector3(-thick * 0.5f, 0.08f, side * 0.5f), scale = new Vector3(thick, 0.16f, side) });
+        parts.Add(new SpeciesAsset.Part { mesh = cube, material = plank, offset = new Vector3(side + thick * 0.5f, 0.08f, side * 0.5f), scale = new Vector3(thick, 0.16f, side) });
+
+        // Piles of 27, 18, 9 and 14 small cubes, a third of a cell each.
+        (int cellX, int cellZ, int count, Material material)[] piles =
+        {
+            (2, 2, 27, stone), (1, 2, 18, stone), (2, 1, 14, dirt), (0, 2, 9, dirt), (1, 1, 5, dirt)
+        };
+        foreach ((int cellX, int cellZ, int count, Material material) in piles)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                int spot = i % 9;
+                var centre = new Vector3(cellX + (spot % 3 + 0.5f) / 3f, (i / 9 + 0.5f) / 3f, cellZ + (spot / 3 + 0.5f) / 3f);
+                parts.Add(new SpeciesAsset.Part { mesh = cube, material = material, offset = centre, scale = Vector3.one * 0.3f });
+            }
+        }
+
+        return parts;
+    }
+
+    private static Material Tinted(Color colour)
+    {
+        var material = new Material(AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/PlantTrunk.mat"));
+        material.SetTexture("_BaseMap", null);
+        material.SetColor("_BaseColor", colour);
+        return material;
     }
 
     // A sheaf: stalks standing together, tied in the middle.

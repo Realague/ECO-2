@@ -32,6 +32,7 @@ MonoBehaviour:
   floatsOnWater: 0
   needsShade: 0
   woodYield: 3
+  woodColour: {r: 0.83, g: 0.74, b: 0.58, a: 1}
   harvest: 0
   produceName: 
   produceYield: 3

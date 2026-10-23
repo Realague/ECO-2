@@ -194,3 +194,49 @@
     margin: 0;
     padding: 0;
 }
+
+/* The name, above the appearance: a field like the main menu's, the reason under it when refused. */
+.name-row {
+    flex-direction: row;
+    align-items: flex-start;
+    padding: 14px 16px 14px 18px;
+    margin-bottom: 8px;
+}
+
+.name-row > .option-label {
+    margin-top: 14px;
+}
+
+.name-field-box {
+    flex-grow: 1;
+}
+
+.name-field {
+    margin: 0;
+}
+
+.name-field > .unity-base-text-field__input,
+.name-field > .unity-text-field__input {
+    height: 54px;
+    padding: 0 16px;
+    font-size: 23px;
+    color: var(--text);
+    background-color: var(--well);
+    border-width: 1px;
+    border-color: var(--control-border);
+    border-radius: 10px;
+    --unity-cursor-color: var(--text);
+}
+
+.name-field:focus > .unity-base-text-field__input,
+.name-field:focus > .unity-text-field__input {
+    border-color: var(--accent);
+}
+
+.name-error {
+    font-size: 17px;
+    color: var(--danger);
+    white-space: normal;
+    margin: 6px 0 0 0;
+    padding: 0;
+}

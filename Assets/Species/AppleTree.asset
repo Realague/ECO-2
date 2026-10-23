@@ -32,6 +32,7 @@ MonoBehaviour:
   floatsOnWater: 0
   needsShade: 0
   woodYield: 3
+  woodColour: {r: 0.78, g: 0.56, b: 0.42, a: 1}
   harvest: 2
   produceName: Apple
   produceYield: 6

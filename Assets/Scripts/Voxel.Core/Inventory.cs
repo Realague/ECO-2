@@ -73,7 +73,7 @@ namespace Voxel.Core
             int entries = reader.ReadInt32();
             for (int i = 0; i < entries; i++)
             {
-                int item = reader.ReadInt32();
+                int item = Items.Upgrade(reader.ReadInt32());
                 int count = reader.ReadInt32();
                 if (Items.IsRetired(item)) continue;
 

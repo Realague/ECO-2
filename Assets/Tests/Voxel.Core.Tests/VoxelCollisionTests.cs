@@ -61,6 +61,26 @@ namespace Voxel.Core.Tests
             Assert.AreEqual(12f - HalfWidth, result.Position.X, Tolerance);
         }
 
+        // A cell named solid besides the blocks (placed storage) stops a walker and carries one.
+        [Test]
+        public void Move_ExtraSolidCell_StopsAndCarries()
+        {
+            World world = FlatGenerator.CreateWorld();
+            int ground = FlatGenerator.GroundHeight;
+            bool Chest(int x, int y, int z) => x == 12 && y == ground && z == 8;
+            var start = new Vector3(8.5f, ground + 0.001f, 8.5f);
+
+            MoveResult walked = VoxelCollision.Move(world, start, HalfWidth, Height, new Vector3(6f, 0f, 0f), Chest);
+            MoveResult landed = VoxelCollision.Move(world, new Vector3(12.5f, ground + 1.5f, 8.5f), HalfWidth, Height, new Vector3(0f, -1f, 0f), Chest);
+            MoveResult without = VoxelCollision.Move(world, start, HalfWidth, Height, new Vector3(6f, 0f, 0f));
+
+            Assert.IsTrue(walked.HitWall);
+            Assert.AreEqual(12f - HalfWidth, walked.Position.X, Tolerance);
+            Assert.IsTrue(landed.Grounded);
+            Assert.AreEqual(ground + 1f, landed.Position.Y, Tolerance);
+            Assert.IsFalse(without.HitWall, "nothing extra without the predicate");
+        }
+
         [Test]
         public void Move_JumpingUnderCeiling_StopsBelowIt()
         {

@@ -579,6 +579,7 @@ GameObject:
   - component: {fileID: 490447455}
   - component: {fileID: 490447457}
   - component: {fileID: 490447456}
+  - component: {fileID: 490447458}
   m_Layer: 0
   m_Name: GameSession
   m_TagString: Untagged
@@ -607,6 +608,7 @@ MonoBehaviour:
   bowSync: {fileID: 490447455}
   miningSync: {fileID: 490447457}
   logSync: {fileID: 490447456}
+  storageSync: {fileID: 490447458}
   appearanceSync: {fileID: 490447452}
   commandSync: {fileID: 490447453}
   appearanceMenu: {fileID: 490447451}
@@ -646,6 +648,7 @@ MonoBehaviour:
   voxelWorld: {fileID: 1566503039}
   inventorySync: {fileID: 490447450}
   ecosystemSync: {fileID: 490447448}
+  storageSync: {fileID: 490447458}
 --- !u!114 &490447448
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -856,8 +859,105 @@ MonoBehaviour:
   ecosystemSync: {fileID: 490447448}
   inventorySync: {fileID: 490447450}
   hungerSync: {fileID: 490447454}
+  storageSync: {fileID: 490447458}
   crackMaterial: {fileID: 2100000, guid: 341a025f25f71654d9010b1edd2ff0be, type: 2}
   chipMaterial: {fileID: 2100000, guid: 97d107f19ba5224459f56d2911206ee9, type: 2}
+--- !u!114 &490447458
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 490447444}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a619e5e8dce422a409b78031fee274e4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.StorageSync
+  networkManager: {fileID: 947039382}
+  worldSync: {fileID: 490447447}
+  inventorySync: {fileID: 490447450}
+  ecosystemSync: {fileID: 490447448}
+  logSync: {fileID: 490447456}
+  woodMaterial: {fileID: 2100000, guid: 17965ac439377474abca152ff17c9021, type: 2}
+  ironMaterial: {fileID: 2100000, guid: 582f92c22b627724db3f3da36c5b3b4f, type: 2}
+  voxelWorld: {fileID: 1566503039}
+--- !u!1 &632794196
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 632794199}
+  - component: {fileID: 632794198}
+  - component: {fileID: 632794197}
+  m_Layer: 0
+  m_Name: StorageUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &632794197
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 632794196}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cc7720ed60cb2b44680db70fde552ebd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.StorageScreen
+  document: {fileID: 632794198}
+  networkManager: {fileID: 947039382}
+  worldSync: {fileID: 490447447}
+  inventorySync: {fileID: 490447450}
+  storageSync: {fileID: 490447458}
+  ecosystemSync: {fileID: 490447448}
+  appearanceMenu: {fileID: 490447451}
+  hotbar: {fileID: 408005230}
+--- !u!114 &632794198
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 632794196}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
+  m_PanelSettings: {fileID: 11400000, guid: 9beb8dfdb858f10469eecb5a078a09e6, type: 2}
+  m_ParentUI: {fileID: 0}
+  sourceAsset: {fileID: 9197481963319205126, guid: 2672e601e02c9644ebc4f16c40b51346, type: 3}
+  m_SortingOrder: 2
+  m_Position: 0
+  m_WorldSpaceSizeMode: 1
+  m_WorldSpaceWidth: 1920
+  m_WorldSpaceHeight: 1080
+  m_PivotReferenceSize: 0
+  m_Pivot: 0
+  m_WorldSpaceCollider: {fileID: 0}
+--- !u!4 &632794199
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 632794196}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &822296571
 GameObject:
   m_ObjectHideFlags: 0
@@ -1758,6 +1858,7 @@ MonoBehaviour:
   networkManager: {fileID: 947039382}
   worldSync: {fileID: 490447447}
   ecosystemSync: {fileID: 490447448}
+  storageSync: {fileID: 490447458}
   appearanceMenu: {fileID: 490447451}
   mapScreen: {fileID: 822296572}
   inventoryScreen: {fileID: 1141440427}
@@ -1824,3 +1925,4 @@ SceneRoots:
   - {fileID: 408005232}
   - {fileID: 1141440429}
   - {fileID: 1863226321}
+  - {fileID: 632794199}

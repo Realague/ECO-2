@@ -44,6 +44,7 @@ namespace Voxel.Client
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private HungerSync hungerSync;
+        [SerializeField] private StorageSync storageSync;
         [SerializeField] private Material crackMaterial;
         [SerializeField] private Material chipMaterial;
 
@@ -335,6 +336,9 @@ namespace Voxel.Client
             needed = MiningRules.HitsToBreak(type);
             calories = HungerRules.PerHit(needed);
             if (world == null || needed <= 0 || Blocks.TypeOf(type) != Blocks.TypeOf(seen)) return false;
+
+            // What storage stands on stays (the player is told before swinging, PlayerController).
+            if (storageSync != null && storageSync.StandsOn(pos)) return false;
 
             Vector3 eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;
             if (!BlockEditRules.IsAllowed(world, eyes.ToNumerics(), pos, Blocks.Air)) return false;

@@ -6,10 +6,19 @@
          named options; rows with swatches pick a colour. -->
     <ui:VisualElement name="screen" class="screen">
         <ui:VisualElement name="panel" class="panel">
-            <ui:Label text="Create your character" class="title" />
+            <ui:Label name="title" text="Create your character" class="title" />
             <ui:VisualElement class="subtitle">
                 <ui:VisualElement class="icon icon--lock" />
-                <ui:Label text="This is how other players will see you. The choice is final." class="subtitle-text" />
+                <ui:Label name="subtitle" text="This is how other players will see you. The choice is final." class="subtitle-text" />
+            </ui:VisualElement>
+
+            <!-- The name others see; checked here as it is typed, then by the server (unique). -->
+            <ui:VisualElement name="row-name" class="name-row">
+                <ui:Label text="Name" class="option-label" />
+                <ui:VisualElement class="name-field-box">
+                    <ui:TextField name="name-field" max-length="16" class="name-field" />
+                    <ui:Label name="name-error" class="name-error hidden" />
+                </ui:VisualElement>
             </ui:VisualElement>
 
             <ui:VisualElement name="row-sex" class="option">
@@ -77,7 +86,7 @@
 
         <ui:VisualElement name="confirm-dialog" class="dialog-backdrop hidden">
             <ui:VisualElement class="dialog">
-                <ui:Label text="Keep this appearance? It cannot be changed later." class="dialog-text" />
+                <ui:Label name="dialog-text" text="Keep this appearance? It cannot be changed later." class="dialog-text" />
                 <ui:VisualElement class="dialog-buttons">
                     <ui:Button name="dialog-back" class="button button--secondary">
                         <ui:Label text="Back" class="button-text" />

@@ -7,6 +7,8 @@ namespace Voxel.Core
         public const float Straw = 0.3f;
         public const float Seed = 0.01f;
         public const float Arrow = 0.05f;
+        public const float Chest = 4f;
+        public const float Stockpile = 2f;
 
         private readonly float[] produce;
 
@@ -19,6 +21,8 @@ namespace Voxel.Core
         {
             if (item == Items.Straw) return Straw;
             if (item == Items.Arrow) return Arrow;
+            if (item == Items.Chest) return Chest;
+            if (item == Items.Stockpile) return Stockpile;
             if (Items.IsSeed(item)) return Seed;
             switch (item)
             {

@@ -9,10 +9,12 @@ using Cursor = UnityEngine.Cursor;
 
 namespace Voxel.Client
 {
-    // Character creation, shown at a player's first connection: sex, skin tone, eye colour, hair style,
-    // hair colour and facial hair, previewed on the player's own model, which the camera faces while
-    // the menu is open (PlayerController; it comes close to the face for the eyes and facial hair).
-    // The choice is final, so confirming asks once more.
+    // Character creation, shown at a player's first connection: the name others see (PlayerNames,
+    // unique on the server), then sex, skin tone, eye colour, hair style, hair colour and facial hair,
+    // previewed on the player's own model, which the camera faces while the menu is open
+    // (PlayerController; it comes close to the face for the eyes and facial hair). A player who has an
+    // appearance but no name yet (a save from before names) gets the name alone. The choice is final,
+    // so confirming asks once more; a name the server refuses brings the menu back with the reason.
     //
     // The screen is a UI Toolkit document (Assets/UI/CharacterCreation.uxml and its style sheets):
     // this class only fills it in and reacts to it. It works with the mouse (arrows, colour swatches,
@@ -54,9 +56,20 @@ namespace Voxel.Client
         private readonly List<VisualElement>[] swatches = new List<VisualElement>[RowCount];
         private VisualElement screen;
         private VisualElement confirmDialog;
+        private Label title;
+        private Label subtitle;
+        private Label dialogText;
+        private TextField nameField;
+        private Label nameError;
+        private Button confirmButton;
 
         private PlayerModel model;
         private PlayerModel confirmedModel;
+
+        // The model whose appearance was sent: if its name is refused, only the name is asked again.
+        private PlayerModel appearanceSentFor;
+        private bool nameOnly;
+        private string refusal;
         private Appearance choice;
         private Row row;
         private bool confirming;
@@ -66,19 +79,25 @@ namespace Voxel.Client
         public bool IsOpen { get; private set; }
 
         // True while the eye colour or the facial hair is being chosen: the camera then frames the face.
-        public bool ShowsFace => IsOpen && !confirming && (row == Row.EyeColor || row == Row.FacialHair);
+        public bool ShowsFace => IsOpen && !confirming && !nameOnly && (row == Row.EyeColor || row == Row.FacialHair);
 
         // After every OnEnable, so that the document has built its elements.
         private void Start()
         {
             Bind(document.rootVisualElement);
             screen.style.display = DisplayStyle.None;
+            appearanceSync.NameRefused += OnNameRefused;
+        }
+
+        private void OnDestroy()
+        {
+            if (appearanceSync != null) appearanceSync.NameRefused -= OnNameRefused;
         }
 
         private void Update()
         {
             PlayerModel local = LocalModel();
-            bool needed = local != null && worldSync.World != null && !local.HasChosenAppearance && local != confirmedModel;
+            bool needed = local != null && worldSync.World != null && (!local.HasChosenAppearance || !local.HasChosenName) && local != confirmedModel;
 
             if (needed && !IsOpen) Open(local);
             else if (!needed && IsOpen) Close();
@@ -97,12 +116,59 @@ namespace Voxel.Client
                 return;
             }
 
+            // While the name is typed, the keys are its letters: only Enter goes on.
+            if (nameField.focusController?.focusedElement == nameField)
+            {
+                if (enter) AskToConfirm();
+                return;
+            }
+
+            if (nameOnly)
+            {
+                if (enter) AskToConfirm();
+                return;
+            }
+
             // Arrows, or the ZQSD keys (physical W/A/S/D positions).
             if (keyboard.upArrowKey.wasPressedThisFrame || keyboard.wKey.wasPressedThisFrame) Select((Row)(((int)row + RowCount - 1) % RowCount));
             if (keyboard.downArrowKey.wasPressedThisFrame || keyboard.sKey.wasPressedThisFrame) Select((Row)(((int)row + 1) % RowCount));
             if (keyboard.leftArrowKey.wasPressedThisFrame || keyboard.aKey.wasPressedThisFrame) Step(row, -1);
             if (keyboard.rightArrowKey.wasPressedThisFrame || keyboard.dKey.wasPressedThisFrame) Step(row, 1);
-            if (enter) SetConfirming(true);
+            if (enter) AskToConfirm();
+        }
+
+        // Asks once more, if the name is valid; otherwise says what a name may be.
+        private void AskToConfirm()
+        {
+            if (!PlayerNames.TryNormalize(nameField.value, out _))
+            {
+                ShowNameError(AppearanceSync.NameRules);
+                nameField.Focus();
+                return;
+            }
+
+            SetConfirming(true);
+        }
+
+        private void OnNameChanged(ChangeEvent<string> changed)
+        {
+            refusal = null;
+            bool valid = PlayerNames.TryNormalize(changed.newValue, out _);
+            confirmButton.SetEnabled(valid);
+            ShowNameError(valid || changed.newValue.Trim().Length < PlayerNames.MinLength ? null : AppearanceSync.NameRules);
+        }
+
+        private void ShowNameError(string message)
+        {
+            nameError.text = message ?? "";
+            nameError.EnableInClassList(HiddenClass, string.IsNullOrEmpty(message));
+        }
+
+        // The server refused the name: the menu comes back (the name alone if the appearance went through).
+        private void OnNameRefused(string reason)
+        {
+            refusal = reason;
+            confirmedModel = null;
         }
 
         // While the button pressed outside the panel is held, the mouse turns the character.
@@ -124,6 +190,14 @@ namespace Voxel.Client
         {
             screen = root.Q("screen");
             confirmDialog = root.Q("confirm-dialog");
+            title = root.Q<Label>("title");
+            subtitle = root.Q<Label>("subtitle");
+            dialogText = root.Q<Label>("dialog-text");
+            nameError = root.Q<Label>("name-error");
+            nameField = root.Q<TextField>("name-field");
+            nameField.maxLength = PlayerNames.MaxLength;
+            nameField.RegisterValueChangedCallback(OnNameChanged);
+            confirmButton = root.Q<Button>("confirm");
 
             // A press on the screen itself, not on the panel or the dialog, starts turning the character.
             screen.RegisterCallback<PointerDownEvent>(pressed =>
@@ -146,7 +220,7 @@ namespace Voxel.Client
                 if (palette != null) swatches[i] = CreateSwatches(palette, line);
             }
 
-            Connect(root.Q<Button>("confirm"), () => SetConfirming(true));
+            Connect(confirmButton, AskToConfirm);
             Connect(root.Q<Button>("dialog-back"), () => SetConfirming(false));
             Connect(root.Q<Button>("dialog-confirm"), Confirm);
         }
@@ -188,11 +262,25 @@ namespace Voxel.Client
             IsOpen = true;
             turning = false;
             yaw = 0f;
+            nameOnly = local.HasChosenAppearance || local == appearanceSentFor;
+            for (int i = 0; i < RowCount; i++)
+            {
+                rows[i].EnableInClassList(HiddenClass, nameOnly);
+            }
+
+            title.text = nameOnly ? "Choose your name" : "Create your character";
+            subtitle.text = nameOnly
+                ? "Players now have names: this is how others will know you. The choice is final."
+                : "This is how other players will see you. The choice is final.";
+            dialogText.text = nameOnly ? "Keep this name? It cannot be changed later." : "Keep this name and appearance? They cannot be changed later.";
+            confirmButton.SetEnabled(PlayerNames.TryNormalize(nameField.value, out _));
+            ShowNameError(refusal);
             SetConfirming(false);
             screen.style.display = DisplayStyle.Flex;
             Cursor.lockState = CursorLockMode.None;
             model.SetHeadVisible(true);
             Refresh();
+            nameField.schedule.Execute(() => nameField.Focus());
         }
 
         private void Close()
@@ -243,9 +331,16 @@ namespace Voxel.Client
 
         private void Confirm()
         {
-            if (!IsOpen) return;
+            if (!IsOpen || !PlayerNames.TryNormalize(nameField.value, out string name)) return;
 
-            appearanceSync.RequestAppearance(choice);
+            if (!nameOnly)
+            {
+                appearanceSync.RequestAppearance(choice);
+                appearanceSentFor = model;
+            }
+
+            refusal = null;
+            appearanceSync.RequestName(name);
             confirmedModel = model;
             Close();
         }

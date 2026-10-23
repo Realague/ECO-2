@@ -932,7 +932,8 @@ namespace Voxel.Client
 
             SpeciesAsset asset = speciesAssets[plant.SpeciesIndex];
             rewards.Clear();
-            if (plant.Growth >= 1f) rewards.Add((Items.Seed(plant.SpeciesIndex), 1));
+            int seeds = MiningRules.SeedsFromFelling(plant.Growth >= 1f, UnityEngine.Random.value);
+            if (seeds > 0) rewards.Add((Items.Seed(plant.SpeciesIndex), seeds));
             if (asset.Harvest != HarvestKind.None) AddCrop(plant.SpeciesIndex, plant.RipeStage, false);
             GiveRewards(clientId);
 
@@ -1068,8 +1069,9 @@ namespace Voxel.Client
 
         // Server side: sprouts a seed in the column a player is aiming at, if it is within their
         // reach and the ground, the room and the fertility allow it.
-        public bool TryPlantSeed(ulong clientId, int speciesIndex, int x, int z)
+        public bool TryPlantSeed(ulong clientId, int speciesIndex, int x, int z, out SowRefusal refusal)
         {
+            refusal = SowRefusal.None;
             if (ecosystem == null || speciesIndex < 0 || speciesIndex >= species.Count) return false;
             if (!networkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client)) return false;
             if (client.PlayerObject == null) return false;
@@ -1080,11 +1082,22 @@ namespace Voxel.Client
             float maxDistance = PlayerRules.Reach + BlockEditRules.ReachTolerance;
             if (dx * dx + dz * dz > maxDistance * maxDistance) return false;
 
-            // A player sows only on soil they tilled (the bed, for a plant rooted in shallow water).
-            if (!IsTilled(serverWorld, x, z)) return false;
+            // A tree's seed goes into its own ground; a crop's only into soil the player tilled (the
+            // bed, for a plant rooted in shallow water).
+            if (!IsTree(speciesIndex) && !IsTilled(serverWorld, x, z))
+            {
+                refusal = SowRefusal.NotTilled;
+                return false;
+            }
 
-            return ecosystem.TryPlant(speciesIndex, x, z);
+            // The natural rules without their draw: either it sprouts or the player is told why.
+            PlantRefusal why = ecosystem.TryPlantByPlayer(speciesIndex, x, z);
+            refusal = (SowRefusal)why;
+            return why == PlantRefusal.None;
         }
+
+        // A species that gives wood: its seeds are sown by anyone, straight into its ground.
+        public bool IsTree(int speciesIndex) => (uint)speciesIndex < (uint)speciesAssets.Length && speciesAssets[speciesIndex].WoodYield > 0;
 
         // Whether the topmost solid block of a column is tilled soil.
         internal static bool IsTilled(World world, int x, int z)
@@ -1097,6 +1110,15 @@ namespace Voxel.Client
         public bool IsAnimalInside(BlockPos pos)
         {
             return ecosystem != null && ecosystem.IsAnimalInside(pos.X, pos.Y, pos.Z);
+        }
+
+        // Whether a plant (or a stump) stands in a column, as this machine shows it.
+        internal bool IsPlantAt(int x, int z) => plantAtColumn.ContainsKey(ColumnKey(x, z));
+
+        // Server side: a column where nothing may sprout, because storage stands there, or no longer.
+        internal void BlockColumn(int x, int z, bool blocked)
+        {
+            ecosystem?.BlockColumn(x, z, blocked);
         }
 
         // Name of a plant species, for display (for instance that of a seed).

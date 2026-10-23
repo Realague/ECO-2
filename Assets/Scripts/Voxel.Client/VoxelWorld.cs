@@ -46,6 +46,10 @@ namespace Voxel.Client
 
         public World World { get; private set; }
 
+        // The blocks' material with the atlas, for what is drawn in block tiles (stockpiles); null on a
+        // server without a display.
+        public Material BlockMaterial => materialInstance;
+
         private void Awake()
         {
             // A server without a display holds the world but does not mesh it.

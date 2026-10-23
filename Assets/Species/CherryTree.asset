@@ -32,6 +32,7 @@ MonoBehaviour:
   floatsOnWater: 0
   needsShade: 0
   woodYield: 3
+  woodColour: {r: 0.7, g: 0.35, b: 0.25, a: 1}
   harvest: 2
   produceName: Cherries
   produceYield: 6

@@ -50,6 +50,8 @@ namespace Voxel.Client
         private BowSync bowSync;
         private MiningSync miningSync;
         private LogSync logSync;
+        private StorageSync storageSync;
+        private StorageScreen storageScreen;
         private HotbarHud hotbar;
         private InventoryScreen inventoryScreen;
         private PlayerModel model;
@@ -87,6 +89,8 @@ namespace Voxel.Client
             bowSync = FindAnyObjectByType<BowSync>();
             miningSync = FindAnyObjectByType<MiningSync>();
             logSync = FindAnyObjectByType<LogSync>();
+            storageSync = FindAnyObjectByType<StorageSync>();
+            storageScreen = FindAnyObjectByType<StorageScreen>();
             hotbar = FindAnyObjectByType<HotbarHud>();
             inventoryScreen = FindAnyObjectByType<InventoryScreen>();
             model = GetComponent<PlayerModel>();
@@ -153,7 +157,7 @@ namespace Voxel.Client
             }
 
             // The full-screen map, the inventory or the command line has the keyboard: the player stands where they are.
-            if ((mapScreen != null && mapScreen.HoldsInput) || (inventoryScreen != null && inventoryScreen.HoldsInput) || CommandConsole.HoldsInput)
+            if ((mapScreen != null && mapScreen.HoldsInput) || (inventoryScreen != null && inventoryScreen.HoldsInput) || StorageScreen.HoldsInput || CommandConsole.HoldsInput)
             {
                 bowSync.CancelDraw();
                 Move(keyboard, false);
@@ -179,6 +183,7 @@ namespace Voxel.Client
             if (hasControl)
             {
                 Interact(mouse);
+                PreviewStorage();
             }
             else
             {
@@ -195,7 +200,7 @@ namespace Voxel.Client
         private void OnGUI()
         {
             if (world == null || (appearanceMenu != null && appearanceMenu.IsOpen) || (mapScreen != null && mapScreen.IsOpen)
-                || (inventoryScreen != null && inventoryScreen.IsOpen)) return;
+                || (inventoryScreen != null && inventoryScreen.IsOpen) || StorageScreen.IsOpen) return;
 
             var crosshair = new Rect(
                 (Screen.width - CrosshairSize) / 2f,
@@ -354,12 +359,37 @@ namespace Voxel.Client
                 return;
             }
 
+            // A chest or a stockpile in hand is placed over the aimed block, facing away from the player.
+            if (Items.IsStorage(held) && StorageRules.TryKindOf(held, out StorageKind kind))
+            {
+                BlockPos cell = hit.Block + hit.Normal;
+                int facing = StorageRules.FacingOf(transform.eulerAngles.y);
+                if (storageSync.CanPlaceHere(kind, cell, facing, transform.position, out _, out StorageRefusal refusal))
+                {
+                    storageSync.RequestPlace(kind, cell, facing);
+                }
+                else
+                {
+                    hotbar.ShowMessage(StorageSync.TextOf(refusal));
+                }
+
+                return;
+            }
+
+            // A tree's seed goes straight into its ground, by anyone; a crop's into tilled soil, by a
+            // gardener. The server applies the natural rules and says why a seed did not take.
             if (Items.IsSeed(held))
             {
-                if (!EcosystemSync.IsTilled(world, hit.Block.X, hit.Block.Z))
+                if (!ecosystemSync.IsTree(Items.SeedSpecies(held)))
                 {
-                    hotbar.ShowMessage("Seeds only grow on tilled soil: use a hoe");
-                    return;
+                    SowRefusal refusal = inventorySync.Speciality != Speciality.Gardener ? SowRefusal.NotGardener
+                        : !EcosystemSync.IsTilled(world, hit.Block.X, hit.Block.Z) ? SowRefusal.NotTilled
+                        : SowRefusal.None;
+                    if (refusal != SowRefusal.None)
+                    {
+                        hotbar.ShowMessage(SowRefusals.TextOf(refusal, ""));
+                        return;
+                    }
                 }
 
                 inventorySync.RequestPlant(held, hit.Block.X, hit.Block.Z);
@@ -371,7 +401,7 @@ namespace Voxel.Client
             BlockPos target = hit.Block + hit.Normal;
             bool insidePlayer = VoxelCollision.IntersectsBlock(
                 transform.position.ToNumerics(), PlayerRules.HalfWidth, PlayerRules.Height, target);
-            if (target != hit.Block && !insidePlayer)
+            if (target != hit.Block && !insidePlayer && !storageSync.IsCovered(target))
             {
                 worldSync.RequestSetBlock(target, Items.BlockOf(held));
             }
@@ -408,6 +438,12 @@ namespace Voxel.Client
                         return;
                     }
 
+                    if (storageSync.StandsOn(hit.Block))
+                    {
+                        hotbar.ShowMessage("Something stands on it");
+                        return;
+                    }
+
                     // A block the player cannot carry stays in place, and the server would refuse it anyway.
                     int drop = Items.DropOf(aimed);
                     if (inventorySync.LocalRoomFor(drop) <= 0)
@@ -428,13 +464,25 @@ namespace Voxel.Client
             if (Items.IsTool(held)) miningSync.TryStartSwing(model, starving);
         }
 
-        // Picks up the log or arrow pointed at, the nearer of the two. Returns false if there is none.
+        // Opens the storage, or picks up the log or arrow, pointed at: the nearest. Returns false if
+        // there is none.
         private bool TryPickUp(float maxDistance)
         {
             Vector3 origin = cameraTransform.position;
             Vector3 forward = cameraTransform.forward;
+            if (storageSync.TryAimed(origin, forward, maxDistance, out int storageId, out float storageDistance))
+            {
+                maxDistance = storageDistance;
+            }
+
             bool log = logSync.TryAimed(origin, forward, maxDistance, out int logId, out float logDistance);
             bool arrow = bowSync.TryAimed(origin, forward, maxDistance, out int arrowId, out float arrowDistance);
+            if (storageId != 0 && !log && !arrow)
+            {
+                storageScreen.Open(storageId);
+                return true;
+            }
+
             if (log && (!arrow || logDistance <= arrowDistance))
             {
                 logSync.RequestPickup(logId);
@@ -445,6 +493,22 @@ namespace Voxel.Client
 
             bowSync.RequestPickup(arrowId);
             return true;
+        }
+
+        // While a chest or a stockpile is in hand, where it would go over the aimed block: green, or
+        // red where it cannot.
+        private void PreviewStorage()
+        {
+            int held = hotbar.SelectedItem;
+            if (!StorageRules.TryKindOf(held, out StorageKind kind) || world == null) return;
+
+            System.Numerics.Vector3 origin = cameraTransform.position.ToNumerics();
+            System.Numerics.Vector3 direction = cameraTransform.forward.ToNumerics();
+            if (!VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, out VoxelHit hit)) return;
+
+            int facing = StorageRules.FacingOf(transform.eulerAngles.y);
+            bool valid = storageSync.CanPlaceHere(kind, hit.Block + hit.Normal, facing, transform.position, out BlockPos position, out _);
+            storageSync.ShowPreview(kind, position, valid);
         }
 
         // The index of a block face (ChunkMesher.FaceNormals) from its normal.
@@ -508,7 +572,8 @@ namespace Voxel.Client
                 transform.position.ToNumerics(),
                 PlayerRules.HalfWidth,
                 PlayerRules.Height,
-                displacement.ToNumerics());
+                displacement.ToNumerics(),
+                storageSync != null ? storageSync.IsSolid : (System.Func<int, int, int, bool>)null);
 
             transform.position = result.Position.ToUnity();
             grounded = result.Grounded;

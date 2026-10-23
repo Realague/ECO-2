@@ -53,7 +53,7 @@ namespace Voxel.Client
         private void Update()
         {
             Texture2D texture = worldMap.Texture;
-            NetworkObject player = texture != null && networkManager.IsListening && !appearanceMenu.IsOpen && !mapScreen.IsOpen && !inventoryScreen.IsOpen
+            NetworkObject player = texture != null && networkManager.IsListening && !appearanceMenu.IsOpen && !mapScreen.IsOpen && !inventoryScreen.IsOpen && !StorageScreen.IsOpen
                 ? networkManager.SpawnManager?.GetLocalPlayerObject()
                 : null;
             screen.style.display = player != null ? DisplayStyle.Flex : DisplayStyle.None;

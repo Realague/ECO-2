@@ -24,6 +24,7 @@ namespace Voxel.Client
     public class InventorySync : MonoBehaviour
     {
         private const string FullMessage = "Inv.Full";
+        private const string SowRefusedMessage = "Inv.SowRefused";
 
         // Arrows in the starting kit, with the tools.
         private const int StartingArrows = 20;
@@ -52,6 +53,9 @@ namespace Voxel.Client
 
         // The local player could not take more, and why.
         public event Action<FullReason> Refused;
+
+        // Raised on the player's machine when a seed they sowed did not sprout, with why and its species.
+        public event Action<SowRefusal, int> SowRefused;
 
         // How many more of an item the local player can carry.
         public int LocalRoomFor(int item) => CarryLimits.Room(Inventory, item, ecosystemSync.ItemWeights);
@@ -88,6 +92,7 @@ namespace Voxel.Client
             running = true;
             Messaging.RegisterNamedMessageHandler(StateMessage, OnState);
             Messaging.RegisterNamedMessageHandler(FullMessage, OnFull);
+            Messaging.RegisterNamedMessageHandler(SowRefusedMessage, OnSowRefused);
         }
 
         public void Stop()
@@ -292,7 +297,7 @@ namespace Voxel.Client
             Publish(clientId);
         }
 
-        // A player gets their starting tools once (there is no crafting to make them), and one whose
+        // A player gets their starting tools, chest and stockpile once (there is no crafting to make them), and one whose
         // save had no hotbar gets one filled with what they own.
         private void OnClientConnected(ulong clientId)
         {
@@ -312,6 +317,18 @@ namespace Voxel.Client
                     state.ReceivedTools = true;
                 }
 
+                // And a chest and a stockpile once, players from before storage too.
+                if (!state.ReceivedStorage)
+                {
+                    foreach (int storage in new[] { Items.Chest, Items.Stockpile })
+                    {
+                        if (!state.Inventory.Has(storage)) state.Hotbar.Place(storage);
+                        state.Inventory.Add(storage, 1);
+                    }
+
+                    state.ReceivedStorage = true;
+                }
+
                 if (state.Hotbar.IsEmpty) state.Hotbar.FillFrom(state.Inventory);
             }
 
@@ -321,10 +338,42 @@ namespace Voxel.Client
         private void Plant(ulong clientId, int seed, int x, int z)
         {
             if (!registry.TryGetState(clientId, out PlayerState state)) return;
-            if (state.Speciality != Speciality.Gardener || !Items.IsSeed(seed) || !state.Inventory.Has(seed)) return;
+            if (!Items.IsSeed(seed) || !state.Inventory.Has(seed)) return;
 
-            // The seed is only spent if it actually sprouted.
-            if (ecosystemSync.TryPlantSeed(clientId, Items.SeedSpecies(seed), x, z)) TryConsume(clientId, seed);
+            // Anyone plants a tree; only gardeners plant crops.
+            int species = Items.SeedSpecies(seed);
+            if (!ecosystemSync.IsTree(species) && state.Speciality != Speciality.Gardener)
+            {
+                TellSowRefused(clientId, SowRefusal.NotGardener, species);
+                return;
+            }
+
+            // The seed is only spent if it actually sprouted; otherwise the player is told why.
+            if (ecosystemSync.TryPlantSeed(clientId, species, x, z, out SowRefusal refusal)) TryConsume(clientId, seed);
+            else if (refusal != SowRefusal.None) TellSowRefused(clientId, refusal, species);
+        }
+
+        private void TellSowRefused(ulong clientId, SowRefusal refusal, int species)
+        {
+            if (clientId == networkManager.LocalClientId)
+            {
+                SowRefused?.Invoke(refusal, species);
+                return;
+            }
+
+            using (var writer = new FastBufferWriter(sizeof(byte) + sizeof(int), Allocator.Temp))
+            {
+                writer.WriteValueSafe((byte)refusal);
+                writer.WriteValueSafe(species);
+                Messaging.SendNamedMessage(SowRefusedMessage, clientId, writer, NetworkDelivery.ReliableSequenced);
+            }
+        }
+
+        private void OnSowRefused(ulong senderId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out byte refusal);
+            reader.ReadValueSafe(out int species);
+            SowRefused?.Invoke((SowRefusal)refusal, species);
         }
 
         private void OnSpeciality(ulong senderId, FastBufferReader reader)

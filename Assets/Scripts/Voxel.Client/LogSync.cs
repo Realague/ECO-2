@@ -152,6 +152,20 @@ namespace Voxel.Client
             Publish(added, 0f);
         }
 
+        // Server side: whether a log lies in this cell (storage cannot be placed over it).
+        internal bool HasLogIn(BlockPos cell)
+        {
+            if (!IsServer) return false;
+
+            store.InColumn(cell.X, cell.Z, inColumn);
+            foreach (int id in inColumn)
+            {
+                if (store.TryGet(id, out LyingLog log) && log.Position.Y >= cell.Y - 0.5f && log.Position.Y < cell.Y + 1f) return true;
+            }
+
+            return false;
+        }
+
         // The log the local player points at, at most maxDistance away (distance along the ray).
         public bool TryAimed(Vector3 origin, Vector3 direction, float maxDistance, out int logId, out float distance)
         {
@@ -275,13 +289,14 @@ namespace Voxel.Client
             float reach = PlayerRules.Reach + BlockEditRules.ReachTolerance + PickHalfWidth;
             if ((log.Position.ToUnity() - eyes).sqrMagnitude > reach * reach) return;
 
-            if (inventorySync.RoomFor(clientId, Items.Wood) <= 0)
+            int wood = Items.WoodOf(log.Species);
+            if (inventorySync.RoomFor(clientId, wood) <= 0)
             {
-                inventorySync.TellFull(clientId, InventorySync.ReasonFor(Items.Wood));
+                inventorySync.TellFull(clientId, InventorySync.ReasonFor(wood));
                 return;
             }
 
-            inventorySync.Give(clientId, Items.Wood, 1);
+            inventorySync.Give(clientId, wood, 1);
             store.Remove(logId);
             shown.Remove(logId);
             foreach (ulong other in networkManager.ConnectedClientsIds)

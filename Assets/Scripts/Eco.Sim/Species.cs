@@ -21,6 +21,25 @@ namespace Eco.Sim
         Perennial
     }
 
+    // Why a seed sown by a player did not sprout (Ecosystem.TryPlantByPlayer), None when it did: the
+    // column is taken (a plant, a stump, storage), it is not a ground the species grows on (or there
+    // is no room at its base), the climate is too far from the species' either way, the soil is too
+    // poor for it, another of its kind is too close, it needs water beside it or shade.
+    public enum PlantRefusal : byte
+    {
+        None,
+        Occupied,
+        Ground,
+        TooCold,
+        TooHot,
+        TooDry,
+        TooWet,
+        PoorSoil,
+        TooClose,
+        NeedsWater,
+        NeedsShade
+    }
+
     // Rules of a plant species. Durations are in simulation steps.
     public sealed class Species
     {

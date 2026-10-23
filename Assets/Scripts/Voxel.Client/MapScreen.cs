@@ -143,7 +143,7 @@ namespace Voxel.Client
             {
                 if (keyboard.escapeKey.wasPressedThisFrame) speciesPanel.Blur();
             }
-            else if (keyboard != null && !CommandConsole.HoldsInput)
+            else if (keyboard != null && !CommandConsole.HoldsInput && !StorageScreen.HoldsInput)
             {
                 if (MapKey(keyboard).wasPressedThisFrame)
                 {

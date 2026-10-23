@@ -112,7 +112,7 @@ namespace Voxel.Core.Tests
         {
             var original = new PlayerStore();
             PlayerState alice = original.GetOrAdd("alice");
-            alice.Hotbar.Set(0, Items.Wood);
+            alice.Hotbar.Set(0, Items.WoodOf(Items.OakSpecies));
             alice.Hotbar.Set(9, Blocks.Stone);
             var stream = new MemoryStream();
             original.Write(stream);
@@ -121,7 +121,7 @@ namespace Voxel.Core.Tests
             PlayerStore loaded = PlayerStore.Read(stream);
 
             Assert.IsTrue(loaded.TryGet("alice", out PlayerState state));
-            Assert.AreEqual(Items.Wood, state.Hotbar[0]);
+            Assert.AreEqual(Items.WoodOf(Items.OakSpecies), state.Hotbar[0]);
             Assert.AreEqual(Blocks.Stone, state.Hotbar[9]);
             Assert.AreEqual(Items.None, state.Hotbar[5]);
         }
@@ -150,6 +150,63 @@ namespace Voxel.Core.Tests
             {
                 Assert.AreEqual(alice.Stomach.Nutrient(i), state.Stomach.Nutrient(i));
             }
+        }
+
+        [Test]
+        public void WriteThenRead_RestoresTheNameAndTheStorageGift()
+        {
+            var original = new PlayerStore();
+            PlayerState alice = original.GetOrAdd("alice");
+            alice.Name = "Alice-Ä 2";
+            alice.ReceivedStorage = true;
+            original.GetOrAdd("bob");
+            var stream = new MemoryStream();
+            original.Write(stream);
+            stream.Position = 0;
+
+            PlayerStore loaded = PlayerStore.Read(stream);
+
+            Assert.IsTrue(loaded.TryGet("alice", out PlayerState state));
+            Assert.AreEqual("Alice-Ä 2", state.Name);
+            Assert.IsTrue(state.ReceivedStorage);
+            Assert.IsTrue(loaded.TryGet("bob", out PlayerState bob));
+            Assert.AreEqual("", bob.Name);
+            Assert.IsFalse(bob.ReceivedStorage);
+            Assert.IsTrue(loaded.IsNameTaken("ALICE-ä 2", "bob"), "names are unique whatever the case");
+            Assert.IsFalse(loaded.IsNameTaken("Alice-Ä 2", "alice"), "one's own name is not taken");
+        }
+
+        // A save from before names and storage (format 6): the tools given are kept, the name is to be
+        // chosen and the chest and stockpile to be given.
+        [Test]
+        public void Read_SaveWithoutName_KeepsTheToolsAndLeavesTheNameToChoose()
+        {
+            var stream = new MemoryStream();
+            using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, true))
+            {
+                writer.Write(0x504F4345u);
+                writer.Write(6);
+                writer.Write(1);
+                writer.Write("alice");
+                writer.Write(1f);
+                writer.Write(2f);
+                writer.Write(3f);
+                writer.Write(90f);
+                writer.Write((byte)Speciality.None);
+                writer.Write(0);
+                writer.Write(Appearance.NotChosen);
+                for (int slot = 0; slot < Hotbar.SlotCount; slot++) writer.Write(Items.None);
+                new Stomach().Write(writer);
+                writer.Write(true);
+            }
+
+            stream.Position = 0;
+            PlayerStore loaded = PlayerStore.Read(stream);
+
+            Assert.IsTrue(loaded.TryGet("alice", out PlayerState state));
+            Assert.IsTrue(state.ReceivedTools);
+            Assert.AreEqual("", state.Name);
+            Assert.IsFalse(state.ReceivedStorage);
         }
 
         // A save from before hunger (format 4): everything else is kept, the stomach starts half full.
@@ -307,7 +364,7 @@ namespace Voxel.Core.Tests
             var store = new PlayerStore();
 
             PlayerState first = store.GetOrAdd("alice");
-            first.Inventory.Add(Items.Wood, 1);
+            first.Inventory.Add(Items.WoodOf(Items.OakSpecies), 1);
 
             Assert.AreSame(first, store.GetOrAdd("alice"));
             Assert.AreEqual(1, store.Count);

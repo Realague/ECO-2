@@ -104,11 +104,22 @@ namespace Voxel.Client
 
             screen.style.display = DisplayStyle.None;
             inventorySync.Refused += OnRefused;
+            inventorySync.SowRefused += OnSowRefused;
         }
 
         private void OnDestroy()
         {
-            if (inventorySync != null) inventorySync.Refused -= OnRefused;
+            if (inventorySync == null) return;
+
+            inventorySync.Refused -= OnRefused;
+            inventorySync.SowRefused -= OnSowRefused;
+        }
+
+        // A seed that did not sprout: why ("Too cold for an oak").
+        private void OnSowRefused(SowRefusal refusal, int species)
+        {
+            string text = SowRefusals.TextOf(refusal, EcosystemSync.DisplayName(ecosystemSync.PlantName(species)).ToLowerInvariant());
+            if (text != null) ShowMessage(text);
         }
 
         private void OnRefused(FullReason reason)

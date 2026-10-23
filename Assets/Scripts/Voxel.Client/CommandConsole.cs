@@ -67,7 +67,7 @@ namespace Voxel.Client
 
         private void Update()
         {
-            bool inGame = worldSync.World != null && networkManager.IsListening && !appearanceMenu.IsOpen && !mapScreen.HoldsInput && !inventoryScreen.HoldsInput
+            bool inGame = worldSync.World != null && networkManager.IsListening && !appearanceMenu.IsOpen && !mapScreen.HoldsInput && !inventoryScreen.HoldsInput && !StorageScreen.HoldsInput
                           && networkManager.SpawnManager?.GetLocalPlayerObject() != null;
             screen.style.display = inGame ? DisplayStyle.Flex : DisplayStyle.None;
             if (!inGame)

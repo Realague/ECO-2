@@ -41,9 +41,9 @@ namespace Voxel.Core.Tests
         [Test]
         public void Wood_IsNeitherABlockNorASeed()
         {
-            Assert.IsTrue(Items.IsValid(Items.Wood));
-            Assert.IsFalse(Items.IsBlock(Items.Wood));
-            Assert.IsFalse(Items.IsSeed(Items.Wood));
+            Assert.IsTrue(Items.IsValid(Items.WoodOf(Items.OakSpecies)));
+            Assert.IsFalse(Items.IsBlock(Items.WoodOf(Items.OakSpecies)));
+            Assert.IsFalse(Items.IsSeed(Items.WoodOf(Items.OakSpecies)));
         }
 
         [Test]

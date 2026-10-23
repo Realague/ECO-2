@@ -32,6 +32,7 @@ MonoBehaviour:
   floatsOnWater: 0
   needsShade: 0
   woodYield: 3
+  woodColour: {r: 0.72, g: 0.76, b: 0.46, a: 1}
   harvest: 2
   produceName: Banana
   produceYield: 6

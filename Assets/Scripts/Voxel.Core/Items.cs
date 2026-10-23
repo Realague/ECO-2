@@ -5,11 +5,20 @@ namespace Voxel.Core
     public static class Items
     {
         public const int None = 0;
-        public const int Wood = 100;
+        // The wood of every species was one item before each tree gave its own (WoodOf): saves holding
+        // it load it as oak wood (Upgrade).
+        public const int LegacyWood = 100;
         public const int Straw = 101;
 
         // Shot with the bow; a shot arrow sticks where it lands and can be picked up again.
         public const int Arrow = 102;
+
+        // Storage, placed in the world (StorageRules): a chest holds items by weight, a stockpile
+        // piles of blocks. Each player gets one of each at their first connection.
+        public const int Chest = 103;
+        public const int Stockpile = 104;
+
+        public static bool IsStorage(int item) => item == Chest || item == Stockpile;
 
         // Tools: each player gets one of each at their first connection (there is no crafting), and
         // breaking, felling, harvesting annuals, tilling and hunting each need theirs (ToolRules).
@@ -33,13 +42,19 @@ namespace Voxel.Core
         public const int MaxProduceSpecies = 100;
         private const int FirstProduce = 300;
 
+        // One wood per plant species that gives wood, what its logs give: FirstWood + index of the species,
+        // named after it ("Oak wood"). Oak (index 0) takes the wood of saves from before.
+        public const int MaxWoodSpecies = 100;
+        private const int FirstWood = 400;
+        public const int OakSpecies = 0;
+
         public static int OfBlock(ushort block) => Blocks.TypeOf(block);
 
         public static bool IsBlock(int item) => item > Blocks.Air && item <= Blocks.LastType && !Blocks.IsRetired((ushort)item);
 
         // An item of an earlier version that no longer exists (the crafted blocks): saved
         // inventories lose it instead of being refused.
-        public static bool IsRetired(int item) => item > Blocks.Air && item < Wood && Blocks.IsRetired((ushort)item);
+        public static bool IsRetired(int item) => item > Blocks.Air && item < LegacyWood && Blocks.IsRetired((ushort)item);
 
         public static ushort BlockOf(int item) => (ushort)item;
 
@@ -55,10 +70,19 @@ namespace Voxel.Core
 
         public static int ProduceSpecies(int item) => item - FirstProduce;
 
+        public static int WoodOf(int plantSpecies) => FirstWood + plantSpecies;
+
+        public static bool IsWood(int item) => item >= FirstWood && item < FirstWood + MaxWoodSpecies;
+
+        public static int WoodSpecies(int item) => item - FirstWood;
+
+        // What an item read from a save of an earlier version is now (the one wood became oak wood).
+        public static int Upgrade(int item) => item == LegacyWood ? WoodOf(OakSpecies) : item;
+
         public static bool IsTool(int item) => item >= FirstTool && item <= LastTool;
 
         public static bool IsValid(int item) =>
-            IsBlock(item) || item == Wood || item == Straw || item == Arrow || IsTool(item) || IsSeed(item) || IsProduce(item);
+            IsBlock(item) || IsWood(item) || item == Straw || item == Arrow || IsStorage(item) || IsTool(item) || IsSeed(item) || IsProduce(item);
 
         // What a broken block yields. Grass and tilled soil cannot be picked up: they give dirt.
         public static int DropOf(ushort block)
@@ -96,16 +120,17 @@ namespace Voxel.Core
                 case Blocks.Bedrock: return "Bedrock";
                 case Blocks.Mud: return "Mud";
                 case Blocks.TilledSoil: return "Tilled soil";
-                case Wood: return "Wood";
                 case Straw: return "Straw";
                 case Arrow: return "Arrow";
+                case Chest: return "Chest";
+                case Stockpile: return "Stockpile";
                 case Shovel: return "Shovel";
                 case Pickaxe: return "Pickaxe";
                 case Axe: return "Axe";
                 case Scythe: return "Scythe";
                 case Hoe: return "Hoe";
                 case Bow: return "Bow";
-                default: return IsSeed(item) ? "Seed" : IsProduce(item) ? "Crop" : "Unknown item";
+                default: return IsSeed(item) ? "Seed" : IsProduce(item) ? "Crop" : IsWood(item) ? "Wood" : "Unknown item";
             }
         }
     }

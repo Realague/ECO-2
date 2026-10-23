@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -103,6 +104,10 @@ namespace Voxel.Client
         private readonly NetworkVariable<ushort> appearanceCode = new NetworkVariable<ushort>(
             Appearance.NotChosen, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+        // The name the player chose (PlayerNames), empty until then. Only the server writes it.
+        private readonly NetworkVariable<FixedString64Bytes> playerName = new NetworkVariable<FixedString64Bytes>(
+            default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
         private readonly List<MeshRenderer> renderers = new List<MeshRenderer>();
         private readonly List<Mesh> meshes = new List<Mesh>();
         private Transform model;
@@ -176,6 +181,17 @@ namespace Voxel.Client
         // True once the player has chosen an appearance (it is then the same on every machine).
         public bool HasChosenAppearance => IsSpawned && appearanceCode.Value != Appearance.NotChosen;
 
+        // The name the player chose, the same on every machine; empty until they have chosen one.
+        public string PlayerName => IsSpawned ? playerName.Value.ToString() : "";
+
+        public bool HasChosenName => PlayerName.Length > 0;
+
+        // Server side: the name kept in the player's saved state, sent to every machine.
+        internal void SetPlayerName(string name)
+        {
+            if (IsServer && playerName.Value.ToString() != name) playerName.Value = new FixedString64Bytes(name);
+        }
+
         // The appearance currently displayed: the chosen one, a preview, or the default.
         public Appearance Appearance => shown;
 
@@ -219,7 +235,11 @@ namespace Voxel.Client
             if (IsServer)
             {
                 AppearanceSync appearanceSync = FindAnyObjectByType<AppearanceSync>();
-                if (appearanceSync != null) appearanceCode.Value = appearanceSync.StoredCode(OwnerClientId);
+                if (appearanceSync != null)
+                {
+                    appearanceCode.Value = appearanceSync.StoredCode(OwnerClientId);
+                    playerName.Value = new FixedString64Bytes(appearanceSync.StoredName(OwnerClientId));
+                }
             }
 
             appearanceCode.OnValueChanged += OnAppearanceChanged;

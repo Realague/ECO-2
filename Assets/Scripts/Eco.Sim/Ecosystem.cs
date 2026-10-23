@@ -59,6 +59,14 @@ namespace Eco.Sim
         private readonly int[] plantAtColumn;
         private readonly ushort[] plantSpeciesAtColumn;
 
+        // Columns where nothing may sprout (placed storage, BlockColumn), by column index. Not saved:
+        // whoever placed what stands there sets them again after loading.
+        private readonly HashSet<int> blockedColumns = new HashSet<int>();
+
+        // Each cell's warmth and wetness (Geography's, 0 to 1), to tell a player why a seed would not take.
+        private float[] cellWarmth;
+        private float[] cellWetness;
+
         // Per species, whether it is tall enough to shade (Height >= ShadeHeight).
         private readonly bool[] shadingSpecies;
         private readonly List<int> dying = new List<int>();
@@ -184,7 +192,7 @@ namespace Eco.Sim
         public bool TryPlaceGrownPlant(int speciesIndex, int x, int z)
         {
             if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) return false;
-            if (plantAtColumn[ColumnIndex(x, z)] != 0) return false;
+            if (plantAtColumn[ColumnIndex(x, z)] != 0 || IsColumnBlocked(x, z)) return false;
 
             Species kind = species[speciesIndex];
             int y = PlantBaseAt(kind, x, z);
@@ -354,9 +362,28 @@ namespace Eco.Sim
             TryAdd(parent.SpeciesIndex, x, z, 0f, 0);
         }
 
+        // Marks a column where nothing may sprout (storage stands there), or frees it. A player action,
+        // between steps; it never removes a plant already there.
+        public void BlockColumn(int x, int z, bool blocked)
+        {
+            if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) return;
+
+            if (blocked) blockedColumns.Add(ColumnIndex(x, z));
+            else blockedColumns.Remove(ColumnIndex(x, z));
+        }
+
+        public bool IsColumnBlocked(int x, int z) => blockedColumns.Count > 0 && blockedColumns.Contains(ColumnIndex(x, z));
+
+        // The plant standing in a column, or 0.
+        public int PlantIdAt(int x, int z)
+        {
+            return (uint)x < (uint)world.SizeX && (uint)z < (uint)world.SizeZ ? plantAtColumn[ColumnIndex(x, z)] : 0;
+        }
+
         private bool TryAdd(int speciesIndex, int x, int z, float growth, int age)
         {
             if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) return false;
+            if (IsColumnBlocked(x, z)) return false;
 
             Species kind = species[speciesIndex];
             int cell = CellIndex(x, z);
@@ -376,6 +403,46 @@ namespace Eco.Sim
             // Where the climate does not quite suit the species, fewer of its seeds take.
             if (vigour < 1f && random.NextFloat() >= vigour) return false;
 
+            Sprout(speciesIndex, x, y, z, growth, age, vigour);
+            return true;
+        }
+
+        // A seed sown by a player: the natural rules (ground and room, climate, soil, spacing, water,
+        // shade) without the draw that makes seeds take less often where the climate suits them less,
+        // so a seed either sprouts or says why not. A player action, between steps; draws nothing at random.
+        public PlantRefusal TryPlantByPlayer(int speciesIndex, int x, int z)
+        {
+            if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) return PlantRefusal.Ground;
+            if (plantAtColumn[ColumnIndex(x, z)] != 0 || IsColumnBlocked(x, z)) return PlantRefusal.Occupied;
+
+            Species kind = species[speciesIndex];
+            int y = PlantBaseAt(kind, x, z);
+            if (!HasGroundAndRoom(kind, x, y, z)) return PlantRefusal.Ground;
+
+            int cell = CellIndex(x, z);
+            float vigour = suitability[speciesIndex][cell];
+            if (vigour <= 0f) return ClimateRefusal(kind, cell);
+            if (Available(cell, speciesIndex) < kind.MinFertility) return PlantRefusal.PoorSoil;
+            if (!IsSpaceFree(x, z, speciesIndex, kind.Spacing)) return PlantRefusal.TooClose;
+            if (kind.NeedsWater && !IsBesideWater(x, y, z)) return PlantRefusal.NeedsWater;
+            if (kind.NeedsShade && !IsShaded(x, z)) return PlantRefusal.NeedsShade;
+
+            Sprout(speciesIndex, x, y, z, 0f, 0, vigour);
+            return PlantRefusal.None;
+        }
+
+        // Which way a cell's climate is too far from a species' (warmth first, then wetness).
+        private PlantRefusal ClimateRefusal(Species kind, int cell)
+        {
+            float warmth = cellWarmth[cell];
+            float wetness = cellWetness[cell];
+            if (warmth < kind.WarmthMin - kind.ClimateTolerance) return PlantRefusal.TooCold;
+            if (warmth > kind.WarmthMax + kind.ClimateTolerance) return PlantRefusal.TooHot;
+            return wetness < kind.WetnessMin ? PlantRefusal.TooDry : PlantRefusal.TooWet;
+        }
+
+        private void Sprout(int speciesIndex, int x, int y, int z, float growth, int age, float vigour)
+        {
             var plant = new Plant
             {
                 Id = nextPlantId++,
@@ -390,7 +457,6 @@ namespace Eco.Sim
 
             Append(plant);
             PlantAdded?.Invoke(plant);
-            return true;
         }
 
         private void Append(Plant plant)
@@ -433,8 +499,8 @@ namespace Eco.Sim
         // climate does not change.
         private void FillSuitability(Geography geography)
         {
-            var warmth = new float[cellsX * cellsZ];
-            var wetness = new float[cellsX * cellsZ];
+            var warmth = cellWarmth = new float[cellsX * cellsZ];
+            var wetness = cellWetness = new float[cellsX * cellsZ];
             for (int cz = 0; cz < cellsZ; cz++)
             {
                 for (int cx = 0; cx < cellsX; cx++)

@@ -9,15 +9,15 @@ namespace Voxel.Core.Tests
         public void FillFrom_GivesOwnedItemsWithoutASlotTheFirstEmptySlots()
         {
             var hotbar = new Hotbar();
-            hotbar.Set(0, Items.Wood);
+            hotbar.Set(0, Items.WoodOf(Items.OakSpecies));
             var inventory = new Inventory();
-            inventory.Add(Items.Wood, 3);
+            inventory.Add(Items.WoodOf(Items.OakSpecies), 3);
             inventory.Add(Blocks.Stone, 5);
             inventory.Add(Blocks.Dirt, 2);
 
             Assert.IsTrue(hotbar.FillFrom(inventory));
 
-            Assert.AreEqual(Items.Wood, hotbar[0], "an item keeps its slot");
+            Assert.AreEqual(Items.WoodOf(Items.OakSpecies), hotbar[0], "an item keeps its slot");
             Assert.AreEqual(Blocks.Stone, hotbar[1], "then the inventory's order");
             Assert.AreEqual(Blocks.Dirt, hotbar[2]);
             Assert.IsFalse(hotbar.FillFrom(inventory), "nothing new to place");
@@ -64,11 +64,11 @@ namespace Voxel.Core.Tests
         {
             var hotbar = new Hotbar();
             Assert.IsTrue(hotbar.IsEmpty);
-            hotbar.Set(0, Items.Wood);
+            hotbar.Set(0, Items.WoodOf(Items.OakSpecies));
 
             Assert.IsTrue(hotbar.Place(Blocks.Stone));
             Assert.AreEqual(Blocks.Stone, hotbar[1]);
-            Assert.IsFalse(hotbar.Place(Items.Wood), "already in a slot");
+            Assert.IsFalse(hotbar.Place(Items.WoodOf(Items.OakSpecies)), "already in a slot");
             Assert.IsFalse(hotbar.IsEmpty);
         }
 
@@ -76,22 +76,22 @@ namespace Voxel.Core.Tests
         public void Set_MovesAnItemOutOfItsSlot_AndRefusesWhatDoesNotExist()
         {
             var hotbar = new Hotbar();
-            Assert.IsTrue(hotbar.Set(2, Items.Wood));
+            Assert.IsTrue(hotbar.Set(2, Items.WoodOf(Items.OakSpecies)));
 
-            Assert.IsTrue(hotbar.Set(7, Items.Wood));
+            Assert.IsTrue(hotbar.Set(7, Items.WoodOf(Items.OakSpecies)));
             Assert.AreEqual(Items.None, hotbar[2], "an item sits in one slot at most");
-            Assert.AreEqual(Items.Wood, hotbar[7]);
+            Assert.AreEqual(Items.WoodOf(Items.OakSpecies), hotbar[7]);
 
             hotbar.Set(3, Blocks.Stone);
-            Assert.IsTrue(hotbar.Set(3, Items.Wood));
+            Assert.IsTrue(hotbar.Set(3, Items.WoodOf(Items.OakSpecies)));
             Assert.AreEqual(Blocks.Stone, hotbar[7], "moved onto a taken slot, the items swap");
-            Assert.AreEqual(Items.Wood, hotbar[3]);
-            hotbar.Set(7, Items.Wood);
+            Assert.AreEqual(Items.WoodOf(Items.OakSpecies), hotbar[3]);
+            hotbar.Set(7, Items.WoodOf(Items.OakSpecies));
 
             Assert.IsTrue(hotbar.Set(7, Items.None), "a slot can be emptied");
             Assert.AreEqual(Items.None, hotbar[7]);
 
-            Assert.IsFalse(hotbar.Set(Hotbar.SlotCount, Items.Wood));
+            Assert.IsFalse(hotbar.Set(Hotbar.SlotCount, Items.WoodOf(Items.OakSpecies)));
             Assert.IsFalse(hotbar.Set(0, 99999));
             Assert.IsFalse(hotbar.Set(0, 4), "a retired block");
         }
@@ -102,7 +102,7 @@ namespace Voxel.Core.Tests
             var stream = new MemoryStream();
             using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, true))
             {
-                writer.Write(Items.Wood);
+                writer.Write(Items.WoodOf(Items.OakSpecies));
                 writer.Write(4);
                 for (int slot = 2; slot < Hotbar.SlotCount; slot++) writer.Write(Items.None);
             }
@@ -110,7 +110,7 @@ namespace Voxel.Core.Tests
             stream.Position = 0;
             var hotbar = new Hotbar();
             hotbar.Read(new BinaryReader(stream));
-            Assert.AreEqual(Items.Wood, hotbar[0]);
+            Assert.AreEqual(Items.WoodOf(Items.OakSpecies), hotbar[0]);
             Assert.AreEqual(Items.None, hotbar[1], "a retired crafted block leaves its slot empty");
 
             var bad = new MemoryStream();

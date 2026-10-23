@@ -38,13 +38,13 @@ namespace Voxel.Core.Tests
         {
             var inventory = new Inventory();
             inventory.Add(Blocks.Stone, 25);
-            inventory.Add(Items.Wood, 10);
+            inventory.Add(Items.WoodOf(Items.OakSpecies), 10);
 
-            Assert.IsTrue(CarryLimits.CountsAsBlock(Items.Wood));
-            Assert.IsFalse(Items.IsBlock(Items.Wood), "it is still not a block to place");
+            Assert.IsTrue(CarryLimits.CountsAsBlock(Items.WoodOf(Items.OakSpecies)));
+            Assert.IsFalse(Items.IsBlock(Items.WoodOf(Items.OakSpecies)), "it is still not a block to place");
             Assert.AreEqual(35, CarryLimits.BlockCount(inventory));
             Assert.AreEqual(0f, CarryLimits.Weight(inventory, Weights));
-            Assert.AreEqual(5, CarryLimits.Room(inventory, Items.Wood, Weights));
+            Assert.AreEqual(5, CarryLimits.Room(inventory, Items.WoodOf(Items.OakSpecies), Weights));
             Assert.AreEqual(5, CarryLimits.Room(inventory, Blocks.Dirt, Weights), "wood and blocks share the 40");
         }
 
