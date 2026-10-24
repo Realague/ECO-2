@@ -1,0 +1,418 @@
+# French texts of ECO 2 (Loc): one per line, the English text, a tab, its translation.
+# "{0}", "{1}"... are the places of values. With a species or an item, {0} is its translated name,
+# {1} the same in lower case ("Bois de {1}": "Bois de chêne"); "de", "le" and "la" are elided before a
+# vowel by the game ("Bois d'acacia"). "context|English" tells apart a word with two uses.
+
+# Main menu
+A living world, shared with friends.	Un monde vivant, partagé entre amis.
+Host a game	Héberger une partie
+Play in your world; friends can join you.	Jouez dans votre monde ; vos amis peuvent vous rejoindre.
+Join a game	Rejoindre une partie
+Enter the address of a friend's game or a server.	Entrez l'adresse de la partie d'un ami ou d'un serveur.
+Options	Options
+Language.	Langue.
+Language	Langue
+Quit	Quitter
+No world yet: create one to start.	Aucun monde pour l'instant : créez-en un pour commencer.
+New world	Nouveau monde
+Password	Mot de passe
+Back	Retour
+Play	Jouer
+Name	Nom
+Shown in the list of worlds.	Affiché dans la liste des mondes.
+Seed	Graine
+The same seed always gives the same world. A number or a word; leave it empty for a random world.	La même graine donne toujours le même monde. Un nombre ou un mot ; laissez vide pour un monde au hasard.
+Create and play	Créer et jouer
+Address	Adresse
+The IPv4 address of the host, for example 192.168.1.20.	L'adresse IPv4 de l'hôte, par exemple 192.168.1.20.
+Leave it empty if the game has none.	Laissez vide si la partie n'en a pas.
+Join	Rejoindre
+Cancel	Annuler
+The game's texts change at once. Your choice is kept on this computer.	Les textes du jeu changent aussitôt. Votre choix est gardé sur cet ordinateur.
+Players who join need it. Leave it empty for an open game. Players connect on UDP port {0}.	Les joueurs qui vous rejoignent en ont besoin. Laissez vide pour une partie ouverte. Les joueurs se connectent sur le port UDP {0}.
+Never saved: playing it makes a new world.	Jamais sauvegardé : y jouer crée un nouveau monde.
+Made by an older version: playing it makes a new world.	Créé par une version plus ancienne : y jouer crée un nouveau monde.
+Seed {0} · {1} × {2} · {3}	Graine {0} · {1} × {2} · {3}
+Connecting	Connexion
+Waiting for {0} to answer.	En attente de la réponse de {0}.
+Loading the world	Chargement du monde
+
+# Connection problems (some come from the server)
+'{0}' is not a valid IPv4 address.	« {0} » n'est pas une adresse IPv4 valide.
+Could not start the connection to {0}.	Impossible de lancer la connexion à {0}.
+Could not start a server on port {0}.	Impossible de lancer un serveur sur le port {0}.
+The server has stopped.	Le serveur s'est arrêté.
+Connection to the server lost or impossible.	Connexion au serveur perdue ou impossible.
+Invalid connection request.	Demande de connexion invalide.
+Wrong password.	Mauvais mot de passe.
+This player is already connected.	Ce joueur est déjà connecté.
+This server does not run the same version of the game: the generated world does not match its own.	Ce serveur ne fait pas tourner la même version du jeu : le monde généré ne correspond pas au sien.
+
+# On-screen session text
+Game hosted on port {0}	Partie hébergée sur le port {0}
+Connected to {0}	Connecté à {0}
+Click: take control	Clic : reprendre la main
+F10: leave the game	F10 : quitter la partie
+Admins: F5 / F6 slow down or speed up time, F7 advance one day	Admins : F5 / F6 ralentir ou accélérer le temps, F7 avancer d'un jour
+Internet: asking the router to open the port…	Internet : demande d'ouverture du port au routeur…
+
+# Character creation
+Create your character	Créez votre personnage
+Choose your name	Choisissez votre pseudo
+This is how other players will see you. The choice is final.	C'est ainsi que les autres joueurs vous verront. Ce choix est définitif.
+Players now have names: this is how others will know you. The choice is final.	Les joueurs ont maintenant un pseudo : c'est ainsi que les autres vous connaîtront. Ce choix est définitif.
+Keep this name? It cannot be changed later.	Garder ce pseudo ? Il ne pourra plus être changé.
+Keep this name and appearance? They cannot be changed later.	Garder ce pseudo et cette apparence ? Ils ne pourront plus être changés.
+Keep this appearance? It cannot be changed later.	Garder cette apparence ? Elle ne pourra plus être changée.
+Drag to turn around	Glissez pour faire tourner
+Confirm	Confirmer
+Sex	Sexe
+Skin tone	Teint
+Eyes	Yeux
+Hair	Cheveux
+Hair colour	Couleur des cheveux
+Facial hair	Pilosité faciale
+Name taken	Pseudo déjà pris
+2 to 16 letters, digits, spaces, _ or -	De 2 à 16 lettres, chiffres, espaces, _ ou -
+Male	Homme
+Female	Femme
+eyes|Green	Verts
+eyes|Brown	Marron
+eyes|Hazel	Noisette
+eyes|Blue	Bleus
+eyes|Grey	Gris
+eyes|Dark	Sombres
+hair|Brown	Châtains
+hair|Black	Noirs
+hair|Dark brown	Bruns
+hair|Auburn	Auburn
+hair|Ginger	Roux
+hair|Blond	Blonds
+hair|Grey	Gris
+Short	Courts
+Buzz cut	Coupe rase
+Long	Longs
+Ponytail	Queue de cheval
+Bun	Chignon
+Bald	Chauve
+None	Aucune
+Stubble	Barbe de trois jours
+Moustache	Moustache
+Full beard	Barbe complète
+
+# HUD, hotbar and stomach
+Day {0}	Jour {0}
+paused	en pause
+(behind)	(en retard)
+Inventory	Inventaire
+Map	Carte
+Commands	Commandes
+Blocks {0} / {1}	Blocs {0} / {1}
+Weight {0} / {1} kg	Poids {0} / {1} kg
+Blocks carried (40 at most)	Blocs portés (40 au plus)
+Weight of everything else (30 kg at most)	Poids de tout le reste (30 kg au plus)
+Carbs	Glucides
+Protein	Protéines
+Fat	Lipides
+Vitamins	Vitamines
+Starving: eat now	Affamé : mangez vite
+Head	Tête
+Killed	Tué
+Enter: send    Escape: close    /help: the commands	Entrée : envoyer    Échap : fermer    /help : les commandes
+That is you.	C'est vous.
+
+# Messages above the hotbar
+Too full to eat	Vous n'avez plus faim
+No arrows left	Plus de flèches
+Your arrow broke	Votre flèche s'est cassée
+Too hungry: eat something	Trop faim : mangez quelque chose
+Something stands on it	Quelque chose est posé dessus
+Too far gone to take	Trop abîmée pour être prise
+A torch goes on top of a block or on its side	Une torche se pose sur le dessus ou sur le côté d'un bloc
+You need a bow to hunt	Il faut un arc pour chasser
+You need {0}	Outil nécessaire : {1}
+Can't carry more than {0} blocks	Impossible de porter plus de {0} blocs
+Too heavy ({0} kg)	Trop lourd ({0} kg)
+They can't carry that	Ce joueur ne peut pas porter ça
+Not yours	Pas à vous
+Empty it first	Videz-le d'abord
+Something is growing there	Quelque chose pousse ici
+Chest is full ({0} kg)	Le coffre est plein ({0} kg)
+No room on the stockpile	Plus de place sur la réserve
+It doesn't go in there	Ça ne se range pas ici
+No room here	Pas de place ici
+Something already stands there	Quelque chose occupe déjà la place
+{3} can't grow on this ground	Ce sol ne convient pas ({1})
+Too cold for {2}	Trop froid ({1})
+Too hot for {2}	Trop chaud ({1})
+Too dry for {2}	Trop sec ({1})
+Too wet for {2}	Trop humide ({1})
+The soil is too poor for {2}	Sol trop pauvre ({1})
+Too close to another {1}	Trop près d'un autre plant de {1}
+{3} needs water beside it	Il faut de l'eau à côté ({1})
+{3} needs shade	Il faut de l'ombre ({1})
+Crops only grow on tilled soil: use a hoe	Les cultures ne poussent que sur la terre labourée : utilisez une houe
+Only gardeners can plant crops	Seuls les jardiniers peuvent planter des cultures
+
+# Aiming label
+Young {1}	Jeune {1}
+{0} stump	Souche de {1}
+{0} (unripe)	{0} (pas mûr)
+{0} (ripe)	{0} (mûr)
+{0} (fully ripe)	{0} (bien mûr)
+{0} carcass	Carcasse de {1}
+{0} · too far gone	{0} · trop abîmée
+{0} · needs {1}	{0} · outil : {2}
+Chest · {0}	Coffre · {0}
+Stockpile · {0} ({1} / {2})	Réserve · {0} ({1} / {2})
+yours	à vous
+someone's	à quelqu'un
+
+# Inventory
+Categories	Catégories
+All	Tout
+Tools	Outils
+Blocks	Blocs
+Seeds	Graines
+Food	Nourriture
+Materials	Matériaux
+Tool	Outil
+Block	Bloc
+Material	Matériau
+Carcass	Carcasse
+Ammunition	Munition
+Storage	Rangement
+Light	Lumière
+Your items	Vos objets
+Search	Rechercher
+Nothing here yet: break blocks, fell trees and harvest ripe crops.	Rien ici pour l'instant : cassez des blocs, abattez des arbres et récoltez des cultures mûres.
+No item matches.	Aucun objet ne correspond.
+Hotbar slot {0}	Emplacement {0} de la barre
+{0} kg each	{0} kg chacun
+Weight	Poids
+Calories	Calories
+Nutrition	Nutrition
+No speciality yet	Pas encore de spécialité
+Become a gardener	Devenir jardinier
+Gardener	Jardinier
+Drag	Glisser
+to a hotbar slot	vers un emplacement de la barre
+Right click	Clic droit
+eat food, empty a hotbar slot	manger, vider un emplacement de la barre
+put in that hotbar slot	mettre dans cet emplacement de la barre
+choose	choisir
+confirm	confirmer
+close	fermer
+Enter	Entrée
+Space	Espace
+Wheel	Molette
+Shift + click	Maj + clic
+
+# Storage
+Chest	Coffre
+Stockpile	Réserve
+Access	Accès
+Your bag	Votre sac
+In your bag	Dans votre sac
+In the chest	Dans le coffre
+On the stockpile	Sur la réserve
+Yours	À vous
+{0}'s	À {0}
+Pick up	Ramasser
+Who may open it	Qui peut l'ouvrir
+Players you allow can take and put things in it. They cannot pick it up or allow others.	Les joueurs autorisés peuvent y prendre et y déposer des objets. Ils ne peuvent ni le ramasser ni autoriser d'autres joueurs.
+No other player with a name is connected.	Aucun autre joueur avec un pseudo n'est connecté.
+Allowed	Autorisé
+Not allowed	Non autorisé
+Allowed, away	Autorisé, absent
+Allow	Autoriser
+Remove	Retirer
+move	déplacer
+move all	tout déplacer
+move one	déplacer un
+line	ligne
+
+# Map
+Layers	Couches
+Click one to lay it over the map.	Cliquez sur une couche pour l'afficher sur la carte.
+You	Vous
+Players	Joueurs
+zoom	zoom
+centre on you	centrer sur vous
+climate	climat
+teleport here	se téléporter ici
+Terrain	Terrain
+Temperature: blue cold, red hot	Température : bleu froid, rouge chaud
+Humidity: ochre dry, blue wet	Humidité : ocre sec, bleu humide
+Plants ({0})	Plantes ({0})
+Animals ({0})	Animaux ({0})
+Soil (NPK)	Sol (NPK)
+Nitrogen	Azote
+Phosphorus	Phosphore
+Potassium	Potassium
+{0} in the soil: {1} on average, deeper where richer	{0} dans le sol : {1} en moyenne, plus foncé là où il est plus riche
+{0}: {1}, yellow where they are most	{0} : {1}, en jaune là où il y en a le plus
+{0} % humidity	{0} % d'humidité
+
+# Places
+Sea	Mer
+Lake	Lac
+River	Rivière
+Marsh	Marais
+Snowfield	Champ de neige
+Mountains	Montagnes
+Jungle	Jungle
+Tropical forest	Forêt tropicale
+Savanna	Savane
+Desert	Désert
+Tundra	Toundra
+Taiga	Taïga
+Temperate forest	Forêt tempérée
+Meadow	Prairie
+
+# Items: names
+Granite	Granit
+Dirt	Terre
+Grass	Herbe
+Water	Eau
+Ice	Glace
+Basalt	Basalte
+Limestone	Calcaire
+Marble	Marbre
+Sandstone	Grès
+Slate	Ardoise
+Sand	Sable
+Snow	Neige
+Gravel	Gravier
+Clay	Argile
+Coal ore	Minerai de charbon
+Iron ore	Minerai de fer
+Copper ore	Minerai de cuivre
+Tin ore	Minerai d'étain
+Gold ore	Minerai d'or
+Rock salt	Sel gemme
+Flint	Silex
+Bedrock	Socle
+Mud	Boue
+Tilled soil	Terre labourée
+Torch	Torche
+Straw	Paille
+Arrow	Flèche
+Shovel	Pelle
+Pickaxe	Pioche
+Axe	Hache
+Scythe	Faux
+Hoe	Houe
+Bow	Arc
+{0} seeds	Graines de {1}
+{0} wood	Bois de {1}
+
+# Items: descriptions
+Digs soft ground: dirt, grass, sand, gravel, clay, snow and mud. Hold it and left click.	Creuse les sols meubles : terre, herbe, sable, gravier, argile, neige et boue. En main, clic gauche.
+Breaks hard blocks: rock, ores and ice. Hold it and left click.	Casse les blocs durs : roche, minerais et glace. En main, clic gauche.
+Fells trees and every plant that gives wood. Hold it and left click.	Abat les arbres et toutes les plantes qui donnent du bois. En main, clic gauche.
+Cuts grass, reeds and ferns, and harvests cereals and vegetables (right click on a ripe one). Fruit is picked by hand.	Coupe l'herbe, les roseaux et les fougères, et récolte les céréales et les légumes (clic droit sur une culture mûre). Les fruits se cueillent à la main.
+Tills grass, dirt, mud or clay (right click): seeds only grow on tilled soil.	Laboure l'herbe, la terre, la boue ou l'argile (clic droit) : les graines ne poussent que sur la terre labourée.
+Hunts animals. Hold the left button to draw, let go to shoot; a shot in the head does double damage.	Pour chasser. Maintenez le bouton gauche pour bander l'arc, relâchez pour tirer ; un tir à la tête fait deux fois plus de dégâts.
+Shot with the bow. An arrow lies where it lands: right click on it to pick it up.	Se tire à l'arc. Une flèche reste là où elle tombe : clic droit dessus pour la ramasser.
+Holds tools, seeds, food and the like, up to 150 kg. Hold it and right click on the ground to place it; right click on it to open it. Only you and the players you allow can open it.	Contient outils, graines, nourriture et autres, jusqu'à 150 kg. En main, clic droit sur le sol pour le poser ; clic droit dessus pour l'ouvrir. Seuls vous et les joueurs que vous autorisez pouvez l'ouvrir.
+Lights what is around it, day and night. Hold it and right click on the top or the side of a block to set it there; hit it, with anything in hand, to take it down.	Éclaire les alentours, de jour comme de nuit. En main, clic droit sur le dessus ou le côté d'un bloc pour la poser ; frappez-la, avec n'importe quoi en main, pour la retirer.
+Holds blocks and wood: nine piles of 27 on a patch of flat ground, 3 by 3. Hold it and right click to place it in front of you; right click on it to open it.	Contient blocs et bois : neuf piles de 27 sur un carré de sol plat de 3 sur 3. En main, clic droit pour la poser devant vous ; clic droit dessus pour l'ouvrir.
+Left over when wheat is harvested.	Ce qui reste quand on récolte le blé.
+A building block. Hold it and right click to place it.	Un bloc de construction. En main, clic droit pour le poser.
+Plant it to grow {2}: hold it and right click on the ground where it grows. It needs a climate and soil that suit it, and room from others of its kind.	À planter pour faire pousser un plant de {1} : en main, clic droit sur un sol où il pousse. Il lui faut un climat et un sol qui lui conviennent, et de la place loin des autres de son espèce.
+Plant it to grow {2}. Only gardeners plant crops, on tilled soil.	À planter pour faire pousser un plant de {1}. Seuls les jardiniers plantent les cultures, sur la terre labourée.
+Harvested from {1} plants when they are ripe. Right click it here, or hold it and right click, to eat it.	Récolté sur les plants de {1} quand ils sont mûrs. Clic droit ici, ou en main clic droit, pour le manger.
+Harvested from {1} plants when they are ripe. It cannot be eaten.	Récolté sur les plants de {1} quand ils sont mûrs. Ne se mange pas.
+From {2} once felled: each log on the ground gives one. Counted with the blocks, and kept on a stockpile.	Tiré d'un arbre abattu ({1}) : chaque rondin au sol en donne un. Compte avec les blocs et se range sur une réserve.
+The body of {2}, taken from the ground while at least half of it was left. Of no use yet: it will be butchered later.	Le corps d'un animal ({1}), ramassé alors qu'il en restait au moins la moitié. Sans usage pour l'instant : il pourra être dépecé plus tard.
+
+# Plants
+Oak	Chêne
+Bush	Buisson
+Birch	Bouleau
+Pine	Pin
+Acacia	Acacia
+Poplar	Peuplier
+Tall grass	Hautes herbes
+Dry grass	Herbe sèche
+Cactus	Cactus
+Reeds	Roseaux
+Jungle tree	Arbre de la jungle
+Palm	Palmier
+Fern	Fougère
+Willow	Saule
+Cypress	Cyprès
+Lily pad	Nénuphar
+Oat	Avoine
+Wheat	Blé
+Beet	Betterave
+Carrot	Carotte
+Potato	Pomme de terre
+Cabbage	Chou
+Maize	Maïs
+Sunflower	Tournesol
+Bean	Haricot
+Butternut	Courge butternut
+Rice	Riz
+Mushroom	Champignon
+Strawberry	Fraisier
+Tomato	Tomate
+Grapevine	Vigne
+Cotton	Cotonnier
+Prickly pear	Figuier de Barbarie
+Apple tree	Pommier
+Cherry tree	Cerisier
+Lemon tree	Citronnier
+Orange tree	Oranger
+Banana tree	Bananier
+Cacao tree	Cacaoyer
+Coffee shrub	Caféier
+Mango tree	Manguier
+Date palm	Palmier dattier
+
+# Crops
+Acorn	Gland
+Pine cone	Pomme de pin
+Oat grain	Grain d'avoine
+Wheat grain	Grain de blé
+Corn	Maïs
+Sunflower seeds	Graines de tournesol
+Beans	Haricots
+Grapes	Raisin
+Apple	Pomme
+Cherries	Cerises
+Lemon	Citron
+Orange	Orange
+Banana	Banane
+Cocoa beans	Fèves de cacao
+Coffee beans	Grains de café
+Mango	Mangue
+Dates	Dattes
+produce|Strawberry	Fraise
+produce|Cotton	Coton
+produce|Prickly pear	Figue de Barbarie
+
+# Animals
+Rabbit	Lapin
+Fox	Renard
+Deer	Cerf
+Reindeer	Renne
+Wolf	Loup
+Bear	Ours
+Gazelle	Gazelle
+Jackal	Chacal
+Snow hare	Lièvre variable
+Jerboa	Gerboise
+Fish	Poisson
+Duck	Canard
+Heron	Héron
+Otter	Loutre
+Crow	Corbeau
+Vulture	Vautour
+Sparrow	Moineau
+Tapir	Tapir
+Jaguar	Jaguar
+Crocodile	Crocodile
+Frog	Grenouille
+Parrot	Perroquet

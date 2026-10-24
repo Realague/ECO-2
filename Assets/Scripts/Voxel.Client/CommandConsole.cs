@@ -139,9 +139,10 @@ namespace Voxel.Client
             }
         }
 
+        // The server answers in English: a fixed answer is translated here (Loc), one with values stays as it is.
         private void AddLine(string text)
         {
-            var label = new Label(text);
+            var label = new Label(Loc.T(text));
             label.AddToClassList("console-line");
             log.Add(label);
             lines.Add((label, Time.unscaledTime));

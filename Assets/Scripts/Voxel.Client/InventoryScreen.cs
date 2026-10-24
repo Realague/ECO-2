@@ -74,6 +74,7 @@ namespace Voxel.Client
         // Categories down the left: null is "All".
         private readonly List<Button> categoryButtons = new List<Button>();
         private readonly List<ItemCategory?> categoryKinds = new List<ItemCategory?>();
+        private readonly List<Label> categoryNames = new List<Label>();
         private ItemCategory? category;
 
         // The items shown and what they were made from (to notice a change).
@@ -164,6 +165,7 @@ namespace Voxel.Client
             search.RegisterCallback<FocusInEvent>(_ => searchBox.AddToClassList("item-search-box--focused"));
             search.RegisterCallback<FocusOutEvent>(_ => searchBox.RemoveFromClassList("item-search-box--focused"));
             hotbar.SlotClicked += OnHotbarSlotClicked;
+            Loc.Changed += OnLanguageChanged;
 
             screen.style.display = DisplayStyle.None;
             if (Application.isBatchMode) enabled = false;
@@ -172,6 +174,7 @@ namespace Voxel.Client
         private void OnDestroy()
         {
             if (hotbar != null) hotbar.SlotClicked -= OnHotbarSlotClicked;
+            Loc.Changed -= OnLanguageChanged;
         }
 
         private void Update()
@@ -248,8 +251,9 @@ namespace Voxel.Client
             var icon = new VisualElement();
             icon.AddToClassList("icon");
             icon.AddToClassList(CategoryIcon(kind));
-            var name = new Label(kind.HasValue ? ItemCatalog.CategoryName(kind.Value) : "All");
+            var name = new Label(CategoryTitle(kind));
             name.AddToClassList("category-name");
+            categoryNames.Add(name);
             button.Add(icon);
             button.Add(name);
             button.clicked += () =>
@@ -261,6 +265,19 @@ namespace Voxel.Client
             list.Add(button);
             categoryButtons.Add(button);
             categoryKinds.Add(kind);
+        }
+
+        private static string CategoryTitle(ItemCategory? kind) => kind.HasValue ? ItemCatalog.CategoryName(kind.Value) : Loc.T("All");
+
+        // Another language: the categories' names, and the items' grid and details shown again.
+        private void OnLanguageChanged()
+        {
+            for (int c = 0; c < categoryNames.Count; c++)
+            {
+                categoryNames[c].text = CategoryTitle(categoryKinds[c]);
+            }
+
+            shownSearch = null;
         }
 
         // The icon class (Common.uss) of a category; null is "All".
@@ -364,9 +381,9 @@ namespace Voxel.Client
 
             ShowCarry(inventory);
             empty.style.display = sorted.Count == 0 ? DisplayStyle.Flex : DisplayStyle.None;
-            empty.text = shownEntries.Count == 0
+            empty.text = Loc.T(shownEntries.Count == 0
                 ? "Nothing here yet: break blocks, fell trees and harvest ripe crops."
-                : "No item matches.";
+                : "No item matches.");
         }
 
         // How much of the carrying limits is used, as counts: blocks out of 40, the rest's weight out of
@@ -376,7 +393,7 @@ namespace Voxel.Client
             int blocks = CarryLimits.BlockCount(inventory);
             float weight = CarryLimits.Weight(inventory, ecosystemSync.ItemWeights);
             carryBlocks.text = $"{blocks} / {CarryLimits.MaxBlocks}";
-            carryWeight.text = $"{weight.ToString("0.0", CultureInfo.InvariantCulture)} / {CarryLimits.MaxWeight:0} kg";
+            carryWeight.text = $"{Loc.Number(weight, "0.0")} / {CarryLimits.MaxWeight:0} kg";
             ShowCarryShare(carryBlocks, (float)blocks / CarryLimits.MaxBlocks);
             ShowCarryShare(carryWeight, weight / CarryLimits.MaxWeight);
         }
@@ -514,12 +531,12 @@ namespace Voxel.Client
             detailsDescription.text = ItemCatalog.DescriptionOf(item, ecosystemSync);
             detailsCount.text = inventorySync.Inventory.Count(item).ToString();
             int slot = inventorySync.Hotbar.SlotOf(item);
-            detailsSlot.text = slot >= 0 ? $"Hotbar slot {SlotLabel(slot)}" : "";
+            detailsSlot.text = slot >= 0 ? Loc.T("Hotbar slot {0}", SlotLabel(slot)) : "";
             detailsSlot.style.display = slot >= 0 ? DisplayStyle.Flex : DisplayStyle.None;
 
             float weight = CarryLimits.CountsAsBlock(item) ? 0f : ecosystemSync.ItemWeights.Of(item);
             detailsWeightLine.style.display = weight > 0f ? DisplayStyle.Flex : DisplayStyle.None;
-            detailsWeight.text = weight.ToString("0.###", CultureInfo.InvariantCulture) + " kg each";
+            detailsWeight.text = Loc.T("{0} kg each", Loc.Number(weight, "0.###"));
 
             Nutrition food = ecosystemSync.FoodOf(item);
             detailsFood.style.display = food.IsFood ? DisplayStyle.Flex : DisplayStyle.None;
@@ -540,7 +557,7 @@ namespace Voxel.Client
         {
             Speciality speciality = inventorySync.Speciality;
             bool chosen = speciality != Speciality.None;
-            specialityName.text = chosen ? Specialities.NameOf(speciality) : "No speciality yet";
+            specialityName.text = chosen ? Loc.Name(Specialities.NameOf(speciality)) : Loc.T("No speciality yet");
             specialityChoose.style.display = chosen ? DisplayStyle.None : DisplayStyle.Flex;
         }
     }

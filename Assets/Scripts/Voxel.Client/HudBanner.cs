@@ -91,8 +91,8 @@ namespace Voxel.Client
             if (damageLayer == null) return;
 
             string text = $"-{Mathf.Max(1, Mathf.RoundToInt(damage))}";
-            if (head) text += " Head";
-            if (killed) text += " · Killed";
+            if (head) text += " " + Loc.T("Head");
+            if (killed) text += " · " + Loc.T("Killed");
             var label = new Label(text) { pickingMode = PickingMode.Ignore };
             label.AddToClassList("damage-number");
             label.EnableInClassList("damage-number--head", head);
@@ -176,7 +176,7 @@ namespace Voxel.Client
             long minutes = (long)SimClock.MinutesAt(ecosystemSync.StepTime);
             long dayNumber = minutes / SimClock.MinutesPerDay + 1;
             int minuteOfDay = (int)(minutes % SimClock.MinutesPerDay);
-            day.text = $"Day {dayNumber}";
+            day.text = Loc.T("Day {0}", dayNumber);
             time.text = $"{minuteOfDay / 60:00}:{minuteOfDay % 60:00}";
 
             bool night = minuteOfDay < DawnMinute || minuteOfDay >= DuskMinute;
@@ -184,8 +184,8 @@ namespace Voxel.Client
             sky.EnableInClassList("hud-sky--night", night);
 
             float multiplier = ecosystemSync.Multiplier;
-            speed.text = (multiplier <= 0f ? "paused" : Mathf.Approximately(multiplier, 1f) ? "" : $"×{multiplier:0.##}")
-                         + (ecosystemSync.IsBehind ? " (behind)" : "");
+            speed.text = (multiplier <= 0f ? Loc.T("paused") : Mathf.Approximately(multiplier, 1f) ? "" : $"×{multiplier:0.##}")
+                         + (ecosystemSync.IsBehind ? " " + Loc.T("(behind)") : "");
 
             // The map's key as this keyboard's layout shows it (M on QWERTY and AZERTY alike, but elsewhere).
             Keyboard keyboard = Keyboard.current;
@@ -203,7 +203,7 @@ namespace Voxel.Client
                 landscape = Landscape.For(world.Seed, world.SizeX, world.SizeZ);
             }
 
-            place.text = Biomes.NameAt(world, landscape, Mathf.FloorToInt(position.x), Mathf.FloorToInt(position.z));
+            place.text = Loc.Name(Biomes.NameAt(world, landscape, Mathf.FloorToInt(position.x), Mathf.FloorToInt(position.z)));
         }
     }
 }

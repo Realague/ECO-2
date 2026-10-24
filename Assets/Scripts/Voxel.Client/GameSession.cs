@@ -74,7 +74,9 @@ namespace Voxel.Client
         private float startTimeScale = 1f;
         private string[] adminIds = Array.Empty<string>();
         private Vector3Int? worldSize;
+        // The last problem, in English (logs) with its values; Message shows it in the player's language.
         private string message = "";
+        private object[] messageValues;
         private bool sessionActive;
         private bool leaving;
         private PlayerRegistry registry;
@@ -98,8 +100,15 @@ namespace Voxel.Client
 
         public ushort Port => port;
 
-        // Why the last game could not start or ended, or empty. Cleared when another one starts.
-        public string Message => message;
+        // Why the last game could not start or ended, or empty, in the player's language (Loc). Cleared
+        // when another one starts.
+        public string Message => messageValues == null ? Loc.T(message) : Loc.T(message, messageValues);
+
+        private void SetMessage(string english, params object[] values)
+        {
+            message = english;
+            messageValues = values.Length > 0 ? values : null;
+        }
 
         // No game: the main menu is showing.
         public bool InMenu => !networkManager.IsListening;
@@ -274,11 +283,11 @@ namespace Voxel.Client
 
         public void StartClient()
         {
-            message = "";
+            SetMessage("");
             leaving = false;
             if (address.Split('.').Length != 4 || !IPAddress.TryParse(address, out _))
             {
-                message = $"'{address}' is not a valid IPv4 address.";
+                SetMessage("'{0}' is not a valid IPv4 address.", address);
                 return;
             }
 
@@ -286,7 +295,7 @@ namespace Voxel.Client
             Transport.SetConnectionData(address, port);
             if (!networkManager.StartClient())
             {
-                message = $"Could not start the connection to {address}.";
+                SetMessage("Could not start the connection to {0}.", address);
                 return;
             }
 
@@ -306,7 +315,7 @@ namespace Voxel.Client
 
         private void StartServerSession(bool withLocalPlayer)
         {
-            message = "";
+            SetMessage("");
             leaving = false;
 
             Directory.CreateDirectory(worldDirectory);
@@ -332,8 +341,8 @@ namespace Voxel.Client
             if (!started)
             {
                 EndSession();
-                message = $"Could not start a server on port {port}.";
-                Debug.LogError(message);
+                SetMessage("Could not start a server on port {0}.", port);
+                Debug.LogError(string.Format(message, messageValues ?? Array.Empty<object>()));
                 QuitIfDedicated();
                 return;
             }
@@ -488,11 +497,11 @@ namespace Voxel.Client
             if (!leaving)
             {
                 string reason = networkManager.DisconnectReason;
-                if (!string.IsNullOrEmpty(worldSync.Failure)) message = worldSync.Failure;
-                else if (ConnectionRefusal.IsKnown(reason)) message = reason;
-                else message = wasServer ? "The server has stopped." : "Connection to the server lost or impossible.";
+                if (!string.IsNullOrEmpty(worldSync.Failure)) SetMessage(worldSync.Failure);
+                else if (ConnectionRefusal.IsKnown(reason)) SetMessage(reason);
+                else SetMessage(wasServer ? "The server has stopped." : "Connection to the server lost or impossible.");
 
-                if (wasServer) Debug.LogError(message);
+                if (wasServer) Debug.LogError(string.Format(message, messageValues ?? Array.Empty<object>()));
             }
 
             leaving = false;
@@ -566,10 +575,10 @@ namespace Voxel.Client
 
             if (Cursor.lockState != CursorLockMode.Locked)
             {
-                string role = networkManager.IsHost ? $"Game hosted on port {port}" : $"Connected to {address}";
+                string role = networkManager.IsHost ? Loc.T("Game hosted on port {0}", port) : Loc.T("Connected to {0}", address);
                 return role + RouterPortText()
-                    + "\nClick: take control\nF10: leave the game"
-                    + "\nAdmins: F5 / F6 slow down or speed up time, F7 advance one day";
+                    + "\n" + Loc.T("Click: take control") + "\n" + Loc.T("F10: leave the game")
+                    + "\n" + Loc.T("Admins: F5 / F6 slow down or speed up time, F7 advance one day");
             }
 
             return "";
@@ -578,7 +587,7 @@ namespace Voxel.Client
         // What the host needs to know to invite players from outside its network. Empty on a client.
         private string RouterPortText()
         {
-            if (forwardingRequest != null) return "\nInternet: asking the router to open the port…";
+            if (forwardingRequest != null) return "\n" + Loc.T("Internet: asking the router to open the port…");
 
             return forwarding != null ? "\n" + forwarding.Summary : "";
         }

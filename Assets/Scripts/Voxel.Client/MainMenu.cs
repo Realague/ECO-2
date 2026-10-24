@@ -22,7 +22,8 @@ namespace Voxel.Client
             Home,
             Host,
             NewWorld,
-            Join
+            Join,
+            Options
         }
 
         private const string HiddenClass = "hidden";
@@ -35,6 +36,9 @@ namespace Voxel.Client
         private VisualElement hostView;
         private VisualElement newWorldView;
         private VisualElement joinView;
+        private VisualElement optionsView;
+        private VisualElement languageList;
+        private Label hostHint;
         private ScrollView worldList;
         private VisualElement worldEmpty;
         private Button hostStart;
@@ -104,9 +108,13 @@ namespace Voxel.Client
             joinAddress = root.Q<TextField>("join-address");
             joinPassword = root.Q<TextField>("join-password");
 
+            optionsView = root.Q("view-options");
+            languageList = root.Q("language-list");
+            hostHint = root.Q<Label>("host-hint");
+
             root.Q<Label>("game-title").text = Application.productName;
-            root.Q<Label>("host-hint").text =
-                $"Players who join need it. Leave it empty for an open game. Players connect on UDP port {session.Port}.";
+            ShowTexts();
+            Loc.Changed += OnLanguageChanged;
 
             Connect(root.Q<Button>("host-button"), () => Show(View.Host));
             Connect(root.Q<Button>("join-button"), () => Show(View.Join));
@@ -119,11 +127,45 @@ namespace Voxel.Client
             Connect(root.Q<Button>("join-back"), () => Show(View.Home));
             Connect(root.Q<Button>("join-start"), StartJoining);
             Connect(root.Q<Button>("busy-cancel"), session.Leave);
+            Connect(root.Q<Button>("options-button"), () => Show(View.Options));
+            Connect(root.Q<Button>("options-back"), () => Show(View.Home));
+        }
 
-            // Options do not exist yet.
-            Button options = root.Q<Button>("options-button");
-            options.SetEnabled(false);
-            options.focusable = false;
+        private void OnDestroy()
+        {
+            Loc.Changed -= OnLanguageChanged;
+        }
+
+        // The texts the menu writes itself, in the player's language (the document's own are
+        // translated by LocalizedDocuments).
+        private void ShowTexts()
+        {
+            hostHint.text = Loc.T("Players who join need it. Leave it empty for an open game. Players connect on UDP port {0}.", session.Port);
+            ShowLanguages();
+        }
+
+        private void OnLanguageChanged()
+        {
+            ShowTexts();
+            if (view == View.Host) ListWorlds();
+            Refresh();
+        }
+
+        // One button per language, named in itself; the one in use is the primary one.
+        private void ShowLanguages()
+        {
+            languageList.Clear();
+            foreach ((string code, string name) in Loc.Languages)
+            {
+                var button = new Button { focusable = false };
+                button.AddToClassList("button");
+                button.AddToClassList(code == Loc.Language ? "button--primary" : "button--secondary");
+                var text = new Label(name);
+                text.AddToClassList("button-text");
+                button.Add(text);
+                button.clicked += () => Loc.SetLanguage(code);
+                languageList.Add(button);
+            }
         }
 
         // Buttons are not focusable: Enter and Escape are read from the keyboard, and only the
@@ -206,11 +248,11 @@ namespace Voxel.Client
         // "Seed 1234 · 1024 × 1024 · 19 Oct 2026, 14:02", or what happens if it is played.
         private static string DetailsOf(WorldSlots.Slot slot)
         {
-            if (!slot.HasSave) return "Never saved: playing it makes a new world.";
+            if (!slot.HasSave) return Loc.T("Never saved: playing it makes a new world.");
 
-            string played = slot.LastPlayed.ToLocalTime().ToString("d MMM yyyy, HH:mm", CultureInfo.InvariantCulture);
-            string details = $"Seed {slot.Seed} · {slot.ChunksX * Chunk.Size} × {slot.ChunksZ * Chunk.Size} · {played}";
-            return slot.IsOutdated ? details + "\nMade by an older version: playing it makes a new world." : details;
+            string played = slot.LastPlayed.ToLocalTime().ToString("d MMM yyyy, HH:mm", Loc.Culture);
+            string details = Loc.T("Seed {0} · {1} × {2} · {3}", slot.Seed, slot.ChunksX * Chunk.Size, slot.ChunksZ * Chunk.Size, played);
+            return slot.IsOutdated ? details + "\n" + Loc.T("Made by an older version: playing it makes a new world.") : details;
         }
 
         private void StartHosting()
@@ -253,20 +295,21 @@ namespace Voxel.Client
             SetVisible(hostView, !busy && view == View.Host);
             SetVisible(newWorldView, !busy && view == View.NewWorld);
             SetVisible(joinView, !busy && view == View.Join);
+            SetVisible(optionsView, !busy && view == View.Options);
             SetVisible(busyView, busy);
             SetVisible(error, !busy && !string.IsNullOrEmpty(session.Message));
             errorText.text = session.Message;
 
             if (session.IsConnecting)
             {
-                busyTitle.text = "Connecting";
-                busyText.text = $"Waiting for {session.Address} to answer.";
+                busyTitle.text = Loc.T("Connecting");
+                busyText.text = Loc.T("Waiting for {0} to answer.", session.Address);
                 busyProgress.style.width = Length.Percent(0f);
             }
             else if (session.IsLoading)
             {
                 int percent = Mathf.RoundToInt(session.LoadingProgress * 100f);
-                busyTitle.text = "Loading the world";
+                busyTitle.text = Loc.T("Loading the world");
                 busyText.text = $"{percent}%";
                 busyProgress.style.width = Length.Percent(percent);
             }

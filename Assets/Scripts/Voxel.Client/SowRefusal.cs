@@ -24,26 +24,33 @@ namespace Voxel.Client
 
     internal static class SowRefusals
     {
-        // What the player reads, plantName in lower case ("oak", "apple tree").
+        // What the player reads, in their language (Loc), plantName the species' English name ("Oak",
+        // "Apple tree"). In the texts: {0} the translated name, {1} in lower case, {2} the English
+        // with its article ("an oak"), {3} the same capitalised.
         public static string TextOf(SowRefusal refusal, string plantName)
         {
-            string a = Article(plantName);
             switch (refusal)
             {
-                case SowRefusal.Occupied: return "Something already stands there";
-                case SowRefusal.Ground: return $"{Capital(a)} can't grow on this ground";
-                case SowRefusal.TooCold: return $"Too cold for {a}";
-                case SowRefusal.TooHot: return $"Too hot for {a}";
-                case SowRefusal.TooDry: return $"Too dry for {a}";
-                case SowRefusal.TooWet: return $"Too wet for {a}";
-                case SowRefusal.PoorSoil: return $"The soil is too poor for {a}";
-                case SowRefusal.TooClose: return $"Too close to another {plantName}";
-                case SowRefusal.NeedsWater: return $"{Capital(a)} needs water beside it";
-                case SowRefusal.NeedsShade: return $"{Capital(a)} needs shade";
-                case SowRefusal.NotTilled: return "Crops only grow on tilled soil: use a hoe";
-                case SowRefusal.NotGardener: return "Only gardeners can plant crops";
+                case SowRefusal.Occupied: return Loc.T("Something already stands there");
+                case SowRefusal.Ground: return Named("{3} can't grow on this ground", plantName);
+                case SowRefusal.TooCold: return Named("Too cold for {2}", plantName);
+                case SowRefusal.TooHot: return Named("Too hot for {2}", plantName);
+                case SowRefusal.TooDry: return Named("Too dry for {2}", plantName);
+                case SowRefusal.TooWet: return Named("Too wet for {2}", plantName);
+                case SowRefusal.PoorSoil: return Named("The soil is too poor for {2}", plantName);
+                case SowRefusal.TooClose: return Named("Too close to another {1}", plantName);
+                case SowRefusal.NeedsWater: return Named("{3} needs water beside it", plantName);
+                case SowRefusal.NeedsShade: return Named("{3} needs shade", plantName);
+                case SowRefusal.NotTilled: return Loc.T("Crops only grow on tilled soil: use a hoe");
+                case SowRefusal.NotGardener: return Loc.T("Only gardeners can plant crops");
                 default: return null;
             }
+        }
+
+        private static string Named(string english, string plantName)
+        {
+            string a = Article(plantName.ToLowerInvariant());
+            return Loc.T(english, Loc.Name(plantName), Loc.Lower(plantName), a, Capital(a));
         }
 
         private static string Article(string name) => (name.Length > 0 && "aeiou".IndexOf(name[0]) >= 0 ? "an " : "a ") + name;

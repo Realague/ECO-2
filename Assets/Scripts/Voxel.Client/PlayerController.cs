@@ -288,10 +288,12 @@ namespace Voxel.Client
 
         internal static string MissingToolMessage(int tool)
         {
-            if (tool == Items.Bow) return "You need a bow to hunt";
+            if (tool == Items.Bow) return Loc.T("You need a bow to hunt");
 
-            string name = Items.NameOf(tool).ToLowerInvariant();
-            return ("aeiou".IndexOf(name[0]) >= 0 ? "You need an " : "You need a ") + name;
+            // {0}: the tool with its English article ("a shovel"), {1}: its translated name in lower case.
+            string name = Items.NameOf(tool);
+            string english = name.ToLowerInvariant();
+            return Loc.T("You need {0}", ("aeiou".IndexOf(english[0]) >= 0 ? "an " : "a ") + english, Loc.Lower(name));
         }
 
         private void Interact(Mouse mouse)

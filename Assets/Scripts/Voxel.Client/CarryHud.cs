@@ -41,7 +41,16 @@ namespace Voxel.Client
             weightText = root.Q<Label>("carry-weight");
             blocksFill = root.Q("carry-blocks-fill");
             weightFill = root.Q("carry-weight-fill");
+            Loc.Changed += OnLanguageChanged;
         }
+
+        private void OnDestroy()
+        {
+            Loc.Changed -= OnLanguageChanged;
+        }
+
+        // Another language: written again at the next frame.
+        private void OnLanguageChanged() => shownBlocks = -1;
 
         private void Update()
         {
@@ -57,8 +66,8 @@ namespace Voxel.Client
 
         internal static void Show(int blocks, float weight, Label blocksText, VisualElement blocksFill, Label weightText, VisualElement weightFill)
         {
-            blocksText.text = $"Blocks {blocks} / {CarryLimits.MaxBlocks}";
-            weightText.text = $"Weight {weight.ToString("0.0", CultureInfo.InvariantCulture)} / {CarryLimits.MaxWeight:0} kg";
+            blocksText.text = Loc.T("Blocks {0} / {1}", blocks, CarryLimits.MaxBlocks);
+            weightText.text = Loc.T("Weight {0} / {1} kg", Loc.Number(weight, "0.0"), CarryLimits.MaxWeight.ToString("0"));
             ShowGauge(blocksFill, (float)blocks / CarryLimits.MaxBlocks);
             ShowGauge(weightFill, weight / CarryLimits.MaxWeight);
         }

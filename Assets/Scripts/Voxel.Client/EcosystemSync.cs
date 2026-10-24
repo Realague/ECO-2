@@ -475,14 +475,21 @@ namespace Voxel.Client
         {
             name = null;
             tool = Items.None;
-            if (animalNames == null)
+            if (animalNames == null || namesLanguage != Loc.Language)
             {
-                animalNames = Array.ConvertAll(animalAssets, asset => DisplayName(asset.name));
-                plantNames = Array.ConvertAll(speciesAssets, asset => DisplayName(asset.name));
-                youngPlantNames = Array.ConvertAll(plantNames, plantName => "Young " + char.ToLowerInvariant(plantName[0]) + plantName.Substring(1));
-                ripePlantNames = Array.ConvertAll(plantNames, plantName => new[]
+                // In the player's language ({0} the species' name, {1} the same in lower case).
+                namesLanguage = Loc.Language;
+                string[] englishPlants = Array.ConvertAll(speciesAssets, asset => DisplayName(asset.name));
+                animalNames = Array.ConvertAll(animalAssets, asset => Loc.Name(DisplayName(asset.name)));
+                plantNames = Array.ConvertAll(englishPlants, Loc.Name);
+                youngPlantNames = Array.ConvertAll(englishPlants, plantName => Loc.T("Young {1}", Loc.Name(plantName), Loc.Lower(plantName)));
+                stumpNames = Array.ConvertAll(englishPlants, plantName => Loc.T("{0} stump", Loc.Name(plantName), Loc.Lower(plantName)));
+                ripePlantNames = Array.ConvertAll(englishPlants, plantName => new[]
                 {
-                    plantName, plantName + " (unripe)", plantName + " (ripe)", plantName + " (fully ripe)"
+                    Loc.Name(plantName),
+                    Loc.T("{0} (unripe)", Loc.Name(plantName), Loc.Lower(plantName)),
+                    Loc.T("{0} (ripe)", Loc.Name(plantName), Loc.Lower(plantName)),
+                    Loc.T("{0} (fully ripe)", Loc.Name(plantName), Loc.Lower(plantName))
                 });
             }
 
@@ -499,18 +506,20 @@ namespace Voxel.Client
 
             PlantView plant = plants[plantId];
             tool = ToolFor(plant);
-            if (plant.Stump) name = plantNames[plant.SpeciesIndex] + " stump";
+            if (plant.Stump) name = stumpNames[plant.SpeciesIndex];
             else if (plant.Stage < Plant.StageCount - 1) name = youngPlantNames[plant.SpeciesIndex];
             else name = ripePlantNames[plant.SpeciesIndex][Mathf.Clamp(plant.RipeStage, 0, Plant.RipeStageCount)];
             return true;
         }
 
-        // Names shown when aiming, worked out once; a crop's name says how ripe it is. Not kept across
-        // a script reload: the Editor would keep the flat arrays but not the jagged one.
+        // Names shown when aiming, worked out once per language; a crop's name says how ripe it is. Not
+        // kept across a script reload: the Editor would keep the flat arrays but not the jagged one.
         [NonSerialized] private string[] animalNames;
         [NonSerialized] private string[] plantNames;
         [NonSerialized] private string[] youngPlantNames;
+        [NonSerialized] private string[] stumpNames;
         [NonSerialized] private string[][] ripePlantNames;
+        [NonSerialized] private string namesLanguage;
 
         // The plant nearest along the ray. A plant's aiming box stays within its own column, so only
         // the columns the ray crosses are looked at, walked one after the other (Amanatides and Woo, in

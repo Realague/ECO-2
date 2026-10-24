@@ -22,6 +22,8 @@ namespace Voxel.Client
             public SpeciesCensus.Kind Kind;
             public int Species;
             public string Name;
+            public string English;
+            public Label Label;
             public Button Button;
             public Label Count;
         }
@@ -33,6 +35,10 @@ namespace Voxel.Client
             public SpeciesCensus.Kind Kind;
             public Foldout Foldout;
             public bool WasOpen;
+
+            // Its title in English, and how many rows it counts (its title's value).
+            public string English;
+            public int Count;
         }
 
         private readonly TextField search;
@@ -47,26 +53,44 @@ namespace Voxel.Client
             ScrollView list = root.Q<ScrollView>("species-list");
 
             IReadOnlyList<SpeciesAsset> plants = ecosystemSync.PlantAssets;
-            Foldout plantsGroup = AddGroup(list, SpeciesCensus.Kind.Plant, $"Plants ({plants.Count})");
+            Foldout plantsGroup = AddGroup(list, SpeciesCensus.Kind.Plant, "Plants ({0})", plants.Count);
             for (int s = 0; s < plants.Count; s++)
             {
                 AddRow(plantsGroup, SpeciesCensus.Kind.Plant, s, EcosystemSync.DisplayName(plants[s].name), worldMap.PlantColour(s));
             }
 
             IReadOnlyList<AnimalSpeciesAsset> animals = ecosystemSync.AnimalAssets;
-            Foldout animalsGroup = AddGroup(list, SpeciesCensus.Kind.Animal, $"Animals ({animals.Count})");
+            Foldout animalsGroup = AddGroup(list, SpeciesCensus.Kind.Animal, "Animals ({0})", animals.Count);
             for (int s = 0; s < animals.Count; s++)
             {
                 AddRow(animalsGroup, SpeciesCensus.Kind.Animal, s, EcosystemSync.DisplayName(animals[s].name), worldMap.AnimalColour(s));
             }
 
-            Foldout soilGroup = AddGroup(list, SpeciesCensus.Kind.Soil, "Soil (NPK)");
+            Foldout soilGroup = AddGroup(list, SpeciesCensus.Kind.Soil, "Soil (NPK)", 0);
             for (int n = 0; n < NutrientNames.Length; n++)
             {
                 AddRow(soilGroup, SpeciesCensus.Kind.Soil, n, NutrientNames[n], ClimateColours.NutrientColour(n));
             }
 
             search.RegisterValueChangedCallback(_ => Filter());
+        }
+
+        // Writes the menus' titles and the names again, in the player's language (Loc), after it changed.
+        public void Retranslate()
+        {
+            foreach (Group group in groups)
+            {
+                group.Foldout.text = Loc.T(group.English, group.Count);
+            }
+
+            foreach (Row row in rows)
+            {
+                row.Name = Loc.Name(row.English);
+                row.Label.text = row.Name;
+            }
+
+            // A search under way matches the new names.
+            if (searching) Filter();
         }
 
         public event Action SelectionChanged;
@@ -97,24 +121,27 @@ namespace Voxel.Client
                 }
 
                 int[] counts = row.Kind == SpeciesCensus.Kind.Plant ? census.PlantCounts : census.AnimalCounts;
-                row.Count.text = row.Species < counts.Length ? counts[row.Species].ToString("N0", CultureInfo.InvariantCulture) : "";
+                row.Count.text = row.Species < counts.Length ? Loc.Number(counts[row.Species]) : "";
             }
         }
 
         // A drop-down menu, closed, whose header is not focusable: the map's keys stay the map's.
-        private Foldout AddGroup(ScrollView list, SpeciesCensus.Kind kind, string title)
+        // title: in English, with the count of its rows as {0}.
+        private Foldout AddGroup(ScrollView list, SpeciesCensus.Kind kind, string title, int count)
         {
-            var foldout = new Foldout { text = title, value = false };
+            var foldout = new Foldout { text = Loc.T(title, count), value = false };
             foldout.AddToClassList("species-group");
             foldout.Q<Toggle>().focusable = false;
             list.Add(foldout);
-            groups.Add(new Group { Kind = kind, Foldout = foldout });
+            groups.Add(new Group { Kind = kind, Foldout = foldout, English = title, Count = count });
             return foldout;
         }
 
-        private void AddRow(Foldout group, SpeciesCensus.Kind kind, int species, string name, UnityEngine.Color colour)
+        // english: the species' or nutrient's name in English, shown in the player's language.
+        private void AddRow(Foldout group, SpeciesCensus.Kind kind, int species, string english, UnityEngine.Color colour)
         {
-            var row = new Row { Kind = kind, Species = species, Name = name, Button = new Button { focusable = false } };
+            string name = Loc.Name(english);
+            var row = new Row { Kind = kind, Species = species, Name = name, English = english, Button = new Button { focusable = false } };
             row.Button.AddToClassList("species-row");
 
             var swatch = new VisualElement();
@@ -125,6 +152,7 @@ namespace Voxel.Client
             var label = new Label(name);
             label.AddToClassList("species-name");
             row.Button.Add(label);
+            row.Label = label;
 
             row.Count = new Label();
             row.Count.AddToClassList("species-count");

@@ -65,7 +65,7 @@ namespace Voxel.Client
             if (!blockHit) return null;
 
             ushort block = world.GetBlock(hit.Block);
-            return WithTool(Items.NameOf(Blocks.TypeOf(block)), ToolRules.ToBreak(block));
+            return WithTool(Loc.Name(Items.NameOf(Blocks.TypeOf(block))), ToolRules.ToBreak(block));
         }
 
         // A chest or a stockpile: whose it is, and how full a stockpile is ("Stockpile · Alice (12 / 243)").
@@ -73,26 +73,29 @@ namespace Voxel.Client
         {
             if (!storageSync.TryDescribe(storageId, out StorageKind kind, out string owner, out bool yours, out int blocks)) return null;
 
-            string whose = yours ? "yours" : owner.Length > 0 ? owner : "someone's";
+            string whose = yours ? Loc.T("yours") : owner.Length > 0 ? owner : Loc.T("someone's");
             return kind == StorageKind.Chest
-                ? $"Chest · {whose}"
-                : $"Stockpile · {whose} ({blocks} / {StorageRules.StockpileCapacity})";
+                ? Loc.T("Chest · {0}", whose)
+                : Loc.T("Stockpile · {0} ({1} / {2})", whose, blocks, StorageRules.StockpileCapacity);
         }
 
         // A carcass, and whether enough of it is left to take: "Deer carcass · too far gone".
         private string CarcassName(int speciesIndex, float meat)
         {
-            string name = $"{EcosystemSync.DisplayName(ecosystemSync.AnimalName(speciesIndex))} carcass";
-            return meat < EcosystemSync.CarcassMinMeat ? name + " · too far gone" : name;
+            string english = EcosystemSync.DisplayName(ecosystemSync.AnimalName(speciesIndex));
+            string name = Loc.T("{0} carcass", Loc.Name(english), Loc.Lower(english));
+            return meat < EcosystemSync.CarcassMinMeat ? Loc.T("{0} · too far gone", name) : name;
         }
 
-        // The tool a click would need, when it is not the one in hand: "Granite · needs a pickaxe".
+        // The tool a click would need, when it is not the one in hand: "Granite · needs a pickaxe"
+        // ({1}: the tool with its English article, {2}: its translated name in lower case).
         private string WithTool(string name, int tool)
         {
             if (name == null || tool == Items.None || hotbar.SelectedItem == tool) return name;
 
-            string toolName = Items.NameOf(tool).ToLowerInvariant();
-            return $"{name} · needs {("aeiou".IndexOf(toolName[0]) >= 0 ? "an" : "a")} {toolName}";
+            string toolName = Items.NameOf(tool);
+            string english = toolName.ToLowerInvariant();
+            return Loc.T("{0} · needs {1}", name, ("aeiou".IndexOf(english[0]) >= 0 ? "an " : "a ") + english, Loc.Lower(toolName));
         }
 
         private void Show(string name)

@@ -322,3 +322,15 @@
     height: 22px;
     margin-right: 10px;
 }
+
+/* Options: one button per language, side by side, the chosen one primary. */
+.language-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.language-list > .button {
+    margin: 0 10px 8px 0;
+    min-width: 160px;
+}

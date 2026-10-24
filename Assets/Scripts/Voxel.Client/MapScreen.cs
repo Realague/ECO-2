@@ -103,6 +103,7 @@ namespace Voxel.Client
             projection = Project;
             speciesPanel = new SpeciesPanel(root, ecosystemSync, worldMap);
             speciesPanel.SelectionChanged += OnSpeciesChosen;
+            Loc.Changed += OnLanguageChanged;
             speciesLayer.style.display = DisplayStyle.None;
 
             root.Q<Button>("tab-map").focusable = false;
@@ -121,8 +122,15 @@ namespace Voxel.Client
 
         private void OnDestroy()
         {
+            Loc.Changed -= OnLanguageChanged;
             DropLayers();
             if (speciesTexture != null) Destroy(speciesTexture);
+        }
+
+        private void OnLanguageChanged()
+        {
+            speciesPanel.Retranslate();
+            ShowLayerName();
         }
 
         private void Update()
@@ -286,12 +294,12 @@ namespace Voxel.Client
         private void ShowLayerName()
         {
             // The plain terrain goes unnamed: only a climate layer laid over it is.
-            string climateName = layer == Layer.Terrain ? "" : LayerNames[(int)layer];
+            string climateName = layer == Layer.Terrain ? "" : Loc.T(LayerNames[(int)layer]);
             string speciesName = speciesPanel == null || speciesPanel.SelectedName == null
                 ? ""
                 : speciesPanel.SelectedKind == SpeciesCensus.Kind.Soil
-                    ? $"{speciesPanel.SelectedName} in the soil: {speciesPanel.SelectedCount} on average, deeper where richer"
-                    : $"{speciesPanel.SelectedName}: {speciesPanel.SelectedCount}, yellow where they are most";
+                    ? Loc.T("{0} in the soil: {1} on average, deeper where richer", speciesPanel.SelectedName, speciesPanel.SelectedCount)
+                    : Loc.T("{0}: {1}, yellow where they are most", speciesPanel.SelectedName, speciesPanel.SelectedCount);
             layerName.text = climateName.Length > 0 && speciesName.Length > 0 ? $"{climateName}   ·   {speciesName}" : climateName + speciesName;
         }
 
@@ -489,7 +497,7 @@ namespace Voxel.Client
             Voxel.Core.Geography geography = world.Geography;
             int celsius = ClimateColours.Celsius(geography.TemperatureAt(x, z));
             int humidity = ClimateColours.Percent(geography.HumidityAt(x, z));
-            pointerText.text = $"X {x}   Y {world.GetSurfaceHeight(x, z)}   Z {z}      {celsius} °C   {humidity} % humidity";
+            pointerText.text = $"X {x}   Y {world.GetSurfaceHeight(x, z)}   Z {z}      {celsius} °C   " + Loc.T("{0} % humidity", humidity);
         }
 
     }

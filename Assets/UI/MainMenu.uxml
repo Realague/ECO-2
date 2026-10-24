@@ -2,7 +2,7 @@
     <Style src="Common.uss" />
     <Style src="MainMenu.uss" />
 
-    <!-- MainMenu shows one view at a time: home, host (the list of worlds), new world, join, or busy (connecting or loading). -->
+    <!-- MainMenu shows one view at a time: home, host (the list of worlds), new world, join, options, or busy (connecting or loading). -->
     <ui:VisualElement name="screen" class="screen">
         <ui:VisualElement name="card" class="panel">
             <ui:VisualElement class="brand">
@@ -40,9 +40,8 @@
                     <ui:VisualElement class="icon icon--gear" />
                     <ui:VisualElement class="menu-button-texts">
                         <ui:Label text="Options" class="menu-button-title" />
-                        <ui:Label text="Graphics, controls and sound." class="menu-button-text" />
+                        <ui:Label text="Language." class="menu-button-text" />
                     </ui:VisualElement>
-                    <ui:Label text="Soon" class="badge" />
                 </ui:Button>
                 <ui:Button name="quit-button" class="link-button">
                     <ui:VisualElement class="icon icon--sign-out" />
@@ -112,6 +111,20 @@
                     <ui:Button name="join-start" class="button button--primary">
                         <ui:VisualElement class="icon icon--play" />
                         <ui:Label text="Join" class="button-text" />
+                    </ui:Button>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- Options: the language (MainMenu fills the list with one button per language, Loc.Languages). -->
+            <ui:VisualElement name="view-options" class="view hidden">
+                <ui:Label text="Options" class="view-title" />
+                <ui:Label text="Language" class="field-label" />
+                <ui:VisualElement name="language-list" class="language-list" />
+                <ui:Label text="The game's texts change at once. Your choice is kept on this computer." class="field-hint" />
+                <ui:VisualElement class="view-buttons">
+                    <ui:Button name="options-back" class="button button--secondary">
+                        <ui:VisualElement class="icon icon--arrow-left" />
+                        <ui:Label text="Back" class="button-text" />
                     </ui:Button>
                 </ui:VisualElement>
             </ui:VisualElement>

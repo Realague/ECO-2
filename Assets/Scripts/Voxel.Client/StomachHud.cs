@@ -46,6 +46,23 @@ namespace Voxel.Client
             {
                 nutrients[i] = root.Q<Label>($"stomach-nutrient-{i}");
             }
+
+            Loc.Changed += OnLanguageChanged;
+        }
+
+        private void OnDestroy()
+        {
+            Loc.Changed -= OnLanguageChanged;
+        }
+
+        // Another language: everything is written again at the next frame.
+        private void OnLanguageChanged()
+        {
+            shownCalories = -1;
+            for (int i = 0; i < shownPercents.Length; i++)
+            {
+                shownPercents[i] = -1;
+            }
         }
 
         private void Update()
@@ -59,14 +76,14 @@ namespace Voxel.Client
                 if (percent == shownPercents[i]) continue;
 
                 shownPercents[i] = percent;
-                nutrients[i].text = $"{NutrientNames[i]} {percent} %";
+                nutrients[i].text = $"{Loc.Name(NutrientNames[i])} {percent} %";
                 changed = true;
             }
 
             if (!changed) return;
 
             shownCalories = kcal;
-            calories.text = kcal.ToString("N0", CultureInfo.InvariantCulture) + " kcal";
+            calories.text = Loc.Number(kcal) + " kcal";
             calories.EnableInClassList(LowClass, stomach.Fullness < LowFullness);
             box.EnableInClassList(StarvingClass, stomach.IsStarving);
             pie.Show(stomach);

@@ -233,7 +233,7 @@ namespace Voxel.Client
             bagGrid.Show(bag.Entries, item => chest ? !StorageRules.AcceptsInChest(item) : !StorageRules.AcceptsInStockpile(item));
             ShowCarry(bag);
 
-            storageTabText.text = chest ? "Chest" : "Stockpile";
+            storageTabText.text = Loc.T(chest ? "Chest" : "Stockpile");
             storeGridView.style.display = chest ? DisplayStyle.Flex : DisplayStyle.None;
             pileGrid.style.display = chest ? DisplayStyle.None : DisplayStyle.Flex;
             storeFillIcon.EnableInClassList("icon--scales", chest);
@@ -242,7 +242,7 @@ namespace Voxel.Client
             {
                 storeGrid.Show(storageSync.OpenedContents.Entries, _ => false);
                 float weight = StorageRules.ChestWeight(storageSync.OpenedContents, ecosystemSync.ItemWeights);
-                storeFill.text = $"{weight.ToString("0.0", CultureInfo.InvariantCulture)} / {StorageRules.ChestMaxWeight:0} kg";
+                storeFill.text = $"{Loc.Number(weight, "0.0")} / {StorageRules.ChestMaxWeight:0} kg";
                 ShowShare(storeFill, weight / StorageRules.ChestMaxWeight);
             }
             else
@@ -254,12 +254,12 @@ namespace Voxel.Client
             }
 
             // The item under the pointer is named in its side's title (the slots show no names).
-            bagTitle.text = bagGrid.HoveredItem != Items.None ? ItemCatalog.NameOf(bagGrid.HoveredItem, ecosystemSync) : "Your bag";
+            bagTitle.text = bagGrid.HoveredItem != Items.None ? ItemCatalog.NameOf(bagGrid.HoveredItem, ecosystemSync) : Loc.T("Your bag");
             int storeItem = chest ? storeGrid.HoveredItem : hoveredPile >= 0 ? storageSync.OpenedPiles.ItemAt(hoveredPile) : Items.None;
-            storeTitle.text = storeItem != Items.None ? ItemCatalog.NameOf(storeItem, ecosystemSync) : chest ? "In the chest" : "On the stockpile";
+            storeTitle.text = storeItem != Items.None ? ItemCatalog.NameOf(storeItem, ecosystemSync) : Loc.T(chest ? "In the chest" : "On the stockpile");
 
             storageSync.TryDescribe(openId, out _, out string ownerName, out bool yours, out _);
-            owner.text = yours ? "Yours" : ownerName.Length > 0 ? $"{ownerName}'s" : "";
+            owner.text = yours ? Loc.T("Yours") : ownerName.Length > 0 ? Loc.T("{0}'s", ownerName) : "";
             bool empty = chest ? storageSync.OpenedContents.DistinctCount == 0 : storageSync.OpenedPiles.IsEmpty;
             pickup.style.display = storageSync.OpenedIsOwner ? DisplayStyle.Flex : DisplayStyle.None;
             pickup.SetEnabled(empty);
@@ -270,7 +270,7 @@ namespace Voxel.Client
             int blocks = CarryLimits.BlockCount(bag);
             float weight = CarryLimits.Weight(bag, ecosystemSync.ItemWeights);
             carryBlocks.text = $"{blocks} / {CarryLimits.MaxBlocks}";
-            carryWeight.text = $"{weight.ToString("0.0", CultureInfo.InvariantCulture)} / {CarryLimits.MaxWeight:0} kg";
+            carryWeight.text = $"{Loc.Number(weight, "0.0")} / {CarryLimits.MaxWeight:0} kg";
             ShowShare(carryBlocks, (float)blocks / CarryLimits.MaxBlocks);
             ShowShare(carryWeight, weight / CarryLimits.MaxWeight);
         }
@@ -353,13 +353,13 @@ namespace Voxel.Client
                 dot.EnableInClassList("access-dot--online", entry.Online);
                 var name = new Label(entry.Name);
                 name.AddToClassList("access-name");
-                var state = new Label(entry.Allowed ? "Allowed" : entry.Online ? "Not allowed" : "Allowed, away");
+                var state = new Label(Loc.T(entry.Allowed ? "Allowed" : entry.Online ? "Not allowed" : "Allowed, away"));
                 state.AddToClassList("access-state");
                 var toggle = new Button { focusable = false };
                 toggle.AddToClassList("button");
                 toggle.AddToClassList(entry.Allowed ? "button--danger" : "button--primary");
                 toggle.AddToClassList("access-toggle");
-                var text = new Label(entry.Allowed ? "Remove" : "Allow");
+                var text = new Label(Loc.T(entry.Allowed ? "Remove" : "Allow"));
                 text.AddToClassList("button-text");
                 toggle.Add(text);
                 string playerName = entry.Name;

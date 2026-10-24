@@ -140,7 +140,7 @@ namespace Voxel.Client
                 case StorageRefusal.NotYours: return "Not yours";
                 case StorageRefusal.NotEmpty: return "Empty it first";
                 case StorageRefusal.PlantInTheWay: return "Something is growing there";
-                case StorageRefusal.ChestFull: return $"Chest is full ({StorageRules.ChestMaxWeight:0} kg)";
+                case StorageRefusal.ChestFull: return Loc.T("Chest is full ({0} kg)", StorageRules.ChestMaxWeight.ToString("0"));
                 case StorageRefusal.StockpileFull: return "No room on the stockpile";
                 case StorageRefusal.NotAccepted: return "It doesn't go in there";
                 case StorageRefusal.TooHungry: return InventorySync.TooHungryMessage;

@@ -118,7 +118,7 @@ namespace Voxel.Client
         // A seed that did not sprout: why ("Too cold for an oak").
         private void OnSowRefused(SowRefusal refusal, int species)
         {
-            string text = SowRefusals.TextOf(refusal, EcosystemSync.DisplayName(ecosystemSync.PlantName(species)).ToLowerInvariant());
+            string text = SowRefusals.TextOf(refusal, EcosystemSync.DisplayName(ecosystemSync.PlantName(species)));
             if (text != null) ShowMessage(text);
         }
 
@@ -127,10 +127,10 @@ namespace Voxel.Client
             switch (reason)
             {
                 case FullReason.Blocks:
-                    ShowMessage($"Can't carry more than {CarryLimits.MaxBlocks} blocks");
+                    ShowMessage(Loc.T("Can't carry more than {0} blocks", CarryLimits.MaxBlocks));
                     break;
                 case FullReason.Weight:
-                    ShowMessage($"Too heavy ({CarryLimits.MaxWeight:0} kg)");
+                    ShowMessage(Loc.T("Too heavy ({0} kg)", CarryLimits.MaxWeight.ToString("0")));
                     break;
                 default:
                     ShowMessage("They can't carry that");
@@ -164,10 +164,12 @@ namespace Voxel.Client
             return -1;
         }
 
-        // Shows a short note above the bar a moment, in place of the held item's name ("Too full to eat").
+        // Shows a short note above the bar a moment, in place of the held item's name ("Too full to eat"),
+        // in the player's language: a fixed English text is translated here (Loc), a text with values
+        // comes translated already.
         public void ShowMessage(string text)
         {
-            message = text;
+            message = Loc.T(text);
             messageUntil = Time.unscaledTime + HeldNameSeconds;
         }
 

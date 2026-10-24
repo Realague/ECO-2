@@ -160,7 +160,7 @@ namespace Voxel.Client
 
         private void ShowNameError(string message)
         {
-            nameError.text = message ?? "";
+            nameError.text = Loc.T(message ?? "");
             nameError.EnableInClassList(HiddenClass, string.IsNullOrEmpty(message));
         }
 
@@ -268,11 +268,11 @@ namespace Voxel.Client
                 rows[i].EnableInClassList(HiddenClass, nameOnly);
             }
 
-            title.text = nameOnly ? "Choose your name" : "Create your character";
-            subtitle.text = nameOnly
+            title.text = Loc.T(nameOnly ? "Choose your name" : "Create your character");
+            subtitle.text = Loc.T(nameOnly
                 ? "Players now have names: this is how others will know you. The choice is final."
-                : "This is how other players will see you. The choice is final.";
-            dialogText.text = nameOnly ? "Keep this name? It cannot be changed later." : "Keep this name and appearance? They cannot be changed later.";
+                : "This is how other players will see you. The choice is final.");
+            dialogText.text = Loc.T(nameOnly ? "Keep this name? It cannot be changed later." : "Keep this name and appearance? They cannot be changed later.");
             confirmButton.SetEnabled(PlayerNames.TryNormalize(nameField.value, out _));
             ShowNameError(refusal);
             SetConfirming(false);
@@ -376,12 +376,12 @@ namespace Voxel.Client
         {
             switch (line)
             {
-                case Row.Sex: return Appearance.NameOf(appearance.Sex);
+                case Row.Sex: return Loc.Name(Appearance.NameOf(appearance.Sex));
                 case Row.SkinTone: return $"{appearance.SkinTone + 1} / {Appearance.SkinToneCount}";
-                case Row.EyeColor: return Appearance.EyeColorNames[appearance.EyeColor];
-                case Row.Hair: return Appearance.NameOf(appearance.Hair);
-                case Row.HairColor: return Appearance.HairColorNames[appearance.HairColor];
-                default: return Appearance.NameOf(appearance.FacialHair);
+                case Row.EyeColor: return Loc.In("eyes", Appearance.EyeColorNames[appearance.EyeColor]);
+                case Row.Hair: return Loc.Name(Appearance.NameOf(appearance.Hair));
+                case Row.HairColor: return Loc.In("hair", Appearance.HairColorNames[appearance.HairColor]);
+                default: return Loc.Name(Appearance.NameOf(appearance.FacialHair));
             }
         }
 

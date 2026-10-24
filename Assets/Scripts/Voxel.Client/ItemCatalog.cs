@@ -39,11 +39,11 @@ namespace Voxel.Client
         {
             switch (category)
             {
-                case ItemCategory.Seeds: return "Seeds";
-                case ItemCategory.Food: return "Food";
-                case ItemCategory.Materials: return "Materials";
-                case ItemCategory.Tools: return "Tools";
-                default: return "Blocks";
+                case ItemCategory.Seeds: return Loc.T("Seeds");
+                case ItemCategory.Food: return Loc.T("Food");
+                case ItemCategory.Materials: return Loc.T("Materials");
+                case ItemCategory.Tools: return Loc.T("Tools");
+                default: return Loc.T("Blocks");
             }
         }
 
@@ -52,59 +52,72 @@ namespace Voxel.Client
         {
             switch (CategoryOf(item))
             {
-                case ItemCategory.Seeds: return "Seed";
-                case ItemCategory.Food: return "Food";
-                case ItemCategory.Materials: return Items.IsCarcass(item) ? "Carcass" : "Material";
-                case ItemCategory.Tools: return item == Items.Arrow ? "Ammunition" : Items.IsStorage(item) ? "Storage" : item == Blocks.Torch ? "Light" : "Tool";
-                default: return "Block";
+                case ItemCategory.Seeds: return Loc.T("Seed");
+                case ItemCategory.Food: return Loc.T("Food");
+                case ItemCategory.Materials: return Loc.T(Items.IsCarcass(item) ? "Carcass" : "Material");
+                case ItemCategory.Tools: return Loc.T(item == Items.Arrow ? "Ammunition" : Items.IsStorage(item) ? "Storage" : item == Blocks.Torch ? "Light" : "Tool");
+                default: return Loc.T("Block");
             }
         }
 
+        // In the player's language (Loc): "Oak seeds", "Graines de chêne". A species' name goes in as
+        // {0} (translated) and {1} (the same in lower case).
         public static string NameOf(int item, EcosystemSync ecosystemSync)
         {
-            if (Items.IsSeed(item)) return $"{PlantName(Items.SeedSpecies(item), ecosystemSync)} seeds";
-            if (Items.IsProduce(item)) return EcosystemSync.DisplayName(ecosystemSync.ProduceName(Items.ProduceSpecies(item)));
-            if (Items.IsWood(item)) return $"{PlantName(Items.WoodSpecies(item), ecosystemSync)} wood";
-            if (Items.IsCarcass(item)) return $"{AnimalName(Items.CarcassSpecies(item), ecosystemSync)} carcass";
-            return Items.NameOf(item);
+            if (Items.IsSeed(item)) return WithPlant("{0} seeds", Items.SeedSpecies(item), ecosystemSync);
+            if (Items.IsProduce(item)) return Loc.In("produce", EcosystemSync.DisplayName(ecosystemSync.ProduceName(Items.ProduceSpecies(item))));
+            if (Items.IsWood(item)) return WithPlant("{0} wood", Items.WoodSpecies(item), ecosystemSync);
+            if (Items.IsCarcass(item)) return WithAnimal("{0} carcass", Items.CarcassSpecies(item), ecosystemSync);
+            return Loc.Name(Items.NameOf(item));
         }
 
+        // {0}: the species with its English article ("an oak"), {1}: its translated name in lower case.
         public static string DescriptionOf(int item, EcosystemSync ecosystemSync)
         {
             if (Items.IsSeed(item))
             {
                 int species = Items.SeedSpecies(item);
-                string grow = $"Plant it to grow {Article(PlantName(species, ecosystemSync).ToLowerInvariant())}";
                 return ecosystemSync.IsTree(species)
-                    ? grow + ": hold it and right click on the ground where it grows. It needs a climate and soil that suit it, and room from others of its kind."
-                    : grow + ". Only gardeners plant crops, on tilled soil.";
+                    ? WithPlant("Plant it to grow {2}: hold it and right click on the ground where it grows. It needs a climate and soil that suit it, and room from others of its kind.", species, ecosystemSync)
+                    : WithPlant("Plant it to grow {2}. Only gardeners plant crops, on tilled soil.", species, ecosystemSync);
             }
 
             if (Items.IsProduce(item))
             {
-                string harvested = $"Harvested from {PlantName(Items.ProduceSpecies(item), ecosystemSync).ToLowerInvariant()} plants when they are ripe.";
-                return ecosystemSync.FoodOf(item).IsFood ? harvested + " Right click it here, or hold it and right click, to eat it." : harvested + " It cannot be eaten.";
+                int species = Items.ProduceSpecies(item);
+                return ecosystemSync.FoodOf(item).IsFood
+                    ? WithPlant("Harvested from {1} plants when they are ripe. Right click it here, or hold it and right click, to eat it.", species, ecosystemSync)
+                    : WithPlant("Harvested from {1} plants when they are ripe. It cannot be eaten.", species, ecosystemSync);
             }
 
             switch (item)
             {
-                case Items.Shovel: return "Digs soft ground: dirt, grass, sand, gravel, clay, snow and mud. Hold it and left click.";
-                case Items.Pickaxe: return "Breaks hard blocks: rock, ores and ice. Hold it and left click.";
-                case Items.Axe: return "Fells trees and every plant that gives wood. Hold it and left click.";
-                case Items.Scythe: return "Cuts grass, reeds and ferns, and harvests cereals and vegetables (right click on a ripe one). Fruit is picked by hand.";
-                case Items.Hoe: return "Tills grass, dirt, mud or clay (right click): seeds only grow on tilled soil.";
-                case Items.Bow: return "Hunts animals. Hold the left button to draw, let go to shoot; a shot in the head does double damage.";
-                case Items.Arrow: return "Shot with the bow. An arrow lies where it lands: right click on it to pick it up.";
-                case Items.Chest: return "Holds tools, seeds, food and the like, up to 150 kg. Hold it and right click on the ground to place it; right click on it to open it. Only you and the players you allow can open it.";
-                case Blocks.Torch: return "Lights what is around it, day and night. Hold it and right click on the top or the side of a block to set it there; hit it, with anything in hand, to take it down.";
-                case Items.Stockpile: return "Holds blocks and wood: nine piles of 27 on a patch of flat ground, 3 by 3. Hold it and right click to place it in front of you; right click on it to open it.";
+                case Items.Shovel: return Loc.T("Digs soft ground: dirt, grass, sand, gravel, clay, snow and mud. Hold it and left click.");
+                case Items.Pickaxe: return Loc.T("Breaks hard blocks: rock, ores and ice. Hold it and left click.");
+                case Items.Axe: return Loc.T("Fells trees and every plant that gives wood. Hold it and left click.");
+                case Items.Scythe: return Loc.T("Cuts grass, reeds and ferns, and harvests cereals and vegetables (right click on a ripe one). Fruit is picked by hand.");
+                case Items.Hoe: return Loc.T("Tills grass, dirt, mud or clay (right click): seeds only grow on tilled soil.");
+                case Items.Bow: return Loc.T("Hunts animals. Hold the left button to draw, let go to shoot; a shot in the head does double damage.");
+                case Items.Arrow: return Loc.T("Shot with the bow. An arrow lies where it lands: right click on it to pick it up.");
+                case Items.Chest: return Loc.T("Holds tools, seeds, food and the like, up to 150 kg. Hold it and right click on the ground to place it; right click on it to open it. Only you and the players you allow can open it.");
+                case Blocks.Torch: return Loc.T("Lights what is around it, day and night. Hold it and right click on the top or the side of a block to set it there; hit it, with anything in hand, to take it down.");
+                case Items.Stockpile: return Loc.T("Holds blocks and wood: nine piles of 27 on a patch of flat ground, 3 by 3. Hold it and right click to place it in front of you; right click on it to open it.");
             }
 
-            if (Items.IsWood(item)) return $"From {Article(PlantName(Items.WoodSpecies(item), ecosystemSync).ToLowerInvariant())} once felled: each log on the ground gives one. Counted with the blocks, and kept on a stockpile.";
-            if (Items.IsCarcass(item)) return $"The body of {Article(AnimalName(Items.CarcassSpecies(item), ecosystemSync).ToLowerInvariant())}, taken from the ground while at least half of it was left. Of no use yet: it will be butchered later.";
-            if (item == Items.Straw) return "Left over when wheat is harvested.";
-            return "A building block. Hold it and right click to place it.";
+            if (Items.IsWood(item)) return WithPlant("From {2} once felled: each log on the ground gives one. Counted with the blocks, and kept on a stockpile.", Items.WoodSpecies(item), ecosystemSync);
+            if (Items.IsCarcass(item)) return WithAnimal("The body of {2}, taken from the ground while at least half of it was left. Of no use yet: it will be butchered later.", Items.CarcassSpecies(item), ecosystemSync);
+            if (item == Items.Straw) return Loc.T("Left over when wheat is harvested.");
+            return Loc.T("A building block. Hold it and right click to place it.");
         }
+
+        // A text about a species, translated: {0} its name, {1} the same in lower case, {2} in lower
+        // case with an English article ("an oak"; a translation does with {1}).
+        private static string WithPlant(string english, int species, EcosystemSync ecosystemSync) => WithName(english, PlantName(species, ecosystemSync));
+
+        private static string WithAnimal(string english, int species, EcosystemSync ecosystemSync) => WithName(english, AnimalName(species, ecosystemSync));
+
+        private static string WithName(string english, string name) =>
+            Loc.T(english, Loc.Name(name), Loc.Lower(name), Article(name.ToLowerInvariant()));
 
         public static Texture2D IconOf(int item, EcosystemSync ecosystemSync)
         {
