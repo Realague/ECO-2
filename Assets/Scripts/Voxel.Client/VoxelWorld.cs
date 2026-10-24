@@ -29,6 +29,11 @@ namespace Voxel.Client
         [Tooltip("Brightness kept where no sky light reaches, deep underground (1 is open sky).")]
         [SerializeField, Range(0f, 0.2f)] private float darkestSkyLight = 0.02f;
 
+        // Torches (TorchViews): the stick, its head and the flame, all with GPU instancing.
+        [SerializeField] private Material torchWoodMaterial;
+        [SerializeField] private Material torchHeadMaterial;
+        [SerializeField] private Material torchFlameMaterial;
+
         // Remeshing this many chunks or more at once is shared among the cores (ChunkMeshing).
         private const int ParallelRemeshCount = 16;
 
@@ -41,6 +46,8 @@ namespace Voxel.Client
         private Material materialInstance;
         private Texture2D atlas;
         private SkyLight skyLight;
+        private BlockLight blockLight;
+        private TorchViews torchViews;
         private string savePath;
         private bool rendering;
 
@@ -59,29 +66,43 @@ namespace Voxel.Client
             atlas = BlockAtlas.CreateTexture();
             materialInstance = new Material(blockMaterial) { mainTexture = atlas };
             Shader.SetGlobalFloat("_DarkestSkyLight", darkestSkyLight);
+            if (torchWoodMaterial != null && torchHeadMaterial != null && torchFlameMaterial != null)
+            {
+                torchViews = new TorchViews(torchWoodMaterial, torchHeadMaterial, torchFlameMaterial);
+            }
         }
 
-        // How bright the blocks are drawn at this position for the sky they see, 0 to 1: the curve of
-        // the blocks' shader (SkyBrightness), for what is drawn with other shaders. 1 without a world.
+        // How bright the blocks are drawn at this position, 0 to 1: the curve of the blocks' shader
+        // for the sky they see (SkyBrightness), or for a torch's light near one (TorchGlow) if that
+        // is brighter; for what is drawn with other shaders. 1 without a world.
         public float SkyBrightnessAt(Vector3 position)
         {
             if (skyLight == null) return 1f;
 
-            float level = skyLight.Get(Mathf.FloorToInt(position.x), Mathf.FloorToInt(position.y), Mathf.FloorToInt(position.z))
-                / (float)SkyLight.Max;
+            int x = Mathf.FloorToInt(position.x);
+            int y = Mathf.FloorToInt(position.y);
+            int z = Mathf.FloorToInt(position.z);
+            float level = skyLight.Get(x, y, z) / (float)SkyLight.Max;
             float curve = level / (3f * (1f - level) + 1f);
-            return Mathf.Lerp(darkestSkyLight, 1f, curve);
+            float sky = Mathf.Lerp(darkestSkyLight, 1f, curve);
+            float torch = blockLight != null ? TorchGlow(blockLight.Get(x, y, z) / (float)Blocks.TorchLight) : 0f;
+            return Mathf.Max(sky, torch);
         }
+
+        // The blocks' shader's curve for a torch's light (0 to 1 at Blocks.TorchLight): bright by the
+        // torch, falling by about a fifth per block.
+        private static float TorchGlow(float level) => level <= 0f ? 0f : (Mathf.Pow(0.8f, (1f - level) * Blocks.TorchLight) - 0.044f) / 0.956f;
 
         private void LateUpdate()
         {
+            if (World != null && torchViews != null && Camera.main != null) torchViews.Render(World, blockLight, Camera.main.transform.position);
             if (dirtyChunks.Count == 0) return;
 
             if (dirtyChunks.Count >= ParallelRemeshCount)
             {
                 remeshing.Clear();
                 remeshing.AddRange(dirtyChunks);
-                ChunkMeshing.BuildAll(World, skyLight, remeshing, ShowMesh);
+                ChunkMeshing.BuildAll(World, skyLight, remeshing, ShowMesh, blockLight);
                 remeshing.Clear();
             }
             else
@@ -89,7 +110,7 @@ namespace Voxel.Client
                 builder ??= new ChunkMeshBuilder();
                 foreach (Chunk chunk in dirtyChunks)
                 {
-                    builder.Build(World, skyLight, chunk);
+                    builder.Build(World, skyLight, chunk, blockLight);
                     ShowMesh(chunk, builder);
                 }
             }
@@ -153,6 +174,7 @@ namespace Voxel.Client
 
             dirtyChunks.Add(chunk);
             skyLight.UpdateChunk(chunk, dirtyChunks);
+            blockLight.UpdateChunk(chunk, dirtyChunks);
 
             // The faces of neighbouring chunks turned toward this one change too.
             foreach (BlockPos offset in NeighbourOffsets)
@@ -179,6 +201,7 @@ namespace Voxel.Client
             chunkMeshes.Clear();
             dirtyChunks.Clear();
             skyLight = null;
+            blockLight = null;
             World = null;
             savePath = null;
         }
@@ -194,10 +217,11 @@ namespace Voxel.Client
 
             var timer = System.Diagnostics.Stopwatch.StartNew();
             skyLight = new SkyLight(World);
+            blockLight = new BlockLight(World);
             double lightSeconds = timer.Elapsed.TotalSeconds;
 
             World.BlockChanged += OnBlockChanged;
-            ChunkMeshing.BuildAll(World, skyLight, World.Chunks, ShowMesh);
+            ChunkMeshing.BuildAll(World, skyLight, World.Chunks, ShowMesh, blockLight);
 
             Debug.Log(
                 $"Sky light worked out in {lightSeconds * 1000:0} ms, chunks meshed in {(timer.Elapsed.TotalSeconds - lightSeconds) * 1000:0} ms "
@@ -261,6 +285,7 @@ namespace Voxel.Client
         {
             MarkDirty(pos);
             skyLight.Update(pos, dirtyChunks);
+            blockLight.Update(pos, dirtyChunks);
 
             // A block on a chunk edge also changes the visible faces of the neighbouring chunk.
             foreach (BlockPos offset in NeighbourOffsets)

@@ -17,6 +17,13 @@ namespace Voxel.Core
         // Block-by-block grid traversal (Amanatides and Woo).
         public static bool Cast(World world, Vector3 origin, Vector3 direction, float maxDistance, out VoxelHit hit)
         {
+            return Cast(world, origin, direction, maxDistance, false, out hit);
+        }
+
+        // The same; with torches, a torch the ray passes through stops it too, when the ray enters its
+        // box (Torches.GetBox) within its cell: what a player strikes.
+        public static bool Cast(World world, Vector3 origin, Vector3 direction, float maxDistance, bool torches, out VoxelHit hit)
+        {
             hit = default;
 
             float length = direction.Length();
@@ -44,10 +51,23 @@ namespace Voxel.Core
 
             while (distance <= maxDistance)
             {
-                if (Blocks.IsSolid(world.GetBlock(x, y, z)))
+                ushort block = world.GetBlock(x, y, z);
+                if (Blocks.IsSolid(block))
                 {
                     hit = new VoxelHit { Block = new BlockPos(x, y, z), Normal = normal, Distance = distance };
                     return true;
+                }
+
+                if (torches && Blocks.IsTorch(block))
+                {
+                    var cell = new BlockPos(x, y, z);
+                    Torches.GetBox(cell, block, out Vector3 min, out Vector3 max);
+                    float entry = ArrowFlight.SegmentEntry(origin, origin + direction * maxDistance, min, max);
+                    if (entry >= 0f && entry <= maxDistance)
+                    {
+                        hit = new VoxelHit { Block = cell, Normal = normal, Distance = entry };
+                        return true;
+                    }
                 }
 
                 if (nextX <= nextY && nextX <= nextZ)

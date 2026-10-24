@@ -53,7 +53,7 @@ namespace Voxel.Client
             // The same ray and reach as PlayerController's strike, so the label names what a click hits.
             System.Numerics.Vector3 origin = eye.transform.position.ToNumerics();
             System.Numerics.Vector3 direction = eye.transform.forward.ToNumerics();
-            bool blockHit = VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, out VoxelHit hit);
+            bool blockHit = VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, true, out VoxelHit hit);
             float reached = blockHit ? hit.Distance : PlayerRules.Reach;
             bool storageHit = storageSync.TryAimed(eye.transform.position, eye.transform.forward, reached, out int storageId, out float storageDistance);
             if (storageHit) reached = storageDistance;

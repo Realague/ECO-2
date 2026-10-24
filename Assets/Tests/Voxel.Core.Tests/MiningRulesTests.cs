@@ -37,7 +37,10 @@ namespace Voxel.Core.Tests
 
                 bool breakable = Blocks.IsBreakable(block);
                 Assert.AreEqual(breakable, MiningRules.HitsToBreak(block) > 0, $"block {type}");
-                Assert.AreEqual(breakable, ToolRules.ToBreak(block) != Items.None, $"block {type}");
+
+                // A torch is the one block taken down by hand.
+                bool byHand = Blocks.IsTorch(block);
+                Assert.AreEqual(breakable && !byHand, ToolRules.ToBreak(block) != Items.None, $"block {type}");
             }
         }
 

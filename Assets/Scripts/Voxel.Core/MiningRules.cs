@@ -39,6 +39,7 @@ namespace Voxel.Core
                 case Blocks.Snow:
                 case Blocks.Mud:
                 case Blocks.TilledSoil:
+                case Blocks.Torch:
                     return 1;
                 case Blocks.Gravel:
                 case Blocks.Clay:

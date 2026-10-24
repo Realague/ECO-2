@@ -6,13 +6,17 @@ namespace Voxel.Core
     // the bow. Items.None means bare hands do.
     public static class ToolRules
     {
-        // The tool a block needs to be broken; Items.None for one that cannot be broken at all.
+        // The tool a block needs to be broken; Items.None for one that cannot be broken at all, or
+        // for a torch, taken down by hand (Blocks.IsBreakable tells them apart).
         public static int ToBreak(ushort block)
         {
             if (!Blocks.IsBreakable(block)) return Items.None;
 
             switch (Blocks.TypeOf(block))
             {
+                // Taken down by hand: whatever is in it does.
+                case Blocks.Torch:
+                    return Items.None;
                 case Blocks.Dirt:
                 case Blocks.Grass:
                 case Blocks.Sand:

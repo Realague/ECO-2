@@ -12,9 +12,11 @@ namespace Voxel.Client
     // against other water. The top of water that has air above sits a little lower than a full
     // block, like a surface.
     //
-    // Each vertex carries the sky light (SkyLight) in the red channel of its colour, 0 to 1. On the
-    // blocks' faces it is smooth: each corner takes the mean level of the four cells in front of
-    // the face around that corner, leaving out opaque ones, and the blocks' shader darkens by it.
+    // Each vertex carries the sky light (SkyLight) in the red channel of its colour, 0 to 1, and the
+    // light of torches (BlockLight) in the green one, 0 to 1 at Blocks.TorchLight. On the blocks'
+    // faces both are smooth: each corner takes the mean level of the four cells in front of the face
+    // around that corner, leaving out opaque ones; the blocks' shader darkens by the first and adds
+    // a warm glow by the second. Torches are not meshed (TorchViews draws them).
     //
     // The work is done by a ChunkMeshBuilder, which only reads the world and the light: builders run
     // on worker threads (ChunkMeshing), each with its own buffers, and only ApplyTo touches the Mesh.
@@ -90,13 +92,19 @@ namespace Voxel.Client
         // along the face's two axes.
         private readonly bool[] frontOpaque = new bool[9];
         private readonly int[] frontLevel = new int[9];
+        private readonly int[] frontGlow = new int[9];
         private readonly float[] cornerLight = new float[4];
+        private readonly float[] cornerGlow = new float[4];
+
+        // The light of torches for the chunk being built; null for none.
+        private BlockLight glow;
 
         // True when the last chunk built has no face to draw.
         public bool IsEmpty => vertices.Count == 0;
 
-        public void Build(World world, SkyLight light, Chunk chunk)
+        public void Build(World world, SkyLight light, Chunk chunk, BlockLight blockLight = null)
         {
+            glow = blockLight;
             vertices.Clear();
             normals.Clear();
             uvs.Clear();
@@ -117,7 +125,7 @@ namespace Voxel.Client
                     {
                         ushort block = chunk.Get(x, y, z);
                         ushort type = Blocks.TypeOf(block);
-                        if (type == Blocks.Air) continue;
+                        if (type == Blocks.Air || type == Blocks.Torch) continue;
 
                         int worldX = originX + x;
                         int worldY = originY + y;
@@ -170,9 +178,11 @@ namespace Voxel.Client
 
                 // A water face is lit by the air in front of it: open sky over a lake, darkness in a cave.
                 float level = light.Get(nx, ny, nz) / (float)SkyLight.Max;
+                float torchLevel = GlowAt(nx, ny, nz);
                 for (int corner = 0; corner < 4; corner++)
                 {
                     cornerLight[corner] = level;
+                    cornerGlow[corner] = torchLevel;
                 }
 
                 AddFace(blockOrigin, face, top, waterTriangles, false);
@@ -198,6 +208,7 @@ namespace Voxel.Client
                     int index = (a + 1) + 3 * (b + 1);
                     frontOpaque[index] = world.IsOpaque(cx, cy, cz);
                     frontLevel[index] = frontOpaque[index] ? 0 : light.Get(cx, cy, cz);
+                    frontGlow[index] = frontOpaque[index] || glow == null ? 0 : glow.Get(cx, cy, cz);
                 }
             }
 
@@ -213,16 +224,19 @@ namespace Voxel.Client
                 int diagonal = (a + 1) + 3 * (b + 1);
 
                 int sum = frontLevel[4];
+                int glowSum = frontGlow[4];
                 int count = 1;
                 if (!frontOpaque[sideA])
                 {
                     sum += frontLevel[sideA];
+                    glowSum += frontGlow[sideA];
                     count++;
                 }
 
                 if (!frontOpaque[sideB])
                 {
                     sum += frontLevel[sideB];
+                    glowSum += frontGlow[sideB];
                     count++;
                 }
 
@@ -230,14 +244,19 @@ namespace Voxel.Client
                 if (!frontOpaque[diagonal] && !(frontOpaque[sideA] && frontOpaque[sideB]))
                 {
                     sum += frontLevel[diagonal];
+                    glowSum += frontGlow[diagonal];
                     count++;
                 }
 
                 cornerLight[corner] = sum / (count * (float)SkyLight.Max);
+                cornerGlow[corner] = glowSum / (count * (float)Blocks.TorchLight);
             }
         }
 
-        // top: height of the block's top, 1 for a full block. The corners' light is in cornerLight.
+        private float GlowAt(int x, int y, int z) => glow == null ? 0f : glow.Get(x, y, z) / (float)Blocks.TorchLight;
+
+        // top: height of the block's top, 1 for a full block. The corners' light is in cornerLight
+        // and cornerGlow.
         private void AddFace(Vector3 blockOrigin, int face, float top, List<int> triangles, bool turnToLight)
         {
             int first = vertices.Count;
@@ -250,7 +269,7 @@ namespace Voxel.Client
                 if (corner.y > 0f) corner.y = top;
                 vertices.Add(blockOrigin + corner);
                 normals.Add(normal);
-                colours.Add(new Color32((byte)Mathf.RoundToInt(cornerLight[i] * 255f), 0, 0, 255));
+                colours.Add(new Color32((byte)Mathf.RoundToInt(cornerLight[i] * 255f), (byte)Mathf.RoundToInt(cornerGlow[i] * 255f), 0, 255));
             }
 
             // The quad is split along the diagonal whose corners are brightest together, so that a

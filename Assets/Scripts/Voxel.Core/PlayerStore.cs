@@ -34,25 +34,30 @@ namespace Voxel.Core
 
         // Whether they were given their starting chest and stockpile (format 7): once only.
         public bool ReceivedStorage;
+
+        // Whether they were given their starting torches (format 8): once only.
+        public bool ReceivedTorches;
     }
 
     // The state of every player known to the server, by player id.
     public sealed class PlayerStore
     {
         private const uint Magic = 0x504F4345; // "ECOP"
-        private const int FormatVersion = 7;
+        private const int FormatVersion = 8;
 
         // Older formats still load. Without inventory, the player keeps their position; without
         // appearance, they choose one at their next connection; without a hotbar, theirs starts empty
         // (the server fills it with what they own); without a stomach, theirs starts half full;
         // without tools, they get them at their next connection; without a name or storage, they choose
-        // a name and get a chest and a stockpile at their next connection.
+        // a name and get a chest and a stockpile at their next connection; without torches, they get
+        // them at their next connection.
         private const int FormatWithoutInventory = 1;
         private const int FormatWithoutAppearance = 2;
         private const int FormatWithoutHotbar = 3;
         private const int FormatWithoutStomach = 4;
         private const int FormatWithoutTools = 5;
         private const int FormatWithoutName = 6;
+        private const int FormatWithoutTorches = 7;
 
         private readonly Dictionary<string, PlayerState> players = new Dictionary<string, PlayerState>();
 
@@ -124,6 +129,7 @@ namespace Voxel.Core
                     writer.Write(state.ReceivedTools);
                     writer.Write(state.Name ?? "");
                     writer.Write(state.ReceivedStorage);
+                    writer.Write(state.ReceivedTorches);
                 }
             }
         }
@@ -187,7 +193,7 @@ namespace Voxel.Core
                     if (formatVersion >= FormatWithoutStomach) state.Hotbar.Read(reader);
                     if (formatVersion >= FormatWithoutTools) state.Stomach.Read(reader);
                     if (formatVersion >= FormatWithoutName) state.ReceivedTools = reader.ReadBoolean();
-                    if (formatVersion >= FormatVersion)
+                    if (formatVersion >= FormatWithoutTorches)
                     {
                         string name = reader.ReadString();
                         if (name.Length > 0 && (!PlayerNames.TryNormalize(name, out string normal) || normal != name))
@@ -198,6 +204,8 @@ namespace Voxel.Core
                         state.Name = name;
                         state.ReceivedStorage = reader.ReadBoolean();
                     }
+
+                    if (formatVersion >= FormatVersion) state.ReceivedTorches = reader.ReadBoolean();
 
                     store.Set(playerId, state);
                 }

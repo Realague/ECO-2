@@ -28,6 +28,7 @@ namespace Voxel.Client
 
         // Arrows in the starting kit, with the tools.
         private const int StartingArrows = 20;
+        private const int StartingTorches = 20;
         private const string StateMessage = "Inv.State";
         private const string SpecialityMessage = "Inv.Speciality";
         private const string GiveMessage = "Inv.Give";
@@ -337,6 +338,14 @@ namespace Voxel.Client
                     }
 
                     state.ReceivedStorage = true;
+                }
+
+                // And torches once, players from before torches too.
+                if (!state.ReceivedTorches)
+                {
+                    if (!state.Inventory.Has(Blocks.Torch)) state.Hotbar.Place(Blocks.Torch);
+                    state.Inventory.Add(Blocks.Torch, StartingTorches);
+                    state.ReceivedTorches = true;
                 }
 
                 if (state.Hotbar.IsEmpty) state.Hotbar.FillFrom(state.Inventory);

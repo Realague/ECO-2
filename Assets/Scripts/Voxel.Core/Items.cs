@@ -131,6 +131,7 @@ namespace Voxel.Core
                 case Blocks.Bedrock: return "Bedrock";
                 case Blocks.Mud: return "Mud";
                 case Blocks.TilledSoil: return "Tilled soil";
+                case Blocks.Torch: return "Torch";
                 case Straw: return "Straw";
                 case Arrow: return "Arrow";
                 case Chest: return "Chest";

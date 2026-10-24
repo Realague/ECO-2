@@ -1398,6 +1398,9 @@ MonoBehaviour:
   waterMaterial: {fileID: 2100000, guid: 5bd02ebd5f8fc8d44a82e5211d374a64, type: 2}
   saveFileName: world.dat
   darkestSkyLight: 0.02
+  torchWoodMaterial: {fileID: 2100000, guid: d6c58eacd8d934e44917e6d85ca61461, type: 2}
+  torchHeadMaterial: {fileID: 2100000, guid: 0fc4334f11bd8a64da85d0e91993fb93, type: 2}
+  torchFlameMaterial: {fileID: 2100000, guid: 6844c1b69698da5458e6978e203ff065, type: 2}
 --- !u!4 &1566503040
 Transform:
   m_ObjectHideFlags: 0

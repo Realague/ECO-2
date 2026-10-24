@@ -63,6 +63,7 @@ namespace Voxel.Client
         private static readonly Color ShallowWater = new Color(0.30f, 0.55f, 0.75f);
         private static readonly Color DeepWater = new Color(0.10f, 0.25f, 0.50f);
         private static readonly Color Unknown = new Color(0.60f, 0.55f, 0.53f);
+        private static readonly Color TorchWood = new Color(0.55f, 0.38f, 0.2f);
 
         // A missing file is drawn as this checkerboard, so it shows.
         private static readonly Color MissingA = new Color(1f, 0f, 1f);
@@ -114,6 +115,9 @@ namespace Voxel.Client
                 if (face == ChunkMesher.TopFace) return Grass;
                 return meanColours != null ? meanColours[DirtTile] : Unknown;
             }
+
+            // A torch has no tile: its chips are of its stick's wood.
+            if (Blocks.IsTorch(block)) return TorchWood;
 
             return meanColours != null ? meanColours[TileFor(block, face)] : Unknown;
         }

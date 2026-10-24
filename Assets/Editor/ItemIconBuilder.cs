@@ -17,7 +17,7 @@ using Voxel.Core;
 // - a seed (Seed_<species>.png) is a pouch tinted like the plant with the plant in front of it;
 // - a crop (Produce_<species>.png) is a pile of fruit of its model's last stage, or the plant;
 // - each tree's wood (Wood_<asset>.png) is a pile of logs in its bark, straw (Straw.png) a sheaf;
-// - an animal's carcass (Carcass_<asset>.png) is its model lying on its side;
+// - an animal's carcass (Carcass_<asset>.png) is its model lying on its side, a torch (Torch.png) its stick and flame;
 // - tools and the arrow (Tool_<name>.png, Arrow.png) are painted as illustrations (ToolIconPainter).
 // Species are found by asset in Assets/Species and named after the asset, so the icons do not depend
 // on the order of species. Every file is written again; rerun the menu after adding a species.
@@ -39,7 +39,8 @@ public static class ItemIconBuilder
 
         for (int type = 1; type <= Blocks.LastType; type++)
         {
-            if (!Items.IsBlock(type)) continue;
+            // A torch is no cube: it is rendered below like the other objects.
+            if (!Items.IsBlock(type) || type == Blocks.Torch) continue;
 
             Texture2D block = BlockIcon((ushort)type);
             Write($"Block_{type}", block);
@@ -104,6 +105,11 @@ public static class ItemIconBuilder
             Texture2D arrow = ToolIconPainter.Paint(Items.Arrow);
             Write("Arrow", arrow);
             UnityEngine.Object.DestroyImmediate(arrow);
+            written++;
+
+            Texture2D torch = renderer.Render(TorchParts(), 18f, 0.75f, Quaternion.Euler(0f, 0f, -28f));
+            Write("Torch", torch);
+            UnityEngine.Object.DestroyImmediate(torch);
             written++;
 
             Texture2D chest = renderer.Render(ChestParts(), 22f, 1.0f);
@@ -399,6 +405,21 @@ public static class ItemIconBuilder
         AddBoxes(parts, ChestShapes.LidWood, ChestShapes.Hinge, wood);
         AddBoxes(parts, ChestShapes.LidIron, ChestShapes.Hinge, iron);
         return parts;
+    }
+
+    // A torch as TorchViews draws it: a wooden stick, a dark head and its flame.
+    private static IReadOnlyList<SpeciesAsset.Part> TorchParts()
+    {
+        Mesh cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+        var wood = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/ArrowShaft.mat");
+        var head = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/ArrowHead.mat");
+        var flame = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/TorchFlame.mat");
+        return new List<SpeciesAsset.Part>
+        {
+            new SpeciesAsset.Part { mesh = cube, material = wood, offset = new Vector3(0f, 0.3f, 0f), scale = new Vector3(0.1f, 0.6f, 0.1f) },
+            new SpeciesAsset.Part { mesh = cube, material = head, offset = new Vector3(0f, 0.63f, 0f), scale = new Vector3(0.14f, 0.11f, 0.14f) },
+            new SpeciesAsset.Part { mesh = cube, material = flame, offset = new Vector3(0f, 0.74f, 0f), scale = new Vector3(0.11f, 0.14f, 0.11f) }
+        };
     }
 
     // The camera looks toward +z: the chest is mirrored so that its front (+z) faces it.

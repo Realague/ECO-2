@@ -184,8 +184,8 @@ namespace Voxel.Core
             return 0;
         }
 
-        // Height of the first air block above the topmost block of the column, water included: what
-        // one sees from above.
+        // Height of the first air block above the topmost block of the column, water included (torches
+        // left out: they stand in the air): what one sees from above.
         public int GetTopHeight(int x, int z)
         {
             if ((uint)x >= (uint)SizeX || (uint)z >= (uint)SizeZ) return 0;
@@ -199,7 +199,7 @@ namespace Voxel.Core
                 ushort[] blocks = chunk.RawBlocks;
                 for (int localY = Chunk.SizeMask; localY >= 0; localY--)
                 {
-                    if (Blocks.TypeOf(blocks[column | (localY << (2 * Chunk.SizeBits))]) != Blocks.Air) return chunkY * Chunk.Size + localY + 1;
+                    if (Blocks.FillsColumn(blocks[column | (localY << (2 * Chunk.SizeBits))])) return chunkY * Chunk.Size + localY + 1;
                 }
             }
 

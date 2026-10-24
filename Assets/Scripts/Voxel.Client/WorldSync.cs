@@ -49,6 +49,7 @@ namespace Voxel.Client
         // hole fills up visibly and the changes do not all go out on the same tick.
         private readonly Queue<BlockPos> pendingWater = new Queue<BlockPos>();
         private readonly List<BlockPos> fill = new List<BlockPos>();
+        private readonly List<BlockPos> heldTorches = new List<BlockPos>();
         private World serverWorld;
         private bool running;
         private bool ready;
@@ -120,7 +121,7 @@ namespace Voxel.Client
         // for responsiveness, and the server corrects it if it refuses.
         public void RequestSetBlock(BlockPos pos, ushort block)
         {
-            if (!ready || !Blocks.IsSolid(block)) return;
+            if (!ready || !Blocks.IsPlaceable(block)) return;
 
             if (serverWorld != null)
             {
@@ -137,7 +138,7 @@ namespace Voxel.Client
         {
             if (inventorySync.IsStarving(clientId)) return false;
 
-            if (!Blocks.IsSolid(block) || !IsEditAllowed(clientId, pos, block)) return false;
+            if (!Blocks.IsPlaceable(block) || !IsEditAllowed(clientId, pos, block)) return false;
 
             // Placing a block takes it from the player's inventory.
             if (!inventorySync.TryConsume(clientId, Items.OfBlock(block))) return false;
@@ -156,7 +157,8 @@ namespace Voxel.Client
             if (serverWorld == null || !IsEditAllowed(clientId, pos, Blocks.Air)) return false;
 
             ushort previous = serverWorld.GetBlock(pos);
-            if (!inventorySync.Owns(clientId, ToolRules.ToBreak(previous))) return false;
+            int tool = ToolRules.ToBreak(previous);
+            if (tool != Items.None && !inventorySync.Owns(clientId, tool)) return false;
 
             int drop = Items.DropOf(previous);
             if (inventorySync.RoomFor(clientId, drop) <= 0)
@@ -167,6 +169,16 @@ namespace Voxel.Client
 
             serverWorld.SetBlock(pos, Blocks.Air);
             inventorySync.Give(clientId, drop, 1);
+
+            // The torches it held fall: whoever broke it gets them back, what they can carry.
+            heldTorches.Clear();
+            Torches.FindHeldBy(serverWorld, pos, heldTorches);
+            foreach (BlockPos torch in heldTorches)
+            {
+                serverWorld.SetBlock(torch, Blocks.Air);
+            }
+
+            if (heldTorches.Count > 0) inventorySync.Give(clientId, Blocks.Torch, heldTorches.Count);
 
             // Next to water, the hole fills up to the water's level.
             if (WaterFill.Find(serverWorld, pos, fill))

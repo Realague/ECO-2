@@ -343,7 +343,8 @@ namespace Voxel.Client
 
             Vector3 eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;
             if (!BlockEditRules.IsAllowed(world, eyes.ToNumerics(), pos, Blocks.Air)) return false;
-            if (!inventorySync.Owns(clientId, ToolRules.ToBreak(type))) return false;
+            int tool = ToolRules.ToBreak(type);
+            if (tool != Items.None && !inventorySync.Owns(clientId, tool)) return false;
 
             int drop = Items.DropOf(type);
             if (inventorySync.RoomFor(clientId, drop) > 0) return true;

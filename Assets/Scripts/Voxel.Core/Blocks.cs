@@ -51,7 +51,15 @@ namespace Voxel.Core
         // generated; broken, it gives dirt.
         public const ushort TilledSoil = 33;
 
-        public const ushort LastType = TilledSoil;
+        // A torch, placed by a player: it gives light (BlockLight). It stands on the top of a block
+        // or hangs on the side of one (its orientation, Torches), lets everything through (players,
+        // rays, light) and is broken by hand. Never generated.
+        public const ushort Torch = 34;
+
+        public const ushort LastType = Torch;
+
+        // The light a torch gives to its own cell (BlockLight): it falls by one level per block.
+        public const int TorchLight = 14;
 
         // Types that existed in earlier versions and no longer do: two gaps.
         private const ushort FirstRetiredGap = 4;
@@ -67,12 +75,23 @@ namespace Voxel.Core
             (ushort)(TypeOf(type) | (orientation << TypeBits));
 
         // Collision, support and aiming: players and animals stand on solid blocks and cannot enter
-        // them, a ray stops at the first one, and only a solid block can be broken. Water is not solid.
+        // them, and a ray stops at the first one. Water and torches are not solid.
         public static bool IsSolid(ushort block)
         {
             ushort type = TypeOf(block);
-            return type != Air && type != Water;
+            return type != Air && type != Water && type != Torch;
         }
+
+        public static bool IsTorch(ushort block) => TypeOf(block) == Torch;
+
+        // What a player may set in a cell: any solid block, or a torch.
+        public static bool IsPlaceable(ushort block) => IsSolid(block) || IsTorch(block);
+
+        // Takes up its cell, as far as a column's height goes (World.GetTopHeight): solid blocks and water.
+        public static bool FillsColumn(ushort block) => IsSolid(block) || IsWater(block);
+
+        // The light a block gives off (BlockLight), 0 for most.
+        public static int LightOf(ushort block) => IsTorch(block) ? TorchLight : 0;
 
         // Hides what is behind it: the faces of blocks touching an opaque block are not drawn. Water
         // is see-through, so the bed of a lake is drawn under it.
@@ -80,8 +99,8 @@ namespace Voxel.Core
 
         public static bool IsWater(ushort block) => TypeOf(block) == Water;
 
-        // A block players can break: any solid block but the bedrock.
-        public static bool IsBreakable(ushort block) => IsSolid(block) && TypeOf(block) != Bedrock;
+        // A block players can break: any solid block but the bedrock, and torches.
+        public static bool IsBreakable(ushort block) => (IsSolid(block) && TypeOf(block) != Bedrock) || IsTorch(block);
 
         // Where a placed block may go: empty space, or water, which it pushes out.
         public static bool IsReplaceable(ushort block)
@@ -90,8 +109,10 @@ namespace Voxel.Core
             return type == Air || type == Water;
         }
 
-        // A block received from the network is only accepted if its type exists. No type can be oriented yet.
-        public static bool IsValid(ushort block) => TypeOf(block) <= LastType && !IsRetired(block) && OrientationOf(block) == 0;
+        // A block received from the network is only accepted if its type exists. Only torches are
+        // oriented (Torches.Standing, or the side they hang on).
+        public static bool IsValid(ushort block) =>
+            TypeOf(block) <= LastType && !IsRetired(block) && OrientationOf(block) <= (IsTorch(block) ? Torches.LastOrientation : 0);
 
         // A type of an earlier version that no longer exists (the crafted blocks): saves turn it into air.
         public static bool IsRetired(ushort block)

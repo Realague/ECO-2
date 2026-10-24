@@ -333,8 +333,10 @@ namespace Voxel.Client
             float reachedDistance = blockHit ? hit.Distance : PlayerRules.Reach;
             if (strike)
             {
+                // A torch, thin as it is, is struck too (by hand), when the ray meets it first.
                 queuedStrike = -1f;
-                Strike(held, origin, direction, blockHit, hit, reachedDistance);
+                bool struckHit = VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, true, out VoxelHit struck);
+                Strike(held, origin, direction, struckHit, struck, struckHit ? struck.Distance : PlayerRules.Reach);
                 return;
             }
 
@@ -410,6 +412,19 @@ namespace Voxel.Client
             if (!Items.IsBlock(held) || !inventorySync.Inventory.Has(held)) return;
 
             BlockPos target = hit.Block + hit.Normal;
+
+            // A torch stands on the top of the aimed block or hangs on its side, in open air.
+            if (held == Blocks.Torch)
+            {
+                if (!Torches.TryOrient(hit.Normal, out ushort torch))
+                {
+                    hotbar.ShowMessage("A torch goes on top of a block or on its side");
+                    return;
+                }
+
+                if (Blocks.TypeOf(world.GetBlock(target)) == Blocks.Air && !storageSync.IsCovered(target)) worldSync.RequestSetBlock(target, torch);
+                return;
+            }
             bool insidePlayer = VoxelCollision.IntersectsBlock(
                 transform.position.ToNumerics(), PlayerRules.HalfWidth, PlayerRules.Height, target);
             if (target != hit.Block && !insidePlayer && !storageSync.IsCovered(target))
@@ -448,8 +463,9 @@ namespace Voxel.Client
                 ushort aimed = world.GetBlock(hit.Block);
                 if (Blocks.IsBreakable(aimed))
                 {
+                    // A torch comes down by hand, whatever is held.
                     int tool = ToolRules.ToBreak(aimed);
-                    if (held != tool)
+                    if (tool != Items.None && held != tool)
                     {
                         TellMissing(tool);
                         return;

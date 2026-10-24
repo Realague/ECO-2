@@ -16,6 +16,7 @@ namespace Voxel.Core
         }
 
         public static BlockPos operator +(BlockPos a, BlockPos b) => new BlockPos(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
+        public static BlockPos operator -(BlockPos a, BlockPos b) => new BlockPos(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
         public static bool operator ==(BlockPos a, BlockPos b) => a.Equals(b);
         public static bool operator !=(BlockPos a, BlockPos b) => !a.Equals(b);
 

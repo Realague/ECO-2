@@ -33,6 +33,17 @@ half SkyBrightness(half skyLight)
     return lerp((half)_DarkestSkyLight, 1.0h, curve);
 }
 
+// ECO: the light of torches (BlockLight), 0 to 1 in the green channel of the vertices' colour,
+// adds a warm glow to the surface's own colour, bright by the torch and falling by about a fifth
+// per block (VoxelWorld.TorchGlow is the same curve).
+half TorchGlow(half torchLight)
+{
+    if (torchLight <= 0.0h) return 0.0h;
+    return (pow(0.8h, (1.0h - torchLight) * 14.0h) - 0.044h) / 0.956h;
+}
+
+static const half3 TorchColour = half3(0.95h, 0.6h, 0.3h);
+
 #if defined(LOD_FADE_CROSSFADE)
     #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/LODCrossFade.hlsl"
 #endif
@@ -55,7 +66,7 @@ struct Attributes
     float2 texcoord     : TEXCOORD0;
     float2 staticLightmapUV   : TEXCOORD1;
     float2 dynamicLightmapUV  : TEXCOORD2;
-    half4 color               : COLOR; // ECO: r is the sky light
+    half4 color               : COLOR; // ECO: r is the sky light, g the torches'
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
@@ -72,7 +83,7 @@ struct Varyings
     half4 tangentWS                : TEXCOORD3;    // xyz: tangent, w: sign
 #endif
 
-    half skyLight                   : TEXCOORD4; // ECO
+    half2 voxelLight                : TEXCOORD4; // ECO: x the sky light, y the torches'
 
 #ifdef _ADDITIONAL_LIGHTS_VERTEX
     half4 fogFactorAndVertexLight   : TEXCOORD5; // x: fogFactor, yzw: vertex light
@@ -212,7 +223,7 @@ Varyings LitPassVertex(Attributes input)
     #endif
 
     output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
-    output.skyLight = input.color.r; // ECO
+    output.voxelLight = input.color.rg; // ECO
 
     // already normalized from normal transform to WS.
     output.normalWS = normalInput.normalWS;
@@ -303,7 +314,8 @@ void LitPassFragment(
     InitializeBakedGIData(input, inputData);
 
     half4 color = UniversalFragmentPBR(inputData, surfaceData);
-    color.rgb *= SkyBrightness(input.skyLight); // ECO
+    color.rgb *= SkyBrightness(input.voxelLight.x); // ECO
+    color.rgb += surfaceData.albedo * TorchColour * TorchGlow(input.voxelLight.y); // ECO
     color.rgb = MixFog(color.rgb, inputData.fogCoord);
     color.a = OutputAlpha(color.a, IsSurfaceTypeTransparent());
 

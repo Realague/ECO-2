@@ -14,19 +14,22 @@ namespace Voxel.Core
         {
             if (!world.InBounds(pos.X, pos.Y, pos.Z) || !Blocks.IsValid(block)) return false;
 
-            // A player sets a solid block or air, never water: water only comes from the world itself.
+            // A player sets a solid block, a torch or air, never water: water only comes from the world itself.
             if (Blocks.IsWater(block)) return false;
 
-            // Placing requires an empty cell (air or water), breaking requires a solid block: a block
-            // is never replaced by another.
-            bool placing = Blocks.IsSolid(block);
+            // Placing requires an empty cell (air or water), breaking a block that is there (solid,
+            // or a torch): a block is never replaced by another.
+            bool placing = Blocks.IsPlaceable(block);
             ushort current = world.GetBlock(pos);
-            bool occupied = Blocks.IsSolid(current);
+            bool occupied = !Blocks.IsReplaceable(current);
             if (placing == occupied) return false;
 
             // Nobody digs through the bottom of the world, nor places bedrock.
             if (!placing && !Blocks.IsBreakable(current)) return false;
             if (Blocks.TypeOf(block) == Blocks.Bedrock) return false;
+
+            // A torch goes in the open air, held by the block it stands on or hangs from.
+            if (Blocks.IsTorch(block) && (Blocks.TypeOf(current) != Blocks.Air || !Torches.HasSupport(world, pos, block))) return false;
 
             float maxDistance = PlayerRules.Reach + ReachTolerance;
             return DistanceSquaredToBlock(eyePosition, pos) <= maxDistance * maxDistance;

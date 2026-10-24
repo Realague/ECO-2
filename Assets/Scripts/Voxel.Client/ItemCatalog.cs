@@ -29,7 +29,7 @@ namespace Voxel.Client
 
         public static ItemCategory CategoryOf(int item)
         {
-            if (Items.IsTool(item) || item == Items.Arrow || Items.IsStorage(item)) return ItemCategory.Tools;
+            if (Items.IsTool(item) || item == Items.Arrow || Items.IsStorage(item) || item == Blocks.Torch) return ItemCategory.Tools;
             if (Items.IsSeed(item)) return ItemCategory.Seeds;
             if (Items.IsProduce(item)) return ItemCategory.Food;
             return Items.IsWood(item) || Items.IsCarcass(item) || item == Items.Straw ? ItemCategory.Materials : ItemCategory.Blocks;
@@ -55,7 +55,7 @@ namespace Voxel.Client
                 case ItemCategory.Seeds: return "Seed";
                 case ItemCategory.Food: return "Food";
                 case ItemCategory.Materials: return Items.IsCarcass(item) ? "Carcass" : "Material";
-                case ItemCategory.Tools: return item == Items.Arrow ? "Ammunition" : Items.IsStorage(item) ? "Storage" : "Tool";
+                case ItemCategory.Tools: return item == Items.Arrow ? "Ammunition" : Items.IsStorage(item) ? "Storage" : item == Blocks.Torch ? "Light" : "Tool";
                 default: return "Block";
             }
         }
@@ -96,6 +96,7 @@ namespace Voxel.Client
                 case Items.Bow: return "Hunts animals. Hold the left button to draw, let go to shoot; a shot in the head does double damage.";
                 case Items.Arrow: return "Shot with the bow. An arrow lies where it lands: right click on it to pick it up.";
                 case Items.Chest: return "Holds tools, seeds, food and the like, up to 150 kg. Hold it and right click on the ground to place it; right click on it to open it. Only you and the players you allow can open it.";
+                case Blocks.Torch: return "Lights what is around it, day and night. Hold it and right click on the top or the side of a block to set it there; hit it, with anything in hand, to take it down.";
                 case Items.Stockpile: return "Holds blocks and wood: nine piles of 27 on a patch of flat ground, 3 by 3. Hold it and right click to place it in front of you; right click on it to open it.";
             }
 
@@ -130,6 +131,7 @@ namespace Voxel.Client
             if (item == Items.Arrow) return "Arrow";
             if (item == Items.Chest) return "Chest";
             if (item == Items.Stockpile) return "Stockpile";
+            if (item == Blocks.Torch) return "Torch";
             if (Items.IsTool(item)) return $"Tool_{Items.NameOf(item)}";
             return $"Block_{item}";
         }
