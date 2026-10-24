@@ -17,8 +17,8 @@ MonoBehaviour:
   seedAttemptsPerDay: 0.4
   seedRange: 8
   spacing: 7
-  minFertility: 0.3
-  fertilityUsePerDay: 0.03
+  minSoil: 0.3
+  soilUsePerDay: 0.03
   nitrogenNeed: 0.4
   phosphorusNeed: 0.7
   potassiumNeed: 0.9
@@ -32,6 +32,7 @@ MonoBehaviour:
   floatsOnWater: 0
   needsShade: 0
   woodYield: 0
+  woodColour: {r: 0.66, g: 0.49, b: 0.31, a: 1}
   harvest: 2
   produceName: Strawberry
   produceYield: 4

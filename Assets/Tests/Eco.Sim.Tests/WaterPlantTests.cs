@@ -30,7 +30,7 @@ namespace Eco.Sim.Tests
         {
             Species lily = TestSpecies.Bush();
             lily.Name = "Lily";
-            lily.MinFertility = 0f;
+            lily.MinSoil = 0f;
             lily.Rooting = Rooting.Flooded;
             lily.Grounds = BedGrounds;
             return lily;
@@ -40,7 +40,7 @@ namespace Eco.Sim.Tests
         {
             Species cypress = TestSpecies.Tree();
             cypress.Name = "Cypress";
-            cypress.MinFertility = 0f;
+            cypress.MinSoil = 0f;
             cypress.Rooting = Rooting.Either;
             cypress.Grounds = new[] { Blocks.Mud, Blocks.Grass, Blocks.Dirt };
             return cypress;

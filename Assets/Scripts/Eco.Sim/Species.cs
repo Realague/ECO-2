@@ -47,7 +47,7 @@ namespace Eco.Sim
 
         public string Name { get; set; }
 
-        // Steps needed to reach adult size on soil of fertility 1, in a climate that suits it.
+        // Steps needed to reach adult size on soil of 1 (Ecosystem.Available), in a climate that suits it.
         public int MaturitySteps { get; set; }
 
         public int LifespanSteps { get; set; }
@@ -64,10 +64,10 @@ namespace Eco.Sim
 
         // Below this much soil to live on (Ecosystem.Available: the scarcest nutrient, weighted by
         // the species' needs), the seed does not sprout and the plant withers.
-        public float MinFertility { get; set; }
+        public float MinSoil { get; set; }
 
         // Soil drawn at each step by an adult plant, from each nutrient times the species' need of it.
-        public float FertilityUse { get; set; }
+        public float SoilUse { get; set; }
 
         // How much the species needs each nutrient, from 0 (it does without) to 1: it is limited by
         // the one it lacks most, and draws on each as much as it needs it (Ecosystem.Soil).

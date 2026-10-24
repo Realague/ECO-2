@@ -16,8 +16,8 @@ namespace Eco.Sim.Tests
             Species crop = TestSpecies.Bush();
             crop.Name = harvest == HarvestKind.Annual ? "Carrot" : "Strawberry";
             crop.SeedChance = 0f;
-            crop.MinFertility = 0f;
-            crop.FertilityUse = 0f;
+            crop.MinSoil = 0f;
+            crop.SoilUse = 0f;
             crop.Harvest = harvest;
             crop.FruitSteps = FruitSteps;
             return crop;
@@ -119,7 +119,7 @@ namespace Eco.Sim.Tests
             World world = MeadowGenerator.CreateWorld(2);
             Species mushroom = TestSpecies.Bush();
             mushroom.Name = "Mushroom";
-            mushroom.MinFertility = 0f;
+            mushroom.MinSoil = 0f;
             mushroom.NeedsShade = true;
             var ecosystem = new Ecosystem(world, new[] { TestSpecies.Tree(), mushroom }, Seed);
             Assert.IsTrue(ecosystem.TryPlaceGrownPlant(0, 10, 10));

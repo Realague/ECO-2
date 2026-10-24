@@ -49,8 +49,8 @@ namespace Eco.Sim.Tests
             SeedChance = 0.01f,
             SeedRange = 6,
             Spacing = 2,
-            MinFertility = 0.2f,
-            FertilityUse = 0.0015f,
+            MinSoil = 0.2f,
+            SoilUse = 0.0015f,
             Height = 5.5f,
             Width = 1f
         };
@@ -63,8 +63,8 @@ namespace Eco.Sim.Tests
             SeedChance = 0.02f,
             SeedRange = 3,
             Spacing = 1,
-            MinFertility = 0.5f,
-            FertilityUse = 0.0008f,
+            MinSoil = 0.5f,
+            SoilUse = 0.0008f,
             Height = 0.9f,
             Width = 0.9f
         };
@@ -82,14 +82,14 @@ namespace Eco.Sim.Tests
             var banks = new[] { Blocks.Grass, Blocks.Dirt, Blocks.Sand, Blocks.Mud };
             return new[]
             {
-                new Species { Name = "Tree", MaturitySteps = 2 * day, LifespanSteps = 20 * day, SeedChance = 2f / day, SeedRange = 5, Spacing = 3, MinFertility = 0.3f, FertilityUse = 0.0008f, NeedNitrogen = 0.6f, NeedPhosphorus = 0.8f, NeedPotassium = 0.5f, Height = 5.5f, Width = 1f },
-                new Species { Name = "Bush", MaturitySteps = day / 2, LifespanSteps = 8 * day, SeedChance = 3f / day, SeedRange = 3, Spacing = 1, MinFertility = 0.4f, FertilityUse = 0.0005f, Height = 0.9f, Width = 0.9f },
-                new Species { Name = "Grass", MaturitySteps = day / 3, LifespanSteps = 5 * day, SeedChance = 4f / day, SeedRange = 2, Spacing = 1, MinFertility = 0.2f, FertilityUse = 0.0003f, NeedPhosphorus = 0.4f, NeedPotassium = 0.4f, Height = 0.6f, Width = 0.8f },
-                new Species { Name = "Mushroom", MaturitySteps = day / 2, LifespanSteps = 6 * day, SeedChance = 3f / day, SeedRange = 3, Spacing = 2, MinFertility = 0.2f, FertilityUse = 0.0002f, Height = 0.4f, Width = 0.4f, NeedsShade = true, Harvest = HarvestKind.Annual, FruitSteps = day },
-                new Species { Name = "Reeds", MaturitySteps = day / 2, LifespanSteps = 6 * day, SeedChance = 3f / day, SeedRange = 2, Spacing = 1, MinFertility = 0.1f, FertilityUse = 0.0002f, Height = 1.5f, Width = 0.6f, NeedsWater = true, Grounds = banks },
-                new Species { Name = "LilyPad", MaturitySteps = day / 2, LifespanSteps = 6 * day, SeedChance = 3f / day, SeedRange = 3, Spacing = 2, MinFertility = 0.1f, FertilityUse = 0.0002f, Height = 0.2f, Width = 0.8f, Rooting = Rooting.Flooded, Grounds = new[] { Blocks.Mud, Blocks.Clay, Blocks.Dirt, Blocks.Sand, Blocks.Gravel } },
-                new Species { Name = "Wheat", MaturitySteps = day, LifespanSteps = 6 * day, SeedChance = 2f / day, SeedRange = 4, Spacing = 3, MinFertility = 0.3f, FertilityUse = 0.0006f, NeedPhosphorus = 0.4f, NeedPotassium = 0.4f, Height = 1f, Width = 0.6f, Harvest = HarvestKind.Annual, FruitSteps = day },
-                new Species { Name = "Bean", MaturitySteps = day, LifespanSteps = 12 * day, SeedChance = 1f / day, SeedRange = 5, Spacing = 4, MinFertility = 0.3f, FertilityUse = 0.0006f, NeedNitrogen = 0.1f, NeedPhosphorus = 0.7f, NeedPotassium = 0.6f, FixesNitrogen = 0.002f, Height = 3.2f, Width = 0.8f, Harvest = HarvestKind.Perennial, FruitSteps = day },
+                new Species { Name = "Tree", MaturitySteps = 2 * day, LifespanSteps = 20 * day, SeedChance = 2f / day, SeedRange = 5, Spacing = 3, MinSoil = 0.3f, SoilUse = 0.0008f, NeedNitrogen = 0.6f, NeedPhosphorus = 0.8f, NeedPotassium = 0.5f, Height = 5.5f, Width = 1f },
+                new Species { Name = "Bush", MaturitySteps = day / 2, LifespanSteps = 8 * day, SeedChance = 3f / day, SeedRange = 3, Spacing = 1, MinSoil = 0.4f, SoilUse = 0.0005f, Height = 0.9f, Width = 0.9f },
+                new Species { Name = "Grass", MaturitySteps = day / 3, LifespanSteps = 5 * day, SeedChance = 4f / day, SeedRange = 2, Spacing = 1, MinSoil = 0.2f, SoilUse = 0.0003f, NeedPhosphorus = 0.4f, NeedPotassium = 0.4f, Height = 0.6f, Width = 0.8f },
+                new Species { Name = "Mushroom", MaturitySteps = day / 2, LifespanSteps = 6 * day, SeedChance = 3f / day, SeedRange = 3, Spacing = 2, MinSoil = 0.2f, SoilUse = 0.0002f, Height = 0.4f, Width = 0.4f, NeedsShade = true, Harvest = HarvestKind.Annual, FruitSteps = day },
+                new Species { Name = "Reeds", MaturitySteps = day / 2, LifespanSteps = 6 * day, SeedChance = 3f / day, SeedRange = 2, Spacing = 1, MinSoil = 0.1f, SoilUse = 0.0002f, Height = 1.5f, Width = 0.6f, NeedsWater = true, Grounds = banks },
+                new Species { Name = "LilyPad", MaturitySteps = day / 2, LifespanSteps = 6 * day, SeedChance = 3f / day, SeedRange = 3, Spacing = 2, MinSoil = 0.1f, SoilUse = 0.0002f, Height = 0.2f, Width = 0.8f, Rooting = Rooting.Flooded, Grounds = new[] { Blocks.Mud, Blocks.Clay, Blocks.Dirt, Blocks.Sand, Blocks.Gravel } },
+                new Species { Name = "Wheat", MaturitySteps = day, LifespanSteps = 6 * day, SeedChance = 2f / day, SeedRange = 4, Spacing = 3, MinSoil = 0.3f, SoilUse = 0.0006f, NeedPhosphorus = 0.4f, NeedPotassium = 0.4f, Height = 1f, Width = 0.6f, Harvest = HarvestKind.Annual, FruitSteps = day },
+                new Species { Name = "Bean", MaturitySteps = day, LifespanSteps = 12 * day, SeedChance = 1f / day, SeedRange = 5, Spacing = 4, MinSoil = 0.3f, SoilUse = 0.0006f, NeedNitrogen = 0.1f, NeedPhosphorus = 0.7f, NeedPotassium = 0.6f, FixesNitrogen = 0.002f, Height = 3.2f, Width = 0.8f, Harvest = HarvestKind.Perennial, FruitSteps = day },
             };
         }
 

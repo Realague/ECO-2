@@ -47,7 +47,7 @@ namespace Eco.Sim.Tests
             hot.WarmthMax = -2f;
             hot.ClimateTolerance = 0f;
             Species hungry = TestSpecies.Tree();
-            hungry.MinFertility = 1.5f;
+            hungry.MinSoil = 1.5f;
             Species sandy = TestSpecies.Tree();
             sandy.Grounds = new[] { Blocks.Sand };
             var ecosystem = new Ecosystem(MeadowGenerator.CreateWorld(2), new[] { cold, hot, hungry, sandy }, Seed);

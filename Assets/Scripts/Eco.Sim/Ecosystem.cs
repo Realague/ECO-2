@@ -328,7 +328,7 @@ namespace Eco.Sim
 
             int cell = CellIndex(plant.X, plant.Z);
             float available = Available(cell, plant.SpeciesIndex);
-            if (available < kind.MinFertility)
+            if (available < kind.MinSoil)
             {
                 if (random.NextFloat() < StarvationChancePerStep) return false;
             }
@@ -392,7 +392,7 @@ namespace Eco.Sim
 
             // The cheapest tests first (none of them draws at random, so their order changes nothing
             // but the cost): the column, the soil and the spacing before the blocks.
-            if (Available(cell, speciesIndex) < kind.MinFertility) return false;
+            if (Available(cell, speciesIndex) < kind.MinSoil) return false;
             if (!IsSpaceFree(x, z, speciesIndex, kind.Spacing)) return false;
 
             int y = PlantBaseAt(kind, x, z);
@@ -422,7 +422,7 @@ namespace Eco.Sim
             int cell = CellIndex(x, z);
             float vigour = suitability[speciesIndex][cell];
             if (vigour <= 0f) return ClimateRefusal(kind, cell);
-            if (Available(cell, speciesIndex) < kind.MinFertility) return PlantRefusal.PoorSoil;
+            if (Available(cell, speciesIndex) < kind.MinSoil) return PlantRefusal.PoorSoil;
             if (!IsSpaceFree(x, z, speciesIndex, kind.Spacing)) return PlantRefusal.TooClose;
             if (kind.NeedsWater && !IsBesideWater(x, y, z)) return PlantRefusal.NeedsWater;
             if (kind.NeedsShade && !IsShaded(x, z)) return PlantRefusal.NeedsShade;

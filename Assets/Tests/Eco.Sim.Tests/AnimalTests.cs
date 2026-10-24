@@ -511,7 +511,7 @@ namespace Eco.Sim.Tests
             tree.SeedChance = 0f;
             Species bush = TestSpecies.Bush();
             bush.SeedChance = 0f;
-            bush.MinFertility = 0.2f;
+            bush.MinSoil = 0.2f;
             return new Ecosystem(world ?? MeadowGenerator.CreateWorld(2), new[] { tree, bush }, new[] { rabbit, fox }, Seed);
         }
 

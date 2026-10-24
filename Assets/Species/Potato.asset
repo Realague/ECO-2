@@ -17,8 +17,8 @@ MonoBehaviour:
   seedAttemptsPerDay: 1.5
   seedRange: 6
   spacing: 5
-  minFertility: 0.3
-  fertilityUsePerDay: 0.04
+  minSoil: 0.3
+  soilUsePerDay: 0.04
   nitrogenNeed: 0.3
   phosphorusNeed: 0.5
   potassiumNeed: 1
@@ -32,6 +32,7 @@ MonoBehaviour:
   floatsOnWater: 0
   needsShade: 0
   woodYield: 0
+  woodColour: {r: 0.66, g: 0.49, b: 0.31, a: 1}
   harvest: 1
   produceName: Potato
   produceYield: 4

@@ -17,8 +17,8 @@ MonoBehaviour:
   seedAttemptsPerDay: 1.5
   seedRange: 2
   spacing: 1
-  minFertility: 0.1
-  fertilityUsePerDay: 0.02
+  minSoil: 0.1
+  soilUsePerDay: 0.02
   nitrogenNeed: 1
   phosphorusNeed: 0.4
   potassiumNeed: 0.4
@@ -32,6 +32,7 @@ MonoBehaviour:
   floatsOnWater: 0
   needsShade: 0
   woodYield: 0
+  woodColour: {r: 0.66, g: 0.49, b: 0.31, a: 1}
   harvest: 0
   produceName: 
   produceYield: 3

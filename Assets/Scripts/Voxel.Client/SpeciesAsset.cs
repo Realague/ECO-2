@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Eco.Sim;
 using UnityEngine;
+using UnityEngine.Serialization;
 using Voxel.Core;
 
 namespace Voxel.Client
@@ -33,10 +34,12 @@ namespace Voxel.Client
         [SerializeField] private float seedAttemptsPerDay = 1.5f;
         [SerializeField] private int seedRange = 6;
         [SerializeField] private int spacing = 2;
-        [SerializeField, Range(0f, 1f)] private float minFertility = 0.2f;
-        [SerializeField] private float fertilityUsePerDay = 0.2f;
 
         [Header("Soil (NPK)")]
+        [Tooltip("Below this much soil to live on (the nutrient it lacks most, weighted by its needs, from 0 to 1), its seeds do not take and the plant withers.")]
+        [SerializeField, Range(0f, 1f), FormerlySerializedAs("minFertility")] private float minSoil = 0.2f;
+        [Tooltip("Soil an adult draws each day, from each nutrient times its need of it.")]
+        [SerializeField, FormerlySerializedAs("fertilityUsePerDay")] private float soilUsePerDay = 0.2f;
         [Tooltip("How much it needs nitrogen, from 0 (it does without) to 1. A plant is limited by the nutrient it lacks most and draws on each as much as it needs it.")]
         [SerializeField, Range(0f, 1f)] private float nitrogenNeed = 1f;
         [Tooltip("How much it needs phosphorus, from 0 to 1.")]
@@ -228,8 +231,8 @@ namespace Voxel.Client
                 SeedChance = seedAttemptsPerDay / SimClock.StepsPerDay,
                 SeedRange = Mathf.Max(1, seedRange),
                 Spacing = Mathf.Max(1, spacing),
-                MinFertility = minFertility,
-                FertilityUse = fertilityUsePerDay / SimClock.StepsPerDay,
+                MinSoil = minSoil,
+                SoilUse = soilUsePerDay / SimClock.StepsPerDay,
                 NeedNitrogen = nitrogenNeed,
                 NeedPhosphorus = phosphorusNeed,
                 NeedPotassium = potassiumNeed,

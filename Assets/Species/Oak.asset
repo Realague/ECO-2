@@ -17,8 +17,8 @@ MonoBehaviour:
   seedAttemptsPerDay: 2.2
   seedRange: 6
   spacing: 3
-  minFertility: 0.86
-  fertilityUsePerDay: 0.12
+  minSoil: 0.86
+  soilUsePerDay: 0.12
   nitrogenNeed: 0.6
   phosphorusNeed: 0.8
   potassiumNeed: 0.5

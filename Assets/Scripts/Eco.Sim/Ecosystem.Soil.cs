@@ -140,7 +140,7 @@ namespace Eco.Sim
         {
             Species kind = species[plant.SpeciesIndex];
             int at = CellIndex(plant.X, plant.Z) * NutrientCount;
-            float litter = kind.FertilityUse * plant.Growth * LitterDays * SimClock.StepsPerDay;
+            float litter = kind.SoilUse * plant.Growth * LitterDays * SimClock.StepsPerDay;
             Enrich(at, litter * kind.NeedNitrogen);
             Enrich(at + 1, litter * kind.NeedPhosphorus);
             Enrich(at + 2, litter * kind.NeedPotassium);
@@ -338,7 +338,7 @@ namespace Eco.Sim
                 values[at] = species[s].NeedNitrogen;
                 values[at + 1] = species[s].NeedPhosphorus;
                 values[at + 2] = species[s].NeedPotassium;
-                values[at + 3] = species[s].FertilityUse;
+                values[at + 3] = species[s].SoilUse;
                 values[at + 4] = species[s].FixesNitrogen;
             }
 

@@ -48,12 +48,12 @@ namespace Eco.Sim.Tests
             return world;
         }
 
-        private static Species Needing(float nitrogen, float phosphorus, float potassium, float minFertility = 0f)
+        private static Species Needing(float nitrogen, float phosphorus, float potassium, float minSoil = 0f)
         {
             Species plant = TestSpecies.Bush();
             plant.Name = "Plant";
             plant.SeedChance = 0f;
-            plant.MinFertility = minFertility;
+            plant.MinSoil = minSoil;
             plant.NeedNitrogen = nitrogen;
             plant.NeedPhosphorus = phosphorus;
             plant.NeedPotassium = potassium;
@@ -94,7 +94,7 @@ namespace Eco.Sim.Tests
         public void APlant_DrawsMostOnWhatItNeeds()
         {
             Species grass = Needing(1f, 0.1f, 0.1f);
-            grass.FertilityUse = 0.02f;
+            grass.SoilUse = 0.02f;
             var ecosystem = new Ecosystem(Quarters(), new[] { grass }, Seed);
             SoilSample before = ecosystem.GetSoil(4, 4);
             Assert.IsTrue(ecosystem.TryPlaceGrownPlant(0, 5, 5));
@@ -124,7 +124,7 @@ namespace Eco.Sim.Tests
         public void APlantDyingWhereItStands_ReturnsToTheSoil_AFelledOneDoesNot()
         {
             Species shortLived = Needing(1f, 1f, 1f);
-            shortLived.FertilityUse = 0.001f;
+            shortLived.SoilUse = 0.001f;
             shortLived.LifespanSteps = shortLived.MaturitySteps + 1;
 
             var dying = new Ecosystem(Quarters(), new[] { shortLived }, Seed);
@@ -167,7 +167,7 @@ namespace Eco.Sim.Tests
         {
             World world = Quarters();
             Species grass = Needing(1f, 0.3f, 0.3f);
-            grass.FertilityUse = 0.02f;
+            grass.SoilUse = 0.02f;
             var ecosystem = new Ecosystem(world, new[] { grass }, Seed);
             Assert.IsTrue(ecosystem.TryPlaceGrownPlant(0, 5, 5));
             for (int step = 0; step < 30; step++) ecosystem.Step();
