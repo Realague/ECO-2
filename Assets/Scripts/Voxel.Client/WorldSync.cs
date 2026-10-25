@@ -40,6 +40,7 @@ namespace Voxel.Client
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private StorageSync storageSync;
+        [SerializeField] private ClaimSync claimSync;
 
         private readonly Dictionary<ulong, ChunkStream> streams = new Dictionary<ulong, ChunkStream>();
         private readonly List<ulong> finishedStreams = new List<ulong>();
@@ -139,6 +140,7 @@ namespace Voxel.Client
             if (inventorySync.IsStarving(clientId)) return false;
 
             if (!Blocks.IsPlaceable(block) || !IsEditAllowed(clientId, pos, block)) return false;
+            if (!claimSync.Check(clientId, pos.X, pos.Z)) return false;
 
             // Placing a block takes it from the player's inventory.
             if (!inventorySync.TryConsume(clientId, Items.OfBlock(block))) return false;
@@ -155,6 +157,7 @@ namespace Voxel.Client
         internal bool TryBreak(ulong clientId, BlockPos pos)
         {
             if (serverWorld == null || !IsEditAllowed(clientId, pos, Blocks.Air)) return false;
+            if (!CanBreakOnClaims(clientId, pos)) return false;
 
             ushort previous = serverWorld.GetBlock(pos);
             int tool = ToolRules.ToBreak(previous);
@@ -190,6 +193,22 @@ namespace Voxel.Client
             }
 
             EditApplied?.Invoke(clientId, EditKind.Broken);
+            return true;
+        }
+
+        // Server side: whether a player may break a block on claimed land: the block's column, and that
+        // of each torch it holds (which would fall with it). Says whose land it is if not.
+        internal bool CanBreakOnClaims(ulong clientId, BlockPos pos)
+        {
+            if (!claimSync.Check(clientId, pos.X, pos.Z)) return false;
+
+            heldTorches.Clear();
+            Torches.FindHeldBy(serverWorld, pos, heldTorches);
+            foreach (BlockPos torch in heldTorches)
+            {
+                if (!claimSync.Check(clientId, torch.X, torch.Z)) return false;
+            }
+
             return true;
         }
 
@@ -236,6 +255,7 @@ namespace Voxel.Client
             if (!ToolRules.CanTill(serverWorld.GetBlock(pos))) return false;
             if (Blocks.IsSolid(serverWorld.GetBlock(pos.X, pos.Y + 1, pos.Z))) return false;
             if (!inventorySync.Owns(clientId, Items.Hoe)) return false;
+            if (!claimSync.Check(clientId, pos.X, pos.Z)) return false;
 
             serverWorld.SetBlock(pos, Blocks.TilledSoil);
             EditApplied?.Invoke(clientId, EditKind.Tilled);

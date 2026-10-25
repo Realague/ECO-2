@@ -16,6 +16,7 @@ namespace Voxel.Client
         [SerializeField] private WorldSync worldSync;
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private StorageSync storageSync;
+        [SerializeField] private ClaimSync claimSync;
         [SerializeField] private AppearanceMenu appearanceMenu;
         [SerializeField] private MapScreen mapScreen;
         [SerializeField] private InventoryScreen inventoryScreen;
@@ -57,15 +58,27 @@ namespace Voxel.Client
             float reached = blockHit ? hit.Distance : PlayerRules.Reach;
             bool storageHit = storageSync.TryAimed(eye.transform.position, eye.transform.forward, reached, out int storageId, out float storageDistance);
             if (storageHit) reached = storageDistance;
-            bool carcassHit = ecosystemSync.TryAimedCarcass(eye.transform.position, eye.transform.forward, reached, out _, out _, out int carcassSpecies, out float meat, out float carcassDistance);
+            bool carcassHit = ecosystemSync.TryAimedCarcass(eye.transform.position, eye.transform.forward, reached, out int carcassX, out int carcassZ, out int carcassSpecies, out float meat, out float carcassDistance);
             if (carcassHit) reached = carcassDistance;
-            if (ecosystemSync.TryAim(origin, direction, reached, out string name, out int tool)) return WithTool(name, tool);
-            if (carcassHit) return CarcassName(carcassSpecies, meat);
+
+            // A plant or an animal stands in the column the ray reaches it in, near enough.
+            System.Numerics.Vector3 near = origin + direction * Mathf.Max(0f, reached - 0.3f);
+            if (ecosystemSync.TryAim(origin, direction, reached, out string name, out int tool)) return OnLand(WithTool(name, tool), Mathf.FloorToInt(near.X), Mathf.FloorToInt(near.Z));
+            if (carcassHit) return OnLand(CarcassName(carcassSpecies, meat), carcassX, carcassZ);
             if (storageHit) return StorageName(storageId);
             if (!blockHit) return null;
 
             ushort block = world.GetBlock(hit.Block);
-            return WithTool(Loc.Name(Items.NameOf(Blocks.TypeOf(block))), ToolRules.ToBreak(block));
+            return OnLand(WithTool(Loc.Name(Items.NameOf(Blocks.TypeOf(block))), ToolRules.ToBreak(block)), hit.Block.X, hit.Block.Z);
+        }
+
+        // What is on someone else's land says so: "Granite · claimed by Alice".
+        private string OnLand(string name, int x, int z)
+        {
+            if (name == null || claimSync == null || claimSync.LocalAllows(x, z)) return name;
+
+            claimSync.TryDescribe(x, z, out string owner, out _);
+            return Loc.T("{0} · claimed by {1}", name, string.IsNullOrEmpty(owner) ? Loc.T("someone") : owner);
         }
 
         // A chest or a stockpile: whose it is, and how full a stockpile is ("Stockpile · Alice (12 / 243)").
@@ -74,9 +87,12 @@ namespace Voxel.Client
             if (!storageSync.TryDescribe(storageId, out StorageKind kind, out string owner, out bool yours, out int blocks)) return null;
 
             string whose = yours ? Loc.T("yours") : owner.Length > 0 ? owner : Loc.T("someone's");
-            return kind == StorageKind.Chest
+            string name = kind == StorageKind.Chest
                 ? Loc.T("Chest · {0}", whose)
-                : Loc.T("Stockpile · {0} ({1} / {2})", whose, blocks, StorageRules.StockpileCapacity);
+                : kind == StorageKind.SmallStockpile
+                    ? Loc.T("Small stockpile · {0} ({1} / {2})", whose, blocks, StorageRules.CapacityOf(kind))
+                    : Loc.T("Stockpile · {0} ({1} / {2})", whose, blocks, StorageRules.CapacityOf(kind));
+            return storageSync.IsPublic(storageId) ? Loc.T("{0} · public", name) : name;
         }
 
         // A carcass, and whether enough of it is left to take: "Deer carcass · too far gone".

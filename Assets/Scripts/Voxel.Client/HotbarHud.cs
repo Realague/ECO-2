@@ -25,6 +25,8 @@ namespace Voxel.Client
         [SerializeField] private WorldSync worldSync;
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private EcosystemSync ecosystemSync;
+        [SerializeField] private ClaimSync claimSync;
+        [SerializeField] private CraftingSync craftingSync;
         [SerializeField] private AppearanceMenu appearanceMenu;
         [SerializeField] private MapScreen mapScreen;
 
@@ -105,14 +107,34 @@ namespace Voxel.Client
             screen.style.display = DisplayStyle.None;
             inventorySync.Refused += OnRefused;
             inventorySync.SowRefused += OnSowRefused;
+            if (claimSync != null) claimSync.Refused += ShowMessage;
+            if (craftingSync != null)
+            {
+                craftingSync.Refused += OnCraftRefused;
+                craftingSync.Crafted += OnCrafted;
+            }
         }
 
         private void OnDestroy()
         {
+            if (claimSync != null) claimSync.Refused -= ShowMessage;
+            if (craftingSync != null)
+            {
+                craftingSync.Refused -= OnCraftRefused;
+                craftingSync.Crafted -= OnCrafted;
+            }
+
             if (inventorySync == null) return;
 
             inventorySync.Refused -= OnRefused;
             inventorySync.SowRefused -= OnSowRefused;
+        }
+
+        private void OnCraftRefused(CraftRefusal refusal) => ShowMessage(CraftingSync.TextOf(refusal));
+
+        private void OnCrafted(int recipe)
+        {
+            if (Recipes.TryGet(recipe, out Recipe made)) ShowMessage(Loc.T("Crafted: {0}", ItemCatalog.NameOf(made.Output, ecosystemSync)));
         }
 
         // A seed that did not sprout: why ("Too cold for an oak").

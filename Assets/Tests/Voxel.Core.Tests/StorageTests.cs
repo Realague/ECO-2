@@ -193,6 +193,77 @@ namespace Voxel.Core.Tests
             Assert.AreEqual(ItemWeights.Chest, Weights.Of(Items.Chest));
             Assert.AreEqual(ItemWeights.Stockpile, Weights.Of(Items.Stockpile));
             Assert.AreEqual("Chest", Items.NameOf(Items.Chest));
+            Assert.IsTrue(Items.IsValid(Items.SmallStockpile));
+            Assert.IsTrue(Items.IsStorage(Items.SmallStockpile));
+            Assert.AreEqual(ItemWeights.SmallStockpile, Weights.Of(Items.SmallStockpile));
+            Assert.IsTrue(StorageRules.TryKindOf(Items.SmallStockpile, out StorageKind kind));
+            Assert.AreEqual(StorageKind.SmallStockpile, kind);
+            Assert.AreEqual(Items.SmallStockpile, StorageRules.ItemOf(StorageKind.SmallStockpile));
+        }
+
+        [Test]
+        public void SmallStockpile_HoldsFourPilesOfTwenty()
+        {
+            Assert.AreEqual(80, StorageRules.CapacityOf(StorageKind.SmallStockpile));
+            Assert.AreEqual(StorageRules.StockpileCapacity, StorageRules.CapacityOf(StorageKind.Stockpile));
+
+            var store = new Storages();
+            Storage small = store.Add(StorageKind.SmallStockpile, new BlockPos(10, 9, 10), 0, "bob");
+
+            Assert.AreEqual(4, small.CellCount);
+            Assert.AreEqual(80, small.Piles.Room(Blocks.Dirt));
+            Assert.AreEqual(80, small.Piles.Add(Blocks.Dirt, 100));
+            Assert.AreEqual(20, small.Piles.CountAt(0));
+            Assert.AreEqual(0, small.Piles.Room(Blocks.Dirt));
+            Assert.IsTrue(store.TryAt(new BlockPos(11, 9, 11), out Storage found, out int index));
+            Assert.AreSame(small, found);
+            Assert.AreEqual(3, index);
+            Assert.IsFalse(store.AnyCovered(new[] { new BlockPos(12, 9, 10) }), "two cells wide");
+            Assert.IsFalse(small.Piles.Set(0, Blocks.Dirt, 21), "no more than 20 a pile");
+        }
+
+        [Test]
+        public void SmallStockpile_WriteThenRead_KeepsItsPiles()
+        {
+            var store = new Storages();
+            Storage small = store.Add(StorageKind.SmallStockpile, new BlockPos(10, 9, 10), 1, "bob");
+            small.Piles.Add(Blocks.Granite, 25);
+            Storage large = store.Add(StorageKind.Stockpile, new BlockPos(20, 9, 20), 0, "bob");
+            large.Piles.Add(Blocks.Dirt, 30);
+            var stream = new MemoryStream();
+            store.Write(stream);
+            stream.Position = 0;
+
+            Storages loaded = Storages.Read(stream);
+
+            Assert.IsTrue(loaded.TryGet(small.Id, out Storage readSmall));
+            Assert.AreEqual(StorageKind.SmallStockpile, readSmall.Kind);
+            Assert.AreEqual(20, readSmall.Piles.CountAt(0));
+            Assert.AreEqual(5, readSmall.Piles.CountAt(1));
+            Assert.IsTrue(loaded.TryGet(large.Id, out Storage readLarge));
+            Assert.AreEqual(30, readLarge.Piles.CountOf(Blocks.Dirt));
+        }
+
+        [Test]
+        public void SmallStockpile_IsPlacedOnTwoByTwo_FromTheNearEdge()
+        {
+            World world = FlatGenerator.CreateWorld();
+            int ground = FlatGenerator.GroundHeight;
+            int side = StorageRules.SmallStockpileSide;
+            var target = new BlockPos(10, 5, 10);
+
+            Assert.AreEqual(new BlockPos(10, 5, 10), StorageRules.StockpileCorner(target, 0, side));
+            Assert.AreEqual(new BlockPos(10, 5, 10), StorageRules.StockpileCorner(target, 1, side));
+            Assert.AreEqual(new BlockPos(10, 5, 9), StorageRules.StockpileCorner(target, 2, side));
+            Assert.AreEqual(new BlockPos(9, 5, 10), StorageRules.StockpileCorner(target, 3, side));
+
+            var corner = new BlockPos(5, ground, 5);
+            Assert.IsTrue(StorageRules.CanPlaceStockpile(world, corner, side));
+            world.SetBlock(7, ground, 7, Blocks.Dirt);
+            Assert.IsTrue(StorageRules.CanPlaceStockpile(world, corner, side), "outside its 2 x 2");
+            Assert.IsFalse(StorageRules.CanPlaceStockpile(world, corner), "inside a large one's 3 x 3");
+            world.SetBlock(6, ground, 6, Blocks.Dirt);
+            Assert.IsFalse(StorageRules.CanPlaceStockpile(world, corner, side));
         }
     }
 }

@@ -28,6 +28,12 @@ namespace Voxel.Client
         // How often the census behind the species list and layer is asked for while the map is open.
         private const float CensusInterval = 2f;
 
+        // A press that moves less than this is a click (claims a plot in plot mode), not a drag.
+        private const float ClickThreshold = 8f;
+
+        // How long a refusal stays in the land panel.
+        private const float LandMessageSeconds = 4f;
+
         private enum Layer
         {
             Terrain,
@@ -44,6 +50,7 @@ namespace Voxel.Client
         [SerializeField] private CommandSync commandSync;
         [SerializeField] private UIDocument document;
         [SerializeField] private InventoryScreen inventoryScreen;
+        [SerializeField] private ClaimSync claimSync;
 
         private VisualElement screen;
         private VisualElement view;
@@ -83,6 +90,24 @@ namespace Voxel.Client
         private int shownCensus = -1;
         private float nextCensus;
 
+        // Plot mode (C): the claimed plots, the one under the pointer, and the land panel in the
+        // species list's place.
+        private VisualElement claimsLayer;
+        private VisualElement claimHover;
+        private VisualElement speciesPanelRoot;
+        private VisualElement landPanel;
+        private Label landCount;
+        private Label landPointer;
+        private Label landMessage;
+        private VisualElement landList;
+        private VisualElement landEmpty;
+        private Texture2D shownClaims;
+        private bool plotMode;
+        private bool pointerInside;
+        private Vector2 pointerLocal;
+        private Vector2 pressAt;
+        private float landMessageUntil;
+
         public bool IsOpen { get; private set; }
 
         // Also true on the frame the map closes, so that the key that closed it does nothing else.
@@ -105,6 +130,21 @@ namespace Voxel.Client
             speciesPanel.SelectionChanged += OnSpeciesChosen;
             Loc.Changed += OnLanguageChanged;
             speciesLayer.style.display = DisplayStyle.None;
+            claimsLayer = root.Q("map-claims");
+            claimHover = root.Q("map-claim-hover");
+            speciesPanelRoot = root.Q("species-panel");
+            landPanel = root.Q("land-panel");
+            landCount = root.Q<Label>("land-count");
+            landPointer = root.Q<Label>("land-pointer");
+            landMessage = root.Q<Label>("land-message");
+            landList = root.Q("land-list");
+            landEmpty = root.Q("land-empty");
+            if (claimSync != null)
+            {
+                claimSync.AccessChanged += ShowLand;
+                claimSync.PlotChanged += OnPlotChanged;
+                claimSync.Refused += OnClaimRefused;
+            }
 
             root.Q<Button>("tab-map").focusable = false;
 
@@ -112,7 +152,11 @@ namespace Voxel.Client
             view.RegisterCallback<PointerDownEvent>(OnPointerDown);
             view.RegisterCallback<PointerMoveEvent>(OnPointerMove);
             view.RegisterCallback<PointerUpEvent>(OnPointerUp);
-            view.RegisterCallback<PointerLeaveEvent>(_ => pointerText.text = "");
+            view.RegisterCallback<PointerLeaveEvent>(_ =>
+            {
+                pointerText.text = "";
+                pointerInside = false;
+            });
             screen.style.display = DisplayStyle.None;
             ShowLayer(Layer.Terrain);
 
@@ -123,6 +167,13 @@ namespace Voxel.Client
         private void OnDestroy()
         {
             Loc.Changed -= OnLanguageChanged;
+            if (claimSync != null)
+            {
+                claimSync.AccessChanged -= ShowLand;
+                claimSync.PlotChanged -= OnPlotChanged;
+                claimSync.Refused -= OnClaimRefused;
+            }
+
             DropLayers();
             if (speciesTexture != null) Destroy(speciesTexture);
         }
@@ -131,6 +182,7 @@ namespace Voxel.Client
         {
             speciesPanel.Retranslate();
             ShowLayerName();
+            ShowLand();
         }
 
         private void Update()
@@ -178,9 +230,19 @@ namespace Voxel.Client
                 {
                     ShowLayer((Layer)(((int)layer + 1) % LayerNames.Length));
                 }
+                else if (IsOpen && PlotKey(keyboard).wasPressedThisFrame)
+                {
+                    SetPlotMode(!plotMode);
+                }
             }
 
             if (!IsOpen) return;
+
+            if (landMessageUntil > 0f && Time.unscaledTime >= landMessageUntil)
+            {
+                landMessageUntil = 0f;
+                landMessage.text = "";
+            }
 
             if (Time.unscaledTime >= nextCensus)
             {
@@ -205,6 +267,54 @@ namespace Voxel.Client
             return keyboard.FindKeyOnCurrentKeyboardLayout("m") ?? keyboard.mKey;
         }
 
+        private static KeyControl PlotKey(Keyboard keyboard)
+        {
+            return keyboard.FindKeyOnCurrentKeyboardLayout("c") ?? keyboard.cKey;
+        }
+
+        // Plot mode: a click claims a free plot or releases one of the player's, and the land panel
+        // (how many they hold, whom they allow) takes the species list's place.
+        private void SetPlotMode(bool on)
+        {
+            plotMode = on && claimSync != null;
+            speciesPanelRoot.EnableInClassList("hidden", plotMode);
+            landPanel.EnableInClassList("hidden", !plotMode);
+            claimHover.EnableInClassList("hidden", true);
+            landPointer.text = "";
+            landMessage.text = "";
+            landMessageUntil = 0f;
+            if (!plotMode) return;
+
+            speciesPanel.Blur();
+            claimSync.RequestAccessList();
+            ShowLand();
+        }
+
+        // The land panel: the plots held out of the most, and the access list.
+        private void ShowLand()
+        {
+            if (claimSync == null || landCount == null) return;
+
+            landCount.text = Loc.T("{0} / {1} plots", claimSync.LocalCount, Voxel.Core.ClaimRules.MaxPlotsPerPlayer);
+            AccessListView.Fill(landList, landEmpty, claimSync.Access, claimSync.RequestAccess);
+        }
+
+        private void OnPlotChanged(int plotX, int plotZ)
+        {
+            if (plotMode) landCount.text = Loc.T("{0} / {1} plots", claimSync.LocalCount, Voxel.Core.ClaimRules.MaxPlotsPerPlayer);
+            if (pointerInside) ShowPointer(pointerLocal);
+        }
+
+        // A refusal while the map is open shows in the land panel (the hotbar is hidden).
+        private void OnClaimRefused(string text)
+        {
+            if (!IsOpen) return;
+
+            if (!plotMode) SetPlotMode(true);
+            landMessage.text = text;
+            landMessageUntil = Time.unscaledTime + LandMessageSeconds;
+        }
+
         public void Open()
         {
             if (IsOpen) return;
@@ -214,6 +324,7 @@ namespace Voxel.Client
             nextCensus = 0f;
             pixelsPerBlock = StartPixelsPerBlock;
             pointerText.text = "";
+            SetPlotMode(false);
             screen.style.display = DisplayStyle.Flex;
             Cursor.lockState = CursorLockMode.None;
         }
@@ -280,7 +391,48 @@ namespace Voxel.Client
                 speciesLayer.style.translate = translate;
             }
 
+            PlaceClaims(texture, translate);
             markers.Place(networkManager, ecosystemSync, worldMap, player, projection);
+        }
+
+        // The claimed plots cover the world like the picture (one pixel per column), and in plot mode
+        // the plot under the pointer is framed.
+        private void PlaceClaims(Texture2D texture, Translate translate)
+        {
+            Texture2D claims = claimSync != null && claimSync.Layer != null ? claimSync.Layer.Texture : null;
+            if (claims != shownClaims)
+            {
+                shownClaims = claims;
+                claimsLayer.style.backgroundImage = claims != null ? new StyleBackground(claims) : new StyleBackground();
+            }
+
+            claimsLayer.style.display = claims != null ? DisplayStyle.Flex : DisplayStyle.None;
+            if (claims != null)
+            {
+                claims.filterMode = pixelsPerBlock < 1f ? FilterMode.Bilinear : FilterMode.Point;
+                claimsLayer.style.width = texture.width * pixelsPerBlock;
+                claimsLayer.style.height = texture.height * pixelsPerBlock;
+                claimsLayer.style.translate = translate;
+            }
+
+            bool hover = plotMode && pointerInside && !dragging;
+            if (hover)
+            {
+                Vector2 column = Unproject(pointerLocal);
+                int plotX = Voxel.Core.ClaimRules.PlotOf(Mathf.FloorToInt(column.x));
+                int plotZ = Voxel.Core.ClaimRules.PlotOf(Mathf.FloorToInt(column.y));
+                hover = plotX >= 0 && plotZ >= 0 && plotX < claimSync.PlotsX && plotZ < claimSync.PlotsZ;
+                if (hover)
+                {
+                    float size = Voxel.Core.ClaimRules.PlotSize * pixelsPerBlock;
+                    claimHover.style.left = viewSize.x * 0.5f + (plotX * Voxel.Core.ClaimRules.PlotSize - centre.x) * pixelsPerBlock;
+                    claimHover.style.top = viewSize.y * 0.5f - ((plotZ + 1) * Voxel.Core.ClaimRules.PlotSize - centre.y) * pixelsPerBlock;
+                    claimHover.style.width = size;
+                    claimHover.style.height = size;
+                }
+            }
+
+            claimHover.EnableInClassList("hidden", !hover);
         }
 
         private void ShowLayer(Layer shown)
@@ -455,6 +607,7 @@ namespace Voxel.Client
 
             if (e.button != 0) return;
 
+            pressAt = e.localPosition;
             dragging = true;
             dragStart = e.localPosition;
             dragCentre = centre;
@@ -470,6 +623,8 @@ namespace Voxel.Client
                 centre = new Vector2(dragCentre.x - moved.x / pixelsPerBlock, dragCentre.y + moved.y / pixelsPerBlock);
             }
 
+            pointerInside = true;
+            pointerLocal = e.localPosition;
             ShowPointer(e.localPosition);
         }
 
@@ -479,6 +634,14 @@ namespace Voxel.Client
 
             dragging = false;
             view.ReleasePointer(e.pointerId);
+
+            // In plot mode a click (not a drag) claims or releases the plot under it.
+            if (!plotMode || ((Vector2)e.localPosition - pressAt).magnitude > ClickThreshold) return;
+
+            // The map moved with the press: back where it was clicked.
+            centre = dragCentre;
+            Vector2 column = Unproject(pressAt);
+            claimSync.RequestToggle(Voxel.Core.ClaimRules.PlotOf(Mathf.FloorToInt(column.x)), Voxel.Core.ClaimRules.PlotOf(Mathf.FloorToInt(column.y)));
         }
 
         // The coordinates of the column under the pointer, the height of its ground, and its climate.
@@ -497,7 +660,26 @@ namespace Voxel.Client
             Voxel.Core.Geography geography = world.Geography;
             int celsius = ClimateColours.Celsius(geography.TemperatureAt(x, z));
             int humidity = ClimateColours.Percent(geography.HumidityAt(x, z));
-            pointerText.text = $"X {x}   Y {world.GetSurfaceHeight(x, z)}   Z {z}      {celsius} °C   " + Loc.T("{0} % humidity", humidity);
+            pointerText.text = $"X {x}   Y {world.GetSurfaceHeight(x, z)}   Z {z}      {celsius} °C   " + Loc.T("{0} % humidity", humidity) + PlotText(x, z);
+        }
+
+        // Whose plot the pointer is over, after the coordinates when it is claimed; in plot mode, with
+        // what a click would do, in the land panel (too long for the footer).
+        private string PlotText(int x, int z)
+        {
+            if (claimSync == null) return "";
+
+            bool claimed = claimSync.TryDescribe(x, z, out string owner, out ClaimRelation relation);
+            if (plotMode)
+            {
+                landPointer.text = !claimed
+                    ? Loc.T("Free plot: click to claim it ({0} / {1})", claimSync.LocalCount, Voxel.Core.ClaimRules.MaxPlotsPerPlayer)
+                    : relation == ClaimRelation.Yours
+                        ? Loc.T("Your plot: click to release it")
+                        : HudBanner.LandOf(owner, relation);
+            }
+
+            return claimed ? "      " + HudBanner.LandOf(owner, relation) : "";
         }
 
     }

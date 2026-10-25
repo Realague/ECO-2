@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Eco.Sim;
 using UnityEngine;
@@ -450,7 +451,8 @@ namespace Voxel.Client
         // rather than the body (the aiming box). An arrow through the head no further in than it
         // enters the body counts as in the head, so a shot from the front or the side may be one, a
         // shot through the rump not. feet: where the animal was shown, which is where it falls if killed.
-        public bool TryHitArrow(Vector3 a, Vector3 b, out int animalId, out bool inHead, out float distance, out Vector3 feet)
+        // Animals shown in a column canHunt refuses are passed through (someone else's land).
+        public bool TryHitArrow(Vector3 a, Vector3 b, Func<int, int, bool> canHunt, out int animalId, out bool inHead, out float distance, out Vector3 feet)
         {
             const float HeadAllowance = 0.35f;
             animalId = 0;
@@ -463,6 +465,7 @@ namespace Voxel.Client
                 View view = entry.Value;
                 AnimalSpecies kind = species[view.SpeciesIndex];
                 Vector3 position = view.PositionAt(now);
+                if (!canHunt(Mathf.FloorToInt(position.x), Mathf.FloorToInt(position.z))) continue;
                 if (assets != null) position.y += view.LiftAt(now, assets[view.SpeciesIndex]);
 
                 float half = kind.Width * 0.5f;

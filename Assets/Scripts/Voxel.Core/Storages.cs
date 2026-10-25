@@ -30,17 +30,17 @@ namespace Voxel.Core
             Facing = facing;
             OwnerId = ownerId;
             if (kind == StorageKind.Chest) Contents = new Inventory();
-            else Piles = new StockpilePiles();
+            else Piles = new StockpilePiles(kind);
         }
 
         public bool IsEmpty => Kind == StorageKind.Chest ? Contents.DistinctCount == 0 : Piles.IsEmpty;
 
         public bool CanOpen(string playerId) => !string.IsNullOrEmpty(playerId) && (playerId == OwnerId || Allowed.Contains(playerId));
 
-        public int CellCount => Kind == StorageKind.Chest ? 1 : StorageRules.PileCount;
+        public int CellCount => Kind == StorageKind.Chest ? 1 : StorageRules.PileCountOf(Kind);
 
         // A cell it covers (0 to CellCount - 1): a chest's own, or a stockpile's piles in order.
-        public BlockPos Cell(int index) => Kind == StorageKind.Chest ? Position : StorageRules.PileCell(Position, index);
+        public BlockPos Cell(int index) => Kind == StorageKind.Chest ? Position : StorageRules.PileCell(Position, index, StorageRules.SideOf(Kind));
 
         // Whether a cell it covers is solid: a chest always, a stockpile's pile when it holds something.
         public bool IsSolidAt(int index) => Kind == StorageKind.Chest || Piles.CountAt(index) > 0;

@@ -87,6 +87,7 @@ namespace Voxel.Client
 
         // The world of this machine, on which the display works out the way each animal walks.
         [SerializeField] private WorldSync worldSync;
+        [SerializeField] private ClaimSync claimSync;
         [SerializeField] private SpeciesAsset[] speciesAssets;
         [SerializeField] private AnimalSpeciesAsset[] animalAssets;
         [SerializeField] private float plantViewDistance = 128f;
@@ -445,6 +446,7 @@ namespace Voxel.Client
             calories = 0f;
             min = max = Vector3.zero;
             if (ecosystem == null || !ecosystem.TryGet(plantId, out Plant plant) || !IsWithinReach(clientId, plant)) return false;
+            if (!claimSync.Check(clientId, plant.X, plant.Z)) return false;
 
             PlantView view = ViewOf(plant);
             if (!inventorySync.Owns(clientId, ToolFor(view))) return false;
@@ -465,7 +467,7 @@ namespace Voxel.Client
             inHead = false;
             distance = 0f;
             feet = default;
-            return animalViews != null && animalViews.TryHitArrow(a, b, out animalId, out inHead, out distance, out feet);
+            return animalViews != null && animalViews.TryHitArrow(a, b, claimSync.LocalAllows, out animalId, out inHead, out distance, out feet);
         }
 
         // What the local player is aiming at, at most maxDistance away: the name of the animal or plant
@@ -674,6 +676,9 @@ namespace Voxel.Client
                 return true;
             }
 
+            // On someone else's land: the player is told whose it is, and nothing is predicted.
+            if (!claimSync.LocalCheck(plants[plantId].X, plants[plantId].Z)) return true;
+
             RequestHarvest(plantId);
             return true;
         }
@@ -767,6 +772,7 @@ namespace Voxel.Client
             var centre = new Vector3(x + 0.5f, eyes.y, z + 0.5f);
             float reach = PlayerRules.Reach + BlockEditRules.ReachTolerance + 1f;
             if ((centre - eyes).sqrMagnitude > reach * reach) return;
+            if (!claimSync.Check(clientId, x, z)) return;
 
             int item = Items.Carcass(species);
             if (inventorySync.RoomFor(clientId, item) <= 0)
@@ -1137,6 +1143,7 @@ namespace Voxel.Client
         private bool TryHarvest(ulong clientId, int plantId)
         {
             if (!ecosystem.TryGet(plantId, out Plant plant) || !IsWithinReach(clientId, plant)) return false;
+            if (!claimSync.Check(clientId, plant.X, plant.Z)) return false;
 
             int tool = HarvestTool(plant.SpeciesIndex);
             if (tool != Items.None && !inventorySync.Owns(clientId, tool)) return false;
@@ -1197,6 +1204,9 @@ namespace Voxel.Client
             float dz = z + 0.5f - position.z;
             float maxDistance = PlayerRules.Reach + BlockEditRules.ReachTolerance;
             if (dx * dx + dz * dz > maxDistance * maxDistance) return false;
+
+            // On someone else's land: the player is told whose it is, and keeps the seed.
+            if (!claimSync.Check(clientId, x, z)) return false;
 
             // A tree's seed goes into its own ground; a crop's only into soil the player tilled (the
             // bed, for a plant rooted in shallow water).
@@ -1359,7 +1369,8 @@ namespace Voxel.Client
         // be near the path (it may have moved one step since the shooter saw it, plus a block); it then
         // takes the damage, and dies once its health is spent, leaving its carcass, or else runs away
         // from where the arrow came from. Returns false, changing nothing, if the hit is not plausible.
-        internal bool TryWoundAnimal(int animalId, IReadOnlyList<System.Numerics.Vector3> path, float damage, int shownX, int shownZ, out bool killed)
+        // An animal on land the shooter may not hunt on is not wounded (they are told whose land it is).
+        internal bool TryWoundAnimal(ulong shooterId, int animalId, IReadOnlyList<System.Numerics.Vector3> path, float damage, int shownX, int shownZ, out bool killed)
         {
             killed = false;
             if (ecosystem == null || path.Count == 0 || !ecosystem.TryGetAnimal(animalId, out Animal animal)) return false;
@@ -1380,6 +1391,8 @@ namespace Voxel.Client
             bool near = Mathf.Abs(shownX - animal.X) <= allowance && Mathf.Abs(shownZ - animal.Z) <= allowance;
             int x = near ? shownX : animal.X;
             int z = near ? shownZ : animal.Z;
+            if (!claimSync.Check(shooterId, animal.X, animal.Z) || !claimSync.Allows(shooterId, x, z)) return false;
+
             killed = ecosystem.Damage(animalId, damage, x, z, allowance);
             if (!killed) MakeFlee(animalId, new Vector3(path[0].X, path[0].Y, path[0].Z), WoundFleeSteps);
             animalRevision++;

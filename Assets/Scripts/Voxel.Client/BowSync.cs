@@ -52,6 +52,7 @@ namespace Voxel.Client
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private WorldSync worldSync;
+        [SerializeField] private ClaimSync claimSync;
         [SerializeField] private Material shaftMaterial;
         [SerializeField] private Material headMaterial;
         [SerializeField] private Material fletchingMaterial;
@@ -425,7 +426,7 @@ namespace Voxel.Client
 
             pending.Remove((clientId, shot));
             float damage = ArrowDamage * ArrowFlight.ClampPower(flight.Power) * (inHead ? HeadMultiplier : 1f);
-            if (animalId != 0 && ecosystemSync.TryWoundAnimal(animalId, flight.Path, damage, shownX, shownZ, out bool killed))
+            if (animalId != 0 && ecosystemSync.TryWoundAnimal(clientId, animalId, flight.Path, damage, shownX, shownZ, out bool killed))
             {
                 SendHit(clientId, shot, damage, inHead, killed);
                 return;
@@ -535,6 +536,7 @@ namespace Voxel.Client
             Vector3 eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;
             float reach = PlayerRules.Reach + BlockEditRules.ReachTolerance + ArrowViews.Length;
             if ((arrow.Position.ToUnity() - eyes).sqrMagnitude > reach * reach) return;
+            if (!claimSync.Check(clientId, Mathf.FloorToInt(arrow.Position.X), Mathf.FloorToInt(arrow.Position.Z))) return;
 
             if (inventorySync.RoomFor(clientId, Items.Arrow) <= 0)
             {

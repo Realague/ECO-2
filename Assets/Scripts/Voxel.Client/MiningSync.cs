@@ -343,6 +343,10 @@ namespace Voxel.Client
 
             Vector3 eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;
             if (!BlockEditRules.IsAllowed(world, eyes.ToNumerics(), pos, Blocks.Air)) return false;
+
+            // On someone else's land no hit counts (the player is told whose it is).
+            if (!worldSync.CanBreakOnClaims(clientId, pos)) return false;
+
             int tool = ToolRules.ToBreak(type);
             if (tool != Items.None && !inventorySync.Owns(clientId, tool)) return false;
 

@@ -165,6 +165,7 @@ Young {1}	Jeune {1}
 {0} · needs {1}	{0} · outil : {2}
 Chest · {0}	Coffre · {0}
 Stockpile · {0} ({1} / {2})	Réserve · {0} ({1} / {2})
+Small stockpile · {0} ({1} / {2})	Petite réserve · {0} ({1} / {2})
 yours	à vous
 someone's	à quelqu'un
 
@@ -211,6 +212,7 @@ Shift + click	Maj + clic
 # Storage
 Chest	Coffre
 Stockpile	Réserve
+Small stockpile	Petite réserve
 Access	Accès
 Your bag	Votre sac
 In your bag	Dans votre sac
@@ -318,6 +320,7 @@ Shot with the bow. An arrow lies where it lands: right click on it to pick it up
 Holds tools, seeds, food and the like, up to 150 kg. Hold it and right click on the ground to place it; right click on it to open it. Only you and the players you allow can open it.	Contient outils, graines, nourriture et autres, jusqu'à 150 kg. En main, clic droit sur le sol pour le poser ; clic droit dessus pour l'ouvrir. Seuls vous et les joueurs que vous autorisez pouvez l'ouvrir.
 Lights what is around it, day and night. Hold it and right click on the top or the side of a block to set it there; hit it, with anything in hand, to take it down.	Éclaire les alentours, de jour comme de nuit. En main, clic droit sur le dessus ou le côté d'un bloc pour la poser ; frappez-la, avec n'importe quoi en main, pour la retirer.
 Holds blocks and wood: nine piles of 27 on a patch of flat ground, 3 by 3. Hold it and right click to place it in front of you; right click on it to open it.	Contient blocs et bois : neuf piles de 27 sur un carré de sol plat de 3 sur 3. En main, clic droit pour la poser devant vous ; clic droit dessus pour l'ouvrir.
+Holds blocks and wood: four piles of 20 on a patch of flat ground, 2 by 2. Hold it and right click to place it in front of you; right click on it to open it.	Contient blocs et bois : quatre piles de 20 sur un carré de sol plat de 2 sur 2. En main, clic droit pour la poser devant vous ; clic droit dessus pour l'ouvrir.
 Left over when wheat is harvested.	Ce qui reste quand on récolte le blé.
 A building block. Hold it and right click to place it.	Un bloc de construction. En main, clic droit pour le poser.
 Plant it to grow {2}: hold it and right click on the ground where it grows. It needs a climate and soil that suit it, and room from others of its kind.	À planter pour faire pousser un plant de {1} : en main, clic droit sur un sol où il pousse. Il lui faut un climat et un sol qui lui conviennent, et de la place loin des autres de son espèce.
@@ -416,3 +419,46 @@ Jaguar	Jaguar
 Crocodile	Crocodile
 Frog	Grenouille
 Parrot	Perroquet
+
+# Claimed land
+someone	quelqu'un
+Already claimed by {0}	Déjà revendiqué par {0}
+You hold {0} plots already, the most you can	Vous avez déjà {0} parcelles, le maximum
+Not your plot	Ce n'est pas votre parcelle
+Choose a name first	Choisissez d'abord un pseudo
+Outside the world	Hors du monde
+Claimed by {0}	Revendiqué par {0}
+Your land	Vos terres
+{0}'s land	Terres de {0}
+{0} · claimed by {1}	{0} · revendiqué par {1}
+{0} / {1} plots	{0} / {1} parcelles
+Free plot: click to claim it ({0} / {1})	Parcelle libre : cliquez pour la revendiquer ({0} / {1})
+Your plot: click to release it	Votre parcelle : cliquez pour la libérer
+Land	Terrain
+Click a free plot to claim it, one of yours to release it. On your land, only you and the players you allow can build, dig, fell, harvest, plant or hunt.	Cliquez sur une parcelle libre pour la revendiquer, sur l'une des vôtres pour la libérer. Sur vos terres, seuls vous et les joueurs que vous autorisez peuvent construire, creuser, abattre, récolter, planter ou chasser.
+Who may act on your land	Qui peut agir sur vos terres
+plots	parcelles
+{0} · public	{0} · public
+{0} · public (unclaimed land)	{0} · public (terre non revendiquée)
+In the chests ({0})	Dans les coffres ({0})
+On the stockpiles ({0})	Sur les réserves ({0})
+On claimed land, storage is the land owner's, open to them and to the players they allow on their land (map, C); the chests, and the stockpiles, of one claimed area share what they hold. Off claimed land, anyone may open it.	Sur une terre revendiquée, un stockage appartient au propriétaire de la terre, et s'ouvre pour lui et pour les joueurs qu'il autorise sur ses terres (carte, C) ; les coffres, et les réserves, d'une même zone revendiquée partagent leur contenu. Hors des terres revendiquées, tout le monde peut l'ouvrir.
+
+# Crafting
+Crafting	Fabrication
+Craft	Fabriquer
+Recipes	Recettes
+Ingredients	Ingrédients
+Duration	Durée
+{0} s	{0} s
+Wood	Bois
+Stone	Pierre
+Auto	Auto
+{0} ×{1}	{0} ×{1}
+Your calories: crafting burns them	Vos calories : fabriquer en consomme
+Crafting {0}… {1} s	Fabrication : {0}… {1} s
+Crafted: {0}	Fabriqué : {0}
+Missing ingredients	Il manque des ingrédients
+No room in your bag for it	Pas de place dans votre sac
+Already crafting	Fabrication déjà en cours
+You can't craft that	Impossible de fabriquer ça

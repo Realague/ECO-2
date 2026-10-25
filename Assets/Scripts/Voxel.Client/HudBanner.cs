@@ -42,6 +42,7 @@ namespace Voxel.Client
         [SerializeField] private MapScreen mapScreen;
         [SerializeField] private InventoryScreen inventoryScreen;
         [SerializeField] private BowSync bowSync;
+        [SerializeField] private ClaimSync claimSync;
 
         private VisualElement screen;
         private VisualElement hints;
@@ -203,7 +204,16 @@ namespace Voxel.Client
                 landscape = Landscape.For(world.Seed, world.SizeX, world.SizeZ);
             }
 
-            place.text = Loc.Name(Biomes.NameAt(world, landscape, Mathf.FloorToInt(position.x), Mathf.FloorToInt(position.z)));
+            int x = Mathf.FloorToInt(position.x);
+            int z = Mathf.FloorToInt(position.z);
+            string biome = Loc.Name(Biomes.NameAt(world, landscape, x, z));
+            place.text = claimSync != null && claimSync.TryDescribe(x, z, out string owner, out ClaimRelation relation)
+                ? Loc.T("{0} · {1}", biome, LandOf(owner, relation))
+                : biome;
         }
+
+        // Whose land it is: "Your land", "Alice's land".
+        internal static string LandOf(string owner, ClaimRelation relation) =>
+            relation == ClaimRelation.Yours ? Loc.T("Your land") : Loc.T("{0}'s land", string.IsNullOrEmpty(owner) ? Loc.T("someone") : owner);
     }
 }

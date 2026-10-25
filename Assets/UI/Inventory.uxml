@@ -11,6 +11,10 @@
                 <ui:VisualElement class="icon icon--tab-inventory inventory-tab-icon" />
                 <ui:Label text="Inventory" class="inventory-tab-text" />
             </ui:Button>
+            <ui:Button name="tab-crafting" class="inventory-tab">
+                <ui:VisualElement class="icon icon--category-tools inventory-tab-icon" />
+                <ui:Label text="Crafting" class="inventory-tab-text" />
+            </ui:Button>
             <ui:VisualElement class="inventory-tabs-space" />
             <ui:VisualElement class="speciality">
                 <ui:VisualElement class="icon icon--plant" />
@@ -52,6 +56,20 @@
                             <ui:Label name="item-empty" class="items-empty" text="Nothing here yet: break blocks, fell trees and harvest ripe crops." />
                             <ui:ScrollView name="item-grid" class="item-grid" />
                         </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- The crafting tab (CraftingPage): every recipe, what it takes and whether the bag holds it. -->
+                <ui:VisualElement name="crafting-page" class="crafting-page">
+                    <ui:VisualElement class="items-heading">
+                        <ui:Label text="Recipes" class="column-title items-title" />
+                        <ui:VisualElement class="carry-count" tooltip="Your calories: crafting burns them">
+                            <ui:VisualElement class="icon icon--fire carry-count-icon" />
+                            <ui:Label name="crafting-calories" class="carry-count-text" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="item-well recipe-well">
+                        <ui:ScrollView name="recipe-list" class="recipe-list" />
                     </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>
@@ -133,6 +151,54 @@
                         <ui:VisualElement class="details-hint">
                             <ui:VisualElement class="sheet-key"><ui:Label text="Tab" class="sheet-key-text" /></ui:VisualElement>
                             <ui:Label text="close" class="details-hint-text" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- The chosen recipe (CraftingPage): what it makes, each ingredient with the wood or rock
+                     chosen for it, its time and calories, and Craft, or the craft under way. -->
+                <ui:VisualElement name="recipe-sheet" class="details recipe-sheet">
+                    <ui:VisualElement class="details-head">
+                        <ui:VisualElement class="details-icon-frame">
+                            <ui:VisualElement name="recipe-icon" class="details-icon" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="details-titles">
+                            <ui:Label name="recipe-name" class="details-name" />
+                            <ui:Label name="recipe-kind" class="details-kind" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:ScrollView name="recipe-body" class="recipe-body">
+                        <ui:Label name="recipe-description" class="details-description" />
+                        <ui:Label text="Ingredients" class="details-section" />
+                        <ui:VisualElement name="recipe-ingredients" />
+                        <ui:VisualElement class="details-line">
+                            <ui:VisualElement class="icon icon--rotate details-line-icon" />
+                            <ui:Label text="Duration" class="details-line-label" />
+                            <ui:Label name="recipe-duration" class="details-line-value" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="details-line">
+                            <ui:VisualElement class="icon icon--fire details-line-icon" />
+                            <ui:Label text="Calories" class="details-line-label" />
+                            <ui:Label name="recipe-calories" class="details-line-value" />
+                        </ui:VisualElement>
+                    </ui:ScrollView>
+
+                    <!-- Craft, or how far the craft under way has gone and Cancel. -->
+                    <ui:VisualElement class="recipe-actions">
+                        <ui:Label name="recipe-reason" class="recipe-reason" />
+                        <ui:VisualElement name="recipe-progress" class="recipe-progress">
+                            <ui:VisualElement class="recipe-progress-bar">
+                                <ui:VisualElement name="recipe-progress-fill" class="recipe-progress-fill" />
+                            </ui:VisualElement>
+                            <ui:Label name="recipe-progress-text" class="recipe-progress-text" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="recipe-buttons">
+                            <ui:Button name="recipe-craft" class="button button--primary recipe-button">
+                                <ui:Label text="Craft" class="button-text" />
+                            </ui:Button>
+                            <ui:Button name="recipe-cancel" class="button button--secondary recipe-button">
+                                <ui:Label text="Cancel" class="button-text" />
+                            </ui:Button>
                         </ui:VisualElement>
                     </ui:VisualElement>
                 </ui:VisualElement>

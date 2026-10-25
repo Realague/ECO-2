@@ -18,14 +18,18 @@ namespace Voxel.Client
         ChestFull = 5,
         StockpileFull = 6,
         NotAccepted = 7,
-        TooHungry = 8
+        TooHungry = 8,
+
+        // Only found by the client, which then says whose land it is (ClaimSync); the server tells it.
+        Claimed = 9
     }
 
     // Chests and stockpiles placed in the world (StorageRules, Storages). The server keeps them and
     // saves them with the world (storage.dat): it places one where a player asks if they own it and the
     // place is free (no block, player, animal, plant or log in it, flat ground for a stockpile), lets
-    // its owner and the players they allow open it, moves items between it and their bags (a chest by
-    // weight, a stockpile by piles), lets the owner allow others and pick it up once empty. Every
+    // its owner and the players they allow open it (anyone, while it stands off claimed land), moves
+    // items between it and their bags (a chest by weight, a stockpile by piles), lets the owner allow
+    // others and pick it up once empty (anyone, while it is public). Every
     // machine knows where each one stands, whose it is, whether it is open and a stockpile's piles (to
     // draw them and collide with them); only the players who opened one get what a chest holds and its
     // access list. Nothing sprouts where storage stands (Ecosystem.BlockColumn).
@@ -41,7 +45,6 @@ namespace Voxel.Client
         private const string ContentsMessage = "Store.Contents";
         private const string ClosedMessage = "Store.Closed";
         private const string MoveMessage = "Store.Move";
-        private const string AccessMessage = "Store.Access";
         private const string PickupMessage = "Store.Pickup";
         private const string RefusedMessage = "Store.Refused";
         private const string SaveFileName = "storage.dat";
@@ -53,11 +56,15 @@ namespace Voxel.Client
         // How often the server checks that open storage is still in reach of who opened it.
         private const float ReachCheckSeconds = 0.5f;
 
+        // Most storage a pool can hold as sent (a whole zone of 16 plots holds far fewer).
+        private const int MaxPoolMembers = 4096;
+
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private WorldSync worldSync;
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private LogSync logSync;
+        [SerializeField] private ClaimSync claimSync;
         [SerializeField] private Material woodMaterial;
         [SerializeField] private Material ironMaterial;
         [SerializeField] private VoxelWorld voxelWorld;
@@ -68,21 +75,6 @@ namespace Voxel.Client
             public string OwnerName = "";
             public bool Yours;
             public bool Open;
-        }
-
-        // A player on the access list of an opened storage.
-        public readonly struct AccessEntry
-        {
-            public readonly string Name;
-            public readonly bool Online;
-            public readonly bool Allowed;
-
-            public AccessEntry(string name, bool online, bool allowed)
-            {
-                Name = name;
-                Online = online;
-                Allowed = allowed;
-            }
         }
 
         // Every machine: the storage in the world (on the server, the saved store itself).
@@ -99,10 +91,10 @@ namespace Voxel.Client
         private readonly List<ulong> leaving = new List<ulong>();
         private float nextReachCheck;
 
-        // The storage the local player has open, as the server last sent it.
+        // The storage the local player has open, as the server last sent it: what its pool holds (the
+        // chests or stockpiles of its claimed zone together, StoragePool).
         private readonly Inventory openedContents = new Inventory();
-        private readonly StockpilePiles openedPiles = new StockpilePiles();
-        private readonly List<AccessEntry> openedAccess = new List<AccessEntry>();
+        private readonly List<StockpilePiles> openedStockpiles = new List<StockpilePiles>();
 
         private StorageViews views;
         private bool running;
@@ -118,13 +110,87 @@ namespace Voxel.Client
 
         public StorageKind OpenedKind { get; private set; }
 
+        // How many chests or stockpiles share what the open one shows (its claimed zone's, else 1).
+        public int OpenedMembers { get; private set; } = 1;
+
+        // What the open chest's pool holds.
         public Inventory OpenedContents => openedContents;
 
-        public StockpilePiles OpenedPiles => openedPiles;
+        // The open stockpile's pool: each member's piles (large and small), and all of them one after
+        // another (StoragePool's numbering).
+        public IReadOnlyList<StockpilePiles> OpenedStockpiles => openedStockpiles;
 
-        public IReadOnlyList<AccessEntry> OpenedAccess => openedAccess;
+        public int OpenedPileCount
+        {
+            get
+            {
+                int count = 0;
+                foreach (StockpilePiles piles in openedStockpiles)
+                {
+                    count += piles.Count;
+                }
 
-        // Raised when what the open storage holds or its access list changed, or it opened.
+                return count;
+            }
+        }
+
+        public int OpenedPileCapacity
+        {
+            get
+            {
+                int capacity = 0;
+                foreach (StockpilePiles piles in openedStockpiles)
+                {
+                    capacity += piles.Capacity;
+                }
+
+                return capacity;
+            }
+        }
+
+        public int OpenedPileItem(int pile) => TryFindOpenedPile(pile, out StockpilePiles piles, out int index) ? piles.ItemAt(index) : Items.None;
+
+        public int OpenedPileCountAt(int pile) => TryFindOpenedPile(pile, out StockpilePiles piles, out int index) ? piles.CountAt(index) : 0;
+
+        // How many a pile of the open pool holds at most.
+        public int OpenedPileSizeAt(int pile) => TryFindOpenedPile(pile, out StockpilePiles piles, out _) ? piles.PileSize : 0;
+
+        private bool TryFindOpenedPile(int pile, out StockpilePiles piles, out int index)
+        {
+            piles = null;
+            index = -1;
+            if (pile < 0) return false;
+
+            foreach (StockpilePiles member in openedStockpiles)
+            {
+                if (pile < member.Count)
+                {
+                    piles = member;
+                    index = pile;
+                    return true;
+                }
+
+                pile -= member.Count;
+            }
+
+            return false;
+        }
+
+        public int OpenedPileTotal
+        {
+            get
+            {
+                int total = 0;
+                foreach (StockpilePiles piles in openedStockpiles)
+                {
+                    total += piles.Total;
+                }
+
+                return total;
+            }
+        }
+
+        // Raised when what the open storage's pool holds changed, or it opened.
         public event Action OpenedChanged;
 
         // Raised when the server closed the open storage (picked up, out of reach, access taken away).
@@ -144,6 +210,7 @@ namespace Voxel.Client
                 case StorageRefusal.StockpileFull: return "No room on the stockpile";
                 case StorageRefusal.NotAccepted: return "It doesn't go in there";
                 case StorageRefusal.TooHungry: return InventorySync.TooHungryMessage;
+                case StorageRefusal.Claimed: return ClaimSync.TextOf(ClaimRefusal.None, "");
                 default: return "No room here";
             }
         }
@@ -167,10 +234,10 @@ namespace Voxel.Client
             Messaging.RegisterNamedMessageHandler(OpenMessage, OnOpen);
             Messaging.RegisterNamedMessageHandler(CloseMessage, OnClose);
             Messaging.RegisterNamedMessageHandler(MoveMessage, OnMove);
-            Messaging.RegisterNamedMessageHandler(AccessMessage, OnAccess);
             Messaging.RegisterNamedMessageHandler(PickupMessage, OnPickup);
             networkManager.OnClientConnectedCallback += OnClientConnected;
             networkManager.OnClientDisconnectCallback += OnClientDisconnected;
+            claimSync.ClaimsChanged += OnClaimsChanged;
         }
 
         // To call right after a client's connection has been launched.
@@ -194,6 +261,7 @@ namespace Voxel.Client
             {
                 networkManager.OnClientConnectedCallback -= OnClientConnected;
                 networkManager.OnClientDisconnectCallback -= OnClientDisconnected;
+                claimSync.ClaimsChanged -= OnClaimsChanged;
             }
 
             store = null;
@@ -249,14 +317,20 @@ namespace Voxel.Client
             ownerName = detail.OwnerName;
             yours = detail.Yours;
 
-            // The server knows them as they are now (a name chosen since).
-            if (IsServer)
+            // On claimed land it is the land owner's, whoever placed it.
+            if (TryLandOf(storage, out int x, out int z) && claimSync.TryDescribe(x, z, out string landOwner, out ClaimRelation relation))
             {
+                ownerName = landOwner;
+                yours = relation == ClaimRelation.Yours;
+            }
+            else if (IsServer)
+            {
+                // The server knows them as they are now (a name chosen since).
                 ownerName = registry.NameOf(storage.OwnerId);
                 yours = registry.TryGetPlayerId(networkManager.LocalClientId, out string localId) && localId == storage.OwnerId;
             }
 
-            blocks = storage.Kind == StorageKind.Stockpile ? storage.Piles.Total : 0;
+            blocks = StorageRules.IsStockpile(storage.Kind) ? storage.Piles.Total : 0;
             return true;
         }
 
@@ -307,11 +381,11 @@ namespace Voxel.Client
         public bool CanPlaceHere(StorageKind kind, BlockPos target, int facing, Vector3 playerFeet, out BlockPos position, out StorageRefusal refusal)
         {
             World world = worldSync.World;
-            position = kind == StorageKind.Chest ? target : StorageRules.StockpileCorner(target, facing);
+            position = kind == StorageKind.Chest ? target : StorageRules.StockpileCorner(target, facing, StorageRules.SideOf(kind));
             refusal = StorageRefusal.NoRoom;
             if (world == null) return false;
 
-            bool fits = kind == StorageKind.Chest ? StorageRules.CanPlaceChest(world, position) : StorageRules.CanPlaceStockpile(world, position);
+            bool fits = kind == StorageKind.Chest ? StorageRules.CanPlaceChest(world, position) : StorageRules.CanPlaceStockpile(world, position, StorageRules.SideOf(kind));
             if (!fits) return false;
 
             var probe = new Storage(0, kind, position, facing, "?");
@@ -326,10 +400,21 @@ namespace Voxel.Client
                     refusal = StorageRefusal.PlantInTheWay;
                     return false;
                 }
+
+                if (!claimSync.LocalAllows(cell.X, cell.Z))
+                {
+                    claimSync.TryDescribe(cell.X, cell.Z, out string ownerName, out _);
+                    ClaimedBy = ownerName;
+                    refusal = StorageRefusal.Claimed;
+                    return false;
+                }
             }
 
             return true;
         }
+
+        // Whose land CanPlaceHere last found in the way (StorageRefusal.Claimed).
+        public string ClaimedBy { get; private set; } = "";
 
         // Draws where held storage would go, this frame (to call every frame while it is held).
         public void ShowPreview(StorageKind kind, BlockPos position, bool valid)
@@ -408,27 +493,8 @@ namespace Voxel.Client
             });
         }
 
-        // The owner allows a player (by name) to open the open storage, or no longer.
-        public void RequestAccess(string playerName, bool allowed)
-        {
-            if (!running || OpenedId == 0) return;
-
-            if (IsServer)
-            {
-                SetAccess(networkManager.LocalClientId, OpenedId, playerName, allowed);
-                return;
-            }
-
-            int id = OpenedId;
-            Send(AccessMessage, NetworkManager.ServerClientId, writer =>
-            {
-                writer.WriteValueSafe(id);
-                writer.WriteValueSafe(playerName);
-                writer.WriteValueSafe(allowed);
-            });
-        }
-
-        // The owner picks the open storage up, once empty.
+        // The owner, or anyone while it is public, picks the open storage up, once empty (or once what
+        // it holds fits in the rest of its pool).
         public void RequestPickup()
         {
             if (!running || OpenedId == 0) return;
@@ -478,8 +544,8 @@ namespace Voxel.Client
             float reach = PlayerRules.Reach + BlockEditRules.ReachTolerance + 1f;
             if ((target3 - eyes).sqrMagnitude > reach * reach) return;
 
-            BlockPos position = kind == StorageKind.Chest ? target : StorageRules.StockpileCorner(target, facing);
-            bool fits = kind == StorageKind.Chest ? StorageRules.CanPlaceChest(serverWorld, position) : StorageRules.CanPlaceStockpile(serverWorld, position);
+            BlockPos position = kind == StorageKind.Chest ? target : StorageRules.StockpileCorner(target, facing, StorageRules.SideOf(kind));
+            bool fits = kind == StorageKind.Chest ? StorageRules.CanPlaceChest(serverWorld, position) : StorageRules.CanPlaceStockpile(serverWorld, position, StorageRules.SideOf(kind));
             var probe = new Storage(0, kind, position, facing, playerId);
             var cells = new List<BlockPos>();
             for (int i = 0; i < probe.CellCount; i++)
@@ -503,6 +569,12 @@ namespace Voxel.Client
                 return;
             }
 
+            // Not on someone else's land, not even one cell of a stockpile.
+            foreach (BlockPos cell in cells)
+            {
+                if (!claimSync.Check(clientId, cell.X, cell.Z)) return;
+            }
+
             if (!inventorySync.TryConsume(clientId, item)) return;
 
             Storage storage = store.Add(kind, position, facing, playerId);
@@ -522,7 +594,7 @@ namespace Voxel.Client
             if (!store.TryGet(storageId, out Storage storage) || !registry.TryGetPlayerId(clientId, out string playerId)) return;
             if (!InReach(clientId, storage)) return;
 
-            if (!storage.CanOpen(playerId))
+            if (!CanUse(playerId, storage))
             {
                 Refuse(clientId, StorageRefusal.NotYours);
                 return;
@@ -569,40 +641,46 @@ namespace Voxel.Client
             SendInt(ClosedMessage, storageId, clientId);
         }
 
+        // Items go into, or come out of, the storage's whole pool (StoragePool): the chests or the
+        // stockpiles of its claimed zone; a pile is numbered across the pool.
         private void Move(ulong clientId, int storageId, bool deposit, int itemOrPile, int count)
         {
             if (count <= 0 || !store.TryGet(storageId, out Storage storage) || !registry.TryGetPlayerId(clientId, out string playerId)) return;
-            if (!storage.CanOpen(playerId) || !InReach(clientId, storage) || !registry.TryGetState(clientId, out PlayerState state)) return;
+            if (!CanUse(playerId, storage) || !InReach(clientId, storage) || !registry.TryGetState(clientId, out PlayerState state)) return;
 
+            List<Storage> pool = PoolOf(storage);
+            bool chest = storage.Kind == StorageKind.Chest;
             if (deposit)
             {
                 int item = itemOrPile;
-                bool accepted = storage.Kind == StorageKind.Chest ? StorageRules.AcceptsInChest(item) : StorageRules.AcceptsInStockpile(item);
+                bool accepted = chest ? StorageRules.AcceptsInChest(item) : StorageRules.AcceptsInStockpile(item);
                 if (!accepted)
                 {
                     Refuse(clientId, StorageRefusal.NotAccepted);
                     return;
                 }
 
-                int room = storage.Kind == StorageKind.Chest
-                    ? StorageRules.ChestRoom(storage.Contents, item, ecosystemSync.ItemWeights)
-                    : storage.Piles.Room(item);
+                int room = chest ? StoragePool.ChestRoom(pool, item, ecosystemSync.ItemWeights) : StoragePool.StockpileRoom(pool, item);
                 int moved = Math.Min(count, Math.Min(state.Inventory.Count(item), room));
                 if (room <= 0)
                 {
-                    Refuse(clientId, storage.Kind == StorageKind.Chest ? StorageRefusal.ChestFull : StorageRefusal.StockpileFull);
+                    Refuse(clientId, chest ? StorageRefusal.ChestFull : StorageRefusal.StockpileFull);
                     return;
                 }
 
                 if (moved <= 0 || !inventorySync.TryConsume(clientId, item, moved)) return;
 
-                if (storage.Kind == StorageKind.Chest) storage.Contents.Add(item, moved);
-                else storage.Piles.Add(item, moved);
+                if (chest) StoragePool.AddToChests(pool, item, moved, ecosystemSync.ItemWeights);
+                else StoragePool.AddToStockpiles(pool, item, moved);
             }
             else
             {
-                int item = storage.Kind == StorageKind.Chest ? itemOrPile : storage.Piles.ItemAt(itemOrPile);
-                int held = storage.Kind == StorageKind.Chest ? storage.Contents.Count(item) : storage.Piles.CountAt(itemOrPile);
+                Storage stockpile = null;
+                int pile = -1;
+                if (!chest && !StoragePool.TryFindPile(pool, itemOrPile, out stockpile, out pile)) return;
+
+                int item = chest ? itemOrPile : stockpile.Piles.ItemAt(pile);
+                int held = chest ? StoragePool.Count(pool, item) : stockpile.Piles.CountAt(pile);
                 if (item == Items.None || held <= 0) return;
 
                 int room = inventorySync.RoomFor(clientId, item);
@@ -613,44 +691,12 @@ namespace Voxel.Client
                 }
 
                 int moved = Math.Min(count, Math.Min(held, room));
-                if (storage.Kind == StorageKind.Chest) storage.Contents.TryRemove(item, moved);
-                else storage.Piles.Take(itemOrPile, moved);
+                if (chest) StoragePool.TakeFromChests(pool, item, moved);
+                else stockpile.Piles.Take(pile, moved);
                 inventorySync.Give(clientId, item, moved);
             }
 
-            Changed(storage);
-        }
-
-        private void SetAccess(ulong clientId, int storageId, string playerName, bool allowed)
-        {
-            if (!store.TryGet(storageId, out Storage storage) || !registry.TryGetPlayerId(clientId, out string playerId)) return;
-            if (storage.OwnerId != playerId)
-            {
-                Refuse(clientId, StorageRefusal.NotYours);
-                return;
-            }
-
-            if (string.IsNullOrEmpty(playerName) || !registry.TryFindByName(playerName, out string other) || other == playerId) return;
-
-            if (allowed) storage.Allowed.Add(other);
-            else storage.Allowed.Remove(other);
-
-            // Someone no longer allowed loses it at once.
-            if (!allowed && viewers.TryGetValue(storageId, out HashSet<ulong> watching))
-            {
-                leaving.Clear();
-                foreach (ulong viewer in watching)
-                {
-                    if (registry.TryGetPlayerId(viewer, out string viewerId) && viewerId == other) leaving.Add(viewer);
-                }
-
-                foreach (ulong viewer in leaving)
-                {
-                    ForceClose(viewer, storageId);
-                }
-            }
-
-            Changed(storage);
+            Changed(storage, pool);
         }
 
         private void Pickup(ulong clientId, int storageId)
@@ -658,15 +704,10 @@ namespace Voxel.Client
             if (!store.TryGet(storageId, out Storage storage) || !registry.TryGetPlayerId(clientId, out string playerId)) return;
             if (!InReach(clientId, storage)) return;
 
-            if (storage.OwnerId != playerId)
+            // Its owner (the land's, on claimed land) picks it up, or anyone while it is public.
+            if (OwnerOf(storage) != playerId && !IsPublic(storage))
             {
                 Refuse(clientId, StorageRefusal.NotYours);
-                return;
-            }
-
-            if (!storage.IsEmpty)
-            {
-                Refuse(clientId, StorageRefusal.NotEmpty);
                 return;
             }
 
@@ -674,6 +715,15 @@ namespace Voxel.Client
             if (inventorySync.RoomFor(clientId, item) <= 0)
             {
                 inventorySync.TellFull(clientId, InventorySync.ReasonFor(item));
+                return;
+            }
+
+            // What it holds goes to the rest of its pool, if it all fits there.
+            List<Storage> pool = PoolOf(storage);
+            pool.Remove(storage);
+            if (!StoragePool.TryEmptyInto(storage, pool, ecosystemSync.ItemWeights))
+            {
+                Refuse(clientId, StorageRefusal.NotEmpty);
                 return;
             }
 
@@ -695,21 +745,37 @@ namespace Voxel.Client
             {
                 if (other != networkManager.LocalClientId) SendInt(RemovedMessage, storageId, other);
             }
+
+            // The rest of the pool took what it held, and is one storage smaller.
+            if (pool.Count > 0) Changed(pool[0], pool);
         }
 
-        // After what a storage holds or who may open it changed: its viewers get it again, and every
-        // machine a stockpile's piles (they are drawn, and solid when not empty).
-        private void Changed(Storage storage)
+        // After what a pool holds changed: whoever has one of its members open gets it again, and
+        // every machine its stockpiles' piles (they are drawn, and solid when not empty).
+        private void Changed(Storage storage, List<Storage> pool)
         {
-            if (viewers.TryGetValue(storage.Id, out HashSet<ulong> watching))
+            foreach (Storage member in pool)
             {
-                foreach (ulong viewer in watching)
+                if (viewers.TryGetValue(member.Id, out HashSet<ulong> watching))
                 {
-                    SendContents(viewer, storage);
+                    foreach (ulong viewer in watching)
+                    {
+                        SendContents(viewer, member);
+                    }
                 }
-            }
 
-            if (storage.Kind == StorageKind.Stockpile) BroadcastState(storage);
+                if (StorageRules.IsStockpile(member.Kind)) BroadcastState(member);
+            }
+        }
+
+        // Plots changed hands: the pools may have too (a zone grown, split or given up), and the
+        // owners of storage with them. Whoever has storage open gets it again.
+        private void OnClaimsChanged()
+        {
+            foreach (KeyValuePair<ulong, int> opened in openedBy)
+            {
+                if (store.TryGet(opened.Value, out Storage storage)) SendContents(opened.Key, storage);
+            }
         }
 
         private void SetOpen(Storage storage, bool open)
@@ -731,41 +797,31 @@ namespace Voxel.Client
                 {
                     writer.WriteValueSafe(storage.Id);
                     writer.WriteValueSafe(open);
-                    if (storage.Kind == StorageKind.Stockpile) WritePiles(writer, storage.Piles);
+                    if (StorageRules.IsStockpile(storage.Kind)) WritePiles(writer, storage.Piles);
                 });
             }
         }
 
-        // What a viewer is sent: whether they own it, what it holds, and for the owner its access list
-        // (the named players connected, then those allowed who are not).
+        // What a viewer is sent: whether it is theirs, and what its pool holds (a chest pool's items
+        // added up, a stockpile pool's piles one stockpile after another).
         private void SendContents(ulong clientId, Storage storage)
         {
-            bool owner = registry.TryGetPlayerId(clientId, out string playerId) && playerId == storage.OwnerId;
-            var access = new List<AccessEntry>();
-            if (owner)
-            {
-                foreach (KeyValuePair<ulong, string> player in registry.Connected)
-                {
-                    string name = registry.NameOf(player.Value);
-                    if (player.Value == storage.OwnerId || name.Length == 0) continue;
-
-                    access.Add(new AccessEntry(name, true, storage.Allowed.Contains(player.Value)));
-                }
-
-                foreach (string allowedId in storage.Allowed)
-                {
-                    if (registry.IsConnected(allowedId)) continue;
-
-                    string name = registry.NameOf(allowedId);
-                    if (name.Length > 0) access.Add(new AccessEntry(name, false, true));
-                }
-
-                access.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
-            }
+            bool owner = registry.TryGetPlayerId(clientId, out string playerId) && playerId == OwnerOf(storage);
+            List<Storage> pool = PoolOf(storage);
+            Inventory contents = storage.Kind == StorageKind.Chest ? StoragePool.Contents(pool) : null;
 
             if (clientId == networkManager.LocalClientId)
             {
-                ShowOpened(storage.Id, storage.Kind, owner, storage.Contents, storage.Piles, access);
+                var piles = new List<StockpilePiles>();
+                if (StorageRules.IsStockpile(storage.Kind))
+                {
+                    foreach (Storage member in pool)
+                    {
+                        piles.Add(member.Piles);
+                    }
+                }
+
+                ShowOpened(storage.Id, storage.Kind, owner, pool.Count, contents, piles);
                 return;
             }
 
@@ -774,10 +830,11 @@ namespace Voxel.Client
                 writer.WriteValueSafe(storage.Id);
                 writer.WriteValueSafe((byte)storage.Kind);
                 writer.WriteValueSafe(owner);
+                writer.WriteValueSafe(pool.Count);
                 if (storage.Kind == StorageKind.Chest)
                 {
-                    writer.WriteValueSafe(storage.Contents.DistinctCount);
-                    foreach (KeyValuePair<int, int> entry in storage.Contents.Entries)
+                    writer.WriteValueSafe(contents.DistinctCount);
+                    foreach (KeyValuePair<int, int> entry in contents.Entries)
                     {
                         writer.WriteValueSafe(entry.Key);
                         writer.WriteValueSafe(entry.Value);
@@ -785,20 +842,89 @@ namespace Voxel.Client
                 }
                 else
                 {
-                    WritePiles(writer, storage.Piles);
-                }
-
-                writer.WriteValueSafe(access.Count);
-                foreach (AccessEntry entry in access)
-                {
-                    writer.WriteValueSafe(entry.Name);
-                    writer.WriteValueSafe(entry.Online);
-                    writer.WriteValueSafe(entry.Allowed);
+                    // Each member's kind first: large and small stockpiles have their own piles.
+                    foreach (Storage member in pool)
+                    {
+                        writer.WriteValueSafe((byte)member.Kind);
+                        WritePiles(writer, member.Piles);
+                    }
                 }
             });
         }
 
-        // Closes storage that is no longer in reach of who opened it.
+        // Who may open a storage and move items in and out: anyone while it stands off claimed land
+        // (public), else the land's owner and the players they allow on their land.
+        private bool CanUse(string playerId, Storage storage)
+        {
+            if (string.IsNullOrEmpty(playerId)) return false;
+
+            return !TryLandOf(storage, out int x, out int z) || claimSync.CanAct(playerId, x, z);
+        }
+
+        // The claimed land a storage stands on: the column of its first cell on claimed land. Its
+        // owner and its pool are that land's.
+        private bool TryLandOf(Storage storage, out int x, out int z)
+        {
+            for (int i = 0; i < storage.CellCount; i++)
+            {
+                BlockPos cell = storage.Cell(i);
+                if (!claimSync.IsClaimed(cell.X, cell.Z)) continue;
+
+                x = cell.X;
+                z = cell.Z;
+                return true;
+            }
+
+            x = z = 0;
+            return false;
+        }
+
+        // Server side: whose a storage is: the owner of the land it stands on, else who placed it.
+        private string OwnerOf(Storage storage)
+        {
+            return TryLandOf(storage, out int x, out int z) ? claimSync.OwnerIdAt(x, z) ?? storage.OwnerId : storage.OwnerId;
+        }
+
+        // Server side: the storage sharing what this one holds: the chests, or the stockpiles (large
+        // and small), on the same claimed zone, in id order; off claimed land, itself alone.
+        private List<Storage> PoolOf(Storage storage)
+        {
+            var pool = new List<Storage>();
+            if (!TryLandOf(storage, out int x, out int z))
+            {
+                pool.Add(storage);
+                return pool;
+            }
+
+            int zone = claimSync.ZoneAt(x, z);
+            foreach (Storage other in store.All)
+            {
+                if (StorageRules.IsStockpile(other.Kind) != StorageRules.IsStockpile(storage.Kind)) continue;
+                if (other == storage || (TryLandOf(other, out int ox, out int oz) && claimSync.ZoneAt(ox, oz) == zone)) pool.Add(other);
+            }
+
+            pool.Sort((a, b) => a.Id.CompareTo(b.Id));
+            return pool;
+        }
+
+        // Whether a storage is open to everyone (none of its cells lies on claimed land), as this
+        // machine knows the claims: for the aiming label and the storage window.
+        public bool IsPublic(int id) => running && shown.TryGet(id, out Storage storage) && IsPublic(storage);
+
+        // Whether a storage is open to everyone: none of its cells lies on claimed land.
+        private bool IsPublic(Storage storage)
+        {
+            for (int i = 0; i < storage.CellCount; i++)
+            {
+                BlockPos cell = storage.Cell(i);
+                if (claimSync.IsClaimed(cell.X, cell.Z)) return false;
+            }
+
+            return true;
+        }
+
+        // Closes storage that is no longer in reach of who opened it, or that they may no longer use
+        // (removed from its access list or from its owner's land).
         private void CheckViewers()
         {
             if (openedBy.Count == 0) return;
@@ -807,6 +933,7 @@ namespace Voxel.Client
             foreach (KeyValuePair<ulong, int> opened in openedBy)
             {
                 if (!store.TryGet(opened.Value, out Storage storage) || !InReach(opened.Key, storage, 1f)) leaving.Add(opened.Key);
+                else if (!registry.TryGetPlayerId(opened.Key, out string playerId) || !CanUse(playerId, storage)) leaving.Add(opened.Key);
             }
 
             foreach (ulong clientId in leaving)
@@ -910,12 +1037,13 @@ namespace Voxel.Client
             writer.WriteValueSafe(registry.NameOf(storage.OwnerId));
             writer.WriteValueSafe(yours);
             writer.WriteValueSafe(detail != null && detail.Open);
-            if (storage.Kind == StorageKind.Stockpile) WritePiles(writer, storage.Piles);
+            if (StorageRules.IsStockpile(storage.Kind)) WritePiles(writer, storage.Piles);
         }
 
+        // As many piles as the stockpile's kind has: the reader knows them from its kind.
         private static void WritePiles(FastBufferWriter writer, StockpilePiles piles)
         {
-            for (int pile = 0; pile < StorageRules.PileCount; pile++)
+            for (int pile = 0; pile < piles.Count; pile++)
             {
                 writer.WriteValueSafe(piles.ItemAt(pile));
                 writer.WriteValueSafe((byte)piles.CountAt(pile));
@@ -925,9 +1053,9 @@ namespace Voxel.Client
         // Fills piles from the wire; false, changing nothing, if anything is out of range.
         private static bool ReadPiles(FastBufferReader reader, StockpilePiles into)
         {
-            var read = new StockpilePiles();
+            var read = new StockpilePiles(into.Count, into.PileSize);
             bool valid = true;
-            for (int pile = 0; pile < StorageRules.PileCount; pile++)
+            for (int pile = 0; pile < into.Count; pile++)
             {
                 reader.ReadValueSafe(out int item);
                 reader.ReadValueSafe(out byte count);
@@ -971,14 +1099,6 @@ namespace Voxel.Client
             Move(senderId, id, deposit, itemOrPile, count);
         }
 
-        private void OnAccess(ulong senderId, FastBufferReader reader)
-        {
-            reader.ReadValueSafe(out int id);
-            reader.ReadValueSafe(out string name);
-            reader.ReadValueSafe(out bool allowed);
-            SetAccess(senderId, id, name, allowed);
-        }
-
         private void OnPickup(ulong senderId, FastBufferReader reader)
         {
             reader.ReadValueSafe(out int id);
@@ -1012,7 +1132,7 @@ namespace Voxel.Client
             if (!shown.TryGet(id, out Storage storage)) return;
 
             if (details.TryGetValue(id, out Shown detail)) detail.Open = open;
-            if (storage.Kind == StorageKind.Stockpile) ReadPiles(reader, storage.Piles);
+            if (StorageRules.IsStockpile(storage.Kind)) ReadPiles(reader, storage.Piles);
         }
 
         private void OnContents(ulong senderId, FastBufferReader reader)
@@ -1020,10 +1140,11 @@ namespace Voxel.Client
             reader.ReadValueSafe(out int id);
             reader.ReadValueSafe(out byte kind);
             reader.ReadValueSafe(out bool owner);
-            if (!StorageRules.IsKind(kind)) return;
+            reader.ReadValueSafe(out int members);
+            if (!StorageRules.IsKind(kind) || members < 1 || members > MaxPoolMembers) return;
 
             var contents = new Inventory();
-            var piles = new StockpilePiles();
+            var piles = new List<StockpilePiles>();
             if (kind == (byte)StorageKind.Chest)
             {
                 reader.ReadValueSafe(out int entries);
@@ -1034,22 +1155,21 @@ namespace Voxel.Client
                     if (count > 0 && StorageRules.AcceptsInChest(item)) contents.Add(item, count);
                 }
             }
-            else if (!ReadPiles(reader, piles))
+            else
             {
-                return;
+                for (int i = 0; i < members; i++)
+                {
+                    reader.ReadValueSafe(out byte memberKind);
+                    if (!StorageRules.IsKind(memberKind) || !StorageRules.IsStockpile((StorageKind)memberKind)) return;
+
+                    var stockpile = new StockpilePiles((StorageKind)memberKind);
+                    if (!ReadPiles(reader, stockpile)) return;
+
+                    piles.Add(stockpile);
+                }
             }
 
-            reader.ReadValueSafe(out int accessCount);
-            var access = new List<AccessEntry>();
-            for (int i = 0; i < accessCount; i++)
-            {
-                reader.ReadValueSafe(out string name);
-                reader.ReadValueSafe(out bool online);
-                reader.ReadValueSafe(out bool allowed);
-                access.Add(new AccessEntry(name, online, allowed));
-            }
-
-            ShowOpened(id, (StorageKind)kind, owner, contents, piles, access);
+            ShowOpened(id, (StorageKind)kind, owner, members, contents, piles);
         }
 
         private void OnClosed(ulong senderId, FastBufferReader reader)
@@ -1078,7 +1198,7 @@ namespace Voxel.Client
             if (!StorageRules.IsKind(kind) || facing > 3) return false;
 
             var storage = new Storage(id, (StorageKind)kind, new BlockPos(x, y, z), facing, "?");
-            if (storage.Kind == StorageKind.Stockpile && !ReadPiles(reader, storage.Piles)) return false;
+            if (StorageRules.IsStockpile(storage.Kind) && !ReadPiles(reader, storage.Piles)) return false;
 
             shown.Put(storage);
             details[id] = new Shown { OwnerName = ownerName, Yours = yours, Open = open };
@@ -1087,16 +1207,24 @@ namespace Voxel.Client
 
         // ---- The local player's open storage ----
 
-        private void ShowOpened(int id, StorageKind kind, bool owner, Inventory contents, StockpilePiles piles, List<AccessEntry> access)
+        private void ShowOpened(int id, StorageKind kind, bool owner, int members, Inventory contents, List<StockpilePiles> piles)
         {
             OpenedId = id;
             OpenedKind = kind;
             OpenedIsOwner = owner;
+            OpenedMembers = members;
             if (contents != null) openedContents.CopyFrom(contents);
             else openedContents.Clear();
-            if (piles != null) openedPiles.CopyFrom(piles);
-            openedAccess.Clear();
-            openedAccess.AddRange(access);
+
+            // Copies: on the host these are the stockpiles themselves.
+            openedStockpiles.Clear();
+            foreach (StockpilePiles stockpile in piles)
+            {
+                var copy = new StockpilePiles(stockpile.Count, stockpile.PileSize);
+                copy.CopyFrom(stockpile);
+                openedStockpiles.Add(copy);
+            }
+
             OpenedChanged?.Invoke();
         }
 

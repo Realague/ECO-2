@@ -9,19 +9,20 @@ using Voxel.Core;
 namespace Voxel.Client
 {
     // The window of an opened chest or stockpile (Assets/UI/Storage.uxml), in the inventory's look:
-    // the player's bag on the left (what the storage does not take greyed), the storage on the right
-    // (a chest's items and its weight out of 150 kg, or a stockpile's nine piles out of 27 each).
-    // Items move by dragging them to the other side (the whole stack), Shift + click (the whole stack)
-    // or a right click (one); the server decides (StorageSync). Its owner also sees an Access tab, to
-    // allow the players with a name to open it, and can pick it up once empty. It opens when the server
-    // lets the player open what they right clicked, and closes with Escape or Tab, when the player
-    // walks away (the server closes it) or loses access. While it is open the mouse is free and the
-    // player stands still (HoldsInput).
+    // the player's bag on the left (what the storage does not take greyed), the storage on the right:
+    // what its pool holds (the chests or stockpiles of its claimed zone together, StoragePool), a
+    // chest pool's items and their weight out of 150 kg a chest, or a stockpile pool's piles, nine a
+    // stockpile, out of 27 each. Items move by dragging them to the other side (the whole stack),
+    // Shift + click (the whole stack) or a right click (one); the server decides (StorageSync). Its
+    // owner, or anyone while it is public, can pick it up (what it holds goes to the rest of its pool).
+    // Who may open it follows the land (StorageSync.CanUse). It opens when the server lets the player
+    // open what they right clicked, and closes with Escape or Tab, when the player walks away (the
+    // server closes it) or loses access. While it is open the mouse is free and the player stands
+    // still (HoldsInput).
     public class StorageScreen : MonoBehaviour
     {
         private const float DragThreshold = 8f;
         private const int MinimumRows = 4;
-        private const string SelectedTabClass = "inventory-tab--selected";
 
         [SerializeField] private UIDocument document;
         [SerializeField] private NetworkManager networkManager;
@@ -35,10 +36,7 @@ namespace Voxel.Client
         private static StorageScreen instance;
 
         private VisualElement screen;
-        private VisualElement storagePage;
-        private VisualElement accessPage;
         private Button storageTab;
-        private Button accessTab;
         private Label storageTabText;
         private Label owner;
         private Label carryBlocks;
@@ -50,21 +48,24 @@ namespace Voxel.Client
         private VisualElement bagWell;
         private VisualElement storeWell;
         private ScrollView storeGridView;
-        private VisualElement pileGrid;
+        private ScrollView pileGrid;
         private Button pickup;
-        private ScrollView accessList;
-        private Label accessEmpty;
         private VisualElement ghost;
         private ItemGrid bagGrid;
         private ItemGrid storeGrid;
-        private readonly VisualElement[] piles = new VisualElement[StorageRules.PileCount];
-        private readonly VisualElement[] pileIcons = new VisualElement[StorageRules.PileCount];
-        private readonly Label[] pileCounts = new Label[StorageRules.PileCount];
+
+        // The piles shown, nine a stockpile of the pool, numbered as StoragePool numbers them.
+        private readonly List<VisualElement> piles = new List<VisualElement>();
+        private readonly List<VisualElement> pileIcons = new List<VisualElement>();
+        private readonly List<Label> pileCounts = new List<Label>();
+
+        // How many piles each stockpile laid out has, in the pool's order.
+        private readonly List<int> pileLayout = new List<int>();
+        private static readonly StockpilePiles[] NoStockpiles = new StockpilePiles[0];
         private int hoveredPile = -1;
 
         private int pendingId;
         private int openId;
-        private bool showingAccess;
         private int closedFrame = -1;
 
         // A press on an item or pile that may become a drag: from the bag (deposit) or the storage.
@@ -89,10 +90,7 @@ namespace Voxel.Client
         {
             VisualElement root = document.rootVisualElement;
             screen = root.Q("screen");
-            storagePage = root.Q("storage-page");
-            accessPage = root.Q("access-page");
             storageTab = root.Q<Button>("tab-storage");
-            accessTab = root.Q<Button>("tab-access");
             storageTabText = root.Q<Label>("tab-storage-text");
             owner = root.Q<Label>("storage-owner");
             carryBlocks = root.Q<Label>("carry-blocks");
@@ -104,10 +102,8 @@ namespace Voxel.Client
             bagWell = root.Q("bag-well");
             storeWell = root.Q("store-well");
             storeGridView = root.Q<ScrollView>("store-grid");
-            pileGrid = root.Q("pile-grid");
+            pileGrid = root.Q<ScrollView>("pile-grid");
             pickup = root.Q<Button>("pickup");
-            accessList = root.Q<ScrollView>("access-list");
-            accessEmpty = root.Q<Label>("access-empty");
             ghost = root.Q("drag-ghost");
 
             bagGrid = new ItemGrid(root.Q<ScrollView>("bag-grid"), ecosystemSync, MinimumRows);
@@ -118,10 +114,8 @@ namespace Voxel.Client
             storeGrid.Moved += OnPointerMove;
             bagGrid.Released += OnPointerUp;
             storeGrid.Released += OnPointerUp;
-            BuildPiles();
 
-            Connect(storageTab, () => ShowTab(false));
-            Connect(accessTab, () => ShowTab(true));
+            storageTab.focusable = false;
             Connect(pickup, () => storageSync.RequestPickup());
 
             storageSync.OpenedChanged += OnOpenedChanged;
@@ -181,15 +175,28 @@ namespace Voxel.Client
 
                 openId = pendingId;
                 pendingId = 0;
-                showingAccess = false;
                 screen.style.display = DisplayStyle.Flex;
                 UnityEngine.Cursor.lockState = CursorLockMode.None;
                 bagGrid.Invalidate();
                 storeGrid.Invalidate();
             }
 
-            ShowAccess();
-            ShowTab(showingAccess && storageSync.OpenedIsOwner);
+            // A stockpile pool gained or lost a stockpile: its piles are laid out again.
+            if (!SameLayout()) BuildPiles();
+        }
+
+        // Whether the piles shown are laid out for the open pool's stockpiles, each its own size.
+        private bool SameLayout()
+        {
+            IReadOnlyList<StockpilePiles> stockpiles = StorageRules.IsStockpile(storageSync.OpenedKind) ? storageSync.OpenedStockpiles : NoStockpiles;
+            if (stockpiles.Count != pileLayout.Count) return false;
+
+            for (int i = 0; i < stockpiles.Count; i++)
+            {
+                if (stockpiles[i].Count != pileLayout[i]) return false;
+            }
+
+            return true;
         }
 
         private void OnOpenedClosed()
@@ -215,16 +222,6 @@ namespace Voxel.Client
             if (relock) UnityEngine.Cursor.lockState = CursorLockMode.Locked;
         }
 
-        private void ShowTab(bool access)
-        {
-            showingAccess = access;
-            storageTab.EnableInClassList(SelectedTabClass, !access);
-            accessTab.EnableInClassList(SelectedTabClass, access);
-            accessTab.style.display = storageSync.OpenedIsOwner ? DisplayStyle.Flex : DisplayStyle.None;
-            storagePage.EnableInClassList("hidden", access);
-            accessPage.EnableInClassList("hidden", !access);
-        }
-
         // Both sides, as they are now (the grids rebuild only when what they show changed).
         private void Refresh()
         {
@@ -233,36 +230,46 @@ namespace Voxel.Client
             bagGrid.Show(bag.Entries, item => chest ? !StorageRules.AcceptsInChest(item) : !StorageRules.AcceptsInStockpile(item));
             ShowCarry(bag);
 
-            storageTabText.text = Loc.T(chest ? "Chest" : "Stockpile");
+            storageTabText.text = Loc.T(Items.NameOf(StorageRules.ItemOf(storageSync.OpenedKind)));
             storeGridView.style.display = chest ? DisplayStyle.Flex : DisplayStyle.None;
             pileGrid.style.display = chest ? DisplayStyle.None : DisplayStyle.Flex;
             storeFillIcon.EnableInClassList("icon--scales", chest);
             storeFillIcon.EnableInClassList("icon--backpack", !chest);
+            int members = storageSync.OpenedMembers;
             if (chest)
             {
                 storeGrid.Show(storageSync.OpenedContents.Entries, _ => false);
                 float weight = StorageRules.ChestWeight(storageSync.OpenedContents, ecosystemSync.ItemWeights);
-                storeFill.text = $"{Loc.Number(weight, "0.0")} / {StorageRules.ChestMaxWeight:0} kg";
-                ShowShare(storeFill, weight / StorageRules.ChestMaxWeight);
+                float capacity = StorageRules.ChestMaxWeight * members;
+                storeFill.text = $"{Loc.Number(weight, "0.0")} / {capacity:0} kg";
+                ShowShare(storeFill, weight / capacity);
             }
             else
             {
                 ShowPiles();
-                int total = storageSync.OpenedPiles.Total;
-                storeFill.text = $"{total} / {StorageRules.StockpileCapacity}";
-                ShowShare(storeFill, (float)total / StorageRules.StockpileCapacity);
+                int total = storageSync.OpenedPileTotal;
+                int capacity = Mathf.Max(1, storageSync.OpenedPileCapacity);
+                storeFill.text = $"{total} / {capacity}";
+                ShowShare(storeFill, (float)total / capacity);
             }
 
-            // The item under the pointer is named in its side's title (the slots show no names).
+            // The item under the pointer is named in its side's title (the slots show no names); else
+            // what the side is, with how many chests or stockpiles share it.
             bagTitle.text = bagGrid.HoveredItem != Items.None ? ItemCatalog.NameOf(bagGrid.HoveredItem, ecosystemSync) : Loc.T("Your bag");
-            int storeItem = chest ? storeGrid.HoveredItem : hoveredPile >= 0 ? storageSync.OpenedPiles.ItemAt(hoveredPile) : Items.None;
-            storeTitle.text = storeItem != Items.None ? ItemCatalog.NameOf(storeItem, ecosystemSync) : Loc.T(chest ? "In the chest" : "On the stockpile");
+            int storeItem = chest ? storeGrid.HoveredItem : hoveredPile >= 0 ? storageSync.OpenedPileItem(hoveredPile) : Items.None;
+            string side = members > 1
+                ? Loc.T(chest ? "In the chests ({0})" : "On the stockpiles ({0})", members)
+                : Loc.T(chest ? "In the chest" : "On the stockpile");
+            storeTitle.text = storeItem != Items.None ? ItemCatalog.NameOf(storeItem, ecosystemSync) : side;
 
             storageSync.TryDescribe(openId, out _, out string ownerName, out bool yours, out _);
             owner.text = yours ? Loc.T("Yours") : ownerName.Length > 0 ? Loc.T("{0}'s", ownerName) : "";
-            bool empty = chest ? storageSync.OpenedContents.DistinctCount == 0 : storageSync.OpenedPiles.IsEmpty;
-            pickup.style.display = storageSync.OpenedIsOwner ? DisplayStyle.Flex : DisplayStyle.None;
-            pickup.SetEnabled(empty);
+            if (storageSync.IsPublic(openId)) owner.text = Loc.T("{0} · public (unclaimed land)", owner.text);
+
+            // Picked up empty, or with what it holds poured into the rest of its pool (the server checks).
+            bool empty = chest ? storageSync.OpenedContents.DistinctCount == 0 : storageSync.OpenedPileTotal == 0;
+            pickup.style.display = storageSync.OpenedIsOwner || storageSync.IsPublic(openId) ? DisplayStyle.Flex : DisplayStyle.None;
+            pickup.SetEnabled(empty || members > 1);
         }
 
         private void ShowCarry(Inventory bag)
@@ -282,94 +289,81 @@ namespace Voxel.Client
             label.EnableInClassList("carry-count-text--full", full);
         }
 
-        // The nine piles, made once, in the order they stand (StorageRules.PileCell: x, then z).
+        // Each stockpile of the pool a block of its piles (nine in three rows, or four in two for a
+        // small one) in the order they stand (StorageRules.PileCell: x, then z), the blocks one under another.
         private void BuildPiles()
         {
-            for (int pile = 0; pile < piles.Length; pile++)
+            pileGrid.Clear();
+            piles.Clear();
+            pileIcons.Clear();
+            pileCounts.Clear();
+            pileLayout.Clear();
+            hoveredPile = -1;
+            IReadOnlyList<StockpilePiles> stockpiles = StorageRules.IsStockpile(storageSync.OpenedKind) ? storageSync.OpenedStockpiles : NoStockpiles;
+            foreach (StockpilePiles stockpile in stockpiles)
             {
-                int index = pile;
-                var slot = new VisualElement();
-                slot.AddToClassList("item-slot");
-                slot.AddToClassList("pile-slot");
-                var icon = new VisualElement { pickingMode = PickingMode.Ignore };
-                icon.AddToClassList("item-icon");
-                var count = new Label { pickingMode = PickingMode.Ignore };
-                count.AddToClassList("item-count");
-                count.AddToClassList("pile-count");
-                slot.Add(icon);
-                slot.Add(count);
-                slot.RegisterCallback<PointerEnterEvent>(_ => hoveredPile = index);
-                slot.RegisterCallback<PointerLeaveEvent>(_ =>
-                {
-                    if (hoveredPile == index) hoveredPile = -1;
-                });
-                slot.RegisterCallback<PointerDownEvent>(e =>
-                {
-                    if (storageSync.OpenedPiles.CountAt(index) > 0) Press(false, index, slot, e);
-                });
-                slot.RegisterCallback<PointerMoveEvent>(OnPointerMove);
-                slot.RegisterCallback<PointerUpEvent>(OnPointerUp);
+                pileLayout.Add(stockpile.Count);
+                var block = new VisualElement { pickingMode = PickingMode.Ignore };
+                block.AddToClassList("pile-block");
+                pileGrid.Add(block);
 
-                // A row per z, three piles each, as they stand on the ground: never wrapped by the width.
-                if (pile % StorageRules.StockpileSide == 0)
+                // Stockpiles are square: their side is the root of their piles.
+                int side = Mathf.RoundToInt(Mathf.Sqrt(stockpile.Count));
+                for (int i = 0; i < stockpile.Count; i++)
                 {
-                    var row = new VisualElement { pickingMode = PickingMode.Ignore };
-                    row.AddToClassList("pile-row");
-                    pileGrid.Add(row);
+                    // A row per z, a pile per x, as they stand on the ground: never wrapped by the width.
+                    if (i % side == 0)
+                    {
+                        var row = new VisualElement { pickingMode = PickingMode.Ignore };
+                        row.AddToClassList("pile-row");
+                        block.Add(row);
+                    }
+
+                    block[block.childCount - 1].Add(AddPile(piles.Count));
                 }
-
-                pileGrid[pileGrid.childCount - 1].Add(slot);
-                piles[pile] = slot;
-                pileIcons[pile] = icon;
-                pileCounts[pile] = count;
             }
+        }
+
+        // One pile's slot, numbered across the pool.
+        private VisualElement AddPile(int index)
+        {
+            var slot = new VisualElement();
+            slot.AddToClassList("item-slot");
+            slot.AddToClassList("pile-slot");
+            var icon = new VisualElement { pickingMode = PickingMode.Ignore };
+            icon.AddToClassList("item-icon");
+            var count = new Label { pickingMode = PickingMode.Ignore };
+            count.AddToClassList("item-count");
+            count.AddToClassList("pile-count");
+            slot.Add(icon);
+            slot.Add(count);
+            slot.RegisterCallback<PointerEnterEvent>(_ => hoveredPile = index);
+            slot.RegisterCallback<PointerLeaveEvent>(_ =>
+            {
+                if (hoveredPile == index) hoveredPile = -1;
+            });
+            slot.RegisterCallback<PointerDownEvent>(e =>
+            {
+                if (storageSync.OpenedPileCountAt(index) > 0) Press(false, index, slot, e);
+            });
+            slot.RegisterCallback<PointerMoveEvent>(OnPointerMove);
+            slot.RegisterCallback<PointerUpEvent>(OnPointerUp);
+
+            piles.Add(slot);
+            pileIcons.Add(icon);
+            pileCounts.Add(count);
+            return slot;
         }
 
         private void ShowPiles()
         {
-            StockpilePiles stock = storageSync.OpenedPiles;
-            for (int pile = 0; pile < piles.Length; pile++)
+            for (int pile = 0; pile < piles.Count; pile++)
             {
-                int item = stock.ItemAt(pile);
-                int count = stock.CountAt(pile);
+                int item = storageSync.OpenedPileItem(pile);
+                int count = storageSync.OpenedPileCountAt(pile);
                 pileIcons[pile].style.backgroundImage = count > 0 ? new StyleBackground(ItemCatalog.IconOf(item, ecosystemSync)) : new StyleBackground();
-                pileCounts[pile].text = count > 0 ? $"{count} / {StorageRules.PileSize}" : "";
+                pileCounts[pile].text = count > 0 ? $"{count} / {storageSync.OpenedPileSizeAt(pile)}" : "";
                 piles[pile].EnableInClassList("item-slot--empty", count == 0);
-            }
-        }
-
-        // The owner's list: each named player connected, then those allowed who are not, with a button.
-        private void ShowAccess()
-        {
-            accessList.Clear();
-            IReadOnlyList<StorageSync.AccessEntry> entries = storageSync.OpenedAccess;
-            accessEmpty.style.display = entries.Count == 0 ? DisplayStyle.Flex : DisplayStyle.None;
-            foreach (StorageSync.AccessEntry entry in entries)
-            {
-                var row = new VisualElement();
-                row.AddToClassList("access-row");
-                var dot = new VisualElement();
-                dot.AddToClassList("access-dot");
-                dot.EnableInClassList("access-dot--online", entry.Online);
-                var name = new Label(entry.Name);
-                name.AddToClassList("access-name");
-                var state = new Label(Loc.T(entry.Allowed ? "Allowed" : entry.Online ? "Not allowed" : "Allowed, away"));
-                state.AddToClassList("access-state");
-                var toggle = new Button { focusable = false };
-                toggle.AddToClassList("button");
-                toggle.AddToClassList(entry.Allowed ? "button--danger" : "button--primary");
-                toggle.AddToClassList("access-toggle");
-                var text = new Label(Loc.T(entry.Allowed ? "Remove" : "Allow"));
-                text.AddToClassList("button-text");
-                toggle.Add(text);
-                string playerName = entry.Name;
-                bool allow = !entry.Allowed;
-                toggle.clicked += () => storageSync.RequestAccess(playerName, allow);
-                row.Add(dot);
-                row.Add(name);
-                row.Add(state);
-                row.Add(toggle);
-                accessList.Add(row);
             }
         }
 
@@ -410,7 +404,7 @@ namespace Voxel.Client
             }
 
             bool chest = storageSync.OpenedKind == StorageKind.Chest;
-            int held = chest ? storageSync.OpenedContents.Count(itemOrPile) : storageSync.OpenedPiles.CountAt(itemOrPile);
+            int held = chest ? storageSync.OpenedContents.Count(itemOrPile) : storageSync.OpenedPileCountAt(itemOrPile);
             storageSync.RequestMove(false, itemOrPile, all ? held : 1);
         }
 
@@ -421,7 +415,7 @@ namespace Voxel.Client
             if (!dragging && Vector2.Distance(e.position, pressedAt) >= DragThreshold)
             {
                 dragging = true;
-                int item = fromBag || storageSync.OpenedKind == StorageKind.Chest ? pressedItemOrPile : storageSync.OpenedPiles.ItemAt(pressedItemOrPile);
+                int item = fromBag || storageSync.OpenedKind == StorageKind.Chest ? pressedItemOrPile : storageSync.OpenedPileItem(pressedItemOrPile);
                 ghost.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(item, ecosystemSync));
                 ghost.RemoveFromClassList("hidden");
                 ghost.BringToFront();

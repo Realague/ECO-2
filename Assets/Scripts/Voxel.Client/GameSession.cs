@@ -52,6 +52,8 @@ namespace Voxel.Client
         [SerializeField] private MiningSync miningSync;
         [SerializeField] private LogSync logSync;
         [SerializeField] private StorageSync storageSync;
+        [SerializeField] private ClaimSync claimSync;
+        [SerializeField] private CraftingSync craftingSync;
         [SerializeField] private AppearanceSync appearanceSync;
         [SerializeField] private CommandSync commandSync;
         [SerializeField] private AppearanceMenu appearanceMenu;
@@ -308,6 +310,8 @@ namespace Voxel.Client
             miningSync.StartClient();
             logSync.StartClient();
             storageSync.StartClient();
+            claimSync.StartClient();
+            craftingSync.StartClient();
             appearanceSync.StartClient();
             commandSync.StartClient();
             sessionActive = true;
@@ -354,6 +358,8 @@ namespace Voxel.Client
             bowSync.StartServer(worldDirectory);
             logSync.StartServer(worldDirectory);
             storageSync.StartServer(worldDirectory, registry);
+            claimSync.StartServer(worldDirectory, registry);
+            craftingSync.StartServer(registry);
             miningSync.StartServer();
             appearanceSync.StartServer(registry);
             commandSync.StartServer();
@@ -429,6 +435,7 @@ namespace Voxel.Client
             bowSync.Save();
             logSync.Save();
             storageSync.Save();
+            claimSync.Save();
         }
 
         // The host is admin of its own game; on a dedicated server, admins are the players
@@ -462,6 +469,7 @@ namespace Voxel.Client
             bowSync.Save();
             logSync.Save();
             storageSync.Save();
+            claimSync.Save();
             ecosystemSync.Stop();
             inventorySync.Stop();
             hungerSync.Stop();
@@ -469,6 +477,8 @@ namespace Voxel.Client
             miningSync.Stop();
             logSync.Stop();
             storageSync.Stop();
+            claimSync.Stop();
+            craftingSync.Stop();
             appearanceSync.Stop();
             commandSync.Stop();
             worldSync.Stop();

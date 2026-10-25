@@ -75,6 +75,31 @@ namespace Voxel.Client
 
         public bool IsConnected(string playerId) => connectedPlayers.ContainsValue(playerId);
 
+        // The access list an owner manages (storage, land): the named players connected, then those
+        // allowed who are not, by name.
+        public List<AccessEntry> AccessEntries(string ownerId, ICollection<string> allowed)
+        {
+            var entries = new List<AccessEntry>();
+            foreach (KeyValuePair<ulong, string> player in connectedPlayers)
+            {
+                string name = NameOf(player.Value);
+                if (player.Value == ownerId || name.Length == 0) continue;
+
+                entries.Add(new AccessEntry(name, true, allowed.Contains(player.Value)));
+            }
+
+            foreach (string allowedId in allowed)
+            {
+                if (IsConnected(allowedId)) continue;
+
+                string name = NameOf(allowedId);
+                if (name.Length > 0) entries.Add(new AccessEntry(name, false, true));
+            }
+
+            entries.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+            return entries;
+        }
+
         public void Close()
         {
             networkManager.ConnectionApprovalCallback = null;

@@ -88,13 +88,14 @@
 .icon--sign-out { background-image: url("Icons/SignOut.png"); }
 .icon--warning { background-image: url("Icons/WarningCircle.png"); }
 .icon--backpack { background-image: url("Icons/Backpack.png"); }
-/* The inventory's tab and categories: solid glyphs cut from the user's mockup (the seeds' drawn by Eco > Write category icons). */
+/* The inventory's tab and categories: solid glyphs cut from the user's mockup (the seeds' and materials' drawn by Eco > Write category icons; the wood's logs were the materials' glyph). */
 .icon--category-all { background-image: url("Icons/CategoryAll.png"); }
 .icon--category-tools { background-image: url("Icons/CategoryTools.png"); }
 .icon--category-blocks { background-image: url("Icons/CategoryBlocks.png"); }
 .icon--category-seeds { background-image: url("Icons/CategorySeeds.png"); }
 .icon--category-food { background-image: url("Icons/CategoryFood.png"); }
 .icon--category-materials { background-image: url("Icons/CategoryMaterials.png"); }
+.icon--category-wood { background-image: url("Icons/CategoryWood.png"); }
 .icon--tab-inventory { background-image: url("Icons/TabInventory.png"); }
 .icon--fire { background-image: url("Icons/Fire.png"); }
 .icon--scales { background-image: url("Icons/Scales.png"); }

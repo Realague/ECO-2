@@ -14,11 +14,14 @@ namespace Voxel.Core
         public const int Arrow = 102;
 
         // Storage, placed in the world (StorageRules): a chest holds items by weight, a stockpile
-        // piles of blocks. Each player gets one of each at their first connection.
+        // piles of blocks. Each player gets a chest and a small stockpile at their first connection.
         public const int Chest = 103;
         public const int Stockpile = 104;
 
-        public static bool IsStorage(int item) => item == Chest || item == Stockpile;
+        // The small stockpile (80 blocks), the one players are given.
+        public const int SmallStockpile = 105;
+
+        public static bool IsStorage(int item) => item == Chest || item == Stockpile || item == SmallStockpile;
 
         // Tools: each player gets one of each at their first connection (there is no crafting), and
         // breaking, felling, harvesting annuals, tilling and hunting each need theirs (ToolRules).
@@ -136,6 +139,7 @@ namespace Voxel.Core
                 case Arrow: return "Arrow";
                 case Chest: return "Chest";
                 case Stockpile: return "Stockpile";
+                case SmallStockpile: return "Small stockpile";
                 case Shovel: return "Shovel";
                 case Pickaxe: return "Pickaxe";
                 case Axe: return "Axe";

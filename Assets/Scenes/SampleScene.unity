@@ -407,6 +407,8 @@ MonoBehaviour:
   worldSync: {fileID: 490447447}
   inventorySync: {fileID: 490447450}
   ecosystemSync: {fileID: 490447448}
+  claimSync: {fileID: 490447459}
+  craftingSync: {fileID: 490447460}
   appearanceMenu: {fileID: 490447451}
   mapScreen: {fileID: 822296572}
 --- !u!114 &408005231
@@ -624,6 +626,8 @@ GameObject:
   - component: {fileID: 490447457}
   - component: {fileID: 490447456}
   - component: {fileID: 490447458}
+  - component: {fileID: 490447459}
+  - component: {fileID: 490447460}
   m_Layer: 0
   m_Name: GameSession
   m_TagString: Untagged
@@ -653,6 +657,8 @@ MonoBehaviour:
   miningSync: {fileID: 490447457}
   logSync: {fileID: 490447456}
   storageSync: {fileID: 490447458}
+  claimSync: {fileID: 490447459}
+  craftingSync: {fileID: 490447460}
   appearanceSync: {fileID: 490447452}
   commandSync: {fileID: 490447453}
   appearanceMenu: {fileID: 490447451}
@@ -693,6 +699,7 @@ MonoBehaviour:
   inventorySync: {fileID: 490447450}
   ecosystemSync: {fileID: 490447448}
   storageSync: {fileID: 490447458}
+  claimSync: {fileID: 490447459}
 --- !u!114 &490447448
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -709,6 +716,7 @@ MonoBehaviour:
   inventorySync: {fileID: 490447450}
   logSync: {fileID: 490447456}
   worldSync: {fileID: 490447447}
+  claimSync: {fileID: 490447459}
   speciesAssets:
   - {fileID: 11400000, guid: 6ea61faa421995f4a9a4b6f892bf2dd4, type: 2}
   - {fileID: 11400000, guid: cc9f79da0d803bf40932a87b727b2553, type: 2}
@@ -834,6 +842,7 @@ MonoBehaviour:
   networkManager: {fileID: 947039382}
   worldSync: {fileID: 490447447}
   ecosystemSync: {fileID: 490447448}
+  claimSync: {fileID: 490447459}
 --- !u!114 &490447454
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -866,6 +875,7 @@ MonoBehaviour:
   inventorySync: {fileID: 490447450}
   ecosystemSync: {fileID: 490447448}
   worldSync: {fileID: 490447447}
+  claimSync: {fileID: 490447459}
   shaftMaterial: {fileID: 2100000, guid: 17965ac439377474abca152ff17c9021, type: 2}
   headMaterial: {fileID: 2100000, guid: 582f92c22b627724db3f3da36c5b3b4f, type: 2}
   fletchingMaterial: {fileID: 2100000, guid: cf00dee74e18ee74db74157f58d7f614, type: 2}
@@ -887,6 +897,7 @@ MonoBehaviour:
   inventorySync: {fileID: 490447450}
   ecosystemSync: {fileID: 490447448}
   worldSync: {fileID: 490447447}
+  claimSync: {fileID: 490447459}
   cutMaterial: {fileID: 2100000, guid: a5265f9b2e89b6145b3cde7c40adc3e8, type: 2}
 --- !u!114 &490447457
 MonoBehaviour:
@@ -925,9 +936,40 @@ MonoBehaviour:
   inventorySync: {fileID: 490447450}
   ecosystemSync: {fileID: 490447448}
   logSync: {fileID: 490447456}
+  claimSync: {fileID: 490447459}
   woodMaterial: {fileID: 2100000, guid: 17965ac439377474abca152ff17c9021, type: 2}
   ironMaterial: {fileID: 2100000, guid: 582f92c22b627724db3f3da36c5b3b4f, type: 2}
   voxelWorld: {fileID: 1566503039}
+--- !u!114 &490447459
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 490447444}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b7355b9a33c95404683344d473f2f00d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.ClaimSync
+  networkManager: {fileID: 947039382}
+  worldSync: {fileID: 490447447}
+--- !u!114 &490447460
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 490447444}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 24b3950d66c8f7f4a9640d3e8f126bc9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.CraftingSync
+  networkManager: {fileID: 947039382}
+  inventorySync: {fileID: 490447450}
+  hungerSync: {fileID: 490447454}
+  ecosystemSync: {fileID: 490447448}
 --- !u!1 &593756662
 GameObject:
   m_ObjectHideFlags: 0
@@ -1090,6 +1132,7 @@ MonoBehaviour:
   commandSync: {fileID: 490447453}
   document: {fileID: 822296573}
   inventoryScreen: {fileID: 1141440427}
+  claimSync: {fileID: 490447459}
 --- !u!114 &822296573
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1322,6 +1365,7 @@ MonoBehaviour:
   appearanceMenu: {fileID: 490447451}
   mapScreen: {fileID: 822296572}
   hotbar: {fileID: 408005230}
+  craftingSync: {fileID: 490447460}
 --- !u!114 &1141440428
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1553,6 +1597,7 @@ MonoBehaviour:
   appearanceMenu: {fileID: 490447451}
   mapScreen: {fileID: 822296572}
   inventoryScreen: {fileID: 1141440427}
+  claimSync: {fileID: 490447459}
   document: {fileID: 1765294191}
 --- !u!114 &1765294191
 MonoBehaviour:
@@ -1685,6 +1730,7 @@ MonoBehaviour:
   mapScreen: {fileID: 822296572}
   inventoryScreen: {fileID: 1141440427}
   bowSync: {fileID: 490447455}
+  claimSync: {fileID: 490447459}
 --- !u!114 &1863226320
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1957,6 +2003,7 @@ MonoBehaviour:
   worldSync: {fileID: 490447447}
   ecosystemSync: {fileID: 490447448}
   storageSync: {fileID: 490447458}
+  claimSync: {fileID: 490447459}
   appearanceMenu: {fileID: 490447451}
   mapScreen: {fileID: 822296572}
   inventoryScreen: {fileID: 1141440427}

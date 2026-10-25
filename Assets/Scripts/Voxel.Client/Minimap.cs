@@ -19,11 +19,14 @@ namespace Voxel.Client
         [SerializeField] private AppearanceMenu appearanceMenu;
         [SerializeField] private MapScreen mapScreen;
         [SerializeField] private InventoryScreen inventoryScreen;
+        [SerializeField] private ClaimSync claimSync;
         [SerializeField] private UIDocument document;
 
         private VisualElement screen;
         private VisualElement frame;
         private VisualElement image;
+        private VisualElement claims;
+        private Texture2D shownClaims;
         private Label position;
         private MapMarkers markers;
         private Texture2D shownTexture;
@@ -41,6 +44,7 @@ namespace Voxel.Client
             screen = root.Q("screen");
             frame = root.Q("map-frame");
             image = root.Q("map-image");
+            claims = root.Q("map-claims");
             position = root.Q<Label>("map-position");
             markers = new MapMarkers(root.Q("map-animals"), root.Q("map-players"), root.Q("map-arrow"));
             projection = Project;
@@ -79,9 +83,27 @@ namespace Voxel.Client
             pixelsPerBlock = size / (2f * Radius);
             image.style.width = texture.width * pixelsPerBlock;
             image.style.height = texture.height * pixelsPerBlock;
-            image.style.translate = new Translate(
+            var translate = new Translate(
                 half - centre.x * pixelsPerBlock,
                 half - (texture.height - centre.z) * pixelsPerBlock);
+            image.style.translate = translate;
+
+            // The claimed plots, over the picture the same way (one pixel per column).
+            Texture2D plots = claimSync != null && claimSync.Layer != null ? claimSync.Layer.Texture : null;
+            if (plots != shownClaims)
+            {
+                shownClaims = plots;
+                claims.style.backgroundImage = plots != null ? new StyleBackground(plots) : new StyleBackground();
+            }
+
+            claims.style.display = plots != null ? DisplayStyle.Flex : DisplayStyle.None;
+            if (plots != null)
+            {
+                plots.filterMode = FilterMode.Point;
+                claims.style.width = image.style.width;
+                claims.style.height = image.style.height;
+                claims.style.translate = translate;
+            }
 
             position.text = $"X {Mathf.FloorToInt(centre.x)}   Y {Mathf.FloorToInt(centre.y)}   Z {Mathf.FloorToInt(centre.z)}";
 

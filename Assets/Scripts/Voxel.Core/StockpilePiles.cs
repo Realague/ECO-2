@@ -4,11 +4,33 @@ using System.IO;
 namespace Voxel.Core
 {
     // The piles of a stockpile, one per cell (StorageRules.PileCell): each holds one block type (or
-    // wood), up to StorageRules.PileSize, and takes another type only once empty.
+    // wood), up to PileSize (StorageRules.PileSizeOf its kind), and takes another type only once empty.
     public sealed class StockpilePiles
     {
-        private readonly int[] items = new int[StorageRules.PileCount];
-        private readonly int[] counts = new int[StorageRules.PileCount];
+        private readonly int[] items;
+        private readonly int[] counts;
+
+        // A large stockpile's piles.
+        public StockpilePiles() : this(StorageRules.PileCount, StorageRules.PileSize)
+        {
+        }
+
+        public StockpilePiles(int pileCount, int pileSize)
+        {
+            items = new int[pileCount];
+            counts = new int[pileCount];
+            PileSize = pileSize;
+        }
+
+        public StockpilePiles(StorageKind kind) : this(StorageRules.PileCountOf(kind), StorageRules.PileSizeOf(kind))
+        {
+        }
+
+        public int Count => items.Length;
+
+        public int PileSize { get; }
+
+        public int Capacity => Count * PileSize;
 
         public int ItemAt(int pile) => items[pile];
 
@@ -49,8 +71,8 @@ namespace Voxel.Core
             int room = 0;
             for (int pile = 0; pile < items.Length; pile++)
             {
-                if (counts[pile] == 0) room += StorageRules.PileSize;
-                else if (items[pile] == item) room += StorageRules.PileSize - counts[pile];
+                if (counts[pile] == 0) room += PileSize;
+                else if (items[pile] == item) room += PileSize - counts[pile];
             }
 
             return room;
@@ -69,7 +91,7 @@ namespace Voxel.Core
                     bool fits = pass == 0 ? counts[pile] > 0 && items[pile] == item : counts[pile] == 0;
                     if (!fits) continue;
 
-                    int put = Math.Min(count - added, StorageRules.PileSize - counts[pile]);
+                    int put = Math.Min(count - added, PileSize - counts[pile]);
                     items[pile] = item;
                     counts[pile] += put;
                     added += put;
@@ -94,7 +116,7 @@ namespace Voxel.Core
         // that cannot be a pile.
         public bool Set(int pile, int item, int count)
         {
-            if ((uint)pile >= (uint)items.Length || count < 0 || count > StorageRules.PileSize) return false;
+            if ((uint)pile >= (uint)items.Length || count < 0 || count > PileSize) return false;
             if (count > 0 && !StorageRules.AcceptsInStockpile(item)) return false;
 
             items[pile] = count > 0 ? item : Items.None;
@@ -124,7 +146,7 @@ namespace Voxel.Core
             {
                 int item = Items.Upgrade(reader.ReadInt32());
                 int count = reader.ReadInt32();
-                bool valid = count > 0 && count <= StorageRules.PileSize && StorageRules.AcceptsInStockpile(item);
+                bool valid = count > 0 && count <= PileSize && StorageRules.AcceptsInStockpile(item);
                 items[pile] = valid ? item : Items.None;
                 counts[pile] = valid ? count : 0;
             }

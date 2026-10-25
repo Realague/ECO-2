@@ -7,8 +7,9 @@ namespace Voxel.Client
 {
     // Draws placed storage, without objects. A chest is a box of planks with iron bands and a clasp
     // (ChestShapes), its front toward where its owner stood, its lid raised while anyone has it open.
-    // A stockpile is a low frame of planks around its cells, with each pile's blocks as small cubes of
-    // a third of a block, 9 to a layer, up to 3 layers (a full pile fills its cell), in the blocks'
+    // A stockpile (3 x 3 cells, or 2 x 2 for a small one) is a low frame of planks around its cells,
+    // with each pile's blocks as small cubes of a third of a block, 9 to a layer, up to 3 layers (a
+    // full pile of a large stockpile fills its cell, a small one's 20 stop on the third), in the blocks'
     // tiles (the blocks' material, fully lit) or, for wood, in its tree's bark; its mesh is made again only
     // when its piles change. Also draws where storage held in hand would go (green, or red where it
     // cannot), as an outline.
@@ -19,6 +20,10 @@ namespace Voxel.Client
 
         private const float FrameThickness = 0.08f;
         private const float CubeSize = 0.3f;
+
+        // A pile's cubes stand 3 by 3 in its cell, 9 to a layer.
+        private const int CubesAcross = 3;
+        private const int CubesPerLayer = CubesAcross * CubesAcross;
         private const float LidOpenDegrees = 65f;
         private const float LidDegreesPerSecond = 220f;
         private const float OutlineThickness = 0.03f;
@@ -34,6 +39,7 @@ namespace Voxel.Client
         private readonly Mesh chestBody;
         private readonly Mesh chestLid;
         private readonly Mesh frame;
+        private readonly Mesh smallFrame;
         private readonly Mesh outline;
         private readonly Dictionary<int, float> lidAngles = new Dictionary<int, float>();
         private readonly Dictionary<int, Pile> piles = new Dictionary<int, Pile>();
@@ -68,14 +74,15 @@ namespace Voxel.Client
 
             chestBody = BoxMesh.Build("ChestBody", new[] { ChestShapes.BodyWood, ChestShapes.BodyIron });
             chestLid = BoxMesh.Build("ChestLid", new[] { ChestShapes.LidWood, ChestShapes.LidIron });
-            frame = BoxMesh.Build("StockpileFrame", new[] { FrameBoxes() });
+            frame = BoxMesh.Build("StockpileFrame", new[] { FrameBoxes(StorageRules.StockpileSide) });
+            smallFrame = BoxMesh.Build("SmallStockpileFrame", new[] { FrameBoxes(StorageRules.SmallStockpileSide) });
             outline = BoxMesh.Build("StorageOutline", new[] { OutlineBoxes() });
         }
 
         // How high a pile of this many blocks stands.
         public static float PileHeight(int count)
         {
-            int layers = (count + StorageRules.StockpileSide * StorageRules.StockpileSide - 1) / (StorageRules.StockpileSide * StorageRules.StockpileSide);
+            int layers = (count + CubesPerLayer - 1) / CubesPerLayer;
             return layers / 3f;
         }
 
@@ -95,7 +102,7 @@ namespace Voxel.Client
 
             Vector3 size = kind == StorageKind.Chest
                 ? new Vector3(1f - 2f * StorageSync.ChestInset, StorageSync.ChestHeight, 1f - 2f * StorageSync.ChestInset)
-                : new Vector3(StorageRules.StockpileSide, 1f / 3f, StorageRules.StockpileSide);
+                : new Vector3(StorageRules.SideOf(kind), 1f / 3f, StorageRules.SideOf(kind));
             Vector3 corner = kind == StorageKind.Chest
                 ? new Vector3(position.X + StorageSync.ChestInset, position.Y, position.Z + StorageSync.ChestInset)
                 : new Vector3(position.X, position.Y, position.Z);
@@ -157,7 +164,8 @@ namespace Voxel.Client
         private void DrawStockpile(Storage storage)
         {
             var corner = new Vector3(storage.Position.X, storage.Position.Y, storage.Position.Z);
-            Graphics.RenderMesh(wood, frame, 0, Matrix4x4.Translate(corner));
+            Mesh border = storage.Kind == StorageKind.SmallStockpile ? smallFrame : frame;
+            Graphics.RenderMesh(wood, border, 0, Matrix4x4.Translate(corner));
 
             long key = PilesKey(storage.Piles);
             if (!piles.TryGetValue(storage.Id, out Pile entry))
@@ -168,7 +176,7 @@ namespace Voxel.Client
 
             if (entry.Key != key)
             {
-                BuildPiles(storage.Piles, entry);
+                BuildPiles(storage.Piles, StorageRules.SideOf(storage.Kind), entry);
                 entry.Key = key;
             }
 
@@ -184,7 +192,7 @@ namespace Voxel.Client
 
         // Each pile's cubes, in the stockpile's own space (its corner at the origin): blocks in the
         // first submesh with their tiles, then each species' wood in a submesh of its own.
-        private void BuildPiles(StockpilePiles stock, Pile entry)
+        private void BuildPiles(StockpilePiles stock, int side, Pile entry)
         {
             vertices.Clear();
             normals.Clear();
@@ -196,21 +204,20 @@ namespace Voxel.Client
                 list.Clear();
             }
 
-            int perLayer = StorageRules.StockpileSide * StorageRules.StockpileSide;
-            for (int pile = 0; pile < StorageRules.PileCount; pile++)
+            for (int pile = 0; pile < stock.Count; pile++)
             {
                 int item = stock.ItemAt(pile);
                 int count = stock.CountAt(pile);
-                int cellX = pile % StorageRules.StockpileSide;
-                int cellZ = pile / StorageRules.StockpileSide;
+                int cellX = pile % side;
+                int cellZ = pile / side;
                 for (int i = 0; i < count; i++)
                 {
-                    int layer = i / perLayer;
-                    int spot = i % perLayer;
+                    int layer = i / CubesPerLayer;
+                    int spot = i % CubesPerLayer;
                     var origin = new Vector3(
-                        cellX + (spot % StorageRules.StockpileSide + 0.5f) / 3f - CubeSize * 0.5f,
+                        cellX + (spot % CubesAcross + 0.5f) / CubesAcross - CubeSize * 0.5f,
                         layer / 3f,
-                        cellZ + (spot / StorageRules.StockpileSide + 0.5f) / 3f - CubeSize * 0.5f);
+                        cellZ + (spot / CubesAcross + 0.5f) / CubesAcross - CubeSize * 0.5f);
                     AddCube(origin, item);
                 }
             }
@@ -295,7 +302,7 @@ namespace Voxel.Client
         private static long PilesKey(StockpilePiles stock)
         {
             long key = 17;
-            for (int pile = 0; pile < StorageRules.PileCount; pile++)
+            for (int pile = 0; pile < stock.Count; pile++)
             {
                 key = key * 31 + stock.ItemAt(pile);
                 key = key * 31 + stock.CountAt(pile);
@@ -305,9 +312,8 @@ namespace Voxel.Client
         }
 
         // Planks just outside the stockpile's cells, so that its cubes never meet them.
-        private static List<(Vector3 centre, Vector3 size)> FrameBoxes()
+        private static List<(Vector3 centre, Vector3 size)> FrameBoxes(float side)
         {
-            float side = StorageRules.StockpileSide;
             float half = FrameThickness * 0.5f;
             float y = FrameHeight * 0.5f;
             return new List<(Vector3, Vector3)>

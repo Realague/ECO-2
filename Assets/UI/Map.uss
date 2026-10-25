@@ -244,3 +244,88 @@
     margin: 0;
     padding: 0;
 }
+
+/* Claimed plots, drawn over the other layers; the plot under the pointer in plot mode (C). */
+.map-claims {
+    -unity-background-scale-mode: stretch-to-fill;
+}
+
+.map-claim-hover {
+    position: absolute;
+    border-width: 2px;
+    border-color: var(--accent);
+    background-color: rgba(243, 223, 174, 0.12);
+}
+
+.land-count {
+    font-size: 19px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--accent);
+    margin: 0 0 4px 0;
+    padding: 0;
+}
+
+.land-message {
+    font-size: 16px;
+    color: var(--text);
+    white-space: normal;
+    margin: 0 0 8px 0;
+    padding: 0;
+}
+
+.land-subtitle {
+    font-size: 18px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text);
+    margin: 6px 0 0 0;
+    padding: 0;
+}
+
+.access-row {
+    flex-direction: row;
+    align-items: center;
+    height: 44px;
+    padding: 0 8px;
+    margin-bottom: 4px;
+    border-radius: 8px;
+    background-color: var(--hover);
+}
+
+.access-dot {
+    width: 10px;
+    height: 10px;
+    margin-right: 8px;
+    border-radius: 5px;
+    background-color: var(--text-muted);
+}
+
+.access-dot--online {
+    background-color: var(--vitamins);
+}
+
+.access-name {
+    flex-grow: 1;
+    font-size: 17px;
+    color: var(--text);
+    margin: 0;
+    padding: 0;
+}
+
+.access-state {
+    display: none;
+}
+
+.access-toggle {
+    height: 34px;
+    min-width: 90px;
+    padding: 0 10px;
+}
+
+.land-pointer {
+    font-size: 16px;
+    color: var(--text-body);
+    white-space: normal;
+    min-height: 22px;
+    margin: 0 0 6px 0;
+    padding: 0;
+}

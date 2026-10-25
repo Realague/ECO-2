@@ -26,6 +26,7 @@ namespace Voxel.Client
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private WorldSync worldSync;
         [SerializeField] private EcosystemSync ecosystemSync;
+        [SerializeField] private ClaimSync claimSync;
 
         private bool serverRunning;
         private bool clientRunning;
@@ -217,6 +218,9 @@ namespace Voxel.Client
                 aimX = Mathf.FloorToInt(p.x);
                 aimZ = Mathf.FloorToInt(p.z);
             }
+
+            // Not on someone else's land.
+            if (!claimSync.Check(clientId, aimX, aimZ)) return;
 
             string name = ecosystemSync.SpeciesName(isAnimal, index);
             int placed = ecosystemSync.Spawn(isAnimal, index, command.Count, aimX, aimZ);

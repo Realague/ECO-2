@@ -115,10 +115,13 @@ public static class ItemIconBuilder
             Texture2D chest = renderer.Render(ChestParts(), 22f, 1.0f);
             Write("Chest", chest);
             UnityEngine.Object.DestroyImmediate(chest);
-            Texture2D stockpile = renderer.Render(StockpileParts(), 32f, 0.95f);
+            Texture2D stockpile = renderer.Render(StockpileParts(3, LargeStockpilePiles), 32f, 0.95f);
             Write("Stockpile", stockpile);
             UnityEngine.Object.DestroyImmediate(stockpile);
-            written += 2;
+            Texture2D smallStockpile = renderer.Render(StockpileParts(2, SmallStockpilePiles), 24f, 0.95f);
+            Write("SmallStockpile", smallStockpile);
+            UnityEngine.Object.DestroyImmediate(smallStockpile);
+            written += 3;
         }
         finally
         {
@@ -433,33 +436,38 @@ public static class ItemIconBuilder
         }
     }
 
-    // A stockpile: a frame of planks around nine cells, piles of small stone and dirt cubes on some.
-    private static IReadOnlyList<SpeciesAsset.Part> StockpileParts()
+    // The piles drawn on each stockpile's icon: cell, how many small cubes (a third of a cell each), stone or dirt.
+    private static readonly (int cellX, int cellZ, int count, bool stone)[] LargeStockpilePiles =
+    {
+        (2, 2, 27, true), (1, 2, 18, true), (2, 1, 14, false), (0, 2, 9, false), (1, 1, 5, false)
+    };
+
+    private static readonly (int cellX, int cellZ, int count, bool stone)[] SmallStockpilePiles =
+    {
+        (1, 1, 20, true), (0, 1, 14, false), (1, 0, 6, false)
+    };
+
+    // A stockpile: a frame of planks around side x side cells, piles of small stone and dirt cubes on some.
+    private static IReadOnlyList<SpeciesAsset.Part> StockpileParts(float side, (int cellX, int cellZ, int count, bool stone)[] piles)
     {
         var plank = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/ArrowShaft.mat");
         var stone = Tinted(new Color(0.55f, 0.55f, 0.57f));
         var dirt = Tinted(new Color(0.47f, 0.33f, 0.22f));
         Mesh cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
         var parts = new List<SpeciesAsset.Part>();
-        const float side = 3f;
         const float thick = 0.12f;
         parts.Add(new SpeciesAsset.Part { mesh = cube, material = plank, offset = new Vector3(side * 0.5f, 0.08f, -thick * 0.5f), scale = new Vector3(side + 2f * thick, 0.16f, thick) });
         parts.Add(new SpeciesAsset.Part { mesh = cube, material = plank, offset = new Vector3(side * 0.5f, 0.08f, side + thick * 0.5f), scale = new Vector3(side + 2f * thick, 0.16f, thick) });
         parts.Add(new SpeciesAsset.Part { mesh = cube, material = plank, offset = new Vector3(-thick * 0.5f, 0.08f, side * 0.5f), scale = new Vector3(thick, 0.16f, side) });
         parts.Add(new SpeciesAsset.Part { mesh = cube, material = plank, offset = new Vector3(side + thick * 0.5f, 0.08f, side * 0.5f), scale = new Vector3(thick, 0.16f, side) });
 
-        // Piles of 27, 18, 9 and 14 small cubes, a third of a cell each.
-        (int cellX, int cellZ, int count, Material material)[] piles =
-        {
-            (2, 2, 27, stone), (1, 2, 18, stone), (2, 1, 14, dirt), (0, 2, 9, dirt), (1, 1, 5, dirt)
-        };
-        foreach ((int cellX, int cellZ, int count, Material material) in piles)
+        foreach ((int cellX, int cellZ, int count, bool isStone) in piles)
         {
             for (int i = 0; i < count; i++)
             {
                 int spot = i % 9;
                 var centre = new Vector3(cellX + (spot % 3 + 0.5f) / 3f, (i / 9 + 0.5f) / 3f, cellZ + (spot / 3 + 0.5f) / 3f);
-                parts.Add(new SpeciesAsset.Part { mesh = cube, material = material, offset = centre, scale = Vector3.one * 0.3f });
+                parts.Add(new SpeciesAsset.Part { mesh = cube, material = isStone ? stone : dirt, offset = centre, scale = Vector3.one * 0.3f });
             }
         }
 

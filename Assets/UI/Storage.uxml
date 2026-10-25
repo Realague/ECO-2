@@ -4,19 +4,15 @@
     <Style src="Storage.uss" />
 
     <!-- StorageScreen fills both grids (the player's bag, the storage's items or piles), the weight or
-         fill of the storage, its access list for the owner, and moves the dragged item's ghost. -->
+         fill of the storage, and moves the dragged item's ghost. -->
     <ui:VisualElement name="screen" class="screen inventory-screen storage-screen">
         <ui:VisualElement class="inventory-tabs">
             <ui:Button name="tab-storage" class="inventory-tab inventory-tab--selected">
                 <ui:VisualElement class="icon icon--tab-inventory inventory-tab-icon" />
                 <ui:Label name="tab-storage-text" text="Chest" class="inventory-tab-text" />
             </ui:Button>
-            <ui:Button name="tab-access" class="inventory-tab">
-                <ui:VisualElement class="icon icon--lock inventory-tab-icon" />
-                <ui:Label text="Access" class="inventory-tab-text" />
-            </ui:Button>
             <ui:VisualElement class="inventory-tabs-space" />
-            <ui:Label name="storage-owner" class="storage-owner" />
+            <ui:Label name="storage-owner" class="storage-owner" tooltip="On claimed land, storage is the land owner's, open to them and to the players they allow on their land (map, C); the chests, and the stockpiles, of one claimed area share what they hold. Off claimed land, anyone may open it." />
         </ui:VisualElement>
 
         <ui:VisualElement name="storage-page" class="inventory-frame">
@@ -40,7 +36,7 @@
                 </ui:VisualElement>
             </ui:VisualElement>
 
-            <!-- The storage: a chest's items, or a stockpile's nine piles. -->
+            <!-- The storage: a chest's items, or a stockpile's nine piles (those of its claimed area together). -->
             <ui:VisualElement class="inventory-main storage-half storage-half--right">
                 <ui:VisualElement class="items">
                     <ui:VisualElement class="items-heading">
@@ -52,7 +48,7 @@
                     </ui:VisualElement>
                     <ui:VisualElement name="store-well" class="item-well">
                         <ui:ScrollView name="store-grid" class="item-grid" />
-                        <ui:VisualElement name="pile-grid" class="pile-grid" />
+                        <ui:ScrollView name="pile-grid" class="pile-grid" />
                     </ui:VisualElement>
                     <ui:VisualElement class="storage-footer">
                         <ui:VisualElement class="storage-hint">
@@ -68,16 +64,6 @@
                         </ui:Button>
                     </ui:VisualElement>
                 </ui:VisualElement>
-            </ui:VisualElement>
-        </ui:VisualElement>
-
-        <!-- Who may open it, besides its owner: the players with a name. -->
-        <ui:VisualElement name="access-page" class="inventory-main access-page hidden">
-            <ui:VisualElement class="items">
-                <ui:Label text="Who may open it" class="column-title" />
-                <ui:Label text="Players you allow can take and put things in it. They cannot pick it up or allow others." class="access-note" />
-                <ui:Label name="access-empty" text="No other player with a name is connected." class="items-empty" />
-                <ui:ScrollView name="access-list" class="access-list" />
             </ui:VisualElement>
         </ui:VisualElement>
 

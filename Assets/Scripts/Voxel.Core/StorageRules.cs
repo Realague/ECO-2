@@ -6,13 +6,15 @@ namespace Voxel.Core
     public enum StorageKind : byte
     {
         Chest = 1,
-        Stockpile = 2
+        Stockpile = 2,
+        SmallStockpile = 3
     }
 
     // What storage holds and where it may stand. A chest stands in one cell on top of a solid block
     // and holds any item that is not a block, up to ChestMaxWeight kg in all; a stockpile covers
     // StockpileSide x StockpileSide cells of flat ground and holds blocks (and wood), one pile per
-    // cell of one block type each, up to PileSize per pile. Facing is a quarter turn (0 toward +z,
+    // cell of one block type each, up to PileSize per pile; a small stockpile the same on
+    // SmallStockpileSide x SmallStockpileSide cells, up to SmallPileSize per pile. Facing is a quarter turn (0 toward +z,
     // 1 toward +x, 2 toward -z, 3 toward -x), the way the player looked when placing it.
     public static class StorageRules
     {
@@ -24,13 +26,36 @@ namespace Voxel.Core
         public const int PileSize = 27;
         public const int StockpileCapacity = PileCount * PileSize;
 
-        public static bool IsKind(byte kind) => kind == (byte)StorageKind.Chest || kind == (byte)StorageKind.Stockpile;
+        // The small stockpile every player is given: 2 x 2 piles of 20, 80 blocks.
+        public const int SmallStockpileSide = 2;
+        public const int SmallPileSize = 20;
 
-        public static int ItemOf(StorageKind kind) => kind == StorageKind.Chest ? Items.Chest : Items.Stockpile;
+        public static bool IsKind(byte kind) => kind == (byte)StorageKind.Chest || kind == (byte)StorageKind.Stockpile || kind == (byte)StorageKind.SmallStockpile;
+
+        public static bool IsStockpile(StorageKind kind) => kind == StorageKind.Stockpile || kind == StorageKind.SmallStockpile;
+
+        // A stockpile's side in cells, its number of piles, the blocks a pile holds and in all.
+        public static int SideOf(StorageKind kind) => kind == StorageKind.SmallStockpile ? SmallStockpileSide : StockpileSide;
+
+        public static int PileCountOf(StorageKind kind) => SideOf(kind) * SideOf(kind);
+
+        public static int PileSizeOf(StorageKind kind) => kind == StorageKind.SmallStockpile ? SmallPileSize : PileSize;
+
+        public static int CapacityOf(StorageKind kind) => PileCountOf(kind) * PileSizeOf(kind);
+
+        public static int ItemOf(StorageKind kind)
+        {
+            switch (kind)
+            {
+                case StorageKind.Chest: return Items.Chest;
+                case StorageKind.SmallStockpile: return Items.SmallStockpile;
+                default: return Items.Stockpile;
+            }
+        }
 
         public static bool TryKindOf(int item, out StorageKind kind)
         {
-            kind = item == Items.Chest ? StorageKind.Chest : StorageKind.Stockpile;
+            kind = item == Items.Chest ? StorageKind.Chest : item == Items.SmallStockpile ? StorageKind.SmallStockpile : StorageKind.Stockpile;
             return Items.IsStorage(item);
         }
 
@@ -75,25 +100,27 @@ namespace Voxel.Core
             return world.InBounds(cell.X, cell.Y, cell.Z) && world.GetBlock(cell) == Blocks.Air && world.IsSolid(cell.X, cell.Y - 1, cell.Z);
         }
 
-        // The corner (lowest x and z) of a stockpile placed by a player facing that way at target:
-        // target is the middle of the area's near edge, the area stretching away from the player.
-        public static BlockPos StockpileCorner(BlockPos target, int facing)
+        // The corner (lowest x and z) of a stockpile of that side placed by a player facing that way
+        // at target: target is the middle of the area's near edge (of an even side, the cell left of
+        // the middle), the area stretching away from the player.
+        public static BlockPos StockpileCorner(BlockPos target, int facing, int side = StockpileSide)
         {
+            int half = (side - 1) / 2;
             switch (facing)
             {
-                case 1: return new BlockPos(target.X, target.Y, target.Z - 1);
-                case 2: return new BlockPos(target.X - 1, target.Y, target.Z - (StockpileSide - 1));
-                case 3: return new BlockPos(target.X - (StockpileSide - 1), target.Y, target.Z - 1);
-                default: return new BlockPos(target.X - 1, target.Y, target.Z);
+                case 1: return new BlockPos(target.X, target.Y, target.Z - half);
+                case 2: return new BlockPos(target.X - half, target.Y, target.Z - (side - 1));
+                case 3: return new BlockPos(target.X - (side - 1), target.Y, target.Z - half);
+                default: return new BlockPos(target.X - half, target.Y, target.Z);
             }
         }
 
         // A stockpile's cells, from its corner: flat solid ground under each, air in each.
-        public static bool CanPlaceStockpile(World world, BlockPos corner)
+        public static bool CanPlaceStockpile(World world, BlockPos corner, int side = StockpileSide)
         {
-            for (int pile = 0; pile < PileCount; pile++)
+            for (int pile = 0; pile < side * side; pile++)
             {
-                BlockPos cell = PileCell(corner, pile);
+                BlockPos cell = PileCell(corner, pile, side);
                 if (!world.InBounds(cell.X, cell.Y, cell.Z) || world.GetBlock(cell) != Blocks.Air) return false;
                 if (!world.IsSolid(cell.X, cell.Y - 1, cell.Z) || world.IsWater(cell.X, cell.Y - 1, cell.Z)) return false;
             }
@@ -101,7 +128,7 @@ namespace Voxel.Core
             return true;
         }
 
-        // The cell of a stockpile's pile (0 to PileCount - 1), from its corner.
-        public static BlockPos PileCell(BlockPos corner, int pile) => new BlockPos(corner.X + pile % StockpileSide, corner.Y, corner.Z + pile / StockpileSide);
+        // The cell of a pile (0 to side² - 1) of a stockpile of that side, from its corner.
+        public static BlockPos PileCell(BlockPos corner, int pile, int side = StockpileSide) => new BlockPos(corner.X + pile % side, corner.Y, corner.Z + pile / side);
     }
 }

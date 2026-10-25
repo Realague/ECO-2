@@ -8,6 +8,7 @@
         <ui:VisualElement class="minimap" picking-mode="Ignore">
             <ui:VisualElement name="map-frame" class="minimap-frame" picking-mode="Ignore">
                 <ui:VisualElement name="map-image" class="map-image" picking-mode="Ignore" />
+                <ui:VisualElement name="map-claims" class="map-image" picking-mode="Ignore" />
                 <ui:VisualElement name="map-animals" class="map-layer" picking-mode="Ignore" />
                 <ui:VisualElement name="map-players" class="map-layer" picking-mode="Ignore" />
                 <vc:MapArrow name="map-arrow" class="map-arrow" />

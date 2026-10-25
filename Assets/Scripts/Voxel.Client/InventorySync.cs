@@ -308,7 +308,7 @@ namespace Voxel.Client
             Publish(clientId);
         }
 
-        // A player gets their starting tools, chest and stockpile once (there is no crafting to make them), and one whose
+        // A player gets their starting tools, chest and small stockpile once (there is no crafting to make them), and one whose
         // save had no hotbar gets one filled with what they own.
         private void OnClientConnected(ulong clientId)
         {
@@ -328,10 +328,11 @@ namespace Voxel.Client
                     state.ReceivedTools = true;
                 }
 
-                // And a chest and a stockpile once, players from before storage too.
+                // And a chest and a small stockpile once, players from before storage too (those who
+                // had the large stockpile before keep it).
                 if (!state.ReceivedStorage)
                 {
-                    foreach (int storage in new[] { Items.Chest, Items.Stockpile })
+                    foreach (int storage in new[] { Items.Chest, Items.SmallStockpile })
                     {
                         if (!state.Inventory.Has(storage)) state.Hotbar.Place(storage);
                         state.Inventory.Add(storage, 1);
@@ -425,7 +426,7 @@ namespace Voxel.Client
         }
 
         // Sends a player their inventory, hotbar and speciality. The host reads its own directly.
-        private void Publish(ulong clientId)
+        internal void Publish(ulong clientId)
         {
             if (clientId == networkManager.LocalClientId) return;
             if (!registry.TryGetState(clientId, out PlayerState state)) return;

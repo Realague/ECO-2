@@ -35,6 +35,7 @@ namespace Voxel.Client
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private WorldSync worldSync;
+        [SerializeField] private ClaimSync claimSync;
         [SerializeField] private Material cutMaterial;
 
         private struct Shown
@@ -288,6 +289,7 @@ namespace Voxel.Client
             Vector3 eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;
             float reach = PlayerRules.Reach + BlockEditRules.ReachTolerance + PickHalfWidth;
             if ((log.Position.ToUnity() - eyes).sqrMagnitude > reach * reach) return;
+            if (!claimSync.Check(clientId, Mathf.FloorToInt(log.Position.X), Mathf.FloorToInt(log.Position.Z))) return;
 
             int wood = Items.WoodOf(log.Species);
             if (inventorySync.RoomFor(clientId, wood) <= 0)

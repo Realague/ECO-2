@@ -8,6 +8,7 @@ namespace Voxel.Client
     internal enum ItemCategory
     {
         Blocks,
+        Wood,
         Seeds,
         Food,
         Materials,
@@ -22,7 +23,7 @@ namespace Voxel.Client
     {
         private const string IconFolder = "ItemIcons";
 
-        public static readonly ItemCategory[] Categories = { ItemCategory.Tools, ItemCategory.Blocks, ItemCategory.Seeds, ItemCategory.Food, ItemCategory.Materials };
+        public static readonly ItemCategory[] Categories = { ItemCategory.Tools, ItemCategory.Blocks, ItemCategory.Wood, ItemCategory.Seeds, ItemCategory.Food, ItemCategory.Materials };
 
         private static readonly Dictionary<int, Texture2D> Icons = new Dictionary<int, Texture2D>();
         private static readonly Dictionary<ItemCategory, Texture2D> MissingIcons = new Dictionary<ItemCategory, Texture2D>();
@@ -32,7 +33,8 @@ namespace Voxel.Client
             if (Items.IsTool(item) || item == Items.Arrow || Items.IsStorage(item) || item == Blocks.Torch) return ItemCategory.Tools;
             if (Items.IsSeed(item)) return ItemCategory.Seeds;
             if (Items.IsProduce(item)) return ItemCategory.Food;
-            return Items.IsWood(item) || Items.IsCarcass(item) || item == Items.Straw ? ItemCategory.Materials : ItemCategory.Blocks;
+            if (Items.IsWood(item)) return ItemCategory.Wood;
+            return Items.IsCarcass(item) || item == Items.Straw ? ItemCategory.Materials : ItemCategory.Blocks;
         }
 
         public static string CategoryName(ItemCategory category)
@@ -43,6 +45,7 @@ namespace Voxel.Client
                 case ItemCategory.Food: return Loc.T("Food");
                 case ItemCategory.Materials: return Loc.T("Materials");
                 case ItemCategory.Tools: return Loc.T("Tools");
+                case ItemCategory.Wood: return Loc.T("Wood");
                 default: return Loc.T("Blocks");
             }
         }
@@ -56,6 +59,7 @@ namespace Voxel.Client
                 case ItemCategory.Food: return Loc.T("Food");
                 case ItemCategory.Materials: return Loc.T(Items.IsCarcass(item) ? "Carcass" : "Material");
                 case ItemCategory.Tools: return Loc.T(item == Items.Arrow ? "Ammunition" : Items.IsStorage(item) ? "Storage" : item == Blocks.Torch ? "Light" : "Tool");
+                case ItemCategory.Wood: return Loc.T("Wood");
                 default: return Loc.T("Block");
             }
         }
@@ -102,6 +106,7 @@ namespace Voxel.Client
                 case Items.Chest: return Loc.T("Holds tools, seeds, food and the like, up to 150 kg. Hold it and right click on the ground to place it; right click on it to open it. Only you and the players you allow can open it.");
                 case Blocks.Torch: return Loc.T("Lights what is around it, day and night. Hold it and right click on the top or the side of a block to set it there; hit it, with anything in hand, to take it down.");
                 case Items.Stockpile: return Loc.T("Holds blocks and wood: nine piles of 27 on a patch of flat ground, 3 by 3. Hold it and right click to place it in front of you; right click on it to open it.");
+                case Items.SmallStockpile: return Loc.T("Holds blocks and wood: four piles of 20 on a patch of flat ground, 2 by 2. Hold it and right click to place it in front of you; right click on it to open it.");
             }
 
             if (Items.IsWood(item)) return WithPlant("From {2} once felled: each log on the ground gives one. Counted with the blocks, and kept on a stockpile.", Items.WoodSpecies(item), ecosystemSync);
@@ -144,6 +149,7 @@ namespace Voxel.Client
             if (item == Items.Arrow) return "Arrow";
             if (item == Items.Chest) return "Chest";
             if (item == Items.Stockpile) return "Stockpile";
+            if (item == Items.SmallStockpile) return "SmallStockpile";
             if (item == Blocks.Torch) return "Torch";
             if (Items.IsTool(item)) return $"Tool_{Items.NameOf(item)}";
             return $"Block_{item}";

@@ -600,3 +600,235 @@
     -unity-background-scale-mode: scale-to-fit;
     opacity: 0.85;
 }
+
+/* ---- The crafting tab (CraftingPage) ---- */
+
+/* The recipes, in the place of the categories and items: a heading, then a well of rows. */
+.crafting-page {
+    flex-grow: 1;
+    padding: 18px 20px 20px 20px;
+    background-color: var(--inv-main);
+    border-width: 1px;
+    border-color: var(--panel-border);
+    border-radius: 6px;
+}
+
+.recipe-well {
+    padding: 12px 6px 12px 12px;
+}
+
+.recipe-list {
+    flex-grow: 1;
+    flex-basis: 0;
+}
+
+/* A recipe: what it makes, then what it takes (red where the bag lacks it), its time and calories. */
+.recipe-row {
+    flex-direction: row;
+    align-items: center;
+    height: 92px;
+    padding: 0 18px 0 12px;
+    margin: 0 10px 10px 0;
+    background-color: var(--inv-slot);
+    border-width: 1px;
+    border-color: var(--inv-slot-border);
+    border-radius: 5px;
+}
+
+.recipe-row:hover {
+    background-color: var(--inv-slot-hover);
+    border-color: #6b6d6e;
+}
+
+.recipe-row--selected,
+.recipe-row--selected:hover {
+    border-color: var(--accent);
+    border-width: 3px;
+}
+
+.recipe-row--unavailable > .recipe-row-icon,
+.recipe-row--unavailable > .recipe-row-text {
+    opacity: 0.5;
+}
+
+.recipe-row-icon {
+    width: 68px;
+    height: 68px;
+    margin-right: 18px;
+    flex-shrink: 0;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.recipe-row-text {
+    flex-grow: 1;
+}
+
+.recipe-row-name {
+    font-size: 21px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text);
+    margin: 0 0 6px 0;
+    padding: 0;
+}
+
+.recipe-row-cost {
+    flex-direction: row;
+    align-items: center;
+}
+
+.recipe-chip {
+    flex-direction: row;
+    align-items: center;
+    margin-right: 18px;
+}
+
+.recipe-chip-icon {
+    width: 28px;
+    height: 28px;
+    margin-right: 6px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.recipe-chip-text {
+    font-size: 17px;
+    color: var(--text-body);
+    margin: 0;
+    padding: 0;
+}
+
+.recipe-chip-text--missing {
+    color: var(--danger);
+}
+
+.recipe-row-meta {
+    align-items: flex-end;
+}
+
+.recipe-row-meta-text {
+    font-size: 16px;
+    color: var(--text-muted);
+    margin: 2px 0;
+    padding: 0;
+}
+
+/* Its sheet: the ingredients scroll when there are many, the actions stay at the foot. */
+.recipe-body {
+    flex-grow: 1;
+    flex-basis: 0;
+}
+
+.ingredient-icon {
+    width: 40px;
+    height: 40px;
+    margin-right: 14px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.ingredient-value--missing {
+    color: #a3443a;
+}
+
+/* The wood or rock that goes in: Auto, or one the bag holds, chosen in gold-brown; one there is too
+   little of, faded. */
+.choices {
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 0 0 6px 54px;
+}
+
+.choice {
+    flex-direction: row;
+    align-items: center;
+    height: 40px;
+    padding: 0 10px;
+    margin: 0 8px 8px 0;
+    background-color: var(--inv-sheet-well);
+    border-width: 1px;
+    border-bottom-width: 3px;
+    border-color: #ae9d87;
+    border-radius: 5px;
+}
+
+.choice:hover {
+    background-color: #d3c4b0;
+}
+
+.choice--selected,
+.choice--selected:hover {
+    background-color: #efe4d2;
+    border-color: #7a5a2c;
+    border-width: 2px;
+    border-bottom-width: 3px;
+}
+
+.choice--short {
+    opacity: 0.5;
+}
+
+.choice-icon {
+    width: 28px;
+    height: 28px;
+    margin-right: 6px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.choice-text {
+    font-size: 15px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--inv-sheet-text);
+    margin: 0;
+    padding: 0;
+}
+
+.recipe-actions {
+    padding-top: 14px;
+    border-top-width: 1px;
+    border-color: var(--inv-sheet-line);
+}
+
+.recipe-reason {
+    font-size: 16px;
+    color: #a3443a;
+    white-space: normal;
+    margin: 0 0 10px 0;
+    padding: 0;
+}
+
+.recipe-progress {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.recipe-progress-bar {
+    flex-grow: 1;
+    height: 14px;
+    background-color: var(--inv-sheet-well);
+    border-radius: 7px;
+    overflow: hidden;
+}
+
+.recipe-progress-fill {
+    height: 100%;
+    width: 0;
+    background-color: var(--action);
+    border-radius: 7px;
+}
+
+.recipe-progress-text {
+    font-size: 16px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--inv-sheet-text);
+    margin: 0 0 0 12px;
+    padding: 0;
+}
+
+.recipe-buttons {
+    flex-direction: row;
+}
+
+.recipe-button {
+    flex-grow: 1;
+    height: 54px;
+    font-size: 20px;
+}

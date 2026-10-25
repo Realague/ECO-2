@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -51,6 +52,7 @@ namespace Voxel.Client
         private MiningSync miningSync;
         private LogSync logSync;
         private StorageSync storageSync;
+        private ClaimSync claimSync;
         private StorageScreen storageScreen;
         private HotbarHud hotbar;
         private InventoryScreen inventoryScreen;
@@ -71,6 +73,7 @@ namespace Voxel.Client
 
         // The last move was stopped by a block on the side.
         private bool againstWall;
+        private readonly List<BlockPos> heldTorches = new List<BlockPos>();
         private (bool enabled, Color colour, FogMode mode, float density) airFog;
 
         private void Awake()
@@ -91,6 +94,7 @@ namespace Voxel.Client
             miningSync = FindAnyObjectByType<MiningSync>();
             logSync = FindAnyObjectByType<LogSync>();
             storageSync = FindAnyObjectByType<StorageSync>();
+            claimSync = FindAnyObjectByType<ClaimSync>();
             storageScreen = FindAnyObjectByType<StorageScreen>();
             hotbar = FindAnyObjectByType<HotbarHud>();
             inventoryScreen = FindAnyObjectByType<InventoryScreen>();
@@ -370,7 +374,11 @@ namespace Voxel.Client
             // A right click uses the held item: the hoe tills, a seed is sown on tilled soil, a block is placed.
             if (held == Items.Hoe)
             {
-                if (ToolRules.CanTill(aimed) && !world.IsSolid(hit.Block.X, hit.Block.Y + 1, hit.Block.Z)) worldSync.RequestTill(hit.Block);
+                if (ToolRules.CanTill(aimed) && !world.IsSolid(hit.Block.X, hit.Block.Y + 1, hit.Block.Z) && claimSync.LocalCheck(hit.Block.X, hit.Block.Z))
+                {
+                    worldSync.RequestTill(hit.Block);
+                }
+
                 return;
             }
 
@@ -385,7 +393,7 @@ namespace Voxel.Client
                 }
                 else
                 {
-                    hotbar.ShowMessage(StorageSync.TextOf(refusal));
+                    hotbar.ShowMessage(refusal == StorageRefusal.Claimed ? ClaimSync.TextOf(ClaimRefusal.None, storageSync.ClaimedBy) : StorageSync.TextOf(refusal));
                 }
 
                 return;
@@ -395,6 +403,8 @@ namespace Voxel.Client
             // gardener. The server applies the natural rules and says why a seed did not take.
             if (Items.IsSeed(held))
             {
+                if (!claimSync.LocalCheck(hit.Block.X, hit.Block.Z)) return;
+
                 if (!ecosystemSync.IsTree(Items.SeedSpecies(held)))
                 {
                     SowRefusal refusal = inventorySync.Speciality != Speciality.Gardener ? SowRefusal.NotGardener
@@ -414,6 +424,7 @@ namespace Voxel.Client
             if (!Items.IsBlock(held) || !inventorySync.Inventory.Has(held)) return;
 
             BlockPos target = hit.Block + hit.Normal;
+            if (!claimSync.LocalCheck(target.X, target.Z)) return;
 
             // A torch stands on the top of the aimed block or hangs on its side, in open air.
             if (held == Blocks.Torch)
@@ -456,6 +467,8 @@ namespace Voxel.Client
                     return;
                 }
 
+                if (ecosystemSync.TryGetView(plantId, out PlantView plant) && !claimSync.LocalCheck(plant.X, plant.Z)) return;
+
                 if (miningSync.TryStartSwing(model, false)) miningSync.HitPlant(plantId, (origin + direction * distance).ToUnity());
                 return;
             }
@@ -479,6 +492,8 @@ namespace Voxel.Client
                         return;
                     }
 
+                    if (!CanBreakOnClaims(hit.Block)) return;
+
                     // A block the player cannot carry stays in place, and the server would refuse it anyway.
                     int drop = Items.DropOf(aimed);
                     if (inventorySync.LocalRoomFor(drop) <= 0)
@@ -497,6 +512,22 @@ namespace Voxel.Client
             }
 
             if (Items.IsTool(held)) miningSync.TryStartSwing(model, false);
+        }
+
+        // Whether the player may break a block on claimed land: its column, and that of each torch it
+        // holds, which would fall with it (the server checks the same). Says whose land it is if not.
+        private bool CanBreakOnClaims(BlockPos block)
+        {
+            if (!claimSync.LocalCheck(block.X, block.Z)) return false;
+
+            heldTorches.Clear();
+            Torches.FindHeldBy(world, block, heldTorches);
+            foreach (BlockPos torch in heldTorches)
+            {
+                if (!claimSync.LocalCheck(torch.X, torch.Z)) return false;
+            }
+
+            return true;
         }
 
         private enum PickupKind { None, Storage, Log, Arrow, Carcass }
@@ -525,16 +556,19 @@ namespace Voxel.Client
                 pickup = new Pickup { Kind = PickupKind.Storage, Id = storageId };
             }
 
+            // A log's or an arrow's column is where the ray meets it.
             if (logSync.TryAimed(origin, forward, nearest, out int logId, out float logDistance))
             {
                 nearest = logDistance;
-                pickup = new Pickup { Kind = PickupKind.Log, Id = logId };
+                Vector3 at = origin + forward * logDistance;
+                pickup = new Pickup { Kind = PickupKind.Log, Id = logId, X = Mathf.FloorToInt(at.x), Z = Mathf.FloorToInt(at.z) };
             }
 
             if (bowSync.TryAimed(origin, forward, nearest, out int arrowId, out float arrowDistance) && arrowDistance < nearest)
             {
                 nearest = arrowDistance;
-                pickup = new Pickup { Kind = PickupKind.Arrow, Id = arrowId };
+                Vector3 at = origin + forward * arrowDistance;
+                pickup = new Pickup { Kind = PickupKind.Arrow, Id = arrowId, X = Mathf.FloorToInt(at.x), Z = Mathf.FloorToInt(at.z) };
             }
 
             if (ecosystemSync.TryAimedCarcass(origin, forward, nearest, out int carcassX, out int carcassZ, out _, out float meat, out float carcassDistance) && carcassDistance < nearest)
@@ -556,14 +590,14 @@ namespace Voxel.Client
                     storageScreen.Open(pickup.Id);
                     return true;
                 case PickupKind.Log:
-                    logSync.RequestPickup(pickup.Id);
+                    if (claimSync.LocalCheck(pickup.X, pickup.Z)) logSync.RequestPickup(pickup.Id);
                     return true;
                 case PickupKind.Arrow:
-                    bowSync.RequestPickup(pickup.Id);
+                    if (claimSync.LocalCheck(pickup.X, pickup.Z)) bowSync.RequestPickup(pickup.Id);
                     return true;
                 case PickupKind.Carcass:
                     if (pickup.Meat < EcosystemSync.CarcassMinMeat) hotbar.ShowMessage("Too far gone to take");
-                    else ecosystemSync.RequestTakeCarcass(pickup.X, pickup.Z);
+                    else if (claimSync.LocalCheck(pickup.X, pickup.Z)) ecosystemSync.RequestTakeCarcass(pickup.X, pickup.Z);
                     return true;
                 default:
                     return false;

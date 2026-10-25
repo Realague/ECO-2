@@ -1,5 +1,5 @@
 /* The storage screen: the inventory's look (Inventory.uss), the player's bag on the left and the
-   storage on the right, or its access list. Sizes are for the 1920 x 1080 reference resolution; the
+   storage on the right. Sizes are for the 1920 x 1080 reference resolution; the
    bottom is left free for the hotbar. */
 
 .storage-half {
@@ -26,11 +26,20 @@
     background-color: var(--inv-slot);
 }
 
-/* A stockpile's piles, three by three as they stand on the ground. */
+/* A stockpile pool's piles: a block of three by three per stockpile, as they stand on the ground,
+   one block under another; the list scrolls when the pool holds more than fit. */
 .pile-grid {
-    flex-direction: column;
-    align-self: center;
+    flex-grow: 1;
     margin-top: 12px;
+}
+
+.pile-grid > .unity-scroll-view__content-viewport > .unity-scroll-view__content-container {
+    align-items: center;
+}
+
+.pile-block {
+    flex-shrink: 0;
+    margin-bottom: 18px;
 }
 
 .pile-row {
@@ -76,66 +85,3 @@
     padding: 0 20px;
 }
 
-/* The access list: a row per player, their name, whether they are here, and a toggle. */
-.access-page {
-    flex-grow: 1;
-    width: 1100px;
-    align-self: flex-start;
-}
-
-.access-note {
-    font-size: 18px;
-    color: var(--text-muted);
-    white-space: normal;
-    margin: 0 0 18px 0;
-    padding: 0;
-}
-
-.access-list {
-    flex-grow: 1;
-}
-
-.access-row {
-    flex-direction: row;
-    align-items: center;
-    height: 64px;
-    padding: 0 16px;
-    margin-bottom: 8px;
-    background-color: var(--inv-slot);
-    border-width: 1px;
-    border-color: var(--inv-slot-border);
-    border-radius: 6px;
-}
-
-.access-dot {
-    width: 12px;
-    height: 12px;
-    margin-right: 14px;
-    border-radius: 6px;
-    background-color: var(--text-muted);
-}
-
-.access-dot--online {
-    background-color: var(--vitamins);
-}
-
-.access-name {
-    flex-grow: 1;
-    font-size: 21px;
-    color: var(--text);
-    margin: 0;
-    padding: 0;
-}
-
-.access-state {
-    font-size: 17px;
-    color: var(--text-muted);
-    margin: 0 18px 0 0;
-    padding: 0;
-}
-
-.access-toggle {
-    height: 42px;
-    min-width: 130px;
-    padding: 0 16px;
-}

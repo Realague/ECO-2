@@ -15,7 +15,8 @@ namespace Voxel.Client
     // (what it is, how many, its hotbar slot, a food's nutrition) and the speciality (chosen once, here). Items go into the hotbar, which stays shown below, by dragging
     // them onto a slot, by clicking a slot with an item chosen, or with the digits 1-0; a right click
     // empties a slot. A right click on a food in the grid eats one. M goes to the full-screen map.
-    // While it is open the mouse is free and the player stands still (HoldsInput).
+    // The Crafting tab (CraftingPage) takes the place of the items and their details, and stays chosen
+    // from one opening to the next. While it is open the mouse is free and the player stands still (HoldsInput).
     public class InventoryScreen : MonoBehaviour
     {
         private const string SelectedItemClass = "item-slot--selected";
@@ -43,8 +44,14 @@ namespace Voxel.Client
         [SerializeField] private AppearanceMenu appearanceMenu;
         [SerializeField] private MapScreen mapScreen;
         [SerializeField] private HotbarHud hotbar;
+        [SerializeField] private CraftingSync craftingSync;
 
         private VisualElement screen;
+        private Button inventoryTab;
+        private Button craftingTab;
+        private VisualElement inventoryMain;
+        private CraftingPage crafting;
+        private bool craftingShown;
         private ScrollView grid;
         private Label carryBlocks;
         private Label carryWeight;
@@ -154,7 +161,13 @@ namespace Voxel.Client
                 AddCategory(categoryList, kind);
             }
 
-            Connect(root.Q<Button>("tab-inventory"), () => { });
+            inventoryMain = root.Q(className: "inventory-main");
+            inventoryTab = root.Q<Button>("tab-inventory");
+            craftingTab = root.Q<Button>("tab-crafting");
+            crafting = new CraftingPage(root, craftingSync, inventorySync, hungerSync, ecosystemSync);
+            Connect(inventoryTab, () => ShowTab(false));
+            Connect(craftingTab, () => ShowTab(true));
+            ShowTab(false);
             Connect(specialityChoose, () => inventorySync.RequestSpeciality(Specialities.Choices[0]));
 
             search.RegisterValueChangedCallback(e =>
@@ -205,7 +218,7 @@ namespace Voxel.Client
                 {
                     Close(true);
                 }
-                else if (IsOpen)
+                else if (IsOpen && !craftingShown)
                 {
                     int slot = HotbarHud.PressedSlot(keyboard);
                     int item = hoveredItem != Items.None ? hoveredItem : selectedItem;
@@ -215,9 +228,30 @@ namespace Voxel.Client
 
             if (!IsOpen) return;
 
-            RefreshItems();
-            ShowDetails();
+            if (craftingShown)
+            {
+                crafting.Refresh();
+            }
+            else
+            {
+                RefreshItems();
+                ShowDetails();
+            }
+
             ShowSpeciality();
+        }
+
+        // The Inventory tab (the items and their details) or the Crafting tab (recipes and their sheet).
+        private void ShowTab(bool craftingTabShown)
+        {
+            craftingShown = craftingTabShown;
+            inventoryTab.EnableInClassList("inventory-tab--selected", !craftingShown);
+            craftingTab.EnableInClassList("inventory-tab--selected", craftingShown);
+            inventoryMain.style.display = craftingShown ? DisplayStyle.None : DisplayStyle.Flex;
+            details.style.display = craftingShown ? DisplayStyle.None : DisplayStyle.Flex;
+            crafting.Show(craftingShown);
+            EndDrag();
+            shownSearch = null;
         }
 
         public void Open()
@@ -278,6 +312,7 @@ namespace Voxel.Client
             }
 
             shownSearch = null;
+            crafting.Retranslate();
         }
 
         // The icon class (Common.uss) of a category; null is "All".
@@ -287,6 +322,7 @@ namespace Voxel.Client
             {
                 case ItemCategory.Tools: return "icon--category-tools";
                 case ItemCategory.Blocks: return "icon--category-blocks";
+                case ItemCategory.Wood: return "icon--category-wood";
                 case ItemCategory.Seeds: return "icon--category-seeds";
                 case ItemCategory.Food: return "icon--category-food";
                 case ItemCategory.Materials: return "icon--category-materials";
