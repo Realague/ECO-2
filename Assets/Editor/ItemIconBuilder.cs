@@ -122,6 +122,19 @@ public static class ItemIconBuilder
             Write("SmallStockpile", smallStockpile);
             UnityEngine.Object.DestroyImmediate(smallStockpile);
             written += 3;
+
+            Texture2D campfire = renderer.Render(CampfireParts(), 30f, 0.95f);
+            Write("Campfire", campfire);
+            UnityEngine.Object.DestroyImmediate(campfire);
+            written++;
+
+            foreach (Dish dish in Dishes.All)
+            {
+                Texture2D icon = renderer.Render(DishParts(dish), 48f, 1.0f);
+                Write($"Dish_{dish.Name.Replace(" ", "")}", icon);
+                UnityEngine.Object.DestroyImmediate(icon);
+                written++;
+            }
         }
         finally
         {
@@ -409,6 +422,103 @@ public static class ItemIconBuilder
         AddBoxes(parts, ChestShapes.LidIron, ChestShapes.Hinge, iron);
         return parts;
     }
+
+    // A campfire as placed ones are drawn (CampfireShapes), burning.
+    private static IReadOnlyList<SpeciesAsset.Part> CampfireParts()
+    {
+        Mesh cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+        var wood = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/ArrowShaft.mat");
+        var flame = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/TorchFlame.mat");
+        var parts = new List<SpeciesAsset.Part>();
+        AddBoxes(parts, CampfireShapes.Logs, Vector3.zero, wood);
+        AddBoxes(parts, CampfireShapes.Stones, Vector3.zero, Tinted(new Color(0.52f, 0.52f, 0.54f)));
+        (Vector3 centre, Vector3 size) = CampfireShapes.Flame;
+        parts.Add(new SpeciesAsset.Part { mesh = cube, material = flame, offset = centre + Vector3.up * 0.08f, scale = size });
+        return parts;
+    }
+
+    // A dish: pieces of its main crop, browned, on a wooden plate; a golden flat bread with darker
+    // spots; or a wooden bowl filled with its colour.
+    private static IReadOnlyList<SpeciesAsset.Part> DishParts(Dish dish)
+    {
+        Mesh cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+        Mesh cylinder = Resources.GetBuiltinResource<Mesh>("Cylinder.fbx");
+        var wood = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/ArrowShaft.mat");
+        var parts = new List<SpeciesAsset.Part>();
+        Color filling = ColourOf(dish.BowlColour);
+        switch (dish.Look)
+        {
+            case DishLook.Bowl:
+                parts.Add(new SpeciesAsset.Part { mesh = cylinder, material = wood, offset = new Vector3(0f, 0.25f, 0f), scale = new Vector3(0.8f, 0.25f, 0.8f) });
+                parts.Add(new SpeciesAsset.Part { mesh = cylinder, material = Tinted(filling), offset = new Vector3(0f, 0.505f, 0f), scale = new Vector3(0.7f, 0.012f, 0.7f) });
+
+                // Chunks in it, a little darker than the broth.
+                Material chunk = Tinted(Color.Lerp(filling, new Color(0.3f, 0.18f, 0.1f), 0.3f));
+                Vector3[] chunks = { new Vector3(-0.14f, 0f, 0.08f), new Vector3(0.12f, 0f, 0.13f), new Vector3(0.06f, 0f, -0.14f), new Vector3(-0.1f, 0f, -0.12f) };
+                foreach (Vector3 place in chunks)
+                {
+                    parts.Add(new SpeciesAsset.Part { mesh = cube, material = chunk, offset = place + new Vector3(0f, 0.53f, 0f), scale = new Vector3(0.11f, 0.05f, 0.1f) });
+                }
+
+                break;
+            case DishLook.Bread:
+                parts.Add(new SpeciesAsset.Part { mesh = cylinder, material = Tinted(filling), offset = new Vector3(0f, 0.08f, 0f), scale = new Vector3(0.9f, 0.08f, 0.9f) });
+                Material burnt = Tinted(filling * 0.6f);
+                Vector3[] spots = { new Vector3(-0.2f, 0f, 0.12f), new Vector3(0.2f, 0f, 0.16f), new Vector3(0.06f, 0f, -0.22f), new Vector3(-0.1f, 0f, -0.06f), new Vector3(0.2f, 0f, -0.08f) };
+                foreach (Vector3 spot in spots)
+                {
+                    parts.Add(new SpeciesAsset.Part { mesh = cube, material = burnt, offset = spot + new Vector3(0f, 0.165f, 0f), scale = new Vector3(0.17f, 0.012f, 0.12f) });
+                }
+
+                break;
+            default:
+                parts.Add(new SpeciesAsset.Part { mesh = cylinder, material = wood, offset = new Vector3(0f, 0.03f, 0f), scale = new Vector3(0.95f, 0.03f, 0.95f) });
+                AddCropPieces(parts, dish, cube);
+                break;
+        }
+
+        return parts;
+    }
+
+    // Three pieces of the dish's main crop on its plate: the first box of its ripe fruit, or lumps in
+    // the plant's colour, browned as if roasted.
+    private static void AddCropPieces(List<SpeciesAsset.Part> parts, Dish dish, Mesh cube)
+    {
+        string name = null;
+        foreach ((int index, string assetName) in CropSpecies.Expected)
+        {
+            if (index == dish.MainSpecies) name = assetName;
+        }
+
+        var asset = name != null ? AssetDatabase.LoadAssetAtPath<SpeciesAsset>($"Assets/Species/{name}.asset") : null;
+        Mesh piece = cube;
+        Color colour = new Color(0.75f, 0.6f, 0.35f);
+        float pieceSize = 0.4f;
+        IReadOnlyList<SpeciesAsset.Part> fruits = asset != null ? asset.FruitPartsOf(0, Eco.Sim.Plant.RipeStageCount) : null;
+        if (fruits != null && fruits.Count > 0 && fruits[0].mesh != null && FirstBox(fruits[0].mesh) is Mesh box)
+        {
+            piece = box;
+            Material fruit = fruits[0].material;
+            colour = fruit.HasProperty("_BaseColor") ? fruit.GetColor("_BaseColor") : fruit.color;
+            float largest = Mathf.Max(box.bounds.size.x, Mathf.Max(box.bounds.size.y, box.bounds.size.z));
+            pieceSize = largest > 0f ? 0.4f / largest : 1f;
+        }
+        else if (asset != null)
+        {
+            colour = MainColour(asset.PartsOf(0));
+        }
+
+        Material roasted = Tinted(Color.Lerp(colour, new Color(0.45f, 0.27f, 0.12f), 0.35f));
+        Vector3[] places = { new Vector3(-0.24f, 0f, 0.08f), new Vector3(0.24f, 0f, 0.12f), new Vector3(0f, 0f, -0.22f) };
+        foreach (Vector3 place in places)
+        {
+            Vector3 scale = piece == cube ? new Vector3(0.36f, 0.26f, 0.3f) : Vector3.one * pieceSize;
+            float height = piece == cube ? 0.26f : piece.bounds.size.y * pieceSize;
+            parts.Add(new SpeciesAsset.Part { mesh = piece, material = roasted, offset = place + new Vector3(0f, 0.06f + height * 0.5f, 0f), scale = scale });
+        }
+    }
+
+    private static Color ColourOf(uint rgb) => new Color(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f);
 
     // A torch as TorchViews draws it: a wooden stick, a dark head and its flame.
     private static IReadOnlyList<SpeciesAsset.Part> TorchParts()

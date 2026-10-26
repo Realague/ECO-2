@@ -77,8 +77,8 @@ namespace Voxel.Core
         public IReadOnlyList<Ingredient> Ingredients { get; }
     }
 
-    // What players craft from their bag (CraftingSync): the basic tools, arrows, torches and storage,
-    // from wood and rock. For an ingredient of a group the player chooses the item that goes in (a
+    // What players craft from their bag (CraftingSync): the basic tools, arrows, torches, storage and
+    // the campfire, from wood and rock; and what campfires cook (Cooking). For an ingredient of a group the player chooses the item that goes in (a
     // choice per ingredient: Items.None for Auto, which takes from what they have most of first, the
     // lowest item first when even, so it is the same on every machine and rare woods are kept; a
     // chosen item must cover the whole count by itself). A recipe's index travels on the network.
@@ -95,8 +95,31 @@ namespace Voxel.Core
             new Recipe(Items.Arrow, 5, 2f, 50f, new Ingredient(IngredientGroup.Wood, 3), new Ingredient(IngredientGroup.Stone, 3)),
             new Recipe(Blocks.Torch, 4, 2f, 50f, new Ingredient(IngredientGroup.Wood, 4)),
             new Recipe(Items.SmallStockpile, 1, 5f, 200f, new Ingredient(IngredientGroup.Wood, 10)),
-            new Recipe(Items.Chest, 1, 6f, 250f, new Ingredient(IngredientGroup.Wood, 10))
+            new Recipe(Items.Chest, 1, 6f, 250f, new Ingredient(IngredientGroup.Wood, 10)),
+            new Recipe(Items.Campfire, 1, 5f, 200f, new Ingredient(IngredientGroup.Stone, 12), new Ingredient(IngredientGroup.Wood, 6))
         };
+
+        // What a campfire cooks (Campfire): one recipe per dish, in Dishes.All's order; there Calories is
+        // the work players put in and Seconds the time it then cooks.
+        public static readonly IReadOnlyList<Recipe> Cooking = CookingRecipes();
+
+        private static Recipe[] CookingRecipes()
+        {
+            var recipes = new Recipe[Dishes.All.Count];
+            for (int i = 0; i < recipes.Length; i++)
+            {
+                Dish dish = Dishes.All[i];
+                var ingredients = new Ingredient[dish.Ingredients.Count];
+                for (int n = 0; n < ingredients.Length; n++)
+                {
+                    ingredients[n] = dish.Ingredients[n];
+                }
+
+                recipes[i] = new Recipe(Items.Dish(i), 1, dish.Seconds, dish.Labour, ingredients);
+            }
+
+            return recipes;
+        }
 
         // The rocks that count as stone: the cover rocks and granite, not ores, flint or salt.
         private static readonly ushort[] Stones = { Blocks.Granite, Blocks.Basalt, Blocks.Limestone, Blocks.Marble, Blocks.Sandstone, Blocks.Slate };

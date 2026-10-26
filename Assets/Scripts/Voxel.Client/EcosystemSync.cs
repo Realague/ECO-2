@@ -211,6 +211,15 @@ namespace Voxel.Client
                 animalSpecies.Add(asset.ToSpecies(speciesAssets, animalAssets));
             }
 
+            // The dishes name their crops by index (CropSpecies).
+            foreach ((int index, string asset) in CropSpecies.Expected)
+            {
+                if (index >= speciesAssets.Length || speciesAssets[index] == null || speciesAssets[index].name != asset)
+                {
+                    Debug.LogError($"Plant species {index} should be {asset} (CropSpecies, used by the dishes).");
+                }
+            }
+
             // A server without a display simulates plants and animals but does not draw them.
             bool rendering = !Application.isBatchMode;
             if (rendering) plantRenderer = new PlantRenderer(speciesAssets);
@@ -1306,9 +1315,10 @@ namespace Voxel.Client
             return speciesIndex >= 0 && speciesIndex < speciesAssets.Length ? speciesAssets[speciesIndex].ProduceName : "?";
         }
 
-        // What eating an item gives: a crop's food values, nothing for anything else.
+        // What eating an item gives: a crop's or a dish's food values, nothing for anything else.
         public Nutrition FoodOf(int item)
         {
+            if (Items.IsDish(item)) return Dishes.FoodOf(item);
             if (!Items.IsProduce(item)) return default;
 
             int speciesIndex = Items.ProduceSpecies(item);

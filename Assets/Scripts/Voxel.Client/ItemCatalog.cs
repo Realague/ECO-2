@@ -32,7 +32,7 @@ namespace Voxel.Client
         {
             if (Items.IsTool(item) || item == Items.Arrow || Items.IsStorage(item) || item == Blocks.Torch) return ItemCategory.Tools;
             if (Items.IsSeed(item)) return ItemCategory.Seeds;
-            if (Items.IsProduce(item)) return ItemCategory.Food;
+            if (Items.IsProduce(item) || Items.IsDish(item)) return ItemCategory.Food;
             if (Items.IsWood(item)) return ItemCategory.Wood;
             return Items.IsCarcass(item) || item == Items.Straw ? ItemCategory.Materials : ItemCategory.Blocks;
         }
@@ -56,9 +56,11 @@ namespace Voxel.Client
             switch (CategoryOf(item))
             {
                 case ItemCategory.Seeds: return Loc.T("Seed");
-                case ItemCategory.Food: return Loc.T("Food");
+                case ItemCategory.Food: return Loc.T(Items.IsDish(item) ? "Dish" : "Food");
                 case ItemCategory.Materials: return Loc.T(Items.IsCarcass(item) ? "Carcass" : "Material");
-                case ItemCategory.Tools: return Loc.T(item == Items.Arrow ? "Ammunition" : Items.IsStorage(item) ? "Storage" : item == Blocks.Torch ? "Light" : "Tool");
+                case ItemCategory.Tools:
+                    if (item == Items.Campfire) return Loc.T("Station");
+                    return Loc.T(item == Items.Arrow ? "Ammunition" : Items.IsStorage(item) ? "Storage" : item == Blocks.Torch ? "Light" : "Tool");
                 case ItemCategory.Wood: return Loc.T("Wood");
                 default: return Loc.T("Block");
             }
@@ -94,6 +96,8 @@ namespace Voxel.Client
                     : WithPlant("Harvested from {1} plants when they are ripe. It cannot be eaten.", species, ecosystemSync);
             }
 
+            if (Items.IsDish(item)) return Loc.T("Cooked on a campfire: it feeds more than the crops it is made from, and in a better balance. Right click it here, or hold it and right click, to eat it.");
+
             switch (item)
             {
                 case Items.Shovel: return Loc.T("Digs soft ground: dirt, grass, sand, gravel, clay, snow and mud. Hold it and left click.");
@@ -107,6 +111,7 @@ namespace Voxel.Client
                 case Blocks.Torch: return Loc.T("Lights what is around it, day and night. Hold it and right click on the top or the side of a block to set it there; hit it, with anything in hand, to take it down.");
                 case Items.Stockpile: return Loc.T("Holds blocks and wood: nine piles of 27 on a patch of flat ground, 3 by 3. Hold it and right click to place it in front of you; right click on it to open it.");
                 case Items.SmallStockpile: return Loc.T("Holds blocks and wood: four piles of 20 on a patch of flat ground, 2 by 2. Hold it and right click to place it in front of you; right click on it to open it.");
+                case Items.Campfire: return Loc.T("Cooks dishes from crops. Queue a dish, put calories into it, and lay wood by the fire: it burns only while it cooks. Ingredients come from your bag and the chests linked to it (those of its claimed zone), and dishes go into them.");
             }
 
             if (Items.IsWood(item)) return WithPlant("From {2} once felled: each log on the ground gives one. Counted with the blocks, and kept on a stockpile.", Items.WoodSpecies(item), ecosystemSync);
@@ -150,6 +155,8 @@ namespace Voxel.Client
             if (item == Items.Chest) return "Chest";
             if (item == Items.Stockpile) return "Stockpile";
             if (item == Items.SmallStockpile) return "SmallStockpile";
+            if (item == Items.Campfire) return "Campfire";
+            if (Dishes.TryGet(item, out Dish dish)) return $"Dish_{dish.Name.Replace(" ", "")}";
             if (item == Blocks.Torch) return "Torch";
             if (Items.IsTool(item)) return $"Tool_{Items.NameOf(item)}";
             return $"Block_{item}";

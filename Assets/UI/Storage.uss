@@ -85,3 +85,179 @@
     padding: 0 20px;
 }
 
+
+/* ---- A campfire (CampfirePage) ---- */
+
+/* Wider than the bag beside it: its dishes and its queue side by side. */
+.campfire-half {
+    flex-grow: 1.7;
+}
+
+.fire-linked {
+    font-size: 17px;
+    color: var(--text-muted);
+    margin: 0 18px 0 0;
+    padding: 0;
+}
+
+.fire-linked--none {
+    color: var(--danger);
+}
+
+/* What is left of the log alight. */
+.fire-burn {
+    width: 90px;
+    height: 10px;
+    margin-left: 12px;
+    background-color: var(--well);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.fire-burn-fill {
+    height: 100%;
+    width: 0;
+    background-color: #e39a3b;
+    border-radius: 5px;
+}
+
+.fire-columns {
+    flex-grow: 1;
+    flex-direction: row;
+}
+
+.fire-column {
+    flex-grow: 1;
+    flex-basis: 0;
+}
+
+.fire-column--right {
+    margin-left: 12px;
+}
+
+.fire-column-title {
+    font-size: 18px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text-body);
+    margin: 0 0 8px 2px;
+    padding: 0;
+}
+
+.fire-well {
+    padding: 10px 4px 10px 10px;
+}
+
+.fire-list {
+    flex-grow: 1;
+    flex-basis: 0;
+}
+
+/* The dishes list reuses the crafting tab's rows (Inventory.uss, .recipe-row), a little lower. */
+.fire-list .recipe-row {
+    height: 84px;
+}
+
+/* A dish on the queue: its icon, its name and who queued it, a bar (calories put in, or cooking) with
+   what it waits for, and its buttons. */
+.job-row {
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 10px 10px 8px;
+    margin: 0 8px 8px 0;
+    background-color: var(--inv-slot);
+    border-width: 1px;
+    border-color: var(--inv-slot-border);
+    border-radius: 5px;
+}
+
+.job-row--cooking {
+    border-color: #e39a3b;
+}
+
+.job-icon {
+    width: 56px;
+    height: 56px;
+    margin-right: 12px;
+    flex-shrink: 0;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.job-text {
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.job-name {
+    font-size: 18px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text);
+    margin: 0;
+    padding: 0;
+}
+
+.job-by {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin: 0 0 6px 0;
+    padding: 0;
+}
+
+.job-bar {
+    height: 10px;
+    background-color: var(--well);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.job-bar-fill {
+    height: 100%;
+    width: 0;
+    background-color: var(--action-hover);
+    border-radius: 5px;
+}
+
+.job-bar-fill--cooking {
+    background-color: #e39a3b;
+}
+
+.job-status {
+    font-size: 15px;
+    color: var(--text-body);
+    margin: 4px 0 0 0;
+    padding: 0;
+}
+
+.job-status--waiting {
+    color: var(--accent);
+}
+
+.job-labour {
+    height: 40px;
+    padding: 0 12px;
+    margin-left: 10px;
+    font-size: 16px;
+}
+
+.job-cancel {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    margin-left: 6px;
+    font-size: 18px;
+}
+
+/* A long dish name gives way to its work and time, cut with an ellipsis. */
+.fire-list .recipe-row-text {
+    flex-shrink: 1;
+    overflow: hidden;
+}
+
+.fire-list .recipe-row-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fire-list .recipe-row-meta {
+    flex-shrink: 0;
+    margin-left: 8px;
+}

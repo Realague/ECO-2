@@ -18,7 +18,8 @@ namespace Voxel.Client
     // Who may open it follows the land (StorageSync.CanUse). It opens when the server lets the player
     // open what they right clicked, and closes with Escape or Tab, when the player walks away (the
     // server closes it) or loses access. While it is open the mouse is free and the player stands
-    // still (HoldsInput).
+    // still (HoldsInput). A campfire opens in the same window, its page (CampfirePage) in the storage's
+    // place; wood moves from the bag to the fire the way items go into a chest.
     public class StorageScreen : MonoBehaviour
     {
         private const float DragThreshold = 8f;
@@ -50,6 +51,10 @@ namespace Voxel.Client
         private ScrollView storeGridView;
         private ScrollView pileGrid;
         private Button pickup;
+        private VisualElement storeHalf;
+        private VisualElement campfireHalf;
+        private Button firePickup;
+        private CampfirePage campfire;
         private VisualElement ghost;
         private ItemGrid bagGrid;
         private ItemGrid storeGrid;
@@ -104,6 +109,10 @@ namespace Voxel.Client
             storeGridView = root.Q<ScrollView>("store-grid");
             pileGrid = root.Q<ScrollView>("pile-grid");
             pickup = root.Q<Button>("pickup");
+            storeHalf = root.Q("store-half");
+            campfireHalf = root.Q("campfire-half");
+            firePickup = root.Q<Button>("fire-pickup");
+            campfire = new CampfirePage(root, storageSync, inventorySync, ecosystemSync);
             ghost = root.Q("drag-ghost");
 
             bagGrid = new ItemGrid(root.Q<ScrollView>("bag-grid"), ecosystemSync, MinimumRows);
@@ -117,10 +126,12 @@ namespace Voxel.Client
 
             storageTab.focusable = false;
             Connect(pickup, () => storageSync.RequestPickup());
+            Connect(firePickup, () => storageSync.RequestPickup());
 
             storageSync.OpenedChanged += OnOpenedChanged;
             storageSync.OpenedClosed += OnOpenedClosed;
             storageSync.Refused += OnRefused;
+            Loc.Changed += campfire.Retranslate;
 
             screen.style.display = DisplayStyle.None;
             if (Application.isBatchMode) enabled = false;
@@ -129,6 +140,7 @@ namespace Voxel.Client
         private void OnDestroy()
         {
             if (instance == this) instance = null;
+            if (campfire != null) Loc.Changed -= campfire.Retranslate;
             if (storageSync == null) return;
 
             storageSync.OpenedChanged -= OnOpenedChanged;
@@ -225,12 +237,26 @@ namespace Voxel.Client
         // Both sides, as they are now (the grids rebuild only when what they show changed).
         private void Refresh()
         {
+            bool fire = storageSync.OpenedKind == StorageKind.Campfire;
             bool chest = storageSync.OpenedKind == StorageKind.Chest;
             Inventory bag = inventorySync.Inventory;
-            bagGrid.Show(bag.Entries, item => chest ? !StorageRules.AcceptsInChest(item) : !StorageRules.AcceptsInStockpile(item));
+            bagGrid.Show(bag.Entries, item => fire ? !Items.IsWood(item) : chest ? !StorageRules.AcceptsInChest(item) : !StorageRules.AcceptsInStockpile(item));
             ShowCarry(bag);
 
             storageTabText.text = Loc.T(Items.NameOf(StorageRules.ItemOf(storageSync.OpenedKind)));
+            storeHalf.style.display = fire ? DisplayStyle.None : DisplayStyle.Flex;
+            campfireHalf.style.display = fire ? DisplayStyle.Flex : DisplayStyle.None;
+            bagTitle.text = bagGrid.HoveredItem != Items.None ? ItemCatalog.NameOf(bagGrid.HoveredItem, ecosystemSync) : Loc.T("Your bag");
+            ShowOwner();
+            if (fire)
+            {
+                // Picked up with nothing queued; its wood goes back to the bag (the server checks).
+                campfire.Refresh();
+                firePickup.style.display = storageSync.OpenedIsOwner || storageSync.IsPublic(openId) ? DisplayStyle.Flex : DisplayStyle.None;
+                firePickup.SetEnabled(storageSync.OpenedJobs.Count == 0);
+                return;
+            }
+
             storeGridView.style.display = chest ? DisplayStyle.Flex : DisplayStyle.None;
             pileGrid.style.display = chest ? DisplayStyle.None : DisplayStyle.Flex;
             storeFillIcon.EnableInClassList("icon--scales", chest);
@@ -255,21 +281,24 @@ namespace Voxel.Client
 
             // The item under the pointer is named in its side's title (the slots show no names); else
             // what the side is, with how many chests or stockpiles share it.
-            bagTitle.text = bagGrid.HoveredItem != Items.None ? ItemCatalog.NameOf(bagGrid.HoveredItem, ecosystemSync) : Loc.T("Your bag");
             int storeItem = chest ? storeGrid.HoveredItem : hoveredPile >= 0 ? storageSync.OpenedPileItem(hoveredPile) : Items.None;
             string side = members > 1
                 ? Loc.T(chest ? "In the chests ({0})" : "On the stockpiles ({0})", members)
                 : Loc.T(chest ? "In the chest" : "On the stockpile");
             storeTitle.text = storeItem != Items.None ? ItemCatalog.NameOf(storeItem, ecosystemSync) : side;
 
-            storageSync.TryDescribe(openId, out _, out string ownerName, out bool yours, out _);
-            owner.text = yours ? Loc.T("Yours") : ownerName.Length > 0 ? Loc.T("{0}'s", ownerName) : "";
-            if (storageSync.IsPublic(openId)) owner.text = Loc.T("{0} · public (unclaimed land)", owner.text);
-
             // Picked up empty, or with what it holds poured into the rest of its pool (the server checks).
             bool empty = chest ? storageSync.OpenedContents.DistinctCount == 0 : storageSync.OpenedPileTotal == 0;
             pickup.style.display = storageSync.OpenedIsOwner || storageSync.IsPublic(openId) ? DisplayStyle.Flex : DisplayStyle.None;
             pickup.SetEnabled(empty || members > 1);
+        }
+
+        // Whose it is (the land's owner, on claimed land), and whether anyone may use it.
+        private void ShowOwner()
+        {
+            storageSync.TryDescribe(openId, out _, out string ownerName, out bool yours, out _);
+            owner.text = yours ? Loc.T("Yours") : ownerName.Length > 0 ? Loc.T("{0}'s", ownerName) : "";
+            if (storageSync.IsPublic(openId)) owner.text = Loc.T("{0} · public (unclaimed land)", owner.text);
         }
 
         private void ShowCarry(Inventory bag)
@@ -399,9 +428,12 @@ namespace Voxel.Client
             if (bag)
             {
                 int count = all ? inventorySync.Inventory.Count(itemOrPile) : 1;
-                storageSync.RequestMove(true, itemOrPile, count);
+                if (storageSync.OpenedKind == StorageKind.Campfire) storageSync.RequestFuel(itemOrPile, count);
+                else storageSync.RequestMove(true, itemOrPile, count);
                 return;
             }
+
+            if (storageSync.OpenedKind == StorageKind.Campfire) return;
 
             bool chest = storageSync.OpenedKind == StorageKind.Chest;
             int held = chest ? storageSync.OpenedContents.Count(itemOrPile) : storageSync.OpenedPileCountAt(itemOrPile);
@@ -435,7 +467,7 @@ namespace Voxel.Client
 
             if (dragging)
             {
-                VisualElement target = fromBag ? storeWell : bagWell;
+                VisualElement target = !fromBag ? bagWell : storageSync.OpenedKind == StorageKind.Campfire ? campfireHalf : storeWell;
                 if (target.worldBound.Contains(e.position)) Move(fromBag, pressedItemOrPile, true);
             }
 

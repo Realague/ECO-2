@@ -4,9 +4,9 @@ using System.Text;
 
 namespace Voxel.Core
 {
-    // A chest or a stockpile placed in the world: where (a chest's cell, a stockpile's corner, at
-    // the height of the cells above the ground), facing which way, whose (the player id of who placed
-    // it), who else may open it, and what it holds.
+    // A chest, a stockpile or a campfire placed in the world: where (a chest's or campfire's cell, a
+    // stockpile's corner, at the height of the cells above the ground), facing which way, whose (the
+    // player id of who placed it), who else may open it, and what it holds.
     public sealed class Storage
     {
         public readonly int Id;
@@ -16,11 +16,14 @@ namespace Voxel.Core
         public readonly string OwnerId;
         public readonly HashSet<string> Allowed = new HashSet<string>();
 
-        // A chest's items (null for a stockpile).
+        // A chest's items (null for the others).
         public readonly Inventory Contents;
 
-        // A stockpile's piles (null for a chest).
+        // A stockpile's piles (null for the others).
         public readonly StockpilePiles Piles;
+
+        // A campfire's wood and queue (null for the others).
+        public readonly Campfire Campfire;
 
         public Storage(int id, StorageKind kind, BlockPos position, int facing, string ownerId)
         {
@@ -30,20 +33,32 @@ namespace Voxel.Core
             Facing = facing;
             OwnerId = ownerId;
             if (kind == StorageKind.Chest) Contents = new Inventory();
+            else if (kind == StorageKind.Campfire) Campfire = new Campfire();
             else Piles = new StockpilePiles(kind);
         }
 
-        public bool IsEmpty => Kind == StorageKind.Chest ? Contents.DistinctCount == 0 : Piles.IsEmpty;
+        public bool IsEmpty
+        {
+            get
+            {
+                switch (Kind)
+                {
+                    case StorageKind.Chest: return Contents.DistinctCount == 0;
+                    case StorageKind.Campfire: return Campfire.IsEmpty;
+                    default: return Piles.IsEmpty;
+                }
+            }
+        }
 
         public bool CanOpen(string playerId) => !string.IsNullOrEmpty(playerId) && (playerId == OwnerId || Allowed.Contains(playerId));
 
-        public int CellCount => Kind == StorageKind.Chest ? 1 : StorageRules.PileCountOf(Kind);
+        public int CellCount => StorageRules.IsSingleCell(Kind) ? 1 : StorageRules.PileCountOf(Kind);
 
-        // A cell it covers (0 to CellCount - 1): a chest's own, or a stockpile's piles in order.
-        public BlockPos Cell(int index) => Kind == StorageKind.Chest ? Position : StorageRules.PileCell(Position, index, StorageRules.SideOf(Kind));
+        // A cell it covers (0 to CellCount - 1): a chest's or campfire's own, or a stockpile's piles in order.
+        public BlockPos Cell(int index) => StorageRules.IsSingleCell(Kind) ? Position : StorageRules.PileCell(Position, index, StorageRules.SideOf(Kind));
 
-        // Whether a cell it covers is solid: a chest always, a stockpile's pile when it holds something.
-        public bool IsSolidAt(int index) => Kind == StorageKind.Chest || Piles.CountAt(index) > 0;
+        // Whether a cell it covers is solid: a chest or a campfire always, a stockpile's pile when it holds something.
+        public bool IsSolidAt(int index) => StorageRules.IsSingleCell(Kind) || Piles.CountAt(index) > 0;
     }
 
     // The storage placed in a world, kept by the server and saved with it (storage.dat), with each
@@ -51,7 +66,8 @@ namespace Voxel.Core
     public sealed class Storages
     {
         private const uint Magic = 0x524F5453; // "STOR"
-        private const int FormatVersion = 1;
+        // Format 2 adds campfires (their wood and queue after them); format 1 still loads.
+        private const int FormatVersion = 2;
 
         private readonly Dictionary<int, Storage> storages = new Dictionary<int, Storage>();
 
@@ -154,6 +170,10 @@ namespace Voxel.Core
                             writer.Write(entry.Value);
                         }
                     }
+                    else if (storage.Kind == StorageKind.Campfire)
+                    {
+                        storage.Campfire.Write(writer);
+                    }
                     else
                     {
                         storage.Piles.Write(writer);
@@ -171,7 +191,7 @@ namespace Voxel.Core
                 if (reader.ReadUInt32() != Magic) throw new InvalidDataException("This file is not a storage save.");
 
                 int format = reader.ReadInt32();
-                if (format != FormatVersion) throw new InvalidDataException($"Unsupported storage save format {format} (expected: {FormatVersion}).");
+                if (format < 1 || format > FormatVersion) throw new InvalidDataException($"Unsupported storage save format {format} (expected: {FormatVersion}).");
 
                 var store = new Storages { nextId = reader.ReadInt32() };
                 int count = reader.ReadInt32();
@@ -186,6 +206,7 @@ namespace Voxel.Core
                     string ownerId = reader.ReadString();
                     if (id <= 0 || id >= store.nextId || store.storages.ContainsKey(id)) throw new InvalidDataException($"Invalid storage id {id}.");
                     if (!StorageRules.IsKind(kind) || facing > 3 || ownerId.Length == 0) throw new InvalidDataException($"Invalid storage {id}.");
+                    if (format < 2 && kind == (byte)StorageKind.Campfire) throw new InvalidDataException($"Campfire {id} in a save from before campfires.");
 
                     var storage = new Storage(id, (StorageKind)kind, position, facing, ownerId);
                     int allowed = reader.ReadInt32();
@@ -207,6 +228,10 @@ namespace Voxel.Core
                             int amount = reader.ReadInt32();
                             if (amount > 0 && StorageRules.AcceptsInChest(item)) storage.Contents.Add(item, amount);
                         }
+                    }
+                    else if (storage.Kind == StorageKind.Campfire)
+                    {
+                        storage.Campfire.Read(reader);
                     }
                     else
                     {

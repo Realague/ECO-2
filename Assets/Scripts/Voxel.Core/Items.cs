@@ -21,7 +21,10 @@ namespace Voxel.Core
         // The small stockpile (80 blocks), the one players are given.
         public const int SmallStockpile = 105;
 
-        public static bool IsStorage(int item) => item == Chest || item == Stockpile || item == SmallStockpile;
+        // A campfire, placed like storage: a station where dishes are cooked (Campfire, crafted).
+        public const int Campfire = 106;
+
+        public static bool IsStorage(int item) => item == Chest || item == Stockpile || item == SmallStockpile || item == Campfire;
 
         // Tools: each player gets one of each at their first connection (there is no crafting), and
         // breaking, felling, harvesting annuals, tilling and hunting each need theirs (ToolRules).
@@ -55,6 +58,10 @@ namespace Voxel.Core
         // index of the animal species, named after it ("Deer carcass"). Not yet of any use (butchering will come).
         public const int MaxCarcassSpecies = 100;
         private const int FirstCarcass = 500;
+
+        // One item per dish cooked on a campfire: FirstDish + its index in Dishes.All.
+        public const int MaxDishes = 100;
+        private const int FirstDish = 600;
 
         public static int OfBlock(ushort block) => Blocks.TypeOf(block);
 
@@ -90,13 +97,20 @@ namespace Voxel.Core
 
         public static int CarcassSpecies(int item) => item - FirstCarcass;
 
+        public static int Dish(int index) => FirstDish + index;
+
+        public static bool IsDish(int item) => item >= FirstDish && item < FirstDish + MaxDishes;
+
+        public static int DishIndex(int item) => item - FirstDish;
+
         // What an item read from a save of an earlier version is now (the one wood became oak wood).
         public static int Upgrade(int item) => item == LegacyWood ? WoodOf(OakSpecies) : item;
 
         public static bool IsTool(int item) => item >= FirstTool && item <= LastTool;
 
         public static bool IsValid(int item) =>
-            IsBlock(item) || IsWood(item) || item == Straw || item == Arrow || IsStorage(item) || IsTool(item) || IsSeed(item) || IsProduce(item) || IsCarcass(item);
+            IsBlock(item) || IsWood(item) || item == Straw || item == Arrow || IsStorage(item) || IsTool(item) || IsSeed(item) || IsProduce(item) || IsCarcass(item)
+            || (IsDish(item) && DishIndex(item) < Dishes.All.Count);
 
         // What a broken block yields. Grass and tilled soil cannot be picked up: they give dirt.
         public static int DropOf(ushort block)
@@ -140,13 +154,16 @@ namespace Voxel.Core
                 case Chest: return "Chest";
                 case Stockpile: return "Stockpile";
                 case SmallStockpile: return "Small stockpile";
+                case Campfire: return "Campfire";
                 case Shovel: return "Shovel";
                 case Pickaxe: return "Pickaxe";
                 case Axe: return "Axe";
                 case Scythe: return "Scythe";
                 case Hoe: return "Hoe";
                 case Bow: return "Bow";
-                default: return IsSeed(item) ? "Seed" : IsProduce(item) ? "Crop" : IsWood(item) ? "Wood" : IsCarcass(item) ? "Carcass" : "Unknown item";
+                default:
+                    if (Dishes.TryGet(item, out Dish dish)) return dish.Name;
+                    return IsSeed(item) ? "Seed" : IsProduce(item) ? "Crop" : IsWood(item) ? "Wood" : IsCarcass(item) ? "Carcass" : "Unknown item";
             }
         }
     }

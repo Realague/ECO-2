@@ -462,3 +462,47 @@ Missing ingredients	Il manque des ingrédients
 No room in your bag for it	Pas de place dans votre sac
 Already crafting	Fabrication déjà en cours
 You can't craft that	Impossible de fabriquer ça
+
+# Campfire
+Campfire	Feu de camp
+Station	Poste de travail
+Dish	Plat
+Baked potato	Pomme de terre au four
+Grilled maize	Maïs grillé
+Flatbread	Galette
+Oat porridge	Porridge d'avoine
+Steamed rice	Riz vapeur
+Bean stew	Ragoût de haricots
+Vegetable soup	Soupe de légumes
+Roasted squash	Courge rôtie
+Mushroom skewer	Brochette de champignons
+Cooked on a campfire: it feeds more than the crops it is made from, and in a better balance. Right click it here, or hold it and right click, to eat it.	Cuit sur un feu de camp : il nourrit plus que les récoltes dont il est fait, et de façon plus équilibrée. Clic droit dessus ici, ou en main avec un clic droit, pour le manger.
+Cooks dishes from crops. Queue a dish, put calories into it, and lay wood by the fire: it burns only while it cooks. Ingredients come from your bag and the chests linked to it (those of its claimed zone), and dishes go into them.	Cuisine des plats à partir des récoltes. Mettez un plat en file, apportez-lui des calories et posez du bois près du feu : il ne brûle que pendant la cuisson. Les ingrédients viennent de votre sac et des coffres liés au feu (ceux de sa zone revendiquée), et les plats y vont.
+Campfire · {0}	Feu de camp · {0}
+Campfire · {0} · cooking	Feu de camp · {0} · en cuisson
+The queue is full ({0})	La file est pleine ({0})
+No room to give back the ingredients	Pas de place pour rendre les ingrédients
+The fire holds {0} wood at most	Le feu prend {0} bois au plus
+Ingredients are taken from your bag, then from the linked chests (those of the campfire's claimed zone; off claimed land, the public chests within 8 blocks), and dishes go into them.	Les ingrédients sont pris dans votre sac, puis dans les coffres liés (ceux de la zone revendiquée du feu ; hors des terres revendiquées, les coffres publics à 8 blocs ou moins), et les plats y vont.
+Wood by the fire (20 at most): it burns only while a dish cooks, 30 s a log	Bois près du feu (20 au plus) : il ne brûle que pendant une cuisson, 30 s par bûche
+What is left of the log alight	Ce qui reste de la bûche allumée
+Dishes	Plats
+Queue	File
+Nothing queued: click a dish.	Rien en file : cliquez sur un plat.
+Click	Clic
+queue a dish	mettre un plat en file
+all the calories, all the wood	toutes les calories, tout le bois
+No linked chest	Aucun coffre lié
+1 linked chest	1 coffre lié
+{0} linked chests	{0} coffres liés
+Queue ({0} / {1})	File ({0} / {1})
+by {0}	par {0}
++{0} kcal	+{0} kcal
+Shift + click: all it needs	Maj + clic : tout ce qu'il faut
+Cancel: the ingredients come back, the calories put in are lost	Annuler : les ingrédients reviennent, les calories apportées sont perdues
+{0} / {1} kcal: needs calories	{0} / {1} kcal : il faut des calories
+Ready: waits its turn	Prêt : attend son tour
+Needs firewood	Il faut du bois
+No linked chest to put it in	Aucun coffre lié où le mettre
+No room in the linked chests	Pas de place dans les coffres liés
+Cooking… {0} s	Cuisson… {0} s

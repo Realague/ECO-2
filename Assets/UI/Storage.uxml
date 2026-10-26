@@ -37,7 +37,7 @@
             </ui:VisualElement>
 
             <!-- The storage: a chest's items, or a stockpile's nine piles (those of its claimed area together). -->
-            <ui:VisualElement class="inventory-main storage-half storage-half--right">
+            <ui:VisualElement name="store-half" class="inventory-main storage-half storage-half--right">
                 <ui:VisualElement class="items">
                     <ui:VisualElement class="items-heading">
                         <ui:Label name="store-title" text="In the chest" class="column-title items-title" />
@@ -61,6 +61,49 @@
                         </ui:VisualElement>
                         <ui:Button name="pickup" class="button button--secondary storage-pickup">
                             <ui:Label name="pickup-text" text="Pick up" class="button-text" />
+                        </ui:Button>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- A campfire (CampfirePage): its wood and linked chests, the dishes it cooks, and its queue. -->
+            <ui:VisualElement name="campfire-half" class="inventory-main storage-half storage-half--right campfire-half">
+                <ui:VisualElement class="items">
+                    <ui:VisualElement class="items-heading">
+                        <ui:Label text="Campfire" class="column-title items-title" />
+                        <ui:Label name="fire-linked" class="fire-linked" tooltip="Ingredients are taken from your bag, then from the linked chests (those of the campfire's claimed zone; off claimed land, the public chests within 8 blocks), and dishes go into them." />
+                        <ui:VisualElement class="carry-count" tooltip="Wood by the fire (20 at most): it burns only while a dish cooks, 30 s a log">
+                            <ui:VisualElement class="icon icon--category-wood carry-count-icon" />
+                            <ui:Label name="fire-fuel" class="carry-count-text" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="fire-burn" tooltip="What is left of the log alight">
+                            <ui:VisualElement name="fire-burn-fill" class="fire-burn-fill" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="fire-columns">
+                        <ui:VisualElement class="fire-column">
+                            <ui:Label text="Dishes" class="fire-column-title" />
+                            <ui:VisualElement class="item-well fire-well">
+                                <ui:ScrollView name="fire-recipes" class="fire-list" />
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                        <ui:VisualElement class="fire-column fire-column--right">
+                            <ui:Label name="fire-queue-title" text="Queue" class="fire-column-title" />
+                            <ui:VisualElement class="item-well fire-well">
+                                <ui:Label name="fire-queue-empty" text="Nothing queued: click a dish." class="items-empty" />
+                                <ui:ScrollView name="fire-queue" class="fire-list" />
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="storage-footer">
+                        <ui:VisualElement class="storage-hint">
+                            <ui:VisualElement class="key"><ui:Label text="Click" class="key-text" /></ui:VisualElement>
+                            <ui:Label text="queue a dish" class="storage-hint-text" />
+                            <ui:VisualElement class="key"><ui:Label text="Shift + click" class="key-text" /></ui:VisualElement>
+                            <ui:Label text="all the calories, all the wood" class="storage-hint-text" />
+                        </ui:VisualElement>
+                        <ui:Button name="fire-pickup" class="button button--secondary storage-pickup">
+                            <ui:Label text="Pick up" class="button-text" />
                         </ui:Button>
                     </ui:VisualElement>
                 </ui:VisualElement>

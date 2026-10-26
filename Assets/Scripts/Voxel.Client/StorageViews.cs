@@ -41,6 +41,9 @@ namespace Voxel.Client
         private readonly Mesh frame;
         private readonly Mesh smallFrame;
         private readonly Mesh outline;
+        private readonly Mesh campfire;
+        private readonly Mesh flame;
+        private readonly RenderParams flameLook;
         private readonly Dictionary<int, float> lidAngles = new Dictionary<int, float>();
         private readonly Dictionary<int, Pile> piles = new Dictionary<int, Pile>();
         private readonly HashSet<int> seen = new HashSet<int>();
@@ -60,11 +63,12 @@ namespace Voxel.Client
             public readonly List<int> WoodSpecies = new List<int>();
         }
 
-        public StorageViews(Material woodMaterial, Material ironMaterial, Material blockMaterial, IReadOnlyList<SpeciesAsset> plants)
+        public StorageViews(Material woodMaterial, Material ironMaterial, Material blockMaterial, Material flameMaterial, IReadOnlyList<SpeciesAsset> plants)
         {
             wood = Params(woodMaterial);
             iron = Params(ironMaterial);
             blocks = Params(blockMaterial);
+            if (flameMaterial != null) flameLook = new RenderParams(flameMaterial) { shadowCastingMode = ShadowCastingMode.Off, receiveShadows = false };
             this.woodMaterial = woodMaterial;
             this.plants = plants;
 
@@ -77,6 +81,8 @@ namespace Voxel.Client
             frame = BoxMesh.Build("StockpileFrame", new[] { FrameBoxes(StorageRules.StockpileSide) });
             smallFrame = BoxMesh.Build("SmallStockpileFrame", new[] { FrameBoxes(StorageRules.SmallStockpileSide) });
             outline = BoxMesh.Build("StorageOutline", new[] { OutlineBoxes() });
+            campfire = BoxMesh.Build("Campfire", new[] { CampfireShapes.Logs, CampfireShapes.Stones });
+            flame = BoxMesh.Build("CampfireFlame", new[] { new List<(Vector3, Vector3)> { (new Vector3(0f, 0.5f, 0f), Vector3.one) } });
         }
 
         // How high a pile of this many blocks stands.
@@ -86,12 +92,32 @@ namespace Voxel.Client
             return layers / 3f;
         }
 
-        // Draws a storage this frame (open: someone has it open).
+        // Draws a storage this frame (open: someone has it open; for a campfire, it burns).
         public void Add(Storage storage, bool open)
         {
             seen.Add(storage.Id);
             if (storage.Kind == StorageKind.Chest) DrawChest(storage, open);
+            else if (storage.Kind == StorageKind.Campfire) DrawCampfire(storage, open);
             else DrawStockpile(storage);
+        }
+
+        // Stones and logs, and while it burns a flame that flickers (two crossed boxes, each its own pace).
+        private void DrawCampfire(Storage storage, bool burning)
+        {
+            var foot = new Vector3(storage.Position.X + 0.5f, storage.Position.Y, storage.Position.Z + 0.5f);
+            Matrix4x4 at = Matrix4x4.TRS(foot, Quaternion.Euler(0f, storage.Facing * 90f, 0f), Vector3.one);
+            Graphics.RenderMesh(wood, campfire, 0, at);
+            Graphics.RenderMesh(iron, campfire, 1, at);
+            if (!burning || flameLook.material == null) return;
+
+            float time = Time.time + storage.Id * 1.7f;
+            for (int i = 0; i < 2; i++)
+            {
+                float flicker = Mathf.PerlinNoise(time * 3.1f, i * 5.3f);
+                var size = new Vector3(CampfireShapes.Flame.size.x * (0.8f + 0.3f * flicker), CampfireShapes.Flame.size.y * (0.7f + 0.6f * flicker), CampfireShapes.Flame.size.z * (0.8f + 0.3f * flicker));
+                Matrix4x4 turn = Matrix4x4.TRS(foot + Vector3.up * 0.08f, Quaternion.Euler(0f, 45f * i + storage.Facing * 90f, 0f), size);
+                Graphics.RenderMesh(flameLook, flame, 0, turn);
+            }
         }
 
         // Where held storage would go: a chest's cell, or a stockpile's cells from its corner.
@@ -100,10 +126,11 @@ namespace Voxel.Client
             RenderParams look = valid ? validOutline : invalidOutline;
             if (look.material == null) return;
 
-            Vector3 size = kind == StorageKind.Chest
-                ? new Vector3(1f - 2f * StorageSync.ChestInset, StorageSync.ChestHeight, 1f - 2f * StorageSync.ChestInset)
+            float height = kind == StorageKind.Campfire ? StorageSync.CampfireHeight : StorageSync.ChestHeight;
+            Vector3 size = StorageRules.IsSingleCell(kind)
+                ? new Vector3(1f - 2f * StorageSync.ChestInset, height, 1f - 2f * StorageSync.ChestInset)
                 : new Vector3(StorageRules.SideOf(kind), 1f / 3f, StorageRules.SideOf(kind));
-            Vector3 corner = kind == StorageKind.Chest
+            Vector3 corner = StorageRules.IsSingleCell(kind)
                 ? new Vector3(position.X + StorageSync.ChestInset, position.Y, position.Z + StorageSync.ChestInset)
                 : new Vector3(position.X, position.Y, position.Z);
             Graphics.RenderMesh(look, outline, 0, Matrix4x4.TRS(corner, Quaternion.identity, size));

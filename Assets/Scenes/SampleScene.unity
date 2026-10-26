@@ -939,6 +939,7 @@ MonoBehaviour:
   claimSync: {fileID: 490447459}
   woodMaterial: {fileID: 2100000, guid: 17965ac439377474abca152ff17c9021, type: 2}
   ironMaterial: {fileID: 2100000, guid: 582f92c22b627724db3f3da36c5b3b4f, type: 2}
+  flameMaterial: {fileID: 2100000, guid: 6844c1b69698da5458e6978e203ff065, type: 2}
   voxelWorld: {fileID: 1566503039}
 --- !u!114 &490447459
 MonoBehaviour:

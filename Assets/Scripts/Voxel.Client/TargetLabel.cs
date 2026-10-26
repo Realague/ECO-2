@@ -87,6 +87,12 @@ namespace Voxel.Client
             if (!storageSync.TryDescribe(storageId, out StorageKind kind, out string owner, out bool yours, out int blocks)) return null;
 
             string whose = yours ? Loc.T("yours") : owner.Length > 0 ? owner : Loc.T("someone's");
+            if (kind == StorageKind.Campfire)
+            {
+                string fire = storageSync.IsBurning(storageId) ? Loc.T("Campfire · {0} · cooking", whose) : Loc.T("Campfire · {0}", whose);
+                return storageSync.IsPublic(storageId) ? Loc.T("{0} · public", fire) : fire;
+            }
+
             string name = kind == StorageKind.Chest
                 ? Loc.T("Chest · {0}", whose)
                 : kind == StorageKind.SmallStockpile

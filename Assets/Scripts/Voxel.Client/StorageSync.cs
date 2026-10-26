@@ -21,7 +21,13 @@ namespace Voxel.Client
         TooHungry = 8,
 
         // Only found by the client, which then says whose land it is (ClaimSync); the server tells it.
-        Claimed = 9
+        Claimed = 9,
+
+        // A campfire's (StorageSync.Campfire.cs).
+        QueueFull = 10,
+        MissingIngredients = 11,
+        NoRoomToGiveBack = 12,
+        FuelFull = 13
     }
 
     // Chests and stockpiles placed in the world (StorageRules, Storages). The server keeps them and
@@ -32,8 +38,9 @@ namespace Voxel.Client
     // others and pick it up once empty (anyone, while it is public). Every
     // machine knows where each one stands, whose it is, whether it is open and a stockpile's piles (to
     // draw them and collide with them); only the players who opened one get what a chest holds and its
-    // access list. Nothing sprouts where storage stands (Ecosystem.BlockColumn).
-    public class StorageSync : MonoBehaviour
+    // access list. Nothing sprouts where storage stands (Ecosystem.BlockColumn). Campfires are placed,
+    // owned, opened and picked up the same way; what they do is in StorageSync.Campfire.cs.
+    public partial class StorageSync : MonoBehaviour
     {
         private const string AllMessage = "Store.All";
         private const string AddedMessage = "Store.Added";
@@ -53,6 +60,9 @@ namespace Voxel.Client
         public const float ChestInset = 0.1f;
         public const float ChestHeight = 0.8f;
 
+        // A campfire's box (stones and logs), for aiming.
+        public const float CampfireHeight = 0.5f;
+
         // How often the server checks that open storage is still in reach of who opened it.
         private const float ReachCheckSeconds = 0.5f;
 
@@ -67,6 +77,9 @@ namespace Voxel.Client
         [SerializeField] private ClaimSync claimSync;
         [SerializeField] private Material woodMaterial;
         [SerializeField] private Material ironMaterial;
+
+        // A campfire's flame (TorchFlame.mat: unlit, so it looks lit by itself at night).
+        [SerializeField] private Material flameMaterial;
         [SerializeField] private VoxelWorld voxelWorld;
 
         // What every machine shows of a storage besides where it stands.
@@ -211,6 +224,10 @@ namespace Voxel.Client
                 case StorageRefusal.NotAccepted: return "It doesn't go in there";
                 case StorageRefusal.TooHungry: return InventorySync.TooHungryMessage;
                 case StorageRefusal.Claimed: return ClaimSync.TextOf(ClaimRefusal.None, "");
+                case StorageRefusal.QueueFull: return Loc.T("The queue is full ({0})", Campfire.MaxJobs);
+                case StorageRefusal.MissingIngredients: return "Missing ingredients";
+                case StorageRefusal.NoRoomToGiveBack: return "No room to give back the ingredients";
+                case StorageRefusal.FuelFull: return Loc.T("The fire holds {0} wood at most", Campfire.MaxFuel);
                 default: return "No room here";
             }
         }
@@ -235,6 +252,7 @@ namespace Voxel.Client
             Messaging.RegisterNamedMessageHandler(CloseMessage, OnClose);
             Messaging.RegisterNamedMessageHandler(MoveMessage, OnMove);
             Messaging.RegisterNamedMessageHandler(PickupMessage, OnPickup);
+            StartCampfireServer();
             networkManager.OnClientConnectedCallback += OnClientConnected;
             networkManager.OnClientDisconnectCallback += OnClientDisconnected;
             claimSync.ClaimsChanged += OnClaimsChanged;
@@ -251,6 +269,7 @@ namespace Voxel.Client
             Messaging.RegisterNamedMessageHandler(ContentsMessage, OnContents);
             Messaging.RegisterNamedMessageHandler(ClosedMessage, OnClosed);
             Messaging.RegisterNamedMessageHandler(RefusedMessage, OnRefused);
+            StartCampfireClient();
         }
 
         public void Stop()
@@ -272,6 +291,7 @@ namespace Voxel.Client
             viewers.Clear();
             openedBy.Clear();
             OpenedId = 0;
+            StopCampfires();
             views?.Clear();
             running = false;
         }
@@ -363,10 +383,11 @@ namespace Voxel.Client
         private static void BoxOf(Storage storage, int index, out System.Numerics.Vector3 min, out System.Numerics.Vector3 max)
         {
             BlockPos cell = storage.Cell(index);
-            if (storage.Kind == StorageKind.Chest)
+            if (StorageRules.IsSingleCell(storage.Kind))
             {
+                float top = storage.Kind == StorageKind.Campfire ? CampfireHeight : ChestHeight;
                 min = new System.Numerics.Vector3(cell.X + ChestInset, cell.Y, cell.Z + ChestInset);
-                max = new System.Numerics.Vector3(cell.X + 1 - ChestInset, cell.Y + ChestHeight, cell.Z + 1 - ChestInset);
+                max = new System.Numerics.Vector3(cell.X + 1 - ChestInset, cell.Y + top, cell.Z + 1 - ChestInset);
                 return;
             }
 
@@ -381,11 +402,11 @@ namespace Voxel.Client
         public bool CanPlaceHere(StorageKind kind, BlockPos target, int facing, Vector3 playerFeet, out BlockPos position, out StorageRefusal refusal)
         {
             World world = worldSync.World;
-            position = kind == StorageKind.Chest ? target : StorageRules.StockpileCorner(target, facing, StorageRules.SideOf(kind));
+            position = StorageRules.IsSingleCell(kind) ? target : StorageRules.StockpileCorner(target, facing, StorageRules.SideOf(kind));
             refusal = StorageRefusal.NoRoom;
             if (world == null) return false;
 
-            bool fits = kind == StorageKind.Chest ? StorageRules.CanPlaceChest(world, position) : StorageRules.CanPlaceStockpile(world, position, StorageRules.SideOf(kind));
+            bool fits = StorageRules.IsSingleCell(kind) ? StorageRules.CanPlaceChest(world, position) : StorageRules.CanPlaceStockpile(world, position, StorageRules.SideOf(kind));
             if (!fits) return false;
 
             var probe = new Storage(0, kind, position, facing, "?");
@@ -513,9 +534,11 @@ namespace Voxel.Client
                 CheckViewers();
             }
 
+            if (IsServer) TickCampfires(Time.unscaledDeltaTime);
+
             if (Application.isBatchMode) return;
 
-            if (views == null) views = new StorageViews(woodMaterial, ironMaterial, voxelWorld.BlockMaterial, ecosystemSync.PlantAssets);
+            if (views == null) views = new StorageViews(woodMaterial, ironMaterial, voxelWorld.BlockMaterial, flameMaterial, ecosystemSync.PlantAssets);
             foreach (Storage storage in shown.All)
             {
                 views.Add(storage, details.TryGetValue(storage.Id, out Shown detail) && detail.Open);
@@ -544,8 +567,8 @@ namespace Voxel.Client
             float reach = PlayerRules.Reach + BlockEditRules.ReachTolerance + 1f;
             if ((target3 - eyes).sqrMagnitude > reach * reach) return;
 
-            BlockPos position = kind == StorageKind.Chest ? target : StorageRules.StockpileCorner(target, facing, StorageRules.SideOf(kind));
-            bool fits = kind == StorageKind.Chest ? StorageRules.CanPlaceChest(serverWorld, position) : StorageRules.CanPlaceStockpile(serverWorld, position, StorageRules.SideOf(kind));
+            BlockPos position = StorageRules.IsSingleCell(kind) ? target : StorageRules.StockpileCorner(target, facing, StorageRules.SideOf(kind));
+            bool fits = StorageRules.IsSingleCell(kind) ? StorageRules.CanPlaceChest(serverWorld, position) : StorageRules.CanPlaceStockpile(serverWorld, position, StorageRules.SideOf(kind));
             var probe = new Storage(0, kind, position, facing, playerId);
             var cells = new List<BlockPos>();
             for (int i = 0; i < probe.CellCount; i++)
@@ -611,7 +634,9 @@ namespace Voxel.Client
 
             watching.Add(clientId);
             SendContents(clientId, storage);
-            SetOpen(storage, true);
+
+            // A chest's lid rises while it is open; a campfire's flag is whether it burns.
+            if (storage.Kind != StorageKind.Campfire) SetOpen(storage, true);
         }
 
         private void Close(ulong clientId, int storageId)
@@ -625,7 +650,7 @@ namespace Voxel.Client
             if (watching.Count > 0) return;
 
             viewers.Remove(storageId);
-            if (store.TryGet(storageId, out Storage storage)) SetOpen(storage, false);
+            if (store.TryGet(storageId, out Storage storage) && storage.Kind != StorageKind.Campfire) SetOpen(storage, false);
         }
 
         // The server closes a player's storage (it went, they left its reach or lost access).
@@ -647,6 +672,7 @@ namespace Voxel.Client
         {
             if (count <= 0 || !store.TryGet(storageId, out Storage storage) || !registry.TryGetPlayerId(clientId, out string playerId)) return;
             if (!CanUse(playerId, storage) || !InReach(clientId, storage) || !registry.TryGetState(clientId, out PlayerState state)) return;
+            if (storage.Kind == StorageKind.Campfire) return;
 
             List<Storage> pool = PoolOf(storage);
             bool chest = storage.Kind == StorageKind.Chest;
@@ -718,10 +744,14 @@ namespace Voxel.Client
                 return;
             }
 
-            // What it holds goes to the rest of its pool, if it all fits there.
+            // What it holds goes to the rest of its pool, if it all fits there; a campfire's wood goes
+            // back to the bag, once nothing is queued.
             List<Storage> pool = PoolOf(storage);
             pool.Remove(storage);
-            if (!StoragePool.TryEmptyInto(storage, pool, ecosystemSync.ItemWeights))
+            bool emptied = storage.Kind == StorageKind.Campfire
+                ? TryEmptyCampfire(clientId, storage)
+                : StoragePool.TryEmptyInto(storage, pool, ecosystemSync.ItemWeights);
+            if (!emptied)
             {
                 Refuse(clientId, StorageRefusal.NotEmpty);
                 return;
@@ -806,6 +836,12 @@ namespace Voxel.Client
         // added up, a stockpile pool's piles one stockpile after another).
         private void SendContents(ulong clientId, Storage storage)
         {
+            if (storage.Kind == StorageKind.Campfire)
+            {
+                SendCampfire(clientId, storage);
+                return;
+            }
+
             bool owner = registry.TryGetPlayerId(clientId, out string playerId) && playerId == OwnerOf(storage);
             List<Storage> pool = PoolOf(storage);
             Inventory contents = storage.Kind == StorageKind.Chest ? StoragePool.Contents(pool) : null;
@@ -890,7 +926,7 @@ namespace Voxel.Client
         private List<Storage> PoolOf(Storage storage)
         {
             var pool = new List<Storage>();
-            if (!TryLandOf(storage, out int x, out int z))
+            if (storage.Kind == StorageKind.Campfire || !TryLandOf(storage, out int x, out int z))
             {
                 pool.Add(storage);
                 return pool;
@@ -899,13 +935,17 @@ namespace Voxel.Client
             int zone = claimSync.ZoneAt(x, z);
             foreach (Storage other in store.All)
             {
-                if (StorageRules.IsStockpile(other.Kind) != StorageRules.IsStockpile(storage.Kind)) continue;
+                if (PoolClassOf(other.Kind) != PoolClassOf(storage.Kind)) continue;
                 if (other == storage || (TryLandOf(other, out int ox, out int oz) && claimSync.ZoneAt(ox, oz) == zone)) pool.Add(other);
             }
 
             pool.Sort((a, b) => a.Id.CompareTo(b.Id));
             return pool;
         }
+
+        // What shares with what: chests together, stockpiles (large and small) together, and a campfire
+        // with nothing.
+        private static int PoolClassOf(StorageKind kind) => StorageRules.IsStockpile(kind) ? 1 : kind == StorageKind.Chest ? 0 : 2;
 
         // Whether a storage is open to everyone (none of its cells lies on claimed land), as this
         // machine knows the claims: for the aiming label and the storage window.

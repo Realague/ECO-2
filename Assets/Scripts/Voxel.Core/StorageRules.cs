@@ -7,7 +7,10 @@ namespace Voxel.Core
     {
         Chest = 1,
         Stockpile = 2,
-        SmallStockpile = 3
+        SmallStockpile = 3,
+
+        // Not storage but placed like it (one cell, like a chest): a station that cooks (Campfire).
+        Campfire = 4
     }
 
     // What storage holds and where it may stand. A chest stands in one cell on top of a solid block
@@ -30,7 +33,10 @@ namespace Voxel.Core
         public const int SmallStockpileSide = 2;
         public const int SmallPileSize = 20;
 
-        public static bool IsKind(byte kind) => kind == (byte)StorageKind.Chest || kind == (byte)StorageKind.Stockpile || kind == (byte)StorageKind.SmallStockpile;
+        public static bool IsKind(byte kind) => kind >= (byte)StorageKind.Chest && kind <= (byte)StorageKind.Campfire;
+
+        // Whether it stands in one cell like a chest (a chest or a campfire), rather than on a patch.
+        public static bool IsSingleCell(StorageKind kind) => !IsStockpile(kind);
 
         public static bool IsStockpile(StorageKind kind) => kind == StorageKind.Stockpile || kind == StorageKind.SmallStockpile;
 
@@ -49,13 +55,21 @@ namespace Voxel.Core
             {
                 case StorageKind.Chest: return Items.Chest;
                 case StorageKind.SmallStockpile: return Items.SmallStockpile;
+                case StorageKind.Campfire: return Items.Campfire;
                 default: return Items.Stockpile;
             }
         }
 
         public static bool TryKindOf(int item, out StorageKind kind)
         {
-            kind = item == Items.Chest ? StorageKind.Chest : item == Items.SmallStockpile ? StorageKind.SmallStockpile : StorageKind.Stockpile;
+            switch (item)
+            {
+                case Items.Chest: kind = StorageKind.Chest; break;
+                case Items.SmallStockpile: kind = StorageKind.SmallStockpile; break;
+                case Items.Campfire: kind = StorageKind.Campfire; break;
+                default: kind = StorageKind.Stockpile; break;
+            }
+
             return Items.IsStorage(item);
         }
 
