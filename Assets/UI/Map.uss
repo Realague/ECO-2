@@ -273,6 +273,18 @@
     padding: 0;
 }
 
+/* Claimed land tinted on the ground in the world (ClaimOverlay). */
+.land-toggle {
+    margin: 4px 0 12px 0;
+}
+
+.land-toggle .unity-toggle__text,
+.land-toggle .unity-label {
+    font-size: 16px;
+    color: var(--text);
+    white-space: normal;
+}
+
 .land-subtitle {
     font-size: 18px;
     -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");

@@ -138,5 +138,20 @@ namespace Voxel.Core.Tests
             Assert.IsTrue(stockpiles[0].IsEmpty);
             Assert.AreEqual(30, stockpiles[1].Piles.CountOf(Blocks.Dirt));
         }
+
+        [Test]
+        public void Taking_AnItemFromStockpiles_DrawsFromEveryPileOfIt()
+        {
+            List<Storage> stockpiles = Stockpiles(2);
+            StoragePool.AddToStockpiles(stockpiles, Blocks.Dirt, StorageRules.StockpileCapacity + 10);
+            stockpiles[0].Piles.Take(0, 27);
+            stockpiles[0].Piles.Add(Blocks.Sand, 5);
+
+            Assert.AreEqual(StorageRules.StockpileCapacity - 17, StoragePool.StockpileCount(stockpiles, Blocks.Dirt));
+            Assert.AreEqual(200, StoragePool.TakeFromStockpiles(stockpiles, Blocks.Dirt, 200));
+            Assert.AreEqual(StorageRules.StockpileCapacity - 217, StoragePool.StockpileCount(stockpiles, Blocks.Dirt));
+            Assert.AreEqual(5, StoragePool.StockpileCount(stockpiles, Blocks.Sand), "other piles untouched");
+            Assert.AreEqual(StorageRules.StockpileCapacity - 217, StoragePool.TakeFromStockpiles(stockpiles, Blocks.Dirt, 999), "no more than there is");
+        }
     }
 }

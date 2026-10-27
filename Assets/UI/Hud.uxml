@@ -42,6 +42,10 @@
                 <ui:VisualElement class="key"><ui:Label text="T" class="key-text" /></ui:VisualElement>
                 <ui:Label text="Commands" class="hud-hint-text" />
             </ui:VisualElement>
+            <ui:VisualElement class="hud-hint" picking-mode="Ignore">
+                <ui:VisualElement class="key"><ui:Label text="C" class="key-text" /></ui:VisualElement>
+                <ui:Label text="Claimed land" class="hud-hint-text" />
+            </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

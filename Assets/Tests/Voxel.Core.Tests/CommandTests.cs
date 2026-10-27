@@ -77,6 +77,27 @@ namespace Voxel.Core.Tests
         {
             Assert.AreEqual("tallgrass", Command.Normalise("Tall_Grass"));
             Assert.AreEqual("snowhare", Command.Normalise("SnowHare"));
+            Assert.AreEqual("boisdechene", Command.Normalise("Bois de chêne"), "accents are dropped");
+        }
+
+        [Test]
+        public void Give_AnItem_WithACountAndAPlayer()
+        {
+            Assert.IsTrue(Command.TryParse("/give oak wood 20 #3", out Command command, out _));
+            Assert.AreEqual(CommandKind.Give, command.Kind);
+            Assert.AreEqual("oakwood", command.Name);
+            Assert.AreEqual(20, command.Count);
+            Assert.AreEqual(3, command.Player);
+
+            Assert.IsTrue(Command.TryParse("give Pioche", out command, out _));
+            Assert.AreEqual("pioche", command.Name);
+            Assert.AreEqual(1, command.Count);
+            Assert.AreEqual(-1, command.Player, "to the one who typed it");
+
+            Assert.IsFalse(Command.TryParse("/give", out _, out _));
+            Assert.IsFalse(Command.TryParse("/give dirt 0", out _, out _));
+            Assert.IsFalse(Command.TryParse($"/give dirt {Command.MaxGiveCount + 1}", out _, out _));
+            Assert.IsFalse(Command.TryParse("/give dirt 5 #x", out _, out _));
         }
     }
 }

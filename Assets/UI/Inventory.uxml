@@ -71,6 +71,12 @@
                     <ui:VisualElement class="item-well recipe-well">
                         <ui:ScrollView name="recipe-list" class="recipe-list" />
                     </ui:VisualElement>
+                    <!-- The queue: orders made one after another, waiting for their ingredients if need be. -->
+                    <ui:Label name="craft-queue-title" text="Queue" class="queue-title" />
+                    <ui:VisualElement class="item-well queue-well">
+                        <ui:Label name="craft-queue-empty" text="Nothing queued: choose a recipe, then Add to the queue." class="items-empty" />
+                        <ui:ScrollView name="craft-queue" class="queue-list" />
+                    </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>
 
@@ -97,6 +103,12 @@
                         <ui:VisualElement class="icon icon--scales details-line-icon" />
                         <ui:Label text="Weight" class="details-line-label" />
                         <ui:Label name="details-weight" class="details-line-value" />
+                    </ui:VisualElement>
+                    <!-- Fuel only: how long one burns on a campfire. -->
+                    <ui:VisualElement name="details-burn-line" class="details-line">
+                        <ui:VisualElement class="icon icon--fire details-line-icon" />
+                        <ui:Label text="Burn time" class="details-line-label" />
+                        <ui:Label name="details-burn" class="details-line-value" />
                     </ui:VisualElement>
                     <!-- Food only: its calories, and its nutrients in the stomach pie's colours. -->
                     <ui:VisualElement name="details-food">
@@ -172,7 +184,7 @@
                         <ui:Label text="Ingredients" class="details-section" />
                         <ui:VisualElement name="recipe-ingredients" />
                         <ui:VisualElement class="details-line">
-                            <ui:VisualElement class="icon icon--rotate details-line-icon" />
+                            <ui:VisualElement class="icon icon--hourglass details-line-icon" />
                             <ui:Label text="Duration" class="details-line-label" />
                             <ui:Label name="recipe-duration" class="details-line-value" />
                         </ui:VisualElement>
@@ -183,7 +195,7 @@
                         </ui:VisualElement>
                     </ui:ScrollView>
 
-                    <!-- Craft, or how far the craft under way has gone and Cancel. -->
+                    <!-- How far the item under way has gone, how many to make, and Add to the queue. -->
                     <ui:VisualElement class="recipe-actions">
                         <ui:Label name="recipe-reason" class="recipe-reason" />
                         <ui:VisualElement name="recipe-progress" class="recipe-progress">
@@ -192,12 +204,10 @@
                             </ui:VisualElement>
                             <ui:Label name="recipe-progress-text" class="recipe-progress-text" />
                         </ui:VisualElement>
+                        <ui:VisualElement name="recipe-quantity" />
                         <ui:VisualElement class="recipe-buttons">
                             <ui:Button name="recipe-craft" class="button button--primary recipe-button">
-                                <ui:Label text="Craft" class="button-text" />
-                            </ui:Button>
-                            <ui:Button name="recipe-cancel" class="button button--secondary recipe-button">
-                                <ui:Label text="Cancel" class="button-text" />
+                                <ui:Label text="Add to the queue" class="button-text" />
                             </ui:Button>
                         </ui:VisualElement>
                     </ui:VisualElement>

@@ -22,9 +22,13 @@ namespace Voxel.Core
         // Shovel hits to dig a stump out.
         public const int StumpHits = 3;
 
-        // The fewest and most axe hits a tree takes, whatever its wood.
-        public const int FewestFellingHits = 2;
-        public const int MostFellingHits = 8;
+        // Axe hits a tree takes for each wood of its size (WoodOf), within these bounds.
+        public const int FellingHitsPerWood = 4;
+        public const int FewestFellingHits = 8;
+        public const int MostFellingHits = 32;
+
+        // The wood a log lying on the ground gives when picked up.
+        public const int WoodPerLog = 3;
 
         // Hits a block takes to break, by hardness; 0 for one that cannot be broken.
         public static int HitsToBreak(ushort block)
@@ -63,11 +67,12 @@ namespace Voxel.Core
             }
         }
 
-        // The wood a plant gives when felled: its species' yield for a grown one, less while young.
+        // How much wood a plant holds by its size: its species' yield for a grown one, less while young
+        // (it leaves a log for each, worth WoodPerLog, and takes FellingHitsPerWood axe hits for each).
         public static int WoodOf(int woodYield, float scale) => (int)Math.Round(woodYield * scale, MidpointRounding.ToEven);
 
-        // Axe hits to fell a plant giving this much wood; one scythe cut for one that gives none.
-        public static int HitsToFell(int wood) => wood <= 0 ? 1 : Math.Clamp(wood, FewestFellingHits, MostFellingHits);
+        // Axe hits to fell a plant holding this much wood; one cut for one that holds none.
+        public static int HitsToFell(int wood) => wood <= 0 ? 1 : Math.Clamp(wood * FellingHitsPerWood, FewestFellingHits, MostFellingHits);
 
         // The time between two hits.
         public static float SwingInterval(bool starving) => starving ? SwingSeconds * StarvingSwingFactor : SwingSeconds;
@@ -92,7 +97,7 @@ namespace Voxel.Core
             return Math.Max(0, hits - lost);
         }
 
-        // Felled wood lies on the ground as logs, one wood each.
+        // A felled tree lies on the ground as logs, one for each wood it held.
         public static int LogsOf(int wood) => Math.Max(0, wood);
 
         // A grown plant cut down gives one seed, and a second this often; a young one none.

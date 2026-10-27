@@ -1,9 +1,18 @@
 namespace Voxel.Core
 {
+    // What a ripe crop is harvested with, set per species: by hand (fruit, leafy and bean crops,
+    // mushrooms), a scythe (cereals and sunflowers) or a shovel (roots, dug up).
+    public enum HarvestTool : byte
+    {
+        Hand,
+        Scythe,
+        Shovel
+    }
+
     // Which tool each action needs (Items.Shovel...). Breaking a block needs a shovel for soft ground
-    // and a pickaxe for anything hard; felling a plant an axe if it gives wood, else a scythe;
-    // harvesting an annual crop a scythe, picking a perennial's fruit nothing; tilling a hoe; hunting
-    // the bow. Items.None means bare hands do.
+    // and a pickaxe for anything hard; felling a plant an axe if it gives wood, a shovel for a root
+    // crop, else a scythe; harvesting a crop its species' HarvestTool; tilling a hoe; hunting the bow.
+    // Items.None means bare hands do.
     public static class ToolRules
     {
         // The tool a block needs to be broken; Items.None for one that cannot be broken at all, or
@@ -38,8 +47,23 @@ namespace Voxel.Core
             return type == Blocks.Grass || type == Blocks.Dirt || type == Blocks.Mud || type == Blocks.Clay;
         }
 
-        public static int ToFell(bool givesWood) => givesWood ? Items.Axe : Items.Scythe;
+        // A plant giving wood is felled with an axe, a root crop dug up with a shovel, anything else cut
+        // with a scythe.
+        public static int ToFell(bool givesWood, HarvestTool harvestTool = HarvestTool.Hand)
+        {
+            if (givesWood) return Items.Axe;
+            return harvestTool == HarvestTool.Shovel ? Items.Shovel : Items.Scythe;
+        }
 
-        public static int ToHarvest(bool annual) => annual ? Items.Scythe : Items.None;
+        // The tool a ripe crop is harvested with (Items.None: by hand).
+        public static int ToHarvest(HarvestTool harvestTool)
+        {
+            switch (harvestTool)
+            {
+                case HarvestTool.Scythe: return Items.Scythe;
+                case HarvestTool.Shovel: return Items.Shovel;
+                default: return Items.None;
+            }
+        }
     }
 }

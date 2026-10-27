@@ -3,23 +3,42 @@
     <Style src="Inventory.uss" />
     <Style src="Storage.uss" />
 
-    <!-- StorageScreen fills both grids (the player's bag, the storage's items or piles), the weight or
-         fill of the storage, and moves the dragged item's ghost. -->
+    <!-- StorageScreen fills both sides (the player's bag, the storage's items or piles, PoolView), the
+         weight or fill of the storage, and moves the dragged item's ghost. A campfire has three tabs:
+         its cooking (CampfirePage), the bag and its linked chests, the bag and its wood. -->
     <ui:VisualElement name="screen" class="screen inventory-screen storage-screen">
         <ui:VisualElement class="inventory-tabs">
             <ui:Button name="tab-storage" class="inventory-tab inventory-tab--selected">
                 <ui:VisualElement class="icon icon--tab-inventory inventory-tab-icon" />
                 <ui:Label name="tab-storage-text" text="Chest" class="inventory-tab-text" />
             </ui:Button>
+            <ui:Button name="tab-cooking" class="inventory-tab">
+                <ui:VisualElement class="icon icon--fire inventory-tab-icon" />
+                <ui:Label text="Cooking" class="inventory-tab-text" />
+            </ui:Button>
+            <ui:Button name="tab-fire-inventory" class="inventory-tab">
+                <ui:VisualElement class="icon icon--backpack inventory-tab-icon" />
+                <ui:Label text="Inventories" class="inventory-tab-text" />
+            </ui:Button>
+            <ui:Button name="tab-fuel" class="inventory-tab">
+                <ui:VisualElement class="icon icon--category-wood inventory-tab-icon" />
+                <ui:Label text="Fuel" class="inventory-tab-text" />
+            </ui:Button>
             <ui:VisualElement class="inventory-tabs-space" />
             <ui:Label name="storage-owner" class="storage-owner" tooltip="On claimed land, storage is the land owner's, open to them and to the players they allow on their land (map, C); the chests, and the stockpiles, of one claimed area share what they hold. Off claimed land, anyone may open it." />
+            <ui:Button name="pickup" class="button button--secondary storage-pickup">
+                <ui:Label text="Pick up" class="button-text" />
+            </ui:Button>
         </ui:VisualElement>
 
+        <!-- Two inventories side by side, each on its own card: the bag, and the storage (or the
+             campfire's linked chests, or its wood). -->
         <ui:VisualElement name="storage-page" class="inventory-frame">
-            <!-- The player's bag: what the storage does not take is greyed. -->
-            <ui:VisualElement class="inventory-main storage-half">
+            <!-- The player's bag: what the other side does not take is greyed. -->
+            <ui:VisualElement class="inventory-main storage-half storage-card storage-card--bag">
                 <ui:VisualElement class="items">
-                    <ui:VisualElement class="items-heading">
+                    <ui:VisualElement class="items-heading storage-card-head">
+                        <ui:VisualElement class="icon icon--backpack storage-card-icon" />
                         <ui:Label name="bag-title" text="Your bag" class="column-title items-title" />
                         <ui:VisualElement class="carry-count" tooltip="Blocks carried (40 at most)">
                             <ui:VisualElement class="icon icon--backpack carry-count-icon" />
@@ -36,19 +55,46 @@
                 </ui:VisualElement>
             </ui:VisualElement>
 
-            <!-- The storage: a chest's items, or a stockpile's nine piles (those of its claimed area together). -->
-            <ui:VisualElement name="store-half" class="inventory-main storage-half storage-half--right">
+            <!-- Between two inventories, what moves goes from one to the other. -->
+            <ui:VisualElement class="storage-exchange" picking-mode="Ignore">
+                <ui:VisualElement class="storage-exchange-disc">
+                    <ui:VisualElement class="icon icon--left-right storage-exchange-icon" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- The storage: its pool merged or a card per chest or stockpile (PoolView). -->
+            <ui:VisualElement name="store-half" class="inventory-main storage-half storage-card storage-card--store">
                 <ui:VisualElement class="items">
-                    <ui:VisualElement class="items-heading">
+                    <ui:VisualElement class="items-heading storage-card-head">
+                        <ui:VisualElement name="store-icon" class="storage-card-icon storage-card-icon--item" />
                         <ui:Label name="store-title" text="In the chest" class="column-title items-title" />
+                        <ui:VisualElement name="view-toggle" class="view-toggle">
+                            <ui:Button name="view-merged" text="Merged" class="view-button view-button--first" tooltip="Everything the chests or stockpiles hold, added up" />
+                            <ui:Button name="view-split" text="Each one" class="view-button view-button--last" tooltip="Each chest or stockpile on its own" />
+                        </ui:VisualElement>
                         <ui:VisualElement class="carry-count">
                             <ui:VisualElement name="store-fill-icon" class="icon icon--scales carry-count-icon" />
                             <ui:Label name="store-fill" class="carry-count-text" />
                         </ui:VisualElement>
+                        <ui:VisualElement name="store-burn" class="fire-burn" tooltip="What is left of the log alight">
+                            <ui:VisualElement name="store-burn-fill" class="fire-burn-fill" />
+                        </ui:VisualElement>
                     </ui:VisualElement>
                     <ui:VisualElement name="store-well" class="item-well">
+                        <ui:Label name="store-empty" class="items-empty" />
                         <ui:ScrollView name="store-grid" class="item-grid" />
-                        <ui:ScrollView name="pile-grid" class="pile-grid" />
+                        <ui:ScrollView name="member-list" class="member-list" />
+                    </ui:VisualElement>
+                    <!-- A campfire's wood: how long it all burns, and the wood under the pointer. -->
+                    <ui:VisualElement name="fuel-info" class="fuel-info">
+                        <ui:VisualElement class="fuel-info-line">
+                            <ui:VisualElement class="icon icon--hourglass fuel-info-icon" />
+                            <ui:Label name="fuel-total" class="fuel-info-text" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="fuel-info-line">
+                            <ui:VisualElement class="icon icon--fire fuel-info-icon" />
+                            <ui:Label name="fuel-hovered" class="fuel-info-text fuel-info-text--muted" />
+                        </ui:VisualElement>
                     </ui:VisualElement>
                     <ui:VisualElement class="storage-footer">
                         <ui:VisualElement class="storage-hint">
@@ -59,18 +105,18 @@
                             <ui:VisualElement class="key"><ui:Label text="Right click" class="key-text" /></ui:VisualElement>
                             <ui:Label text="move one" class="storage-hint-text" />
                         </ui:VisualElement>
-                        <ui:Button name="pickup" class="button button--secondary storage-pickup">
-                            <ui:Label name="pickup-text" text="Pick up" class="button-text" />
-                        </ui:Button>
                     </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>
+        </ui:VisualElement>
 
-            <!-- A campfire (CampfirePage): its wood and linked chests, the dishes it cooks, and its queue. -->
-            <ui:VisualElement name="campfire-half" class="inventory-main storage-half storage-half--right campfire-half">
-                <ui:VisualElement class="items">
+        <!-- A campfire's cooking (CampfirePage), laid out as the inventory's crafting tab: the dishes and
+             the queue, then the chosen dish's sheet. -->
+        <ui:VisualElement name="cooking-page" class="inventory-frame">
+            <ui:VisualElement class="inventory-left">
+                <ui:VisualElement class="crafting-page">
                     <ui:VisualElement class="items-heading">
-                        <ui:Label text="Campfire" class="column-title items-title" />
+                        <ui:Label text="Dishes" class="column-title items-title" />
                         <ui:Label name="fire-linked" class="fire-linked" tooltip="Ingredients are taken from your bag, then from the linked chests (those of the campfire's claimed zone; off claimed land, the public chests within 8 blocks), and dishes go into them." />
                         <ui:VisualElement class="carry-count" tooltip="Wood by the fire (20 at most): it burns only while a dish cooks, 30 s a log">
                             <ui:VisualElement class="icon icon--category-wood carry-count-icon" />
@@ -79,32 +125,93 @@
                         <ui:VisualElement class="fire-burn" tooltip="What is left of the log alight">
                             <ui:VisualElement name="fire-burn-fill" class="fire-burn-fill" />
                         </ui:VisualElement>
-                    </ui:VisualElement>
-                    <ui:VisualElement class="fire-columns">
-                        <ui:VisualElement class="fire-column">
-                            <ui:Label text="Dishes" class="fire-column-title" />
-                            <ui:VisualElement class="item-well fire-well">
-                                <ui:ScrollView name="fire-recipes" class="fire-list" />
-                            </ui:VisualElement>
-                        </ui:VisualElement>
-                        <ui:VisualElement class="fire-column fire-column--right">
-                            <ui:Label name="fire-queue-title" text="Queue" class="fire-column-title" />
-                            <ui:VisualElement class="item-well fire-well">
-                                <ui:Label name="fire-queue-empty" text="Nothing queued: click a dish." class="items-empty" />
-                                <ui:ScrollView name="fire-queue" class="fire-list" />
-                            </ui:VisualElement>
+                        <ui:VisualElement class="carry-count fire-calories" tooltip="Your calories: the work put into dishes burns them">
+                            <ui:VisualElement class="icon icon--fire carry-count-icon" />
+                            <ui:Label name="fire-calories" class="carry-count-text" />
                         </ui:VisualElement>
                     </ui:VisualElement>
-                    <ui:VisualElement class="storage-footer">
-                        <ui:VisualElement class="storage-hint">
-                            <ui:VisualElement class="key"><ui:Label text="Click" class="key-text" /></ui:VisualElement>
-                            <ui:Label text="queue a dish" class="storage-hint-text" />
-                            <ui:VisualElement class="key"><ui:Label text="Shift + click" class="key-text" /></ui:VisualElement>
-                            <ui:Label text="all the calories, all the wood" class="storage-hint-text" />
+                    <ui:VisualElement class="item-well recipe-well">
+                        <ui:ScrollView name="fire-recipes" class="recipe-list" />
+                    </ui:VisualElement>
+                    <ui:Label name="fire-queue-title" text="Queue" class="queue-title" />
+                    <ui:VisualElement class="item-well queue-well">
+                        <ui:Label name="fire-queue-empty" text="Nothing queued: choose a dish, then Add to the queue." class="items-empty" />
+                        <ui:ScrollView name="fire-queue" class="queue-list" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement class="inventory-side">
+                <ui:VisualElement class="details recipe-sheet">
+                    <ui:VisualElement class="details-head">
+                        <ui:VisualElement class="details-icon-frame">
+                            <ui:VisualElement name="fire-sheet-icon" class="details-icon" />
                         </ui:VisualElement>
-                        <ui:Button name="fire-pickup" class="button button--secondary storage-pickup">
-                            <ui:Label text="Pick up" class="button-text" />
-                        </ui:Button>
+                        <ui:VisualElement class="details-titles">
+                            <ui:Label name="fire-sheet-name" class="details-name" />
+                            <ui:Label name="fire-sheet-kind" class="details-kind" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:ScrollView class="recipe-body">
+                        <ui:Label name="fire-sheet-description" class="details-description" />
+                        <ui:Label text="Ingredients" class="details-section" />
+                        <ui:VisualElement name="fire-sheet-ingredients" />
+                        <ui:VisualElement class="details-line">
+                            <ui:VisualElement class="icon icon--hourglass details-line-icon" />
+                            <ui:Label text="Duration" class="details-line-label" />
+                            <ui:Label name="fire-sheet-duration" class="details-line-value" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="details-line" tooltip="The calories players spend cooking it, put in from the queue">
+                            <ui:VisualElement class="icon icon--fire details-line-icon" />
+                            <ui:Label text="Work" class="details-line-label" />
+                            <ui:Label name="fire-sheet-work" class="details-line-value" />
+                        </ui:VisualElement>
+                        <!-- What one dish gives: as the inventory's details show a food. -->
+                        <ui:VisualElement class="details-line">
+                            <ui:VisualElement class="icon icon--scales details-line-icon" />
+                            <ui:Label text="Weight" class="details-line-label" />
+                            <ui:Label name="fire-sheet-weight" class="details-line-value" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="details-line" tooltip="What one dish gives the one who eats it">
+                            <ui:VisualElement class="icon icon--category-food details-line-icon" />
+                            <ui:Label text="Calories" class="details-line-label" />
+                            <ui:Label name="fire-sheet-calories" class="details-line-value" />
+                        </ui:VisualElement>
+                        <ui:Label text="Nutrition" class="details-section" />
+                        <ui:VisualElement class="nutrient">
+                            <ui:VisualElement class="stomach-dot stomach-dot--carbs" />
+                            <ui:Label text="Carbs" class="nutrient-name" />
+                            <ui:VisualElement class="nutrient-bar"><ui:VisualElement name="fire-sheet-nutrient-bar-0" class="nutrient-fill stomach-dot--carbs" /></ui:VisualElement>
+                            <ui:Label name="fire-sheet-nutrient-0" class="nutrient-value" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="nutrient">
+                            <ui:VisualElement class="stomach-dot stomach-dot--protein" />
+                            <ui:Label text="Protein" class="nutrient-name" />
+                            <ui:VisualElement class="nutrient-bar"><ui:VisualElement name="fire-sheet-nutrient-bar-1" class="nutrient-fill stomach-dot--protein" /></ui:VisualElement>
+                            <ui:Label name="fire-sheet-nutrient-1" class="nutrient-value" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="nutrient">
+                            <ui:VisualElement class="stomach-dot stomach-dot--fat" />
+                            <ui:Label text="Fat" class="nutrient-name" />
+                            <ui:VisualElement class="nutrient-bar"><ui:VisualElement name="fire-sheet-nutrient-bar-2" class="nutrient-fill stomach-dot--fat" /></ui:VisualElement>
+                            <ui:Label name="fire-sheet-nutrient-2" class="nutrient-value" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="nutrient">
+                            <ui:VisualElement class="stomach-dot stomach-dot--vitamins" />
+                            <ui:Label text="Vitamins" class="nutrient-name" />
+                            <ui:VisualElement class="nutrient-bar"><ui:VisualElement name="fire-sheet-nutrient-bar-3" class="nutrient-fill stomach-dot--vitamins" /></ui:VisualElement>
+                            <ui:Label name="fire-sheet-nutrient-3" class="nutrient-value" />
+                        </ui:VisualElement>
+                    </ui:ScrollView>
+
+                    <ui:VisualElement class="recipe-actions">
+                        <ui:Label name="fire-sheet-reason" class="recipe-reason" />
+                        <ui:VisualElement name="fire-sheet-quantity" />
+                        <ui:VisualElement class="recipe-buttons">
+                            <ui:Button name="fire-sheet-queue" class="button button--primary recipe-button">
+                                <ui:Label text="Add to the queue" class="button-text" />
+                            </ui:Button>
+                        </ui:VisualElement>
                     </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>

@@ -310,10 +310,10 @@ Bow	Arc
 {0} wood	Bois de {1}
 
 # Items: descriptions
-Digs soft ground: dirt, grass, sand, gravel, clay, snow and mud. Hold it and left click.	Creuse les sols meubles : terre, herbe, sable, gravier, argile, neige et boue. En main, clic gauche.
+Digs soft ground: dirt, grass, sand, gravel, clay, snow and mud, and digs up roots: beets, carrots and potatoes (right click on a ripe one). Hold it and left click.	Creuse les sols meubles : terre, herbe, sable, gravier, argile, neige et boue, et déterre les racines : betteraves, carottes et pommes de terre (clic droit sur une culture mûre). En main, clic gauche.
 Breaks hard blocks: rock, ores and ice. Hold it and left click.	Casse les blocs durs : roche, minerais et glace. En main, clic gauche.
 Fells trees and every plant that gives wood. Hold it and left click.	Abat les arbres et toutes les plantes qui donnent du bois. En main, clic gauche.
-Cuts grass, reeds and ferns, and harvests cereals and vegetables (right click on a ripe one). Fruit is picked by hand.	Coupe l'herbe, les roseaux et les fougères, et récolte les céréales et les légumes (clic droit sur une culture mûre). Les fruits se cueillent à la main.
+Cuts grass, reeds and ferns, and harvests oats, wheat, maize, sunflowers and rice (right click on a ripe one). Other crops are picked by hand.	Coupe l'herbe, les roseaux et les fougères, et récolte l'avoine, le blé, le maïs, les tournesols et le riz (clic droit sur une culture mûre). Les autres cultures se cueillent à la main.
 Tills grass, dirt, mud or clay (right click): seeds only grow on tilled soil.	Laboure l'herbe, la terre, la boue ou l'argile (clic droit) : les graines ne poussent que sur la terre labourée.
 Hunts animals. Hold the left button to draw, let go to shoot; a shot in the head does double damage.	Pour chasser. Maintenez le bouton gauche pour bander l'arc, relâchez pour tirer ; un tir à la tête fait deux fois plus de dégâts.
 Shot with the bow. An arrow lies where it lands: right click on it to pick it up.	Se tire à l'arc. Une flèche reste là où elle tombe : clic droit dessus pour la ramasser.
@@ -446,7 +446,6 @@ On claimed land, storage is the land owner's, open to them and to the players th
 
 # Crafting
 Crafting	Fabrication
-Craft	Fabriquer
 Recipes	Recettes
 Ingredients	Ingrédients
 Duration	Durée
@@ -488,10 +487,6 @@ Wood by the fire (20 at most): it burns only while a dish cooks, 30 s a log	Bois
 What is left of the log alight	Ce qui reste de la bûche allumée
 Dishes	Plats
 Queue	File
-Nothing queued: click a dish.	Rien en file : cliquez sur un plat.
-Click	Clic
-queue a dish	mettre un plat en file
-all the calories, all the wood	toutes les calories, tout le bois
 No linked chest	Aucun coffre lié
 1 linked chest	1 coffre lié
 {0} linked chests	{0} coffres liés
@@ -500,9 +495,71 @@ by {0}	par {0}
 +{0} kcal	+{0} kcal
 Shift + click: all it needs	Maj + clic : tout ce qu'il faut
 Cancel: the ingredients come back, the calories put in are lost	Annuler : les ingrédients reviennent, les calories apportées sont perdues
-{0} / {1} kcal: needs calories	{0} / {1} kcal : il faut des calories
 Ready: waits its turn	Prêt : attend son tour
 Needs firewood	Il faut du bois
 No linked chest to put it in	Aucun coffre lié où le mettre
 No room in the linked chests	Pas de place dans les coffres liés
 Cooking… {0} s	Cuisson… {0} s
+
+# Queues, quantities, storage views
+The queue is full	La file est pleine
+Quantity	Quantité
+Shift + click: ten less	Maj + clic : dix de moins
+Shift + click: ten more	Maj + clic : dix de plus
+Max	Max
+As many as can be made now	Autant que possible maintenant
+Add to the queue	Ajouter à la file
+Cancel: nothing was taken yet	Annuler : rien n'a encore été pris
+Nothing queued: choose a recipe, then Add to the queue.	Rien en file : choisissez une recette, puis Ajouter à la file.
+Nothing queued: choose a dish, then Add to the queue.	Rien en file : choisissez un plat, puis Ajouter à la file.
+Missing ingredients: the order will wait until they are in your bag	Il manque des ingrédients : la commande attendra qu'ils soient dans votre sac
+Missing ingredients: waits until they are in your bag	Il manque des ingrédients : attend qu'ils soient dans votre sac
+Missing ingredients: the order will wait for them in the linked chests	Il manque des ingrédients : la commande les attendra dans les coffres liés
+Missing ingredients: put them in a linked chest	Il manque des ingrédients : mettez-les dans un coffre lié
+No linked chest: dishes need one to go into	Aucun coffre lié : les plats doivent aller dans un coffre
+{0} × {1} = {2}	{0} × {1} = {2}
+{0} to make	{0} à fabriquer
+1 to make	1 à fabriquer
+Crafting… {0} s	Fabrication… {0} s
+Waits its turn	Attend son tour
+ingredients for {0} / {1}	ingrédients pour {0} / {1}
+bag {0} · linked chests {1}	sac {0} · coffres liés {1}
+Work	Travail
+Your calories: the work put into dishes burns them	Vos calories : le travail mis dans les plats les brûle
+Cooking	Cuisine
+Inventories	Inventaires
+Fuel	Combustible
+By the fire	Près du feu
+Linked chest	Coffre lié
+Linked chests ({0})	Coffres liés ({0})
+No linked chest: place a chest on the campfire's claimed land, or a public chest within 8 blocks off claimed land.	Aucun coffre lié : posez un coffre sur la terre revendiquée du feu, ou un coffre public à 8 blocs ou moins hors des terres revendiquées.
+Merged	Fusionnée
+Each one	Par stockage
+Everything the chests or stockpiles hold, added up	Tout ce que contiennent les coffres ou les réserves, additionné
+Each chest or stockpile on its own	Chaque coffre ou réserve séparément
+This chest	Ce coffre
+This stockpile	Cette réserve
+Chest {0}	Coffre {0}
+Stockpile {0}	Réserve {0}
+At {0}, {1}, {2}	En {0}, {1}, {2}
+
+# Fuel, typed quantities, dish sheet
+Burn time	Durée de combustion
+{0} each	{0} chacun
+{0} min	{0} min
+{0} min {1} s	{0} min {1} s
+Type how many to make	Saisissez combien en fabriquer
+1 log · {0} of cooking	1 bûche · {0} de cuisson
+{0} logs · {1} of cooking	{0} bûches · {1} de cuisson
+{0} · burns {1}	{0} · brûle {1}
+Each log burns {0}; it burns only while a dish cooks	Chaque bûche brûle {0}, seulement pendant qu'un plat cuit
+What one dish gives the one who eats it	Ce qu'un plat apporte à qui le mange
+The calories players spend cooking it, put in from the queue	Les calories que les joueurs dépensent pour le cuisiner, ajoutées depuis la file
+
+# Campfire bars, claimed land in the world
+{0} / {1} kcal	{0} / {1} kcal
+Needs calories to cook	Il faut des calories pour cuire
+Claimed land shown (C)	Terres revendiquées affichées (C)
+Claimed land hidden (C)	Terres revendiquées masquées (C)
+Show claimed land in the world (C while playing)	Afficher les terres revendiquées dans le monde (C en jeu)
+Claimed land	Terres revendiquées

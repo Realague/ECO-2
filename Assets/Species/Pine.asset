@@ -33,7 +33,7 @@ MonoBehaviour:
   needsShade: 0
   woodYield: 4
   woodColour: {r: 0.88, g: 0.74, b: 0.47, a: 1}
-  harvest: 2
+  harvest: 0
   produceName: Pine cone
   produceYield: 4
   seedYield: 0

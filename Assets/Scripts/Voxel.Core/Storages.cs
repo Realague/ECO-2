@@ -66,8 +66,9 @@ namespace Voxel.Core
     public sealed class Storages
     {
         private const uint Magic = 0x524F5453; // "STOR"
-        // Format 2 adds campfires (their wood and queue after them); format 1 still loads.
-        private const int FormatVersion = 2;
+        // Format 2 adds campfires (their wood and queue after them), format 3 orders of several
+        // dishes (Campfire.Write); formats 1 and 2 still load.
+        private const int FormatVersion = 3;
 
         private readonly Dictionary<int, Storage> storages = new Dictionary<int, Storage>();
 
@@ -231,7 +232,7 @@ namespace Voxel.Core
                     }
                     else if (storage.Kind == StorageKind.Campfire)
                     {
-                        storage.Campfire.Read(reader);
+                        storage.Campfire.Read(reader, format);
                     }
                     else
                     {

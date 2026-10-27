@@ -11,7 +11,8 @@ namespace Voxel.Core
         Stone
     }
 
-    // Why a player cannot craft a recipe (the last two are only the server's: CraftingSync).
+    // Why a player cannot craft a recipe, or why an order waits (Busy, TooHungry and QueueFull are
+    // only CraftingSync's).
     public enum CraftRefusal : byte
     {
         None,
@@ -20,7 +21,8 @@ namespace Voxel.Core
         BadChoice,
         Busy,
         TooHungry,
-        Unknown
+        Unknown,
+        QueueFull
     }
 
     public readonly struct Ingredient
@@ -187,6 +189,22 @@ namespace Voxel.Core
             Consume(inventory, recipe, choices, weights);
             inventory.Add(recipe.Output, recipe.OutputCount);
             return CraftRefusal.None;
+        }
+
+        // How many times over the player could craft a recipe now, one after another (each taking its
+        // ingredients and adding what it makes), up to limit.
+        public static int MaxCraftable(Inventory inventory, Recipe recipe, IReadOnlyList<int> choices, ItemWeights weights, int limit)
+        {
+            var copy = new Inventory();
+            copy.CopyFrom(inventory);
+            int made = 0;
+            while (made < limit && Consume(copy, recipe, choices, weights) == CraftRefusal.None)
+            {
+                copy.Add(recipe.Output, recipe.OutputCount);
+                made++;
+            }
+
+            return made;
         }
 
         // Takes the ingredients out of an inventory and checks the room left; a refusal may leave it

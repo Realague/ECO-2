@@ -380,8 +380,8 @@ namespace Voxel.Client
             return true;
         }
 
-        // The tool a plant of this species is felled with.
-        private int FellingTool(int speciesIndex) => ToolRules.ToFell(speciesAssets[speciesIndex].WoodYield > 0);
+        // The tool a plant of this species is felled with (a root crop is dug up).
+        private int FellingTool(int speciesIndex) => ToolRules.ToFell(speciesAssets[speciesIndex].WoodYield > 0, speciesAssets[speciesIndex].HarvestTool);
 
         // The tool a plant shown here is hit with: its felling tool, or a shovel to dig a stump out.
         internal int ToolFor(PlantView view) => view.Stump ? Items.Shovel : FellingTool(view.SpeciesIndex);
@@ -467,7 +467,7 @@ namespace Voxel.Client
         }
 
         // The tool a crop of this species is harvested with (Items.None: by hand).
-        private int HarvestTool(int speciesIndex) => ToolRules.ToHarvest(speciesAssets[speciesIndex].Harvest == HarvestKind.Annual);
+        private int HarvestTool(int speciesIndex) => ToolRules.ToHarvest(speciesAssets[speciesIndex].HarvestTool);
 
         // Which shown animal a flying arrow's segment hits first (AnimalViews.TryHitArrow).
         internal bool TryHitArrow(Vector3 a, Vector3 b, out int animalId, out bool inHead, out float distance, out Vector3 feet)
@@ -619,6 +619,13 @@ namespace Voxel.Client
 
         internal string SpeciesName(bool isAnimal, int index) =>
             DisplayName(isAnimal ? animalAssets[index].name : speciesAssets[index].name);
+
+        internal int PlantSpeciesCount => speciesAssets.Length;
+
+        internal int AnimalSpeciesCount => animalAssets.Length;
+
+        // Whether a plant species is a crop, whose harvest is an item (Items.Produce).
+        internal bool IsCrop(int speciesIndex) => (uint)speciesIndex < (uint)speciesAssets.Length && speciesAssets[speciesIndex].Harvest != HarvestKind.None;
 
         // Places up to count adults (or grown plants) of a species in the columns around (x, z),
         // nearest first, where the species can stand or grow and the column is free. Returns how many.

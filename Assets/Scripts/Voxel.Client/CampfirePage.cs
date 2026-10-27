@@ -5,81 +5,123 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // The storage window's page for a campfire (Storage.uxml: campfire-half), run by StorageScreen: the
-    // wood by the fire and what is left of the log alight, how many chests are linked, the dishes it
-    // cooks (what each takes, as the bag and the linked chests hold it; a click queues one) and its
-    // queue: each dish with who queued it, the calories put in or how far it has cooked, what it waits
-    // for, a button putting 100 kcal into it (Shift: all it needs) and one cancelling it.
+    // A campfire's cooking tab (Storage.uxml: cooking-page), run by StorageScreen and laid out as the
+    // inventory's crafting tab: the wood by the fire and what is left of the log alight, how many chests
+    // are linked and the player's calories; the dishes it cooks (what each takes, as the bag and the
+    // linked chests hold it, its time and work; a click chooses one); under them the queue, each order
+    // with who queued it, how many are left, the calories put in or how far its dish has cooked, what it
+    // waits for, a button putting 100 kcal into it (Shift: all it needs) and one cancelling it; and the
+    // chosen dish's sheet: its ingredients for as many as asked and where they are, its time and work,
+    // how many to make and Add to the queue (taken without its ingredients: it waits for them).
     internal sealed class CampfirePage
     {
         private readonly StorageSync storageSync;
         private readonly InventorySync inventorySync;
+        private readonly HungerSync hungerSync;
         private readonly EcosystemSync ecosystemSync;
 
         private readonly Label linked;
         private readonly Label fuel;
         private readonly VisualElement burnFill;
-        private readonly ScrollView recipes;
-        private readonly ScrollView queue;
+        private readonly Label calories;
         private readonly Label queueTitle;
-        private readonly Label queueEmpty;
+        private readonly VisualElement sheetIcon;
+        private readonly Label sheetName;
+        private readonly Label sheetKind;
+        private readonly Label sheetDescription;
+        private readonly VisualElement sheetIngredients;
+        private readonly Label sheetDuration;
+        private readonly Label sheetWork;
+        private readonly Label sheetWeight;
+        private readonly Label sheetCalories;
+        private readonly Label[] sheetNutrients = new Label[Nutrition.NutrientCount];
+        private readonly VisualElement[] sheetNutrientBars = new VisualElement[Nutrition.NutrientCount];
+        private readonly Label sheetReason;
+        private readonly Button queueButton;
+        private readonly QuantityStepper quantity;
+        private readonly OrderRows queue;
 
         private readonly List<Row> rows = new List<Row>();
-        private readonly List<JobRow> jobRows = new List<JobRow>();
+        private int selected;
         private long shownKey = long.MinValue;
+        private long queueKey = long.MinValue;
 
         private sealed class Row
         {
             public VisualElement Root;
             public Label Name;
             public readonly List<Label> Counts = new List<Label>();
-            public Label Meta;
+            public Label Seconds;
+            public Label Work;
         }
 
-        private sealed class JobRow
-        {
-            // The dish's id: its view is looked up again each frame (each state from the server makes new ones).
-            public int Id;
-            public VisualElement Root;
-            public VisualElement Fill;
-            public Label Status;
-            public Button Labour;
-        }
-
-        public CampfirePage(VisualElement root, StorageSync storageSync, InventorySync inventorySync, EcosystemSync ecosystemSync)
+        public CampfirePage(VisualElement root, StorageSync storageSync, InventorySync inventorySync, HungerSync hungerSync, EcosystemSync ecosystemSync)
         {
             this.storageSync = storageSync;
             this.inventorySync = inventorySync;
+            this.hungerSync = hungerSync;
             this.ecosystemSync = ecosystemSync;
             linked = root.Q<Label>("fire-linked");
             fuel = root.Q<Label>("fire-fuel");
             burnFill = root.Q("fire-burn-fill");
-            recipes = root.Q<ScrollView>("fire-recipes");
-            queue = root.Q<ScrollView>("fire-queue");
+            calories = root.Q<Label>("fire-calories");
             queueTitle = root.Q<Label>("fire-queue-title");
-            queueEmpty = root.Q<Label>("fire-queue-empty");
+            sheetIcon = root.Q("fire-sheet-icon");
+            sheetName = root.Q<Label>("fire-sheet-name");
+            sheetKind = root.Q<Label>("fire-sheet-kind");
+            sheetDescription = root.Q<Label>("fire-sheet-description");
+            sheetIngredients = root.Q("fire-sheet-ingredients");
+            sheetDuration = root.Q<Label>("fire-sheet-duration");
+            sheetWork = root.Q<Label>("fire-sheet-work");
+            sheetWeight = root.Q<Label>("fire-sheet-weight");
+            sheetCalories = root.Q<Label>("fire-sheet-calories");
+            for (int i = 0; i < Nutrition.NutrientCount; i++)
+            {
+                sheetNutrients[i] = root.Q<Label>($"fire-sheet-nutrient-{i}");
+                sheetNutrientBars[i] = root.Q($"fire-sheet-nutrient-bar-{i}");
+            }
+            sheetReason = root.Q<Label>("fire-sheet-reason");
+            queueButton = root.Q<Button>("fire-sheet-queue");
+            queueButton.focusable = false;
+            queueButton.clicked += () => storageSync.RequestQueue(selected, quantity.Value);
+
+            quantity = new QuantityStepper(root.Q("fire-sheet-quantity"), Campfire.MaxCount, () => Makeable(Recipes.Cooking[selected]));
+            quantity.Changed += () => shownKey = long.MinValue;
+            queue = new OrderRows(root.Q<ScrollView>("fire-queue"), root.Q<Label>("fire-queue-empty"), storageSync.RequestCancelJob, storageSync.RequestLabour);
+
+            ScrollView recipes = root.Q<ScrollView>("fire-recipes");
             recipes.verticalScrollerVisibility = ScrollerVisibility.AlwaysVisible;
-            queue.verticalScrollerVisibility = ScrollerVisibility.Auto;
             for (int r = 0; r < Recipes.Cooking.Count; r++)
             {
-                AddRow(r);
+                recipes.Add(MakeRow(r));
             }
         }
 
-        public void Retranslate() => shownKey = long.MinValue;
+        // Whether the count is being typed, and leaving its field.
+        public bool IsTyping => quantity.IsTyping;
 
-        // Every frame while a campfire is open: the bars, and the rest when what it shows changed.
+        public void Blur() => quantity.Blur();
+
+        public void Retranslate()
+        {
+            shownKey = long.MinValue;
+            queueKey = long.MinValue;
+            quantity.Retranslate();
+        }
+
+        // Every frame while the tab is shown: the bars, and the rest when what it shows changed.
         public void Refresh()
         {
-            int linkedChests = storageSync.OpenedLinkedChests;
             fuel.text = $"{storageSync.OpenedFuel} / {Campfire.MaxFuel}";
-            burnFill.style.width = Length.Percent(Mathf.Clamp01(storageSync.OpenedBurning / Campfire.SecondsPerWood) * 100f);
-            ShowBars();
+            burnFill.style.width = Length.Percent(Mathf.Clamp01(storageSync.OpenedBurning / storageSync.OpenedLogSeconds) * 100f);
+            calories.text = $"{hungerSync.Stomach.Calories:0} kcal";
+            ShowQueue();
 
             long key = KeyOf();
             if (key == shownKey) return;
 
             shownKey = key;
+            int linkedChests = storageSync.OpenedLinkedChests;
             linked.text = linkedChests == 0 ? Loc.T("No linked chest")
                 : linkedChests == 1 ? Loc.T("1 linked chest") : Loc.T("{0} linked chests", linkedChests);
             linked.EnableInClassList("fire-linked--none", linkedChests == 0);
@@ -88,10 +130,10 @@ namespace Voxel.Client
                 ShowRow(r);
             }
 
-            BuildQueue();
+            ShowSheet();
         }
 
-        private void AddRow(int index)
+        private VisualElement MakeRow(int index)
         {
             Recipe recipe = Recipes.Cooking[index];
             var row = new Row { Root = new VisualElement() };
@@ -125,26 +167,23 @@ namespace Voxel.Client
 
             text.Add(costs);
             row.Root.Add(text);
-            var meta = new VisualElement { pickingMode = PickingMode.Ignore };
-            meta.AddToClassList("recipe-row-meta");
-            row.Meta = new Label { pickingMode = PickingMode.Ignore };
-            row.Meta.AddToClassList("recipe-row-meta-text");
-            meta.Add(row.Meta);
-            row.Root.Add(meta);
+            row.Root.Add(CraftingPage.MetaOf(out row.Seconds, out row.Work));
             row.Root.RegisterCallback<PointerDownEvent>(e =>
             {
-                if (e.button == 0) storageSync.RequestQueue(index);
+                if (e.button != 0) return;
+
+                selected = index;
+                shownKey = long.MinValue;
             });
-            recipes.Add(row.Root);
             rows.Add(row);
+            return row.Root;
         }
 
-        // What a dish takes, as the bag and the linked chests hold it; greyed when it cannot be queued.
+        // What a dish takes, as the bag and the linked chests hold it.
         private void ShowRow(int index)
         {
             Recipe recipe = Recipes.Cooking[index];
             Row row = rows[index];
-            bool missing = false;
             row.Name.text = ItemCatalog.NameOf(recipe.Output, ecosystemSync);
             for (int i = 0; i < recipe.Ingredients.Count; i++)
             {
@@ -153,137 +192,178 @@ namespace Voxel.Client
                 row.Counts[i].text = $"{Mathf.Min(have, 9999)} / {ingredient.Count}";
                 row.Counts[i].EnableInClassList("recipe-chip-text--missing", have < ingredient.Count);
                 row.Counts[i].parent.tooltip = ItemCatalog.NameOf(ingredient.Item, ecosystemSync);
-                missing |= have < ingredient.Count;
             }
 
-            row.Meta.text = $"{recipe.Calories:0} kcal · {Loc.T("{0} s", Loc.Number(recipe.Seconds, "0.#"))}";
+            row.Seconds.text = Loc.T("{0} s", Loc.Number(recipe.Seconds, "0.#"));
+            row.Work.text = $"{recipe.Calories:0} kcal";
+            row.Root.EnableInClassList("recipe-row--selected", index == selected);
+            row.Root.EnableInClassList("recipe-row--unavailable", Makeable(recipe) == 0);
+        }
+
+        private void ShowSheet()
+        {
+            Recipe recipe = Recipes.Cooking[selected];
+            int count = quantity.Value;
+            sheetIcon.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(recipe.Output, ecosystemSync));
+            sheetName.text = ItemCatalog.NameOf(recipe.Output, ecosystemSync);
+            sheetKind.text = ItemCatalog.KindName(recipe.Output);
+            sheetDescription.text = ItemCatalog.DescriptionOf(recipe.Output, ecosystemSync);
+            sheetDuration.text = CraftingPage.Times(Loc.T("{0} s", Loc.Number(recipe.Seconds, "0.#")), Loc.T("{0} s", Loc.Number(recipe.Seconds * count, "0.#")), count);
+            sheetWork.text = CraftingPage.Times($"{recipe.Calories:0} kcal", $"{recipe.Calories * count:0} kcal", count);
+
+            // What one dish gives whoever eats it.
+            Nutrition food = ecosystemSync.FoodOf(recipe.Output);
+            sheetWeight.text = Loc.T("{0} kg each", Loc.Number(ecosystemSync.ItemWeights.Of(recipe.Output), "0.###"));
+            sheetCalories.text = $"{food.Calories:0} kcal";
+            for (int i = 0; i < Nutrition.NutrientCount; i++)
+            {
+                float points = food.Nutrient(i);
+                sheetNutrients[i].text = points.ToString("0");
+                sheetNutrientBars[i].style.width = Length.Percent(Mathf.Clamp01(points / ItemCatalog.FullNutrient) * 100f);
+            }
+
+            // Each ingredient for as many as asked, and where it is: the bag, the linked chests.
+            sheetIngredients.Clear();
+            foreach (Ingredient ingredient in recipe.Ingredients)
+            {
+                int bag = inventorySync.Inventory.Count(ingredient.Item);
+                int chests = storageSync.OpenedLinkedContents.Count(ingredient.Item);
+                int need = ingredient.Count * count;
+                var line = new VisualElement();
+                line.AddToClassList("details-line");
+                var picture = new VisualElement();
+                picture.AddToClassList("ingredient-icon");
+                picture.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(ingredient.Item, ecosystemSync));
+                var label = new Label(ItemCatalog.NameOf(ingredient.Item, ecosystemSync));
+                label.AddToClassList("details-line-label");
+                var value = new Label($"{bag + chests} / {need}");
+                value.AddToClassList("details-line-value");
+                value.EnableInClassList("ingredient-value--missing", bag + chests < need);
+                line.Add(picture);
+                line.Add(label);
+                line.Add(value);
+                sheetIngredients.Add(line);
+                var source = new Label(Loc.T("bag {0} · linked chests {1}", bag, chests));
+                source.AddToClassList("ingredient-source");
+                sheetIngredients.Add(source);
+            }
+
+            // Why it cannot be queued; in amber, what it will wait for.
             bool full = storageSync.OpenedJobs.Count >= Campfire.MaxJobs;
-            row.Root.EnableInClassList("recipe-row--unavailable", missing || full);
+            queueButton.SetEnabled(!full);
+            string warning = storageSync.OpenedLinkedChests == 0 ? Loc.T("No linked chest: dishes need one to go into")
+                : Makeable(recipe) < count ? Loc.T("Missing ingredients: the order will wait for them in the linked chests") : "";
+            sheetReason.text = full ? Loc.T("The queue is full ({0})", Campfire.MaxJobs) : warning;
+            sheetReason.EnableInClassList("recipe-reason--warning", !full);
+            sheetReason.style.display = sheetReason.text.Length > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        // How many of a dish the bag and the linked chests hold the ingredients for.
+        private int Makeable(Recipe recipe)
+        {
+            int count = Campfire.MaxCount;
+            foreach (Ingredient ingredient in recipe.Ingredients)
+            {
+                count = Mathf.Min(count, Have(ingredient.Item) / ingredient.Count);
+            }
+
+            return count;
         }
 
         private int Have(int item) => inventorySync.Inventory.Count(item) + storageSync.OpenedLinkedContents.Count(item);
 
-        // The queue, laid out again when it changed.
-        private void BuildQueue()
+        // The queue's rows, laid out again when the orders change; their bars and states every frame.
+        private void ShowQueue()
         {
-            queue.Clear();
-            jobRows.Clear();
             IReadOnlyList<CookJobView> jobs = storageSync.OpenedJobs;
-            queueTitle.text = Loc.T("Queue ({0} / {1})", jobs.Count, Campfire.MaxJobs);
-            queueEmpty.style.display = jobs.Count == 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            long key = 17;
             foreach (CookJobView job in jobs)
             {
-                queue.Add(MakeJobRow(job));
+                key = key * 31 + job.Id;
+                key = key * 31 + job.Count;
+                key = key * 31 + job.Stocked;
             }
 
-            ShowBars();
+            if (key != queueKey)
+            {
+                queueKey = key;
+                queueTitle.text = Loc.T("Queue ({0} / {1})", jobs.Count, Campfire.MaxJobs);
+                var lines = new List<OrderRows.Line>();
+                foreach (CookJobView job in jobs)
+                {
+                    Recipe recipe = Recipes.Cooking[job.Recipe];
+                    string name = ItemCatalog.NameOf(recipe.Output, ecosystemSync);
+                    string by = string.IsNullOrEmpty(job.Creator) ? "" : Loc.T("by {0}", job.Creator);
+                    if (job.Count > 1 || job.Stocked < job.Count)
+                    {
+                        string stocked = Loc.T("ingredients for {0} / {1}", job.Stocked, job.Count);
+                        by = by.Length > 0 ? $"{by} · {stocked}" : stocked;
+                    }
+                    lines.Add(new OrderRows.Line
+                    {
+                        Id = job.Id,
+                        Icon = ItemCatalog.IconOf(recipe.Output, ecosystemSync),
+                        Name = job.Count > 1 ? Loc.T("{0} ×{1}", name, job.Count) : name,
+                        Under = by
+                    });
+                }
+
+                queue.Build(lines);
+            }
+
+            CookJobView cooking = storageSync.CookingJob;
+            foreach (CookJobView job in jobs)
+            {
+                ShowJob(job, cooking);
+            }
         }
 
-        private VisualElement MakeJobRow(CookJobView job)
+        // An order's two bars, both always shown: the calories put into it, and how far its dish has
+        // cooked; then what it waits for, or the cooking.
+        private void ShowJob(CookJobView job, CookJobView cooking)
         {
             Recipe recipe = Recipes.Cooking[job.Recipe];
-            var row = new JobRow { Id = job.Id, Root = new VisualElement() };
-            row.Root.AddToClassList("job-row");
-            var picture = new VisualElement { pickingMode = PickingMode.Ignore };
-            picture.AddToClassList("job-icon");
-            picture.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(recipe.Output, ecosystemSync));
-            row.Root.Add(picture);
+            float total = recipe.Calories * job.Count;
+            float put = total - job.LabourLeft;
+            queue.SetLabour(job.Id, put / total, Loc.T("{0} / {1} kcal", put.ToString("0"), total.ToString("0")));
 
-            var text = new VisualElement { pickingMode = PickingMode.Ignore };
-            text.AddToClassList("job-text");
-            var name = new Label(ItemCatalog.NameOf(recipe.Output, ecosystemSync)) { pickingMode = PickingMode.Ignore };
-            name.AddToClassList("job-name");
-            var by = new Label(string.IsNullOrEmpty(job.Creator) ? "" : Loc.T("by {0}", job.Creator)) { pickingMode = PickingMode.Ignore };
-            by.AddToClassList("job-by");
-            var bar = new VisualElement { pickingMode = PickingMode.Ignore };
-            bar.AddToClassList("job-bar");
-            row.Fill = new VisualElement { pickingMode = PickingMode.Ignore };
-            row.Fill.AddToClassList("job-bar-fill");
-            bar.Add(row.Fill);
-            row.Status = new Label { pickingMode = PickingMode.Ignore };
-            row.Status.AddToClassList("job-status");
-            text.Add(name);
-            text.Add(by);
-            text.Add(bar);
-            text.Add(row.Status);
-            row.Root.Add(text);
-
-            // Calories go in 100 at a time; Shift puts in all it still needs (as far as the player has them).
-            row.Labour = new Button { focusable = false, text = Loc.T("+{0} kcal", StorageSync.LabourStep.ToString("0")), tooltip = Loc.T("Shift + click: all it needs") };
-            row.Labour.AddToClassList("button");
-            row.Labour.AddToClassList("button--primary");
-            row.Labour.AddToClassList("job-labour");
-            row.Labour.RegisterCallback<ClickEvent>(e => storageSync.RequestLabour(job.Id, e.shiftKey));
-            row.Root.Add(row.Labour);
-
-            var cancel = new Button { focusable = false, text = "✕", tooltip = Loc.T("Cancel: the ingredients come back, the calories put in are lost") };
-            cancel.AddToClassList("button");
-            cancel.AddToClassList("button--secondary");
-            cancel.AddToClassList("job-cancel");
-            cancel.clicked += () => storageSync.RequestCancelJob(job.Id);
-            row.Root.Add(cancel);
-
-            jobRows.Add(row);
-            return row.Root;
-        }
-
-        // Each dish's bar and what it waits for: the calories put in, else how far it has cooked.
-        private void ShowBars()
-        {
-            CookJobView cooking = storageSync.CookingJob;
-            foreach (JobRow row in jobRows)
+            float left = storageSync.SecondsLeftOf(job);
+            float done = 1f - left / recipe.Seconds;
+            bool more = job.LabourLeft > 0f;
+            if (!job.UnitPaid)
             {
-                CookJobView job = null;
-                foreach (CookJobView view in storageSync.OpenedJobs)
-                {
-                    if (view.Id == row.Id) job = view;
-                }
+                queue.Set(job.Id, done, true, Loc.T("Needs calories to cook"), true, true, false);
+                return;
+            }
 
-                if (job == null) continue;
+            if (job.Stocked == 0)
+            {
+                queue.Set(job.Id, done, true, Loc.T("Missing ingredients: put them in a linked chest"), true, more, false);
+                return;
+            }
 
-                Recipe recipe = Recipes.Cooking[job.Recipe];
-                bool laboured = job.LabourLeft <= 0f;
-                row.Labour.style.display = laboured ? DisplayStyle.None : DisplayStyle.Flex;
-                row.Root.EnableInClassList("job-row--cooking", job == cooking && storageSync.OpenedStatus == CampfireStatus.Cooking);
-                row.Fill.EnableInClassList("job-bar-fill--cooking", laboured);
-                if (!laboured)
-                {
-                    float put = recipe.Calories - job.LabourLeft;
-                    row.Fill.style.width = Length.Percent(Mathf.Clamp01(put / recipe.Calories) * 100f);
-                    SetStatus(row, Loc.T("{0} / {1} kcal: needs calories", put.ToString("0"), recipe.Calories.ToString("0")), true);
-                    continue;
-                }
+            if (job != cooking)
+            {
+                queue.Set(job.Id, done, true, Loc.T("Ready: waits its turn"), true, more, false);
+                return;
+            }
 
-                float left = storageSync.SecondsLeftOf(job);
-                row.Fill.style.width = Length.Percent(Mathf.Clamp01(1f - left / recipe.Seconds) * 100f);
-                if (job != cooking)
-                {
-                    SetStatus(row, Loc.T("Ready: waits its turn"), true);
-                    continue;
-                }
-
-                switch (storageSync.OpenedStatus)
-                {
-                    case CampfireStatus.NoFuel:
-                        SetStatus(row, Loc.T("Needs firewood"), true);
-                        break;
-                    case CampfireStatus.NoRoom:
-                        SetStatus(row, Loc.T(storageSync.OpenedLinkedChests == 0 ? "No linked chest to put it in" : "No room in the linked chests"), true);
-                        break;
-                    default:
-                        SetStatus(row, Loc.T("Cooking… {0} s", Mathf.CeilToInt(left)), false);
-                        break;
-                }
+            switch (storageSync.OpenedStatus)
+            {
+                case CampfireStatus.NoFuel:
+                    queue.Set(job.Id, done, true, Loc.T("Needs firewood"), true, more, false);
+                    break;
+                case CampfireStatus.NoRoom:
+                    queue.Set(job.Id, done, true, Loc.T(storageSync.OpenedLinkedChests == 0 ? "No linked chest to put it in" : "No room in the linked chests"), true, more, false);
+                    break;
+                default:
+                    queue.Set(job.Id, done, true, Loc.T("Cooking… {0} s", Mathf.CeilToInt(left)), false, more, storageSync.OpenedStatus == CampfireStatus.Cooking);
+                    break;
             }
         }
 
-        private static void SetStatus(JobRow row, string text, bool waiting)
-        {
-            row.Status.text = text;
-            row.Status.EnableInClassList("job-status--waiting", waiting);
-        }
-
-        // What the rows show depends on: the bag, the linked chests, the queue and the campfire's state.
+        // What the list and sheet show depends on: the bag, the linked chests, the queue's length, the
+        // dish and quantity chosen.
         private long KeyOf()
         {
             long key = 17;
@@ -297,15 +377,10 @@ namespace Voxel.Client
                 key += (entry.Key * 6271L + entry.Value) * 40503L;
             }
 
-            key = key * 31 + (int)storageSync.OpenedStatus;
             key = key * 31 + storageSync.OpenedLinkedChests;
-            foreach (CookJobView job in storageSync.OpenedJobs)
-            {
-                key = key * 31 + job.Id;
-                key = key * 31 + (long)job.LabourLeft;
-                key = key * 31 + (long)(job.SecondsLeft * 10f);
-            }
-
+            key = key * 31 + storageSync.OpenedJobs.Count;
+            key = key * 31 + selected;
+            key = key * 31 + quantity.Value;
             return key;
         }
     }

@@ -17,9 +17,11 @@ namespace Voxel.Client
         private const float SlotGap = 12f;
         private const float FitSlack = 2f;
 
-        private readonly ScrollView view;
+        // Where the slots go, and the element whose width they fill.
+        private readonly VisualElement view;
+        private readonly VisualElement measured;
         private readonly EcosystemSync ecosystemSync;
-        private readonly int minimumRows;
+        private int minimumRows;
         private readonly List<KeyValuePair<int, int>> shown = new List<KeyValuePair<int, int>>();
         private readonly List<int> sorted = new List<int>();
         private readonly Dictionary<int, VisualElement> slots = new Dictionary<int, VisualElement>();
@@ -37,14 +39,28 @@ namespace Voxel.Client
         public int HoveredItem { get; private set; } = Items.None;
 
         public ItemGrid(ScrollView view, EcosystemSync ecosystemSync, int minimumRows)
+            : this(view, view.contentViewport, ecosystemSync, minimumRows)
         {
-            this.view = view;
-            this.ecosystemSync = ecosystemSync;
-            this.minimumRows = minimumRows;
             view.contentContainer.style.flexDirection = FlexDirection.Row;
             view.contentContainer.style.flexWrap = Wrap.Wrap;
             view.verticalScrollerVisibility = ScrollerVisibility.AlwaysVisible;
-            view.contentViewport.RegisterCallback<GeometryChangedEvent>(_ =>
+        }
+
+        // A grid that does not scroll: as tall as its rows (inside a list that scrolls, a chest's card).
+        public ItemGrid(VisualElement container, EcosystemSync ecosystemSync, int minimumRows)
+            : this(container, container, ecosystemSync, minimumRows)
+        {
+            container.style.flexDirection = FlexDirection.Row;
+            container.style.flexWrap = Wrap.Wrap;
+        }
+
+        private ItemGrid(VisualElement view, VisualElement measured, EcosystemSync ecosystemSync, int minimumRows)
+        {
+            this.view = view;
+            this.measured = measured;
+            this.ecosystemSync = ecosystemSync;
+            this.minimumRows = minimumRows;
+            measured.RegisterCallback<GeometryChangedEvent>(_ =>
             {
                 Layout(out int newColumns, out float newSize);
                 if (newColumns != columns || !Mathf.Approximately(newSize, size)) dirty = true;
@@ -52,6 +68,19 @@ namespace Voxel.Client
         }
 
         public void Invalidate() => dirty = true;
+
+        // How many rows it shows at least, empty slots filling them.
+        public int MinimumRows
+        {
+            get => minimumRows;
+            set
+            {
+                if (value == minimumRows) return;
+
+                minimumRows = value;
+                dirty = true;
+            }
+        }
 
         // Shows these items (item, count); dimmed ones are greyed and take no clicks.
         public void Show(IEnumerable<KeyValuePair<int, int>> entries, Func<int, bool> dimmed)
@@ -118,7 +147,7 @@ namespace Voxel.Client
 
         private void Layout(out int columnCount, out float slotSize)
         {
-            float width = view.contentViewport.layout.width;
+            float width = measured.layout.width;
             if (float.IsNaN(width) || width < TargetSlot + SlotGap) width = 4f * (TargetSlot + SlotGap);
             columnCount = Mathf.Max(1, Mathf.FloorToInt(width / (TargetSlot + SlotGap)));
             // A little slack: slots filling the width exactly can wrap once the panel scales to the screen.

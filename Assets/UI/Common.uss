@@ -98,6 +98,7 @@
 .icon--category-wood { background-image: url("Icons/CategoryWood.png"); }
 .icon--tab-inventory { background-image: url("Icons/TabInventory.png"); }
 .icon--fire { background-image: url("Icons/Fire.png"); }
+.icon--hourglass { background-image: url("Icons/Hourglass.png"); }
 .icon--scales { background-image: url("Icons/Scales.png"); }
 .icon--search { background-image: url("Icons/MagnifyingGlass.png"); }
 

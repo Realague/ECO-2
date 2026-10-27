@@ -32,9 +32,6 @@ namespace Voxel.Client
         private const float SlotGap = 12f;
         private const float FitSlack = 2f;
 
-        // Nutrient points a food bar shows full (foods have 0 to about 15, as in Eco).
-        private const float FullNutrient = 15f;
-
         [SerializeField] private UIDocument document;
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private WorldSync worldSync;
@@ -70,6 +67,8 @@ namespace Voxel.Client
         private Label detailsSlot;
         private VisualElement detailsWeightLine;
         private Label detailsWeight;
+        private VisualElement detailsBurnLine;
+        private Label detailsBurn;
         private VisualElement detailsFood;
         private Label detailsCalories;
         private readonly Label[] detailsNutrients = new Label[Nutrition.NutrientCount];
@@ -135,6 +134,8 @@ namespace Voxel.Client
             detailsSlot = root.Q<Label>("details-slot");
             detailsWeightLine = root.Q("details-weight-line");
             detailsWeight = root.Q<Label>("details-weight");
+            detailsBurnLine = root.Q("details-burn-line");
+            detailsBurn = root.Q<Label>("details-burn");
             detailsFood = root.Q("details-food");
             detailsCalories = root.Q<Label>("details-calories");
             for (int i = 0; i < detailsNutrients.Length; i++)
@@ -202,10 +203,15 @@ namespace Voxel.Client
             }
 
             Keyboard keyboard = Keyboard.current;
-            if (keyboard != null && IsOpen && search.focusController?.focusedElement == search)
+            if (keyboard != null && IsOpen && (search.focusController?.focusedElement == search || crafting.IsTyping))
             {
-                // Letters typed in the search are not keys; Escape leaves it first.
-                if (keyboard.escapeKey.wasPressedThisFrame) search.Blur();
+                // Letters typed in the search, or a count typed on the crafting sheet, are not keys;
+                // Escape leaves the field first.
+                if (keyboard.escapeKey.wasPressedThisFrame)
+                {
+                    search.Blur();
+                    crafting.Blur();
+                }
             }
             else if (keyboard != null && !CommandConsole.HoldsInput && !mapScreen.HoldsInput && !StorageScreen.HoldsInput)
             {
@@ -573,6 +579,9 @@ namespace Voxel.Client
             float weight = CarryLimits.CountsAsBlock(item) ? 0f : ecosystemSync.ItemWeights.Of(item);
             detailsWeightLine.style.display = weight > 0f ? DisplayStyle.Flex : DisplayStyle.None;
             detailsWeight.text = Loc.T("{0} kg each", Loc.Number(weight, "0.###"));
+            float burns = Fuels.SecondsOf(item);
+            detailsBurnLine.style.display = burns > 0f ? DisplayStyle.Flex : DisplayStyle.None;
+            detailsBurn.text = Loc.T("{0} each", ItemCatalog.DurationText(burns));
 
             Nutrition food = ecosystemSync.FoodOf(item);
             detailsFood.style.display = food.IsFood ? DisplayStyle.Flex : DisplayStyle.None;
@@ -583,7 +592,7 @@ namespace Voxel.Client
             {
                 float points = food.Nutrient(i);
                 detailsNutrients[i].text = points.ToString("0");
-                detailsNutrientBars[i].style.width = Length.Percent(Mathf.Clamp01(points / FullNutrient) * 100f);
+                detailsNutrientBars[i].style.width = Length.Percent(Mathf.Clamp01(points / ItemCatalog.FullNutrient) * 100f);
             }
         }
 

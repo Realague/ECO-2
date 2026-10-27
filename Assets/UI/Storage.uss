@@ -1,24 +1,86 @@
 /* The storage screen: the inventory's look (Inventory.uss), the player's bag on the left and the
-   storage on the right. Sizes are for the 1920 x 1080 reference resolution; the
-   bottom is left free for the hotbar. */
+   storage on the right, each on a card of its own; a campfire's cooking tab reuses the crafting tab's
+   layout. Sizes are for the 1920 x 1080 reference resolution; the bottom is left free for the hotbar. */
 
 .storage-half {
     flex-grow: 1;
     flex-basis: 0;
 }
 
-.storage-half--right {
-    margin-left: 12px;
+/* Two inventories, plainly apart: each its own card, lit along its top in its own colour (the bag
+   neutral, the storage copper), with its icon by its title, and a narrow lane between them. */
+.storage-card {
+    border-top-width: 4px;
+}
+
+.storage-card--bag {
+    border-top-color: #8d9093;
+}
+
+.storage-card--store {
+    border-top-color: #c0803f;
+}
+
+.storage-card-head {
+    padding-bottom: 10px;
+    border-bottom-width: 1px;
+    border-color: var(--panel-border);
+}
+
+.storage-card-icon {
+    width: 30px;
+    height: 30px;
+    margin-right: 12px;
+    flex-shrink: 0;
+    -unity-background-image-tint-color: var(--text-muted);
+}
+
+/* The storage's own picture (a chest, a stockpile, a campfire), not a tinted glyph. */
+.storage-card-icon--item {
+    width: 40px;
+    height: 40px;
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: #ffffff;
+}
+
+.storage-exchange {
+    width: 44px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+}
+
+/* A dark disc, so that the arrows show over the world seen between the cards. */
+.storage-exchange-disc {
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--panel);
+    border-width: 1px;
+    border-color: var(--panel-border);
+    border-radius: 20px;
+}
+
+.storage-exchange-icon {
+    width: 24px;
+    height: 24px;
+    -unity-background-image-tint-color: var(--text-muted);
 }
 
 .storage-owner {
     font-size: 19px;
     color: var(--text-muted);
-    margin: 0;
+    margin: 0 18px 0 0;
     padding: 0;
 }
 
-/* What the storage does not take, in the bag. */
+.storage-pickup {
+    height: 44px;
+    padding: 0 20px;
+}
+
+/* What the other side does not take, in the bag. */
 .item-slot--dimmed,
 .item-slot--dimmed:hover {
     opacity: 0.32;
@@ -26,17 +88,97 @@
     background-color: var(--inv-slot);
 }
 
-/* A stockpile pool's piles: a block of three by three per stockpile, as they stand on the ground,
-   one block under another; the list scrolls when the pool holds more than fit. */
-.pile-grid {
+/* Merged, or each storage on its own (PoolView). */
+.view-toggle {
+    flex-direction: row;
+    margin-right: 16px;
+}
+
+.view-button {
+    height: 34px;
+    padding: 0 12px;
+    margin: 0;
+    font-size: 15px;
+    color: var(--text-body);
+    background-color: var(--well);
+    border-width: 1px;
+    border-color: var(--panel-border);
+    border-radius: 0;
+}
+
+.view-button:hover {
+    background-color: var(--hover);
+}
+
+.view-button--first {
+    border-top-left-radius: 5px;
+    border-bottom-left-radius: 5px;
+}
+
+.view-button--last {
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+    border-left-width: 0;
+}
+
+.view-button--selected,
+.view-button--selected:hover {
+    background-color: #d8c4ab;
+    color: var(--tab-selected-text);
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+}
+
+/* Each chest or stockpile on its own card, one under another; the one open framed in copper. */
+.member-list {
     flex-grow: 1;
-    margin-top: 12px;
 }
 
-.pile-grid > .unity-scroll-view__content-viewport > .unity-scroll-view__content-container {
+.pool-card {
+    flex-shrink: 0;
+    margin: 0 10px 12px 0;
+    padding: 10px 6px 4px 12px;
+    background-color: #2b2d2e;
+    border-width: 1px;
+    border-color: #45484a;
+    border-radius: 6px;
+}
+
+.pool-card--open {
+    border-color: #c0803f;
+}
+
+.pool-card-head {
+    flex-direction: row;
     align-items: center;
+    margin-bottom: 10px;
 }
 
+.pool-card-icon {
+    width: 34px;
+    height: 34px;
+    margin-right: 10px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.pool-card-title {
+    flex-grow: 1;
+    font-size: 18px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text);
+    margin: 0;
+    padding: 0;
+}
+
+.pool-card-fill {
+    margin-right: 8px;
+}
+
+.pool-card .pile-block {
+    margin-bottom: 8px;
+    align-self: center;
+}
+
+/* A stockpile's piles: three by three (two by two for a small one), as they stand on the ground. */
 .pile-block {
     flex-shrink: 0;
     margin-bottom: 18px;
@@ -80,18 +222,8 @@
     padding: 0;
 }
 
-.storage-pickup {
-    height: 44px;
-    padding: 0 20px;
-}
-
 
 /* ---- A campfire (CampfirePage) ---- */
-
-/* Wider than the bag beside it: its dishes and its queue side by side. */
-.campfire-half {
-    flex-grow: 1.7;
-}
 
 .fire-linked {
     font-size: 17px;
@@ -102,6 +234,10 @@
 
 .fire-linked--none {
     color: var(--danger);
+}
+
+.fire-calories {
+    margin-left: 18px;
 }
 
 /* What is left of the log alight. */
@@ -121,143 +257,75 @@
     border-radius: 5px;
 }
 
-.fire-columns {
-    flex-grow: 1;
-    flex-direction: row;
-}
-
-.fire-column {
-    flex-grow: 1;
-    flex-basis: 0;
-}
-
-.fire-column--right {
-    margin-left: 12px;
-}
-
-.fire-column-title {
-    font-size: 18px;
-    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
-    color: var(--text-body);
-    margin: 0 0 8px 2px;
-    padding: 0;
-}
-
-.fire-well {
-    padding: 10px 4px 10px 10px;
-}
-
-.fire-list {
-    flex-grow: 1;
-    flex-basis: 0;
-}
-
-/* The dishes list reuses the crafting tab's rows (Inventory.uss, .recipe-row), a little lower. */
-.fire-list .recipe-row {
-    height: 84px;
-}
-
-/* A dish on the queue: its icon, its name and who queued it, a bar (calories put in, or cooking) with
-   what it waits for, and its buttons. */
-.job-row {
-    flex-direction: row;
-    align-items: center;
-    padding: 10px 10px 10px 8px;
-    margin: 0 8px 8px 0;
-    background-color: var(--inv-slot);
-    border-width: 1px;
-    border-color: var(--inv-slot-border);
-    border-radius: 5px;
-}
-
-.job-row--cooking {
-    border-color: #e39a3b;
-}
-
-.job-icon {
-    width: 56px;
-    height: 56px;
-    margin-right: 12px;
-    flex-shrink: 0;
-    -unity-background-scale-mode: scale-to-fit;
-}
-
-.job-text {
-    flex-grow: 1;
-    flex-shrink: 1;
-}
-
-.job-name {
-    font-size: 18px;
-    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
-    color: var(--text);
-    margin: 0;
-    padding: 0;
-}
-
-.job-by {
-    font-size: 14px;
-    color: var(--text-muted);
-    margin: 0 0 6px 0;
-    padding: 0;
-}
-
-.job-bar {
-    height: 10px;
-    background-color: var(--well);
-    border-radius: 5px;
-    overflow: hidden;
-}
-
-.job-bar-fill {
-    height: 100%;
-    width: 0;
-    background-color: var(--action-hover);
-    border-radius: 5px;
-}
-
-.job-bar-fill--cooking {
-    background-color: #e39a3b;
-}
-
-.job-status {
-    font-size: 15px;
-    color: var(--text-body);
-    margin: 4px 0 0 0;
-    padding: 0;
-}
-
-.job-status--waiting {
-    color: var(--accent);
-}
-
-.job-labour {
-    height: 40px;
-    padding: 0 12px;
-    margin-left: 10px;
-    font-size: 16px;
-}
-
-.job-cancel {
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    margin-left: 6px;
-    font-size: 18px;
-}
-
-/* A long dish name gives way to its work and time, cut with an ellipsis. */
-.fire-list .recipe-row-text {
+/* A long dish name gives way to what it takes, cut with an ellipsis. */
+.recipe-list .recipe-row-text {
     flex-shrink: 1;
     overflow: hidden;
 }
 
-.fire-list .recipe-row-name {
+.recipe-list .recipe-row-name {
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.fire-list .recipe-row-meta {
+/* A campfire's wood: a narrow card, its slots only as tall as their rows, then how long it burns. */
+.storage-card--fuel {
+    flex-grow: 0.6;
+}
+
+.storage-card--fuel .item-well {
+    flex-grow: 0;
+    padding-bottom: 12px;
+}
+
+.storage-card--fuel .item-grid {
+    flex-grow: 0;
+    flex-basis: auto;
+    height: 162px;
+}
+
+/* The hints wrap in the narrow card rather than overlap. */
+.storage-card--fuel .storage-hint {
+    flex-wrap: wrap;
+}
+
+.storage-card--fuel .storage-hint > * {
     flex-shrink: 0;
-    margin-left: 8px;
+    margin-bottom: 6px;
+}
+
+.fuel-info {
+    margin-top: 14px;
+    padding: 12px 14px;
+    background-color: #2b2d2e;
+    border-width: 1px;
+    border-color: #45484a;
+    border-radius: 6px;
+}
+
+.fuel-info-line {
+    flex-direction: row;
+    align-items: center;
+    margin: 3px 0;
+}
+
+.fuel-info-icon {
+    width: 22px;
+    height: 22px;
+    margin-right: 10px;
+    flex-shrink: 0;
+    -unity-background-image-tint-color: #e39a3b;
+}
+
+.fuel-info-text {
+    flex-shrink: 1;
+    font-size: 17px;
+    color: var(--text);
+    white-space: normal;
+    margin: 0;
+    padding: 0;
+}
+
+.fuel-info-text--muted {
+    color: var(--text-muted);
 }

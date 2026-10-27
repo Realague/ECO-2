@@ -291,14 +291,15 @@ namespace Voxel.Client
             if ((log.Position.ToUnity() - eyes).sqrMagnitude > reach * reach) return;
             if (!claimSync.Check(clientId, Mathf.FloorToInt(log.Position.X), Mathf.FloorToInt(log.Position.Z))) return;
 
+            // A log is worth several wood, all taken at once or none.
             int wood = Items.WoodOf(log.Species);
-            if (inventorySync.RoomFor(clientId, wood) <= 0)
+            if (inventorySync.RoomFor(clientId, wood) < MiningRules.WoodPerLog)
             {
                 inventorySync.TellFull(clientId, InventorySync.ReasonFor(wood));
                 return;
             }
 
-            inventorySync.Give(clientId, wood, 1);
+            inventorySync.Give(clientId, wood, MiningRules.WoodPerLog);
             store.Remove(logId);
             shown.Remove(logId);
             foreach (ulong other in networkManager.ConnectedClientsIds)

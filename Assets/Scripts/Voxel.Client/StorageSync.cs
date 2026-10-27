@@ -30,6 +30,16 @@ namespace Voxel.Client
         FuelFull = 13
     }
 
+    // A chest or stockpile of the open pool, or a chest linked to the open campfire, as the server last
+    // sent it: a chest's items, or a stockpile's piles.
+    public sealed class StorageMember
+    {
+        public int Id;
+        public StorageKind Kind;
+        public readonly Inventory Contents = new Inventory();
+        public StockpilePiles Piles;
+    }
+
     // Chests and stockpiles placed in the world (StorageRules, Storages). The server keeps them and
     // saves them with the world (storage.dat): it places one where a player asks if they own it and the
     // place is free (no block, player, animal, plant or log in it, flat ground for a stockpile), lets
@@ -108,6 +118,7 @@ namespace Voxel.Client
         // chests or stockpiles of its claimed zone together, StoragePool).
         private readonly Inventory openedContents = new Inventory();
         private readonly List<StockpilePiles> openedStockpiles = new List<StockpilePiles>();
+        private readonly List<StorageMember> openedMembers = new List<StorageMember>();
 
         private StorageViews views;
         private bool running;
@@ -128,6 +139,9 @@ namespace Voxel.Client
 
         // What the open chest's pool holds.
         public Inventory OpenedContents => openedContents;
+
+        // Each chest or stockpile of the open pool, in id order, with what it holds.
+        public IReadOnlyList<StorageMember> OpenedMemberList => openedMembers;
 
         // The open stockpile's pool: each member's piles (large and small), and all of them one after
         // another (StoragePool's numbering).
@@ -493,14 +507,15 @@ namespace Voxel.Client
         }
 
         // Moves items of the open storage: deposit count of an item from the bag, or take count from
-        // the storage (a chest's item, or a stockpile's pile).
-        public void RequestMove(bool deposit, int itemOrPile, int count)
+        // the storage (a chest's item, a stockpile's pile, or with byItem a stockpile's item from every
+        // pile of it); into or out of one member of its pool (a storage id), or the whole pool (0).
+        public void RequestMove(bool deposit, int itemOrPile, int count, int member = 0, bool byItem = false)
         {
             if (!running || OpenedId == 0 || count <= 0) return;
 
             if (IsServer)
             {
-                Move(networkManager.LocalClientId, OpenedId, deposit, itemOrPile, count);
+                Move(networkManager.LocalClientId, OpenedId, deposit, itemOrPile, count, member, byItem);
                 return;
             }
 
@@ -511,6 +526,8 @@ namespace Voxel.Client
                 writer.WriteValueSafe(deposit);
                 writer.WriteValueSafe(itemOrPile);
                 writer.WriteValueSafe(count);
+                writer.WriteValueSafe(member);
+                writer.WriteValueSafe(byItem);
             });
         }
 
@@ -668,14 +685,31 @@ namespace Voxel.Client
 
         // Items go into, or come out of, the storage's whole pool (StoragePool): the chests or the
         // stockpiles of its claimed zone; a pile is numbered across the pool.
-        private void Move(ulong clientId, int storageId, bool deposit, int itemOrPile, int count)
+        private void Move(ulong clientId, int storageId, bool deposit, int itemOrPile, int count, int member, bool byItem)
         {
             if (count <= 0 || !store.TryGet(storageId, out Storage storage) || !registry.TryGetPlayerId(clientId, out string playerId)) return;
-            if (!CanUse(playerId, storage) || !InReach(clientId, storage) || !registry.TryGetState(clientId, out PlayerState state)) return;
+            if (!CanUse(playerId, storage) || !InReach(clientId, storage)) return;
             if (storage.Kind == StorageKind.Campfire) return;
 
             List<Storage> pool = PoolOf(storage);
-            bool chest = storage.Kind == StorageKind.Chest;
+            if (MoveWithin(clientId, pool, storage.Kind == StorageKind.Chest, deposit, itemOrPile, count, member, byItem)) Changed(storage, pool);
+        }
+
+        // Moves items between a player's bag and a pool of chests or of stockpiles, or one member of it
+        // (member: its id, 0 for the whole pool). Returns whether anything moved.
+        private bool MoveWithin(ulong clientId, List<Storage> pool, bool chest, bool deposit, int itemOrPile, int count, int member, bool byItem)
+        {
+            if (!registry.TryGetState(clientId, out PlayerState state)) return false;
+
+            List<Storage> target = pool;
+            if (member != 0)
+            {
+                Storage one = pool.Find(s => s.Id == member);
+                if (one == null) return false;
+
+                target = new List<Storage> { one };
+            }
+
             if (deposit)
             {
                 int item = itemOrPile;
@@ -683,46 +717,47 @@ namespace Voxel.Client
                 if (!accepted)
                 {
                     Refuse(clientId, StorageRefusal.NotAccepted);
-                    return;
+                    return false;
                 }
 
-                int room = chest ? StoragePool.ChestRoom(pool, item, ecosystemSync.ItemWeights) : StoragePool.StockpileRoom(pool, item);
+                int room = chest ? StoragePool.ChestRoom(target, item, ecosystemSync.ItemWeights) : StoragePool.StockpileRoom(target, item);
                 int moved = Math.Min(count, Math.Min(state.Inventory.Count(item), room));
                 if (room <= 0)
                 {
                     Refuse(clientId, chest ? StorageRefusal.ChestFull : StorageRefusal.StockpileFull);
-                    return;
+                    return false;
                 }
 
-                if (moved <= 0 || !inventorySync.TryConsume(clientId, item, moved)) return;
+                if (moved <= 0 || !inventorySync.TryConsume(clientId, item, moved)) return false;
 
-                if (chest) StoragePool.AddToChests(pool, item, moved, ecosystemSync.ItemWeights);
-                else StoragePool.AddToStockpiles(pool, item, moved);
+                if (chest) StoragePool.AddToChests(target, item, moved, ecosystemSync.ItemWeights);
+                else StoragePool.AddToStockpiles(target, item, moved);
+                return true;
             }
-            else
+
+            // A pile is numbered across the whole pool.
+            Storage stockpile = null;
+            int pile = -1;
+            bool byPile = !chest && !byItem;
+            if (byPile && !StoragePool.TryFindPile(pool, itemOrPile, out stockpile, out pile)) return false;
+
+            int taken = byPile ? stockpile.Piles.ItemAt(pile) : itemOrPile;
+            int held = byPile ? stockpile.Piles.CountAt(pile) : chest ? StoragePool.Count(target, taken) : StoragePool.StockpileCount(target, taken);
+            if (taken == Items.None || held <= 0) return false;
+
+            int bagRoom = inventorySync.RoomFor(clientId, taken);
+            if (bagRoom <= 0)
             {
-                Storage stockpile = null;
-                int pile = -1;
-                if (!chest && !StoragePool.TryFindPile(pool, itemOrPile, out stockpile, out pile)) return;
-
-                int item = chest ? itemOrPile : stockpile.Piles.ItemAt(pile);
-                int held = chest ? StoragePool.Count(pool, item) : stockpile.Piles.CountAt(pile);
-                if (item == Items.None || held <= 0) return;
-
-                int room = inventorySync.RoomFor(clientId, item);
-                if (room <= 0)
-                {
-                    inventorySync.TellFull(clientId, InventorySync.ReasonFor(item));
-                    return;
-                }
-
-                int moved = Math.Min(count, Math.Min(held, room));
-                if (chest) StoragePool.TakeFromChests(pool, item, moved);
-                else stockpile.Piles.Take(pile, moved);
-                inventorySync.Give(clientId, item, moved);
+                inventorySync.TellFull(clientId, InventorySync.ReasonFor(taken));
+                return false;
             }
 
-            Changed(storage, pool);
+            int given = Math.Min(count, Math.Min(held, bagRoom));
+            if (byPile) stockpile.Piles.Take(pile, given);
+            else if (chest) StoragePool.TakeFromChests(target, taken, given);
+            else StoragePool.TakeFromStockpiles(target, taken, given);
+            inventorySync.Give(clientId, taken, given);
+            return true;
         }
 
         private void Pickup(ulong clientId, int storageId)
@@ -796,6 +831,9 @@ namespace Voxel.Client
 
                 if (StorageRules.IsStockpile(member.Kind)) BroadcastState(member);
             }
+
+            // Campfires open in a window show what their linked chests hold.
+            if (storage.Kind == StorageKind.Chest) RefreshFiresLinkedTo(pool);
         }
 
         // Plots changed hands: the pools may have too (a zone grown, split or given up), and the
@@ -844,20 +882,10 @@ namespace Voxel.Client
 
             bool owner = registry.TryGetPlayerId(clientId, out string playerId) && playerId == OwnerOf(storage);
             List<Storage> pool = PoolOf(storage);
-            Inventory contents = storage.Kind == StorageKind.Chest ? StoragePool.Contents(pool) : null;
 
             if (clientId == networkManager.LocalClientId)
             {
-                var piles = new List<StockpilePiles>();
-                if (StorageRules.IsStockpile(storage.Kind))
-                {
-                    foreach (Storage member in pool)
-                    {
-                        piles.Add(member.Piles);
-                    }
-                }
-
-                ShowOpened(storage.Id, storage.Kind, owner, pool.Count, contents, piles);
+                ShowOpened(storage.Id, storage.Kind, owner, MembersOf(pool));
                 return;
             }
 
@@ -866,26 +894,93 @@ namespace Voxel.Client
                 writer.WriteValueSafe(storage.Id);
                 writer.WriteValueSafe((byte)storage.Kind);
                 writer.WriteValueSafe(owner);
-                writer.WriteValueSafe(pool.Count);
-                if (storage.Kind == StorageKind.Chest)
+                WriteMembers(writer, pool);
+            });
+        }
+
+        // Each storage of a pool (or each chest linked to a campfire), one after another: its id and kind,
+        // then a chest's items or a stockpile's piles (large and small stockpiles have their own).
+        private static void WriteMembers(FastBufferWriter writer, List<Storage> pool)
+        {
+            writer.WriteValueSafe(pool.Count);
+            foreach (Storage member in pool)
+            {
+                writer.WriteValueSafe(member.Id);
+                writer.WriteValueSafe((byte)member.Kind);
+                if (StorageRules.IsStockpile(member.Kind))
                 {
-                    writer.WriteValueSafe(contents.DistinctCount);
-                    foreach (KeyValuePair<int, int> entry in contents.Entries)
-                    {
-                        writer.WriteValueSafe(entry.Key);
-                        writer.WriteValueSafe(entry.Value);
-                    }
+                    WritePiles(writer, member.Piles);
+                    continue;
+                }
+
+                writer.WriteValueSafe(member.Contents.DistinctCount);
+                foreach (KeyValuePair<int, int> entry in member.Contents.Entries)
+                {
+                    writer.WriteValueSafe(entry.Key);
+                    writer.WriteValueSafe(entry.Value);
+                }
+            }
+        }
+
+        // Null if they cannot be a pool's storage.
+        private static List<StorageMember> ReadMembers(FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out int count);
+            if (count < 0 || count > MaxPoolMembers) return null;
+
+            var members = new List<StorageMember>();
+            for (int i = 0; i < count; i++)
+            {
+                reader.ReadValueSafe(out int id);
+                reader.ReadValueSafe(out byte kind);
+                if (!StorageRules.IsKind(kind) || kind == (byte)StorageKind.Campfire) return null;
+
+                var member = new StorageMember { Id = id, Kind = (StorageKind)kind };
+                if (StorageRules.IsStockpile(member.Kind))
+                {
+                    member.Piles = new StockpilePiles(member.Kind);
+                    if (!ReadPiles(reader, member.Piles)) return null;
                 }
                 else
                 {
-                    // Each member's kind first: large and small stockpiles have their own piles.
-                    foreach (Storage member in pool)
+                    reader.ReadValueSafe(out int entries);
+                    if (entries < 0 || entries > 4096) return null;
+
+                    for (int e = 0; e < entries; e++)
                     {
-                        writer.WriteValueSafe((byte)member.Kind);
-                        WritePiles(writer, member.Piles);
+                        reader.ReadValueSafe(out int item);
+                        reader.ReadValueSafe(out int amount);
+                        if (amount > 0 && StorageRules.AcceptsInChest(item)) member.Contents.Add(item, amount);
                     }
                 }
-            });
+
+                members.Add(member);
+            }
+
+            return members;
+        }
+
+        // The host's own copies of a pool's storage, as a client would read them.
+        private static List<StorageMember> MembersOf(List<Storage> pool)
+        {
+            var members = new List<StorageMember>();
+            foreach (Storage storage in pool)
+            {
+                var member = new StorageMember { Id = storage.Id, Kind = storage.Kind };
+                if (StorageRules.IsStockpile(storage.Kind))
+                {
+                    member.Piles = new StockpilePiles(storage.Piles.Count, storage.Piles.PileSize);
+                    member.Piles.CopyFrom(storage.Piles);
+                }
+                else
+                {
+                    member.Contents.CopyFrom(storage.Contents);
+                }
+
+                members.Add(member);
+            }
+
+            return members;
         }
 
         // Who may open a storage and move items in and out: anyone while it stands off claimed land
@@ -1136,7 +1231,9 @@ namespace Voxel.Client
             reader.ReadValueSafe(out bool deposit);
             reader.ReadValueSafe(out int itemOrPile);
             reader.ReadValueSafe(out int count);
-            Move(senderId, id, deposit, itemOrPile, count);
+            reader.ReadValueSafe(out int member);
+            reader.ReadValueSafe(out bool byItem);
+            Move(senderId, id, deposit, itemOrPile, count, member, byItem);
         }
 
         private void OnPickup(ulong senderId, FastBufferReader reader)
@@ -1180,36 +1277,12 @@ namespace Voxel.Client
             reader.ReadValueSafe(out int id);
             reader.ReadValueSafe(out byte kind);
             reader.ReadValueSafe(out bool owner);
-            reader.ReadValueSafe(out int members);
-            if (!StorageRules.IsKind(kind) || members < 1 || members > MaxPoolMembers) return;
+            if (!StorageRules.IsKind(kind)) return;
 
-            var contents = new Inventory();
-            var piles = new List<StockpilePiles>();
-            if (kind == (byte)StorageKind.Chest)
-            {
-                reader.ReadValueSafe(out int entries);
-                for (int i = 0; i < entries; i++)
-                {
-                    reader.ReadValueSafe(out int item);
-                    reader.ReadValueSafe(out int count);
-                    if (count > 0 && StorageRules.AcceptsInChest(item)) contents.Add(item, count);
-                }
-            }
-            else
-            {
-                for (int i = 0; i < members; i++)
-                {
-                    reader.ReadValueSafe(out byte memberKind);
-                    if (!StorageRules.IsKind(memberKind) || !StorageRules.IsStockpile((StorageKind)memberKind)) return;
+            List<StorageMember> members = ReadMembers(reader);
+            if (members == null || members.Count < 1) return;
 
-                    var stockpile = new StockpilePiles((StorageKind)memberKind);
-                    if (!ReadPiles(reader, stockpile)) return;
-
-                    piles.Add(stockpile);
-                }
-            }
-
-            ShowOpened(id, (StorageKind)kind, owner, members, contents, piles);
+            ShowOpened(id, (StorageKind)kind, owner, members);
         }
 
         private void OnClosed(ulong senderId, FastBufferReader reader)
@@ -1247,25 +1320,41 @@ namespace Voxel.Client
 
         // ---- The local player's open storage ----
 
-        private void ShowOpened(int id, StorageKind kind, bool owner, int members, Inventory contents, List<StockpilePiles> piles)
+        private void ShowOpened(int id, StorageKind kind, bool owner, List<StorageMember> members)
         {
             OpenedId = id;
             OpenedKind = kind;
             OpenedIsOwner = owner;
-            OpenedMembers = members;
-            if (contents != null) openedContents.CopyFrom(contents);
-            else openedContents.Clear();
-
-            // Copies: on the host these are the stockpiles themselves.
+            OpenedMembers = members.Count;
+            openedMembers.Clear();
+            openedMembers.AddRange(members);
+            openedContents.Clear();
             openedStockpiles.Clear();
-            foreach (StockpilePiles stockpile in piles)
+            foreach (StorageMember member in members)
             {
-                var copy = new StockpilePiles(stockpile.Count, stockpile.PileSize);
-                copy.CopyFrom(stockpile);
-                openedStockpiles.Add(copy);
+                if (member.Piles != null) openedStockpiles.Add(member.Piles);
+                else AddAll(openedContents, member.Contents);
             }
 
             OpenedChanged?.Invoke();
+        }
+
+        private static void AddAll(Inventory into, Inventory from)
+        {
+            foreach (KeyValuePair<int, int> entry in from.Entries)
+            {
+                into.Add(entry.Key, entry.Value);
+            }
+        }
+
+        // Where a storage stands, as every machine knows.
+        public bool TryPositionOf(int storageId, out BlockPos position)
+        {
+            position = default;
+            if (!running || !shown.TryGet(storageId, out Storage storage)) return false;
+
+            position = storage.Position;
+            return true;
         }
 
         private void ClosedHere()

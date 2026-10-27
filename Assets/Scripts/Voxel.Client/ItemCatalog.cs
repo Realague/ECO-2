@@ -23,6 +23,18 @@ namespace Voxel.Client
     {
         private const string IconFolder = "ItemIcons";
 
+        // Nutrient points a food bar shows full (foods have 0 to about 15, as in Eco).
+        public const float FullNutrient = 15f;
+
+        // A burn time as players read it: "30 s", "2 min 30 s".
+        public static string DurationText(float seconds)
+        {
+            int whole = Mathf.CeilToInt(seconds);
+            if (whole < 60) return Loc.T("{0} s", whole);
+
+            return whole % 60 == 0 ? Loc.T("{0} min", whole / 60) : Loc.T("{0} min {1} s", whole / 60, whole % 60);
+        }
+
         public static readonly ItemCategory[] Categories = { ItemCategory.Tools, ItemCategory.Blocks, ItemCategory.Wood, ItemCategory.Seeds, ItemCategory.Food, ItemCategory.Materials };
 
         private static readonly Dictionary<int, Texture2D> Icons = new Dictionary<int, Texture2D>();
@@ -100,10 +112,10 @@ namespace Voxel.Client
 
             switch (item)
             {
-                case Items.Shovel: return Loc.T("Digs soft ground: dirt, grass, sand, gravel, clay, snow and mud. Hold it and left click.");
+                case Items.Shovel: return Loc.T("Digs soft ground: dirt, grass, sand, gravel, clay, snow and mud, and digs up roots: beets, carrots and potatoes (right click on a ripe one). Hold it and left click.");
                 case Items.Pickaxe: return Loc.T("Breaks hard blocks: rock, ores and ice. Hold it and left click.");
                 case Items.Axe: return Loc.T("Fells trees and every plant that gives wood. Hold it and left click.");
-                case Items.Scythe: return Loc.T("Cuts grass, reeds and ferns, and harvests cereals and vegetables (right click on a ripe one). Fruit is picked by hand.");
+                case Items.Scythe: return Loc.T("Cuts grass, reeds and ferns, and harvests oats, wheat, maize, sunflowers and rice (right click on a ripe one). Other crops are picked by hand.");
                 case Items.Hoe: return Loc.T("Tills grass, dirt, mud or clay (right click): seeds only grow on tilled soil.");
                 case Items.Bow: return Loc.T("Hunts animals. Hold the left button to draw, let go to shoot; a shot in the head does double damage.");
                 case Items.Arrow: return Loc.T("Shot with the bow. An arrow lies where it lands: right click on it to pick it up.");

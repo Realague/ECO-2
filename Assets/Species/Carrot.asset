@@ -34,6 +34,7 @@ MonoBehaviour:
   woodYield: 0
   woodColour: {r: 0.66, g: 0.49, b: 0.31, a: 1}
   harvest: 1
+  harvestTool: 2
   produceName: Carrot
   produceYield: 3
   seedYield: 2

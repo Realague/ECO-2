@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using Unity.Collections;
 using Unity.Netcode;
@@ -27,6 +28,7 @@ namespace Voxel.Client
         [SerializeField] private WorldSync worldSync;
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private ClaimSync claimSync;
+        [SerializeField] private InventorySync inventorySync;
 
         private bool serverRunning;
         private bool clientRunning;
@@ -139,7 +141,104 @@ namespace Voxel.Client
                 case CommandKind.Spawn:
                     Spawn(clientId, command, aimX, aimZ);
                     break;
+                case CommandKind.Give:
+                    Give(clientId, command);
+                    break;
             }
+        }
+
+        // Items into a player's bag, what fits (the carrying limits hold); the item named in English or
+        // in the server's language.
+        private void Give(ulong clientId, Command command)
+        {
+            ulong target = command.Player < 0 ? clientId : (ulong)command.Player;
+            if (!networkManager.ConnectedClients.ContainsKey(target))
+            {
+                Reply(clientId, $"There is no player #{command.Player}. /players lists them.");
+                return;
+            }
+
+            if (!TryFindItem(command.Name, out int item))
+            {
+                Reply(clientId, $"There is no item called '{command.Name}'. Write its name as the inventory shows it, for instance /give oak wood 20.");
+                return;
+            }
+
+            string name = EnglishNameOf(item);
+            int given = inventorySync.Give(target, item, command.Count);
+            string whose = target == clientId ? "your" : $"player #{target}'s";
+            if (given == 0)
+            {
+                Reply(clientId, $"No room for {name} in {whose} bag (40 blocks, 30 kg).");
+                return;
+            }
+
+            Reply(clientId, given == command.Count
+                ? $"Gave {given} × {name} into {whose} bag."
+                : $"Gave {given} × {name} into {whose} bag: no room for more.");
+            if (target != clientId) Reply(target, $"Player #{clientId} gave you {given} × {name}.");
+        }
+
+        private bool TryFindItem(string normalisedName, out int found)
+        {
+            foreach (int item in GivableItems())
+            {
+                if (Command.Normalise(EnglishNameOf(item)) == normalisedName || Command.Normalise(ItemCatalog.NameOf(item, ecosystemSync)) == normalisedName)
+                {
+                    found = item;
+                    return true;
+                }
+            }
+
+            found = Items.None;
+            return false;
+        }
+
+        // Every item a player may hold: blocks (not water), what is crafted, each species' seeds, wood
+        // and crop, each animal's carcass, the dishes.
+        private IEnumerable<int> GivableItems()
+        {
+            for (int type = 1; type <= Blocks.LastType; type++)
+            {
+                if (type != Blocks.Water && Items.IsValid(type)) yield return type;
+            }
+
+            foreach (int item in new[] { Items.Straw, Items.Arrow, Items.Chest, Items.Stockpile, Items.SmallStockpile, Items.Campfire })
+            {
+                yield return item;
+            }
+
+            for (int tool = Items.Shovel; tool <= Items.Bow; tool++)
+            {
+                if (Items.IsTool(tool)) yield return tool;
+            }
+
+            for (int species = 0; species < ecosystemSync.PlantSpeciesCount; species++)
+            {
+                yield return Items.Seed(species);
+                if (ecosystemSync.IsTree(species)) yield return Items.WoodOf(species);
+                if (ecosystemSync.IsCrop(species)) yield return Items.Produce(species);
+            }
+
+            for (int animal = 0; animal < ecosystemSync.AnimalSpeciesCount; animal++)
+            {
+                yield return Items.Carcass(animal);
+            }
+
+            for (int dish = 0; dish < Dishes.All.Count; dish++)
+            {
+                yield return Items.Dish(dish);
+            }
+        }
+
+        // An item's name in English, which the server answers in.
+        private string EnglishNameOf(int item)
+        {
+            if (Items.IsSeed(item)) return $"{ecosystemSync.SpeciesName(false, Items.SeedSpecies(item))} seeds";
+            if (Items.IsWood(item)) return $"{ecosystemSync.SpeciesName(false, Items.WoodSpecies(item))} wood";
+            if (Items.IsProduce(item)) return EcosystemSync.DisplayName(ecosystemSync.ProduceName(Items.ProduceSpecies(item)));
+            if (Items.IsCarcass(item)) return $"{ecosystemSync.SpeciesName(true, Items.CarcassSpecies(item))} carcass";
+            return Items.NameOf(item);
         }
 
         private string PlayerList(ulong clientId)

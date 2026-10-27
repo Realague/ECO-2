@@ -843,6 +843,7 @@ MonoBehaviour:
   worldSync: {fileID: 490447447}
   ecosystemSync: {fileID: 490447448}
   claimSync: {fileID: 490447459}
+  inventorySync: {fileID: 490447450}
 --- !u!114 &490447454
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1056,6 +1057,7 @@ MonoBehaviour:
   inventorySync: {fileID: 490447450}
   storageSync: {fileID: 490447458}
   ecosystemSync: {fileID: 490447448}
+  hungerSync: {fileID: 490447454}
   appearanceMenu: {fileID: 490447451}
   hotbar: {fileID: 408005230}
 --- !u!114 &632794198
@@ -1444,6 +1446,56 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1201000721}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1407768943
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1407768945}
+  - component: {fileID: 1407768944}
+  m_Layer: 0
+  m_Name: ClaimOverlay
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1407768944
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1407768943}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b316dc8c710d6146ac05972102dfcad, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.ClaimOverlay
+  claimSync: {fileID: 490447459}
+  worldSync: {fileID: 490447447}
+  hotbar: {fileID: 408005230}
+  mapScreen: {fileID: 822296572}
+  inventoryScreen: {fileID: 1141440427}
+  material: {fileID: 2100000, guid: 8d29619cc5fc08348ab2c1a35f2d1c4b, type: 2}
+--- !u!4 &1407768945
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1407768943}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -2074,3 +2126,4 @@ SceneRoots:
   - {fileID: 632794199}
   - {fileID: 593756664}
   - {fileID: 220129608}
+  - {fileID: 1407768945}

@@ -832,3 +832,233 @@
     height: 54px;
     font-size: 20px;
 }
+
+/* An order may be queued without its ingredients: said in amber, not red. */
+.recipe-reason--warning {
+    color: #8a5a12;
+}
+
+/* Where an ingredient is found, under its line on a campfire's sheet. */
+.ingredient-source {
+    font-size: 14px;
+    color: var(--inv-sheet-muted);
+    margin: -6px 0 8px 54px;
+    padding: 0;
+}
+
+/* A recipe row's time and calories, each with its glyph. */
+.recipe-row-meta-line {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.recipe-row-meta-icon {
+    width: 18px;
+    height: 18px;
+    margin-right: 6px;
+    -unity-background-image-tint-color: var(--text-muted);
+}
+
+/* How many to make (QuantityStepper). */
+.stepper {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.stepper-title {
+    flex-grow: 1;
+    font-size: 17px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--inv-sheet-text);
+    margin: 0;
+    padding: 0;
+}
+
+.stepper-button {
+    width: 44px;
+    height: 40px;
+    margin: 0;
+    padding: 0;
+    font-size: 22px;
+    color: var(--inv-sheet-text);
+    background-color: var(--inv-sheet-well);
+    border-width: 1px;
+    border-bottom-width: 3px;
+    border-color: #ae9d87;
+    border-radius: 5px;
+}
+
+.stepper-button:hover {
+    background-color: #d3c4b0;
+}
+
+/* The count, typed on the sheet's cream: a small inset field. */
+.stepper-field {
+    width: 64px;
+    margin: 0 8px;
+}
+
+.stepper-field > .unity-base-text-field__input,
+.stepper-field > .unity-text-field__input {
+    height: 40px;
+    padding: 0 6px;
+    font-size: 21px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    -unity-text-align: middle-center;
+    color: var(--inv-sheet-text);
+    background-color: #efe4d2;
+    border-width: 1px;
+    border-color: #ae9d87;
+    border-radius: 5px;
+    --unity-cursor-color: var(--inv-sheet-text);
+}
+
+.stepper-field:focus > .unity-base-text-field__input,
+.stepper-field:focus > .unity-text-field__input {
+    border-color: #7a5a2c;
+    border-width: 2px;
+}
+
+.stepper-max {
+    width: auto;
+    padding: 0 14px;
+    margin-left: 12px;
+    font-size: 16px;
+}
+
+/* The queue under the recipes: a title, then a well of orders. */
+.queue-title {
+    font-size: 18px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text-body);
+    margin: 14px 0 8px 2px;
+    padding: 0;
+}
+
+.queue-well {
+    flex-grow: 0;
+    flex-shrink: 0;
+    height: 240px;
+    padding: 10px 4px 2px 10px;
+}
+
+.queue-list {
+    flex-grow: 1;
+    flex-basis: 0;
+}
+
+/* An order on a queue (OrderRows): its icon, its name and a line under it, a bar (calories put in,
+   cooking, or the item under way) with what it waits for, and its buttons. */
+.job-row {
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 10px 10px 8px;
+    margin: 0 8px 8px 0;
+    background-color: var(--inv-slot);
+    border-width: 1px;
+    border-color: var(--inv-slot-border);
+    border-radius: 5px;
+}
+
+.job-row--cooking {
+    border-color: #e39a3b;
+}
+
+.job-icon {
+    width: 56px;
+    height: 56px;
+    margin-right: 12px;
+    flex-shrink: 0;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.job-text {
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.job-name {
+    font-size: 18px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text);
+    margin: 0;
+    padding: 0;
+}
+
+.job-by {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin: 0 0 6px 0;
+    padding: 0;
+}
+
+.job-bar {
+    height: 10px;
+    background-color: var(--well);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.job-bar-fill {
+    height: 100%;
+    width: 0;
+    background-color: var(--action-hover);
+    border-radius: 5px;
+}
+
+.job-bar-fill--cooking {
+    background-color: #e39a3b;
+}
+
+/* A bar and what it reads after it: on a campfire, the calories put in above the cooking. */
+.job-bar-line {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.job-bar-line > .job-bar {
+    flex-grow: 1;
+}
+
+.job-bar-fill--labour {
+    background-color: #7fae6b;
+}
+
+.job-bar-text {
+    width: 130px;
+    flex-shrink: 0;
+    font-size: 13px;
+    -unity-text-align: middle-right;
+    color: var(--text-muted);
+    margin: 0 0 0 8px;
+    padding: 0;
+}
+
+.job-status {
+    font-size: 15px;
+    color: var(--text-body);
+    margin: 4px 0 0 0;
+    padding: 0;
+}
+
+.job-status--waiting {
+    color: var(--accent);
+}
+
+.job-labour {
+    height: 40px;
+    padding: 0 12px;
+    margin-left: 10px;
+    font-size: 16px;
+}
+
+.job-cancel {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    margin-left: 6px;
+    font-size: 18px;
+}

@@ -88,6 +88,9 @@ namespace Voxel.Client
         [Tooltip("A crop: none, an annual (pulled up when harvested) or a perennial (picked again and again). " +
                  "Once adult it ripens through 3 stages, giving a third, two thirds and all of its harvest.")]
         [SerializeField] private HarvestKind harvest;
+        [Tooltip("What a ripe crop is harvested with: by hand, a scythe (cereals) or a shovel (roots, which are also " +
+                 "dug up with it when cut down).")]
+        [SerializeField] private HarvestTool harvestTool;
         [Tooltip("What the harvest gives, its item named so: \"Apple\", \"Wheat grain\".")]
         [SerializeField] private string produceName;
         [Tooltip("Crops given by a fully ripe harvest.")]
@@ -205,6 +208,8 @@ namespace Voxel.Client
         }
 
         public HarvestKind Harvest => harvest;
+
+        public HarvestTool HarvestTool => harvestTool;
 
         public string ProduceName => string.IsNullOrEmpty(produceName) ? name : produceName;
 

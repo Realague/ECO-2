@@ -101,6 +101,7 @@ namespace Voxel.Client
         private Label landMessage;
         private VisualElement landList;
         private VisualElement landEmpty;
+        private Toggle landShowWorld;
         private Texture2D shownClaims;
         private bool plotMode;
         private bool pointerInside;
@@ -139,6 +140,9 @@ namespace Voxel.Client
             landMessage = root.Q<Label>("land-message");
             landList = root.Q("land-list");
             landEmpty = root.Q("land-empty");
+            landShowWorld = root.Q<Toggle>("land-show-world");
+            landShowWorld.focusable = false;
+            landShowWorld.RegisterValueChangedCallback(e => ClaimOverlay.SetShown(e.newValue));
             if (claimSync != null)
             {
                 claimSync.AccessChanged += ShowLand;
@@ -287,6 +291,7 @@ namespace Voxel.Client
 
             speciesPanel.Blur();
             claimSync.RequestAccessList();
+            landShowWorld.SetValueWithoutNotify(ClaimOverlay.Shown);
             ShowLand();
         }
 

@@ -7,10 +7,12 @@ namespace Voxel.Client
 {
     // The inventory's crafting tab (Inventory.uxml: crafting-page, recipe-sheet), run by
     // InventoryScreen: every recipe in a list, with what it takes (red where the bag lacks it), its
-    // time and calories, greyed when it cannot be crafted; the chosen one on the sheet, each
-    // ingredient with what the bag holds of it and, for wood or stone, which one goes in (Auto, or one
-    // the bag holds: kept per group for the session, back to Auto once the bag has none of it), then
-    // Craft, or the craft under way with its progress and Cancel.
+    // time and calories, greyed when it cannot be crafted now; under it the queue (CraftingSync), each
+    // order with how many are left, the item under way or what it waits for, and a cross cancelling
+    // it; the chosen recipe on the sheet, each ingredient with what the bag holds of it for as many as
+    // are asked and, for wood or stone, which one goes in (Auto, or one the bag holds: kept per group
+    // for the session, back to Auto once the bag has none of it), how many to make, and Add to the
+    // queue, which also takes an order whose ingredients are missing (it waits for them).
     internal sealed class CraftingPage
     {
         private const string SelectedRowClass = "recipe-row--selected";
@@ -36,7 +38,9 @@ namespace Voxel.Client
         private readonly VisualElement progressFill;
         private readonly Label progressText;
         private readonly Button craft;
-        private readonly Button cancel;
+        private readonly Label queueTitle;
+        private readonly QuantityStepper quantity;
+        private readonly OrderRows queue;
 
         // A row per recipe, in Recipes.All's order.
         private readonly List<Row> rows = new List<Row>();
@@ -48,13 +52,15 @@ namespace Voxel.Client
 
         // What the list and sheet were last drawn from: changed, they are drawn again.
         private long shownKey = long.MinValue;
+        private long queueKey = long.MinValue;
 
         private sealed class Row
         {
             public VisualElement Root;
             public Label Name;
             public readonly List<Label> Counts = new List<Label>();
-            public Label Meta;
+            public Label Seconds;
+            public Label Calories;
         }
 
         public CraftingPage(VisualElement root, CraftingSync craftingSync, InventorySync inventorySync, HungerSync hungerSync, EcosystemSync ecosystemSync)
@@ -80,11 +86,17 @@ namespace Voxel.Client
             progressFill = root.Q("recipe-progress-fill");
             progressText = root.Q<Label>("recipe-progress-text");
             craft = root.Q<Button>("recipe-craft");
-            cancel = root.Q<Button>("recipe-cancel");
+            queueTitle = root.Q<Label>("craft-queue-title");
             craft.focusable = false;
-            cancel.focusable = false;
-            craft.clicked += () => craftingSync.RequestCraft(selected, ChoicesFor(Recipes.All[selected]));
-            cancel.clicked += craftingSync.RequestCancel;
+            craft.clicked += () => craftingSync.RequestQueue(selected, ChoicesFor(Recipes.All[selected]), quantity.Value);
+
+            quantity = new QuantityStepper(root.Q("recipe-quantity"), CraftQueue.MaxCount, () =>
+            {
+                Recipe recipe = Recipes.All[selected];
+                return Recipes.MaxCraftable(inventorySync.Inventory, recipe, ChoicesFor(recipe), ecosystemSync.ItemWeights, CraftQueue.MaxCount);
+            });
+            quantity.Changed += () => shownKey = long.MinValue;
+            queue = new OrderRows(root.Q<ScrollView>("craft-queue"), root.Q<Label>("craft-queue-empty"), craftingSync.RequestCancel, null);
 
             list.verticalScrollerVisibility = ScrollerVisibility.AlwaysVisible;
             for (int r = 0; r < Recipes.All.Count; r++)
@@ -100,17 +112,30 @@ namespace Voxel.Client
             page.style.display = shown ? DisplayStyle.Flex : DisplayStyle.None;
             sheet.style.display = shown ? DisplayStyle.Flex : DisplayStyle.None;
             shownKey = long.MinValue;
+            queueKey = long.MinValue;
         }
 
-        // Another language: everything is written again.
-        public void Retranslate() => shownKey = long.MinValue;
+        // Whether the count is being typed, and leaving its field.
+        public bool IsTyping => quantity.IsTyping;
 
-        // Every frame while the tab is shown: the progress, and the rest when what it shows changed.
+        public void Blur() => quantity.Blur();
+
+        // Another language: everything is written again.
+        public void Retranslate()
+        {
+            shownKey = long.MinValue;
+            queueKey = long.MinValue;
+            quantity.Retranslate();
+        }
+
+        // Every frame while the tab is shown: the progress and the queue's bars, and the rest when what
+        // it shows changed.
         public void Refresh()
         {
             Inventory bag = inventorySync.Inventory;
             calories.text = $"{hungerSync.Stomach.Calories:0} kcal";
             ShowProgress();
+            ShowQueue();
 
             long key = KeyOf(bag);
             if (key == shownKey) return;
@@ -158,12 +183,7 @@ namespace Voxel.Client
 
             text.Add(costs);
             row.Root.Add(text);
-            row.Meta = new Label { pickingMode = PickingMode.Ignore };
-            row.Meta.AddToClassList("recipe-row-meta-text");
-            var meta = new VisualElement { pickingMode = PickingMode.Ignore };
-            meta.AddToClassList("recipe-row-meta");
-            meta.Add(row.Meta);
-            row.Root.Add(meta);
+            row.Root.Add(MetaOf(out row.Seconds, out row.Calories));
 
             row.Root.RegisterCallback<PointerDownEvent>(e =>
             {
@@ -174,6 +194,32 @@ namespace Voxel.Client
             });
             list.Add(row.Root);
             rows.Add(row);
+        }
+
+        // A recipe row's time (an hourglass) over its calories (a flame).
+        internal static VisualElement MetaOf(out Label seconds, out Label calories)
+        {
+            var meta = new VisualElement { pickingMode = PickingMode.Ignore };
+            meta.AddToClassList("recipe-row-meta");
+            seconds = MetaLine(meta, "icon--hourglass");
+            calories = MetaLine(meta, "icon--fire");
+            return meta;
+        }
+
+        private static Label MetaLine(VisualElement meta, string glyph)
+        {
+            var line = new VisualElement { pickingMode = PickingMode.Ignore };
+            line.AddToClassList("recipe-row-meta-line");
+            var picture = new VisualElement { pickingMode = PickingMode.Ignore };
+            picture.AddToClassList("icon");
+            picture.AddToClassList(glyph);
+            picture.AddToClassList("recipe-row-meta-icon");
+            var text = new Label { pickingMode = PickingMode.Ignore };
+            text.AddToClassList("recipe-row-meta-text");
+            line.Add(picture);
+            line.Add(text);
+            meta.Add(line);
+            return text;
         }
 
         private void ShowRow(int index, Inventory bag)
@@ -190,7 +236,8 @@ namespace Voxel.Client
                 row.Counts[i].EnableInClassList("recipe-chip-text--missing", have < ingredient.Count);
             }
 
-            row.Meta.text = $"{Loc.T("{0} s", Loc.Number(recipe.Seconds, "0.#"))} · {recipe.Calories:0} kcal";
+            row.Seconds.text = Loc.T("{0} s", Loc.Number(recipe.Seconds, "0.#"));
+            row.Calories.text = $"{recipe.Calories:0} kcal";
             row.Root.EnableInClassList(SelectedRowClass, index == selected);
             row.Root.EnableInClassList("recipe-row--unavailable", Recipes.Check(bag, recipe, choices, ecosystemSync.ItemWeights) != CraftRefusal.None);
         }
@@ -199,18 +246,20 @@ namespace Voxel.Client
         {
             Recipe recipe = Recipes.All[selected];
             int[] choices = ChoicesFor(recipe);
+            int count = quantity.Value;
             icon.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(recipe.Output, ecosystemSync));
             name.text = OutputName(recipe);
             kind.text = ItemCatalog.KindName(recipe.Output);
             description.text = ItemCatalog.DescriptionOf(recipe.Output, ecosystemSync);
-            duration.text = Loc.T("{0} s", Loc.Number(recipe.Seconds, "0.#"));
-            cost.text = $"{recipe.Calories:0} kcal";
+            duration.text = Times(Loc.T("{0} s", Loc.Number(recipe.Seconds, "0.#")), Loc.T("{0} s", Loc.Number(recipe.Seconds * count, "0.#")), count);
+            cost.text = Times($"{recipe.Calories:0} kcal", $"{recipe.Calories * count:0} kcal", count);
 
             ingredients.Clear();
             for (int i = 0; i < recipe.Ingredients.Count; i++)
             {
                 Ingredient ingredient = recipe.Ingredients[i];
                 int have = Recipes.Have(bag, ingredient, choices[i]);
+                int need = ingredient.Count * count;
                 var line = new VisualElement();
                 line.AddToClassList("details-line");
                 var picture = new VisualElement();
@@ -218,9 +267,9 @@ namespace Voxel.Client
                 picture.style.backgroundImage = new StyleBackground(choices[i] != Items.None ? ItemCatalog.IconOf(choices[i], ecosystemSync) : IconOf(ingredient));
                 var label = new Label(IngredientName(ingredient, choices[i]));
                 label.AddToClassList("details-line-label");
-                var value = new Label($"{have} / {ingredient.Count}");
+                var value = new Label($"{have} / {need}");
                 value.AddToClassList("details-line-value");
-                value.EnableInClassList("ingredient-value--missing", have < ingredient.Count);
+                value.EnableInClassList("ingredient-value--missing", have < need);
                 line.Add(picture);
                 line.Add(label);
                 line.Add(value);
@@ -229,15 +278,20 @@ namespace Voxel.Client
                 if (ingredient.IsGroup) ingredients.Add(Choices(ingredient, choices[i], bag));
             }
 
-            // Craft, or why not; while crafting, the progress and Cancel (ShowProgress).
-            CraftRefusal refusal = craftingSync.LocalCheck(selected, choices);
-            bool crafting = craftingSync.ActiveRecipe >= 0;
+            // Why it cannot be queued, or, in amber, that it will wait for its ingredients.
+            CraftRefusal refusal = craftingSync.LocalCheck(selected, choices, count);
             craft.SetEnabled(refusal == CraftRefusal.None);
-            craft.style.display = crafting ? DisplayStyle.None : DisplayStyle.Flex;
-            cancel.style.display = crafting ? DisplayStyle.Flex : DisplayStyle.None;
-            bool tell = refusal != CraftRefusal.None && refusal != CraftRefusal.Busy;
-            reason.text = tell ? Loc.T(CraftingSync.TextOf(refusal)) : "";
-            reason.style.display = tell ? DisplayStyle.Flex : DisplayStyle.None;
+            bool waits = refusal == CraftRefusal.None && Recipes.MaxCraftable(bag, recipe, choices, ecosystemSync.ItemWeights, count) < count;
+            reason.text = refusal != CraftRefusal.None ? Loc.T(CraftingSync.TextOf(refusal))
+                : waits ? Loc.T("Missing ingredients: the order will wait until they are in your bag") : "";
+            reason.EnableInClassList("recipe-reason--warning", refusal == CraftRefusal.None);
+            reason.style.display = reason.text.Length > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+        }
+
+        // "15 s", or for several "15 s × 3 = 45 s".
+        internal static string Times(string one, string all, int count)
+        {
+            return count <= 1 ? one : Loc.T("{0} × {1} = {2}", one, count, all);
         }
 
         // The wood or rock that goes in for an ingredient: Auto, then each one the bag holds.
@@ -249,7 +303,7 @@ namespace Voxel.Client
             foreach (int item in Recipes.Options(bag, ingredient))
             {
                 int count = bag.Count(item);
-                VisualElement option = Choice(ingredient.Group, item, count.ToString(), ItemCatalog.IconOf(item, ecosystemSync), choice == item, count < ingredient.Count);
+                VisualElement option = Choice(ingredient.Group, item, count.ToString(), ItemCatalog.IconOf(item, ecosystemSync), choice == item, count < ingredient.Count * quantity.Value);
                 option.tooltip = ItemCatalog.NameOf(item, ecosystemSync);
                 row.Add(option);
             }
@@ -284,14 +338,64 @@ namespace Voxel.Client
             return option;
         }
 
+        // The item under way, whatever its recipe.
         private void ShowProgress()
         {
-            int active = craftingSync.ActiveRecipe;
-            progress.style.display = active >= 0 ? DisplayStyle.Flex : DisplayStyle.None;
-            if (active < 0) return;
+            CraftOrderView active = craftingSync.Active;
+            progress.style.display = active != null ? DisplayStyle.Flex : DisplayStyle.None;
+            if (active == null) return;
 
-            progressFill.style.width = Length.Percent(craftingSync.Progress * 100f);
-            progressText.text = Loc.T("Crafting {0}… {1} s", OutputName(Recipes.All[active]), Mathf.CeilToInt(craftingSync.SecondsLeft));
+            progressFill.style.width = Length.Percent(craftingSync.ProgressOf(active) * 100f);
+            progressText.text = Loc.T("Crafting {0}… {1} s", OutputName(Recipes.All[active.Recipe]), Mathf.CeilToInt(craftingSync.SecondsLeftOf(active)));
+        }
+
+        // The queue's rows, laid out again when the orders change; their bars every frame.
+        private void ShowQueue()
+        {
+            IReadOnlyList<CraftOrderView> orders = craftingSync.Orders;
+            long key = 17;
+            foreach (CraftOrderView order in orders)
+            {
+                key = key * 31 + order.Id;
+                key = key * 31 + order.Count;
+            }
+
+            if (key != queueKey)
+            {
+                queueKey = key;
+                queueTitle.text = Loc.T("Queue ({0} / {1})", orders.Count, CraftQueue.MaxOrders);
+                var lines = new List<OrderRows.Line>();
+                foreach (CraftOrderView order in orders)
+                {
+                    Recipe recipe = Recipes.All[order.Recipe];
+                    lines.Add(new OrderRows.Line
+                    {
+                        Id = order.Id,
+                        Icon = ItemCatalog.IconOf(recipe.Output, ecosystemSync),
+                        Name = OutputName(recipe),
+                        Under = order.Count > 1 ? Loc.T("{0} to make", order.Count) : Loc.T("1 to make")
+                    });
+                }
+
+                queue.Build(lines);
+            }
+
+            foreach (CraftOrderView order in orders)
+            {
+                if (order.Running)
+                {
+                    queue.Set(order.Id, craftingSync.ProgressOf(order), false, Loc.T("Crafting… {0} s", Mathf.CeilToInt(craftingSync.SecondsLeftOf(order))), false, false, true);
+                    continue;
+                }
+
+                string status = order.Waiting switch
+                {
+                    CraftRefusal.None => Loc.T("Waits its turn"),
+                    CraftRefusal.Missing => Loc.T("Missing ingredients: waits until they are in your bag"),
+                    _ => Loc.T(CraftingSync.TextOf(order.Waiting))
+                };
+                queue.Set(order.Id, 0f, false, status, order.Waiting != CraftRefusal.None, false, false);
+            }
         }
 
         // The choice for each of a recipe's ingredients: the item chosen for its group, while the bag
@@ -312,8 +416,8 @@ namespace Voxel.Client
             return choices;
         }
 
-        // What the list and sheet show depends on: the bag, the stomach running out, the craft under
-        // way, the recipe and choices chosen.
+        // What the list and sheet show depends on: the bag, the stomach running out, the queue being
+        // full, the recipe, choices and quantity chosen.
         private long KeyOf(Inventory bag)
         {
             long key = 17;
@@ -324,7 +428,8 @@ namespace Voxel.Client
             }
 
             key = key * 31 + selected;
-            key = key * 31 + craftingSync.ActiveRecipe;
+            key = key * 31 + quantity.Value;
+            key = key * 31 + (craftingSync.IsFull ? 1 : 0);
             key = key * 31 + (hungerSync.Stomach.IsStarving ? 1 : 0);
             foreach (KeyValuePair<IngredientGroup, int> choice in chosen)
             {

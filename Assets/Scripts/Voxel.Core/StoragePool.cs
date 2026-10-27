@@ -168,6 +168,33 @@ namespace Voxel.Core
             return added;
         }
 
+        // How many of an item the stockpiles hold together.
+        public static int StockpileCount(IReadOnlyList<Storage> stockpiles, int item)
+        {
+            int count = 0;
+            foreach (Storage stockpile in stockpiles)
+            {
+                count += stockpile.Piles.CountOf(item);
+            }
+
+            return count;
+        }
+
+        // Takes up to count of an item from the piles holding it, in the pool's order. Returns how many.
+        public static int TakeFromStockpiles(IReadOnlyList<Storage> stockpiles, int item, int count)
+        {
+            int taken = 0;
+            foreach (Storage stockpile in stockpiles)
+            {
+                for (int pile = 0; pile < stockpile.Piles.Count && taken < count; pile++)
+                {
+                    if (stockpile.Piles.ItemAt(pile) == item) taken += stockpile.Piles.Take(pile, count - taken);
+                }
+            }
+
+            return taken;
+        }
+
         // ---- Both ----
 
         // Moves everything a storage holds into the others of its pool, if all of it fits; else

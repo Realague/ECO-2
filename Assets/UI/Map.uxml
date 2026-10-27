@@ -55,6 +55,7 @@
                     <ui:Label name="land-pointer" class="land-pointer" />
                     <ui:Label text="Click a free plot to claim it, one of yours to release it. On your land, only you and the players you allow can build, dig, fell, harvest, plant or hunt." class="species-hint" />
                     <ui:Label name="land-message" class="land-message" />
+                    <ui:Toggle name="land-show-world" text="Show claimed land in the world (C while playing)" class="land-toggle" />
                     <ui:Label text="Who may act on your land" class="land-subtitle" />
                     <ui:Label name="land-empty" text="No other player with a name is connected." class="species-hint" />
                     <ui:ScrollView name="land-list" class="species-list" />

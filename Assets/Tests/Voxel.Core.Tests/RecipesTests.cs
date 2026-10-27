@@ -115,5 +115,18 @@ namespace Voxel.Core.Tests
             bag.TryRemove(Items.Produce(1), 1);
             Assert.AreEqual(CraftRefusal.None, Recipes.Check(bag, torches, null, Weights));
         }
+
+        [Test]
+        public void MaxCraftable_CountsWhatTheBagAllows()
+        {
+            Recipe bow = RecipeFor(Items.Bow);
+            var bag = new Inventory();
+            bag.Add(Oak, 30);
+
+            Assert.AreEqual(2, Recipes.MaxCraftable(bag, bow, null, Weights, 99), "12 wood each");
+            Assert.AreEqual(1, Recipes.MaxCraftable(bag, bow, null, Weights, 1), "no more than asked");
+            Assert.AreEqual(30, bag.Count(Oak), "nothing taken");
+            Assert.AreEqual(0, Recipes.MaxCraftable(new Inventory(), bow, null, Weights, 99));
+        }
     }
 }

@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Globalization;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -8,18 +6,19 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // The window of an opened chest or stockpile (Assets/UI/Storage.uxml), in the inventory's look:
-    // the player's bag on the left (what the storage does not take greyed), the storage on the right:
-    // what its pool holds (the chests or stockpiles of its claimed zone together, StoragePool), a
-    // chest pool's items and their weight out of 150 kg a chest, or a stockpile pool's piles, nine a
-    // stockpile, out of 27 each. Items move by dragging them to the other side (the whole stack),
-    // Shift + click (the whole stack) or a right click (one); the server decides (StorageSync). Its
-    // owner, or anyone while it is public, can pick it up (what it holds goes to the rest of its pool).
-    // Who may open it follows the land (StorageSync.CanUse). It opens when the server lets the player
-    // open what they right clicked, and closes with Escape or Tab, when the player walks away (the
-    // server closes it) or loses access. While it is open the mouse is free and the player stands
-    // still (HoldsInput). A campfire opens in the same window, its page (CampfirePage) in the storage's
-    // place; wood moves from the bag to the fire the way items go into a chest.
+    // The window of an opened chest, stockpile or campfire (Assets/UI/Storage.uxml), in the inventory's
+    // look. For a chest or stockpile: the player's bag on the left (what the storage does not take
+    // greyed), the storage on the right, each on its own card: what its pool holds (the chests or
+    // stockpiles of its claimed zone together, StoragePool), merged or each storage on its own card
+    // (PoolView), with a chest pool's weight out of 150 kg a chest or a stockpile pool's fill. For a
+    // campfire, three tabs: its cooking (CampfirePage), the bag beside its linked chests, and the bag
+    // beside its wood. Items move by dragging them to the other side (the whole stack; dropped on a
+    // storage's card, into that one), Shift + click (the whole stack) or a right click (one); the server
+    // decides (StorageSync). Its owner, or anyone while it is public, can pick it up (what it holds goes
+    // to the rest of its pool; a campfire, with nothing queued, its wood to the bag). Who may open it
+    // follows the land (StorageSync.CanUse). It opens when the server lets the player open what they
+    // right clicked, and closes with Escape or Tab, when the player walks away (the server closes it)
+    // or loses access. While it is open the mouse is free and the player stands still (HoldsInput).
     public class StorageScreen : MonoBehaviour
     {
         private const float DragThreshold = 8f;
@@ -31,52 +30,67 @@ namespace Voxel.Client
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private StorageSync storageSync;
         [SerializeField] private EcosystemSync ecosystemSync;
+        [SerializeField] private HungerSync hungerSync;
         [SerializeField] private AppearanceMenu appearanceMenu;
         [SerializeField] private HotbarHud hotbar;
 
         private static StorageScreen instance;
 
+        // What the window shows: a chest pool, a stockpile pool, or one of a campfire's three tabs.
+        private enum Mode
+        {
+            Chests,
+            Stockpiles,
+            Cooking,
+            Linked,
+            Fuel
+        }
+
         private VisualElement screen;
         private Button storageTab;
         private Label storageTabText;
+        private Button cookingTab;
+        private Button linkedTab;
+        private Button fuelTab;
         private Label owner;
+        private Button pickup;
+        private VisualElement storagePage;
+        private VisualElement cookingPage;
         private Label carryBlocks;
         private Label carryWeight;
         private Label bagTitle;
         private Label storeTitle;
+        private VisualElement storeIcon;
         private Label storeFill;
         private VisualElement storeFillIcon;
+        private VisualElement storeBurn;
+        private VisualElement storeBurnFill;
+        private Label storeEmpty;
+        private VisualElement storeHalf;
+        private VisualElement fuelInfo;
+        private Label fuelTotal;
+        private Label fuelHovered;
         private VisualElement bagWell;
         private VisualElement storeWell;
-        private ScrollView storeGridView;
-        private ScrollView pileGrid;
-        private Button pickup;
-        private VisualElement storeHalf;
-        private VisualElement campfireHalf;
-        private Button firePickup;
         private CampfirePage campfire;
+        private PoolView pool;
         private VisualElement ghost;
         private ItemGrid bagGrid;
-        private ItemGrid storeGrid;
 
-        // The piles shown, nine a stockpile of the pool, numbered as StoragePool numbers them.
-        private readonly List<VisualElement> piles = new List<VisualElement>();
-        private readonly List<VisualElement> pileIcons = new List<VisualElement>();
-        private readonly List<Label> pileCounts = new List<Label>();
-
-        // How many piles each stockpile laid out has, in the pool's order.
-        private readonly List<int> pileLayout = new List<int>();
-        private static readonly StockpilePiles[] NoStockpiles = new StockpilePiles[0];
-        private int hoveredPile = -1;
+        // The campfire tab chosen (Cooking when a campfire opens).
+        private Mode fireTab = Mode.Cooking;
 
         private int pendingId;
         private int openId;
         private int closedFrame = -1;
 
-        // A press on an item or pile that may become a drag: from the bag (deposit) or the storage.
+        // A press on an item or pile that may become a drag: from the bag (deposit) or the storage
+        // (which storage of the pool, 0 for any, and whether it is a stockpile's item from every pile).
         private bool pressing;
         private bool fromBag;
         private int pressedItemOrPile;
+        private int pressedMember;
+        private bool pressedByItem;
         private VisualElement pressedSlot;
         private Vector2 pressedAt;
         private bool dragging;
@@ -85,6 +99,9 @@ namespace Voxel.Client
 
         // Also true on the frame it closes, so that its key does nothing else.
         public static bool HoldsInput => instance != null && (instance.openId != 0 || Time.frameCount == instance.closedFrame);
+
+        private Mode CurrentMode => storageSync.OpenedKind == StorageKind.Campfire ? fireTab
+            : storageSync.OpenedKind == StorageKind.Chest ? Mode.Chests : Mode.Stockpiles;
 
         private void Awake()
         {
@@ -97,36 +114,46 @@ namespace Voxel.Client
             screen = root.Q("screen");
             storageTab = root.Q<Button>("tab-storage");
             storageTabText = root.Q<Label>("tab-storage-text");
+            cookingTab = root.Q<Button>("tab-cooking");
+            linkedTab = root.Q<Button>("tab-fire-inventory");
+            fuelTab = root.Q<Button>("tab-fuel");
             owner = root.Q<Label>("storage-owner");
+            pickup = root.Q<Button>("pickup");
+            storagePage = root.Q("storage-page");
+            cookingPage = root.Q("cooking-page");
             carryBlocks = root.Q<Label>("carry-blocks");
             carryWeight = root.Q<Label>("carry-weight");
             bagTitle = root.Q<Label>("bag-title");
             storeTitle = root.Q<Label>("store-title");
+            storeIcon = root.Q("store-icon");
             storeFill = root.Q<Label>("store-fill");
             storeFillIcon = root.Q("store-fill-icon");
+            storeBurn = root.Q("store-burn");
+            storeBurnFill = root.Q("store-burn-fill");
+            storeEmpty = root.Q<Label>("store-empty");
+            storeHalf = root.Q("store-half");
+            fuelInfo = root.Q("fuel-info");
+            fuelTotal = root.Q<Label>("fuel-total");
+            fuelHovered = root.Q<Label>("fuel-hovered");
             bagWell = root.Q("bag-well");
             storeWell = root.Q("store-well");
-            storeGridView = root.Q<ScrollView>("store-grid");
-            pileGrid = root.Q<ScrollView>("pile-grid");
-            pickup = root.Q<Button>("pickup");
-            storeHalf = root.Q("store-half");
-            campfireHalf = root.Q("campfire-half");
-            firePickup = root.Q<Button>("fire-pickup");
-            campfire = new CampfirePage(root, storageSync, inventorySync, ecosystemSync);
+            campfire = new CampfirePage(root, storageSync, inventorySync, hungerSync, ecosystemSync);
+            pool = new PoolView(root, storageSync, ecosystemSync, MinimumRows);
             ghost = root.Q("drag-ghost");
 
             bagGrid = new ItemGrid(root.Q<ScrollView>("bag-grid"), ecosystemSync, MinimumRows);
-            storeGrid = new ItemGrid(storeGridView, ecosystemSync, MinimumRows);
-            bagGrid.Pressed += (item, slot, e) => Press(true, item, slot, e);
-            storeGrid.Pressed += (item, slot, e) => Press(false, item, slot, e);
+            bagGrid.Pressed += (item, slot, e) => Press(true, item, 0, false, slot, e);
             bagGrid.Moved += OnPointerMove;
-            storeGrid.Moved += OnPointerMove;
             bagGrid.Released += OnPointerUp;
-            storeGrid.Released += OnPointerUp;
+            pool.Pressed += (itemOrPile, member, byItem, slot, e) => Press(false, itemOrPile, member, byItem, slot, e);
+            pool.Moved += OnPointerMove;
+            pool.Released += OnPointerUp;
 
             storageTab.focusable = false;
+            Connect(cookingTab, () => ShowFireTab(Mode.Cooking));
+            Connect(linkedTab, () => ShowFireTab(Mode.Linked));
+            Connect(fuelTab, () => ShowFireTab(Mode.Fuel));
             Connect(pickup, () => storageSync.RequestPickup());
-            Connect(firePickup, () => storageSync.RequestPickup());
 
             storageSync.OpenedChanged += OnOpenedChanged;
             storageSync.OpenedClosed += OnOpenedClosed;
@@ -169,8 +196,13 @@ namespace Voxel.Client
 
             if (openId == 0) return;
 
+            // A count typed on the campfire's sheet: the keys are its own, Escape leaves the field first.
             Keyboard keyboard = Keyboard.current;
-            if (keyboard != null && (keyboard.escapeKey.wasPressedThisFrame || keyboard.tabKey.wasPressedThisFrame))
+            if (campfire.IsTyping)
+            {
+                if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame) campfire.Blur();
+            }
+            else if (keyboard != null && (keyboard.escapeKey.wasPressedThisFrame || keyboard.tabKey.wasPressedThisFrame))
             {
                 Close(true);
                 return;
@@ -181,34 +213,24 @@ namespace Voxel.Client
 
         private void OnOpenedChanged()
         {
-            if (openId == 0)
-            {
-                if (storageSync.OpenedId == 0 || storageSync.OpenedId != pendingId) return;
+            if (openId != 0 || storageSync.OpenedId == 0 || storageSync.OpenedId != pendingId) return;
 
-                openId = pendingId;
-                pendingId = 0;
-                screen.style.display = DisplayStyle.Flex;
-                UnityEngine.Cursor.lockState = CursorLockMode.None;
-                bagGrid.Invalidate();
-                storeGrid.Invalidate();
-            }
-
-            // A stockpile pool gained or lost a stockpile: its piles are laid out again.
-            if (!SameLayout()) BuildPiles();
+            openId = pendingId;
+            pendingId = 0;
+            fireTab = Mode.Cooking;
+            screen.style.display = DisplayStyle.Flex;
+            UnityEngine.Cursor.lockState = CursorLockMode.None;
+            bagGrid.Invalidate();
+            pool.Invalidate();
         }
 
-        // Whether the piles shown are laid out for the open pool's stockpiles, each its own size.
-        private bool SameLayout()
+        private void ShowFireTab(Mode tab)
         {
-            IReadOnlyList<StockpilePiles> stockpiles = StorageRules.IsStockpile(storageSync.OpenedKind) ? storageSync.OpenedStockpiles : NoStockpiles;
-            if (stockpiles.Count != pileLayout.Count) return false;
+            if (fireTab == tab) return;
 
-            for (int i = 0; i < stockpiles.Count; i++)
-            {
-                if (stockpiles[i].Count != pileLayout[i]) return false;
-            }
-
-            return true;
+            fireTab = tab;
+            EndDrag();
+            pool.Invalidate();
         }
 
         private void OnOpenedClosed()
@@ -234,63 +256,140 @@ namespace Voxel.Client
             if (relock) UnityEngine.Cursor.lockState = CursorLockMode.Locked;
         }
 
-        // Both sides, as they are now (the grids rebuild only when what they show changed).
+        // Everything shown, as it is now (the grids rebuild only when what they show changed).
         private void Refresh()
         {
+            Mode mode = CurrentMode;
             bool fire = storageSync.OpenedKind == StorageKind.Campfire;
-            bool chest = storageSync.OpenedKind == StorageKind.Chest;
-            Inventory bag = inventorySync.Inventory;
-            bagGrid.Show(bag.Entries, item => fire ? !Items.IsWood(item) : chest ? !StorageRules.AcceptsInChest(item) : !StorageRules.AcceptsInStockpile(item));
-            ShowCarry(bag);
-
+            storageTab.style.display = fire ? DisplayStyle.None : DisplayStyle.Flex;
             storageTabText.text = Loc.T(Items.NameOf(StorageRules.ItemOf(storageSync.OpenedKind)));
-            storeHalf.style.display = fire ? DisplayStyle.None : DisplayStyle.Flex;
-            campfireHalf.style.display = fire ? DisplayStyle.Flex : DisplayStyle.None;
-            bagTitle.text = bagGrid.HoveredItem != Items.None ? ItemCatalog.NameOf(bagGrid.HoveredItem, ecosystemSync) : Loc.T("Your bag");
+            ShowTab(cookingTab, fire, mode == Mode.Cooking);
+            ShowTab(linkedTab, fire, mode == Mode.Linked);
+            ShowTab(fuelTab, fire, mode == Mode.Fuel);
+
+            storagePage.style.display = mode == Mode.Cooking ? DisplayStyle.None : DisplayStyle.Flex;
+            cookingPage.style.display = mode == Mode.Cooking ? DisplayStyle.Flex : DisplayStyle.None;
             ShowOwner();
-            if (fire)
+            ShowPickup(mode);
+            if (mode == Mode.Cooking)
             {
-                // Picked up with nothing queued; its wood goes back to the bag (the server checks).
                 campfire.Refresh();
-                firePickup.style.display = storageSync.OpenedIsOwner || storageSync.IsPublic(openId) ? DisplayStyle.Flex : DisplayStyle.None;
-                firePickup.SetEnabled(storageSync.OpenedJobs.Count == 0);
                 return;
             }
 
-            storeGridView.style.display = chest ? DisplayStyle.Flex : DisplayStyle.None;
-            pileGrid.style.display = chest ? DisplayStyle.None : DisplayStyle.Flex;
-            storeFillIcon.EnableInClassList("icon--scales", chest);
-            storeFillIcon.EnableInClassList("icon--backpack", !chest);
+            Inventory bag = inventorySync.Inventory;
+            bagGrid.Show(bag.Entries, item => !Takes(mode, item));
+            ShowCarry(bag);
+            bagTitle.text = bagGrid.HoveredItem != Items.None ? ItemCatalog.NameOf(bagGrid.HoveredItem, ecosystemSync) : Loc.T("Your bag");
+
+            storeIcon.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(StorageRules.ItemOf(mode == Mode.Linked ? StorageKind.Chest : storageSync.OpenedKind), ecosystemSync));
+            storeBurn.style.display = mode == Mode.Fuel ? DisplayStyle.Flex : DisplayStyle.None;
+            storeFillIcon.EnableInClassList("icon--scales", mode == Mode.Chests || mode == Mode.Linked);
+            storeFillIcon.EnableInClassList("icon--backpack", mode == Mode.Stockpiles);
+            storeFillIcon.EnableInClassList("icon--category-wood", mode == Mode.Fuel);
+            bool noChest = mode == Mode.Linked && storageSync.OpenedLinkedChests == 0;
+            storeEmpty.text = noChest ? Loc.T("No linked chest: place a chest on the campfire's claimed land, or a public chest within 8 blocks off claimed land.") : "";
+            storeEmpty.style.display = noChest ? DisplayStyle.Flex : DisplayStyle.None;
+
+            string side;
             int members = storageSync.OpenedMembers;
-            if (chest)
+            switch (mode)
             {
-                storeGrid.Show(storageSync.OpenedContents.Entries, _ => false);
-                float weight = StorageRules.ChestWeight(storageSync.OpenedContents, ecosystemSync.ItemWeights);
-                float capacity = StorageRules.ChestMaxWeight * members;
-                storeFill.text = $"{Loc.Number(weight, "0.0")} / {capacity:0} kg";
-                ShowShare(storeFill, weight / capacity);
-            }
-            else
-            {
-                ShowPiles();
-                int total = storageSync.OpenedPileTotal;
-                int capacity = Mathf.Max(1, storageSync.OpenedPileCapacity);
-                storeFill.text = $"{total} / {capacity}";
-                ShowShare(storeFill, (float)total / capacity);
+                case Mode.Chests:
+                    pool.ShowChests(storageSync.OpenedMemberList, storageSync.OpenedContents, openId);
+                    ShowWeight(storageSync.OpenedContents, members);
+                    side = members > 1 ? Loc.T("In the chests ({0})", members) : Loc.T("In the chest");
+                    break;
+                case Mode.Stockpiles:
+                    pool.ShowStockpiles(storageSync.OpenedMemberList, openId);
+                    int total = storageSync.OpenedPileTotal;
+                    int capacity = Mathf.Max(1, storageSync.OpenedPileCapacity);
+                    storeFill.text = $"{total} / {capacity}";
+                    ShowShare(storeFill, (float)total / capacity);
+                    side = members > 1 ? Loc.T("On the stockpiles ({0})", members) : Loc.T("On the stockpile");
+                    break;
+                case Mode.Linked:
+                    int chests = storageSync.OpenedLinkedChests;
+                    pool.ShowChests(storageSync.OpenedLinkedMembers, storageSync.OpenedLinkedContents, 0);
+                    ShowWeight(storageSync.OpenedLinkedContents, Mathf.Max(1, chests));
+                    side = chests > 1 ? Loc.T("Linked chests ({0})", chests) : Loc.T("Linked chest");
+                    break;
+                default:
+                    pool.ShowSingle(storageSync.OpenedFuelContents);
+                    storeFill.text = $"{storageSync.OpenedFuel} / {Campfire.MaxFuel}";
+                    ShowShare(storeFill, (float)storageSync.OpenedFuel / Campfire.MaxFuel);
+                    storeBurnFill.style.width = Length.Percent(Mathf.Clamp01(storageSync.OpenedBurning / storageSync.OpenedLogSeconds) * 100f);
+                    side = Loc.T("By the fire");
+                    break;
             }
 
-            // The item under the pointer is named in its side's title (the slots show no names); else
-            // what the side is, with how many chests or stockpiles share it.
-            int storeItem = chest ? storeGrid.HoveredItem : hoveredPile >= 0 ? storageSync.OpenedPileItem(hoveredPile) : Items.None;
-            string side = members > 1
-                ? Loc.T(chest ? "In the chests ({0})" : "On the stockpiles ({0})", members)
-                : Loc.T(chest ? "In the chest" : "On the stockpile");
+            // The item under the pointer is named in its side's title (the slots show no names).
+            int storeItem = pool.HoveredItem;
             storeTitle.text = storeItem != Items.None ? ItemCatalog.NameOf(storeItem, ecosystemSync) : side;
+            ShowFuelInfo(mode, storeItem != Items.None ? storeItem : bagGrid.HoveredItem);
+        }
 
-            // Picked up empty, or with what it holds poured into the rest of its pool (the server checks).
-            bool empty = chest ? storageSync.OpenedContents.DistinctCount == 0 : storageSync.OpenedPileTotal == 0;
+        // The wood side is narrow, as tall as its slots, with how long it all burns and how long the
+        // wood under the pointer (on either side) would.
+        private void ShowFuelInfo(Mode mode, int hovered)
+        {
+            bool fuel = mode == Mode.Fuel;
+            storeHalf.EnableInClassList("storage-card--fuel", fuel);
+            fuelInfo.style.display = fuel ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!fuel) return;
+
+            int logs = storageSync.OpenedFuel;
+            string cooking = ItemCatalog.DurationText(storageSync.OpenedFuelSeconds);
+            fuelTotal.text = logs == 1 ? Loc.T("1 log · {0} of cooking", cooking) : Loc.T("{0} logs · {1} of cooking", logs, cooking);
+            float burns = Fuels.SecondsOf(hovered);
+            fuelHovered.text = burns > 0f
+                ? Loc.T("{0} · burns {1}", ItemCatalog.NameOf(hovered, ecosystemSync), ItemCatalog.DurationText(burns))
+                : Loc.T("Each log burns {0}; it burns only while a dish cooks", ItemCatalog.DurationText(Fuels.WoodSeconds));
+        }
+
+        private static void ShowTab(Button tab, bool shown, bool selected)
+        {
+            tab.style.display = shown ? DisplayStyle.Flex : DisplayStyle.None;
+            tab.EnableInClassList("inventory-tab--selected", selected);
+        }
+
+        // Whether the other side takes an item from the bag.
+        private static bool Takes(Mode mode, int item)
+        {
+            switch (mode)
+            {
+                case Mode.Stockpiles: return StorageRules.AcceptsInStockpile(item);
+                case Mode.Fuel: return Fuels.IsFuel(item);
+                default: return StorageRules.AcceptsInChest(item);
+            }
+        }
+
+        private void ShowWeight(Inventory contents, int chests)
+        {
+            float weight = StorageRules.ChestWeight(contents, ecosystemSync.ItemWeights);
+            float capacity = StorageRules.ChestMaxWeight * chests;
+            storeFill.text = $"{Loc.Number(weight, "0.0")} / {capacity:0} kg";
+            ShowShare(storeFill, weight / capacity);
+        }
+
+        // Its owner, or anyone while it is public, picks it up: empty, or with what it holds poured into
+        // the rest of its pool (the server checks); a campfire with nothing queued.
+        private void ShowPickup(Mode mode)
+        {
             pickup.style.display = storageSync.OpenedIsOwner || storageSync.IsPublic(openId) ? DisplayStyle.Flex : DisplayStyle.None;
-            pickup.SetEnabled(empty || members > 1);
+            bool alone = storageSync.OpenedMembers <= 1;
+            switch (mode)
+            {
+                case Mode.Chests:
+                    pickup.SetEnabled(storageSync.OpenedContents.DistinctCount == 0 || !alone);
+                    break;
+                case Mode.Stockpiles:
+                    pickup.SetEnabled(storageSync.OpenedPileTotal == 0 || !alone);
+                    break;
+                default:
+                    pickup.SetEnabled(storageSync.OpenedJobs.Count == 0);
+                    break;
+            }
         }
 
         // Whose it is (the land's owner, on claimed land), and whether anyone may use it.
@@ -318,91 +417,13 @@ namespace Voxel.Client
             label.EnableInClassList("carry-count-text--full", full);
         }
 
-        // Each stockpile of the pool a block of its piles (nine in three rows, or four in two for a
-        // small one) in the order they stand (StorageRules.PileCell: x, then z), the blocks one under another.
-        private void BuildPiles()
-        {
-            pileGrid.Clear();
-            piles.Clear();
-            pileIcons.Clear();
-            pileCounts.Clear();
-            pileLayout.Clear();
-            hoveredPile = -1;
-            IReadOnlyList<StockpilePiles> stockpiles = StorageRules.IsStockpile(storageSync.OpenedKind) ? storageSync.OpenedStockpiles : NoStockpiles;
-            foreach (StockpilePiles stockpile in stockpiles)
-            {
-                pileLayout.Add(stockpile.Count);
-                var block = new VisualElement { pickingMode = PickingMode.Ignore };
-                block.AddToClassList("pile-block");
-                pileGrid.Add(block);
-
-                // Stockpiles are square: their side is the root of their piles.
-                int side = Mathf.RoundToInt(Mathf.Sqrt(stockpile.Count));
-                for (int i = 0; i < stockpile.Count; i++)
-                {
-                    // A row per z, a pile per x, as they stand on the ground: never wrapped by the width.
-                    if (i % side == 0)
-                    {
-                        var row = new VisualElement { pickingMode = PickingMode.Ignore };
-                        row.AddToClassList("pile-row");
-                        block.Add(row);
-                    }
-
-                    block[block.childCount - 1].Add(AddPile(piles.Count));
-                }
-            }
-        }
-
-        // One pile's slot, numbered across the pool.
-        private VisualElement AddPile(int index)
-        {
-            var slot = new VisualElement();
-            slot.AddToClassList("item-slot");
-            slot.AddToClassList("pile-slot");
-            var icon = new VisualElement { pickingMode = PickingMode.Ignore };
-            icon.AddToClassList("item-icon");
-            var count = new Label { pickingMode = PickingMode.Ignore };
-            count.AddToClassList("item-count");
-            count.AddToClassList("pile-count");
-            slot.Add(icon);
-            slot.Add(count);
-            slot.RegisterCallback<PointerEnterEvent>(_ => hoveredPile = index);
-            slot.RegisterCallback<PointerLeaveEvent>(_ =>
-            {
-                if (hoveredPile == index) hoveredPile = -1;
-            });
-            slot.RegisterCallback<PointerDownEvent>(e =>
-            {
-                if (storageSync.OpenedPileCountAt(index) > 0) Press(false, index, slot, e);
-            });
-            slot.RegisterCallback<PointerMoveEvent>(OnPointerMove);
-            slot.RegisterCallback<PointerUpEvent>(OnPointerUp);
-
-            piles.Add(slot);
-            pileIcons.Add(icon);
-            pileCounts.Add(count);
-            return slot;
-        }
-
-        private void ShowPiles()
-        {
-            for (int pile = 0; pile < piles.Count; pile++)
-            {
-                int item = storageSync.OpenedPileItem(pile);
-                int count = storageSync.OpenedPileCountAt(pile);
-                pileIcons[pile].style.backgroundImage = count > 0 ? new StyleBackground(ItemCatalog.IconOf(item, ecosystemSync)) : new StyleBackground();
-                pileCounts[pile].text = count > 0 ? $"{count} / {storageSync.OpenedPileSizeAt(pile)}" : "";
-                piles[pile].EnableInClassList("item-slot--empty", count == 0);
-            }
-        }
-
         // ---- Moving items ----
 
-        private void Press(bool bag, int itemOrPile, VisualElement slot, PointerDownEvent e)
+        private void Press(bool bag, int itemOrPile, int member, bool byItem, VisualElement slot, PointerDownEvent e)
         {
             if (e.button == 1)
             {
-                Move(bag, itemOrPile, false);
+                Move(bag, itemOrPile, member, byItem, false);
                 return;
             }
 
@@ -410,34 +431,82 @@ namespace Voxel.Client
 
             if (e.shiftKey)
             {
-                Move(bag, itemOrPile, true);
+                Move(bag, itemOrPile, member, byItem, true);
                 return;
             }
 
             pressing = true;
             fromBag = bag;
             pressedItemOrPile = itemOrPile;
+            pressedMember = member;
+            pressedByItem = byItem;
             pressedSlot = slot;
             pressedAt = e.position;
             slot.CapturePointer(e.pointerId);
         }
 
-        // Moves the whole stack, or one, from one side to the other.
-        private void Move(bool bag, int itemOrPile, bool all)
+        // Moves the whole stack, or one, from one side to the other: into or out of one storage of the
+        // pool (member), or the whole pool (0).
+        private void Move(bool bag, int itemOrPile, int member, bool byItem, bool all)
         {
+            Mode mode = CurrentMode;
             if (bag)
             {
                 int count = all ? inventorySync.Inventory.Count(itemOrPile) : 1;
-                if (storageSync.OpenedKind == StorageKind.Campfire) storageSync.RequestFuel(itemOrPile, count);
-                else storageSync.RequestMove(true, itemOrPile, count);
+                switch (mode)
+                {
+                    case Mode.Linked:
+                        storageSync.RequestFireMove(true, itemOrPile, count, member);
+                        break;
+                    case Mode.Fuel:
+                        storageSync.RequestFuel(itemOrPile, count);
+                        break;
+                    default:
+                        storageSync.RequestMove(true, itemOrPile, count, member);
+                        break;
+                }
+
                 return;
             }
 
-            if (storageSync.OpenedKind == StorageKind.Campfire) return;
+            switch (mode)
+            {
+                case Mode.Chests:
+                    storageSync.RequestMove(false, itemOrPile, all ? ContentsOf(storageSync.OpenedMemberList, storageSync.OpenedContents, member).Count(itemOrPile) : 1, member);
+                    break;
+                case Mode.Stockpiles:
+                    int held = byItem ? StockpileCount(itemOrPile) : storageSync.OpenedPileCountAt(itemOrPile);
+                    storageSync.RequestMove(false, itemOrPile, all ? held : 1, 0, byItem);
+                    break;
+                case Mode.Linked:
+                    storageSync.RequestFireMove(false, itemOrPile, all ? ContentsOf(storageSync.OpenedLinkedMembers, storageSync.OpenedLinkedContents, member).Count(itemOrPile) : 1, member);
+                    break;
+                case Mode.Fuel:
+                    storageSync.RequestTakeFuel(itemOrPile, all ? storageSync.OpenedFuelContents.Count(itemOrPile) : 1);
+                    break;
+            }
+        }
 
-            bool chest = storageSync.OpenedKind == StorageKind.Chest;
-            int held = chest ? storageSync.OpenedContents.Count(itemOrPile) : storageSync.OpenedPileCountAt(itemOrPile);
-            storageSync.RequestMove(false, itemOrPile, all ? held : 1);
+        // What one storage holds, or the whole pool (member 0).
+        private static Inventory ContentsOf(System.Collections.Generic.IReadOnlyList<StorageMember> members, Inventory total, int member)
+        {
+            foreach (StorageMember one in members)
+            {
+                if (one.Id == member) return one.Contents;
+            }
+
+            return total;
+        }
+
+        private int StockpileCount(int item)
+        {
+            int count = 0;
+            foreach (StockpilePiles piles in storageSync.OpenedStockpiles)
+            {
+                count += piles.CountOf(item);
+            }
+
+            return count;
         }
 
         private void OnPointerMove(PointerMoveEvent e)
@@ -447,7 +516,8 @@ namespace Voxel.Client
             if (!dragging && Vector2.Distance(e.position, pressedAt) >= DragThreshold)
             {
                 dragging = true;
-                int item = fromBag || storageSync.OpenedKind == StorageKind.Chest ? pressedItemOrPile : storageSync.OpenedPileItem(pressedItemOrPile);
+                bool pile = !fromBag && CurrentMode == Mode.Stockpiles && !pressedByItem;
+                int item = pile ? storageSync.OpenedPileItem(pressedItemOrPile) : pressedItemOrPile;
                 ghost.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(item, ecosystemSync));
                 ghost.RemoveFromClassList("hidden");
                 ghost.BringToFront();
@@ -460,15 +530,15 @@ namespace Voxel.Client
             ghost.style.top = local.y - 36f;
         }
 
-        // Dropped on the other side, the whole stack goes there.
+        // Dropped on the other side, the whole stack goes there; on a storage's card, into that one.
         private void OnPointerUp(PointerUpEvent e)
         {
             if (!pressing) return;
 
             if (dragging)
             {
-                VisualElement target = !fromBag ? bagWell : storageSync.OpenedKind == StorageKind.Campfire ? campfireHalf : storeWell;
-                if (target.worldBound.Contains(e.position)) Move(fromBag, pressedItemOrPile, true);
+                if (fromBag && storeWell.worldBound.Contains(e.position)) Move(true, pressedItemOrPile, pool.MemberAt(e.position), false, true);
+                else if (!fromBag && bagWell.worldBound.Contains(e.position)) Move(false, pressedItemOrPile, pressedMember, pressedByItem, true);
             }
 
             if (pressedSlot != null && pressedSlot.HasPointerCapture(e.pointerId)) pressedSlot.ReleasePointer(e.pointerId);
