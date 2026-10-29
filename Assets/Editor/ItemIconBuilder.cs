@@ -128,10 +128,31 @@ public static class ItemIconBuilder
             UnityEngine.Object.DestroyImmediate(campfire);
             written++;
 
+            Texture2D table = renderer.Render(ButcherTableParts(), 26f, 0.95f);
+            Write("ButcherTable", table);
+            UnityEngine.Object.DestroyImmediate(table);
+            written++;
+
+            for (int kind = 0; kind < Butchery.MeatKindCount; kind++)
+            {
+                Texture2D meat = renderer.Render(MeatParts((MeatKind)kind), 40f, 1.05f);
+                Write($"Meat_{(MeatKind)kind}", meat);
+                UnityEngine.Object.DestroyImmediate(meat);
+                written++;
+            }
+
+            foreach ((string name, IReadOnlyList<SpeciesAsset.Part> parts, float pitch) in new[] { ("Hide", HideParts(), 50f), ("Bones", BonesParts(), 40f), ("Fat", FatParts(), 30f) })
+            {
+                Texture2D icon = renderer.Render(parts, pitch, 1.05f);
+                Write(name, icon);
+                UnityEngine.Object.DestroyImmediate(icon);
+                written++;
+            }
+
             foreach (Dish dish in Dishes.All)
             {
                 Texture2D icon = renderer.Render(DishParts(dish), 48f, 1.0f);
-                Write($"Dish_{dish.Name.Replace(" ", "")}", icon);
+                Write($"Dish_{dish.Name.Replace(" ", "").Replace("'", "")}", icon);
                 UnityEngine.Object.DestroyImmediate(icon);
                 written++;
             }
@@ -461,6 +482,29 @@ public static class ItemIconBuilder
                 }
 
                 break;
+            case DishLook.Roast:
+                // A browned joint on a plate, darker grill marks across it.
+                parts.Add(new SpeciesAsset.Part { mesh = cylinder, material = wood, offset = new Vector3(0f, 0.03f, 0f), scale = new Vector3(0.95f, 0.03f, 0.95f) });
+                parts.Add(new SpeciesAsset.Part { mesh = cube, material = Tinted(filling), offset = new Vector3(0f, 0.22f, 0f), scale = new Vector3(0.72f, 0.32f, 0.52f) });
+                parts.Add(new SpeciesAsset.Part { mesh = cube, material = Tinted(Color.Lerp(filling, Color.white, 0.25f)), offset = new Vector3(0.02f, 0.39f, 0.01f), scale = new Vector3(0.6f, 0.03f, 0.42f) });
+                Material marks = Tinted(filling * 0.55f);
+                for (int i = 0; i < 3; i++)
+                {
+                    parts.Add(new SpeciesAsset.Part { mesh = cube, material = marks, offset = new Vector3(-0.18f + i * 0.18f, 0.41f, 0f), scale = new Vector3(0.04f, 0.012f, 0.44f) });
+                }
+
+                break;
+            case DishLook.Skewer:
+                // Chunks of meat threaded on a stick.
+                parts.Add(new SpeciesAsset.Part { mesh = cube, material = wood, offset = new Vector3(0f, 0.2f, 0f), scale = new Vector3(1.1f, 0.04f, 0.04f) });
+                Material meat = Tinted(filling);
+                for (int i = 0; i < 4; i++)
+                {
+                    float size = 0.17f + (i % 2) * 0.02f;
+                    parts.Add(new SpeciesAsset.Part { mesh = cube, material = meat, offset = new Vector3(-0.3f + i * 0.2f, 0.2f, 0f), scale = new Vector3(size, size * 0.95f, size * 1.05f) });
+                }
+
+                break;
             case DishLook.Bread:
                 parts.Add(new SpeciesAsset.Part { mesh = cylinder, material = Tinted(filling), offset = new Vector3(0f, 0.08f, 0f), scale = new Vector3(0.9f, 0.08f, 0.9f) });
                 Material burnt = Tinted(filling * 0.6f);
@@ -519,6 +563,118 @@ public static class ItemIconBuilder
     }
 
     private static Color ColourOf(uint rgb) => new Color(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f);
+
+    // A butcher's table as placed ones are drawn (ButcherTableShapes), with its cleaver.
+    private static IReadOnlyList<SpeciesAsset.Part> ButcherTableParts()
+    {
+        var wood = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/ArrowShaft.mat");
+        var iron = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/ArrowHead.mat");
+        var parts = new List<SpeciesAsset.Part>();
+        AddBoxes(parts, ButcherTableShapes.Wood, Vector3.zero, wood);
+        AddBoxes(parts, ButcherTableShapes.Iron, Vector3.zero, iron);
+        return parts;
+    }
+
+    // Raw meat: a red cut with a rim of fat (darker the bigger the game), a pale drumstick for poultry,
+    // a salmon-pink fillet with its silver skin for fish.
+    private static IReadOnlyList<SpeciesAsset.Part> MeatParts(MeatKind kind)
+    {
+        Mesh cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+        Mesh sphere = Resources.GetBuiltinResource<Mesh>("Sphere.fbx");
+        Mesh cylinder = Resources.GetBuiltinResource<Mesh>("Cylinder.fbx");
+        Material fat = Tinted(new Color(0.95f, 0.9f, 0.78f));
+        Material bone = Tinted(new Color(0.93f, 0.91f, 0.85f));
+        var parts = new List<SpeciesAsset.Part>();
+        switch (kind)
+        {
+            case MeatKind.Poultry:
+                parts.Add(new SpeciesAsset.Part { mesh = sphere, material = Tinted(new Color(0.93f, 0.74f, 0.62f)), offset = new Vector3(-0.15f, 0.2f, 0f), scale = new Vector3(0.55f, 0.36f, 0.4f) });
+                parts.Add(new SpeciesAsset.Part { mesh = Baked(cylinder, Quaternion.Euler(0f, 0f, 90f), new Vector3(0.11f, 0.26f, 0.11f)), material = bone, offset = new Vector3(0.32f, 0.2f, 0f), scale = Vector3.one });
+                parts.Add(new SpeciesAsset.Part { mesh = sphere, material = bone, offset = new Vector3(0.6f, 0.2f, 0.04f), scale = Vector3.one * 0.15f });
+                parts.Add(new SpeciesAsset.Part { mesh = sphere, material = bone, offset = new Vector3(0.6f, 0.2f, -0.04f), scale = Vector3.one * 0.14f });
+                break;
+            case MeatKind.Fish:
+                parts.Add(new SpeciesAsset.Part { mesh = cube, material = Tinted(new Color(0.96f, 0.58f, 0.46f)), offset = new Vector3(0f, 0.1f, 0f), scale = new Vector3(0.9f, 0.14f, 0.36f) });
+                parts.Add(new SpeciesAsset.Part { mesh = cube, material = Tinted(new Color(0.72f, 0.75f, 0.8f)), offset = new Vector3(0f, 0.025f, 0.01f), scale = new Vector3(0.92f, 0.035f, 0.37f) });
+                Material line = Tinted(new Color(0.99f, 0.82f, 0.74f));
+                for (int i = 0; i < 4; i++)
+                {
+                    parts.Add(new SpeciesAsset.Part { mesh = cube, material = line, offset = new Vector3(-0.3f + i * 0.2f, 0.175f, 0f), scale = new Vector3(0.025f, 0.012f, 0.3f) });
+                }
+
+                break;
+            default:
+                Color red = kind == MeatKind.SmallGame ? new Color(0.74f, 0.3f, 0.28f) : kind == MeatKind.Game ? new Color(0.62f, 0.17f, 0.15f) : new Color(0.5f, 0.11f, 0.1f);
+                parts.Add(new SpeciesAsset.Part { mesh = cube, material = Tinted(red), offset = new Vector3(0f, 0.11f, 0f), scale = new Vector3(0.7f, 0.2f, 0.5f) });
+                parts.Add(new SpeciesAsset.Part { mesh = cube, material = fat, offset = new Vector3(0f, 0.105f, -0.27f), scale = new Vector3(0.72f, 0.19f, 0.07f) });
+                parts.Add(new SpeciesAsset.Part { mesh = cube, material = Tinted(Color.Lerp(red, Color.white, 0.3f)), offset = new Vector3(0.12f, 0.215f, 0.05f), scale = new Vector3(0.18f, 0.012f, 0.12f) });
+                if (kind == MeatKind.LargeGame)
+                {
+                    parts.Add(new SpeciesAsset.Part { mesh = cylinder, material = bone, offset = new Vector3(-0.18f, 0.11f, 0.06f), scale = new Vector3(0.13f, 0.105f, 0.13f) });
+                }
+
+                break;
+        }
+
+        return parts;
+    }
+
+    // A hide laid flat: the body and four legs, a paler belly.
+    private static IReadOnlyList<SpeciesAsset.Part> HideParts()
+    {
+        Mesh cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+        Material hide = Tinted(new Color(0.55f, 0.38f, 0.24f));
+        var parts = new List<SpeciesAsset.Part>
+        {
+            new SpeciesAsset.Part { mesh = cube, material = hide, offset = new Vector3(0f, 0.03f, 0f), scale = new Vector3(0.8f, 0.06f, 0.56f) },
+            new SpeciesAsset.Part { mesh = cube, material = Tinted(new Color(0.72f, 0.56f, 0.4f)), offset = new Vector3(0.02f, 0.064f, 0f), scale = new Vector3(0.5f, 0.012f, 0.3f) }
+        };
+
+        for (int i = 0; i < 4; i++)
+        {
+            float x = i % 2 == 0 ? -0.42f : 0.42f;
+            float z = i < 2 ? -0.3f : 0.3f;
+            parts.Add(new SpeciesAsset.Part { mesh = cube, material = hide, offset = new Vector3(x, 0.025f, z), scale = new Vector3(0.22f, 0.05f, 0.18f) });
+        }
+
+        return parts;
+    }
+
+    // Two bones crossed, each a shaft with knobs at its ends.
+    private static IReadOnlyList<SpeciesAsset.Part> BonesParts()
+    {
+        Mesh sphere = Resources.GetBuiltinResource<Mesh>("Sphere.fbx");
+        Mesh cylinder = Resources.GetBuiltinResource<Mesh>("Cylinder.fbx");
+        Material bone = Tinted(new Color(0.93f, 0.9f, 0.82f));
+        var parts = new List<SpeciesAsset.Part>();
+        for (int i = 0; i < 2; i++)
+        {
+            float turn = i == 0 ? 35f : -35f;
+            Quaternion lying = Quaternion.Euler(0f, turn, 0f) * Quaternion.Euler(0f, 0f, 90f);
+            Vector3 along = Quaternion.Euler(0f, turn, 0f) * Vector3.right;
+            float y = 0.08f + i * 0.09f;
+            parts.Add(new SpeciesAsset.Part { mesh = Baked(cylinder, lying, new Vector3(0.09f, 0.36f, 0.09f)), material = bone, offset = new Vector3(0f, y, 0f), scale = Vector3.one });
+            for (int end = -1; end <= 1; end += 2)
+            {
+                Vector3 at = along * (0.36f * end) + new Vector3(0f, y, 0f);
+                parts.Add(new SpeciesAsset.Part { mesh = sphere, material = bone, offset = at + Quaternion.Euler(0f, turn, 0f) * new Vector3(0f, 0f, 0.05f), scale = Vector3.one * 0.13f });
+                parts.Add(new SpeciesAsset.Part { mesh = sphere, material = bone, offset = at - Quaternion.Euler(0f, turn, 0f) * new Vector3(0f, 0f, 0.05f), scale = Vector3.one * 0.125f });
+            }
+        }
+
+        return parts;
+    }
+
+    // A block of fat, a smaller one leaning on it.
+    private static IReadOnlyList<SpeciesAsset.Part> FatParts()
+    {
+        Mesh cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+        return new List<SpeciesAsset.Part>
+        {
+            new SpeciesAsset.Part { mesh = cube, material = Tinted(new Color(0.96f, 0.92f, 0.74f)), offset = new Vector3(-0.08f, 0.18f, 0f), scale = new Vector3(0.5f, 0.36f, 0.44f) },
+            new SpeciesAsset.Part { mesh = cube, material = Tinted(new Color(0.93f, 0.87f, 0.66f)), offset = new Vector3(0.28f, 0.12f, 0.06f), scale = new Vector3(0.26f, 0.24f, 0.3f) }
+        };
+    }
 
     // A torch as TorchViews draws it: a wooden stick, a dark head and its flame.
     private static IReadOnlyList<SpeciesAsset.Part> TorchParts()
@@ -608,6 +764,24 @@ public static class ItemIconBuilder
         var tie = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/PlantTrunk.mat");
         parts.Add(new SpeciesAsset.Part { mesh = cube, material = tie, offset = new Vector3(0f, 0.6f, 0f), scale = new Vector3(0.42f, 0.1f, 0.42f) });
         return parts;
+    }
+
+    // A copy of a mesh scaled then turned (a part has an offset and a scale, no rotation).
+    private static Mesh Baked(Mesh mesh, Quaternion turn, Vector3 scale)
+    {
+        var copy = UnityEngine.Object.Instantiate(mesh);
+        var vertices = copy.vertices;
+        var normals = copy.normals;
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            vertices[i] = turn * Vector3.Scale(vertices[i], scale);
+            if (i < normals.Length) normals[i] = (turn * new Vector3(normals[i].x / scale.x, normals[i].y / scale.y, normals[i].z / scale.z)).normalized;
+        }
+
+        copy.vertices = vertices;
+        copy.normals = normals;
+        copy.RecalculateBounds();
+        return copy;
     }
 
     private static Mesh RotatedOnItsSide(Mesh mesh)

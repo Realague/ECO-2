@@ -199,7 +199,7 @@ Gardener	Jardinier
 Drag	Glisser
 to a hotbar slot	vers un emplacement de la barre
 Right click	Clic droit
-eat food, empty a hotbar slot	manger, vider un emplacement de la barre
+eat food, butcher a carcass (knife), empty a hotbar slot	manger, découper une carcasse (couteau), vider un emplacement de la barre
 put in that hotbar slot	mettre dans cet emplacement de la barre
 choose	choisir
 confirm	confirmer
@@ -327,8 +327,8 @@ Plant it to grow {2}: hold it and right click on the ground where it grows. It n
 Plant it to grow {2}. Only gardeners plant crops, on tilled soil.	À planter pour faire pousser un plant de {1}. Seuls les jardiniers plantent les cultures, sur la terre labourée.
 Harvested from {1} plants when they are ripe. Right click it here, or hold it and right click, to eat it.	Récolté sur les plants de {1} quand ils sont mûrs. Clic droit ici, ou en main clic droit, pour le manger.
 Harvested from {1} plants when they are ripe. It cannot be eaten.	Récolté sur les plants de {1} quand ils sont mûrs. Ne se mange pas.
-From {2} once felled: each log on the ground gives one. Counted with the blocks, and kept on a stockpile.	Tiré d'un arbre abattu ({1}) : chaque rondin au sol en donne un. Compte avec les blocs et se range sur une réserve.
-The body of {2}, taken from the ground while at least half of it was left. Of no use yet: it will be butchered later.	Le corps d'un animal ({1}), ramassé alors qu'il en restait au moins la moitié. Sans usage pour l'instant : il pourra être dépecé plus tard.
+From {2} once felled: each log on the ground gives three. Counted with the blocks, and kept on a stockpile.	Tiré d'un arbre abattu ({1}) : chaque rondin au sol en donne trois. Compte avec les blocs et se range sur une réserve.
+The body of {2}, taken from the ground while at least half of it was left. Butcher it with a knife (right click it here) for half its meat, or on a butcher's table for all of it, with the hide, bones and fat.	Le corps d'un animal ({1}), ramassé alors qu'il en restait au moins la moitié. Découpez-le au couteau (clic droit dessus ici) pour la moitié de sa viande, ou sur un établi de boucher pour toute sa viande, avec la peau, les os et la graisse.
 
 # Plants
 Oak	Chêne
@@ -475,14 +475,14 @@ Bean stew	Ragoût de haricots
 Vegetable soup	Soupe de légumes
 Roasted squash	Courge rôtie
 Mushroom skewer	Brochette de champignons
-Cooked on a campfire: it feeds more than the crops it is made from, and in a better balance. Right click it here, or hold it and right click, to eat it.	Cuit sur un feu de camp : il nourrit plus que les récoltes dont il est fait, et de façon plus équilibrée. Clic droit dessus ici, ou en main avec un clic droit, pour le manger.
-Cooks dishes from crops. Queue a dish, put calories into it, and lay wood by the fire: it burns only while it cooks. Ingredients come from your bag and the chests linked to it (those of its claimed zone), and dishes go into them.	Cuisine des plats à partir des récoltes. Mettez un plat en file, apportez-lui des calories et posez du bois près du feu : il ne brûle que pendant la cuisson. Les ingrédients viennent de votre sac et des coffres liés au feu (ceux de sa zone revendiquée), et les plats y vont.
+Cooked on a campfire: it feeds more than what it is made from, and in a better balance. Right click it here, or hold it and right click, to eat it.	Cuit sur un feu de camp : il nourrit plus que ce dont il est fait, et de façon plus équilibrée. Clic droit dessus ici, ou en main avec un clic droit, pour le manger.
+Cooks dishes from crops and meat. Queue a dish, put calories into it, and lay wood by the fire: it burns only while it cooks. Ingredients come from your bag and the chests linked to it (those of its claimed zone), and dishes go into them.	Cuisine des plats à partir des récoltes et de la viande. Mettez un plat en file, apportez-lui des calories et posez du bois près du feu : il ne brûle que pendant la cuisson. Les ingrédients viennent de votre sac et des coffres liés au feu (ceux de sa zone revendiquée), et les plats y vont.
 Campfire · {0}	Feu de camp · {0}
 Campfire · {0} · cooking	Feu de camp · {0} · en cuisson
 The queue is full ({0})	La file est pleine ({0})
 No room to give back the ingredients	Pas de place pour rendre les ingrédients
 The fire holds {0} wood at most	Le feu prend {0} bois au plus
-Ingredients are taken from your bag, then from the linked chests (those of the campfire's claimed zone; off claimed land, the public chests within 8 blocks), and dishes go into them.	Les ingrédients sont pris dans votre sac, puis dans les coffres liés (ceux de la zone revendiquée du feu ; hors des terres revendiquées, les coffres publics à 8 blocs ou moins), et les plats y vont.
+Ingredients are taken from your bag, then from the linked chests (those of the same claimed zone; off claimed land, the public chests within 8 blocks), and what is made goes into them.	Les ingrédients sont pris dans votre sac, puis dans les coffres liés (ceux de la même zone revendiquée ; hors des terres revendiquées, les coffres publics à 8 blocs ou moins), et ce qui est fait y va.
 Wood by the fire (20 at most): it burns only while a dish cooks, 30 s a log	Bois près du feu (20 au plus) : il ne brûle que pendant une cuisson, 30 s par bûche
 What is left of the log alight	Ce qui reste de la bûche allumée
 Dishes	Plats
@@ -525,14 +525,14 @@ Waits its turn	Attend son tour
 ingredients for {0} / {1}	ingrédients pour {0} / {1}
 bag {0} · linked chests {1}	sac {0} · coffres liés {1}
 Work	Travail
-Your calories: the work put into dishes burns them	Vos calories : le travail mis dans les plats les brûle
+Your calories: the work put into orders burns them	Vos calories : le travail mis dans les commandes les brûle
 Cooking	Cuisine
 Inventories	Inventaires
 Fuel	Combustible
 By the fire	Près du feu
 Linked chest	Coffre lié
 Linked chests ({0})	Coffres liés ({0})
-No linked chest: place a chest on the campfire's claimed land, or a public chest within 8 blocks off claimed land.	Aucun coffre lié : posez un coffre sur la terre revendiquée du feu, ou un coffre public à 8 blocs ou moins hors des terres revendiquées.
+No linked chest: place a chest on the same claimed land, or a public chest within 8 blocks off claimed land.	Aucun coffre lié : posez un coffre sur la même terre revendiquée, ou un coffre public à 8 blocs ou moins hors des terres revendiquées.
 Merged	Fusionnée
 Each one	Par stockage
 Everything the chests or stockpiles hold, added up	Tout ce que contiennent les coffres ou les réserves, additionné
@@ -554,7 +554,7 @@ Type how many to make	Saisissez combien en fabriquer
 {0} · burns {1}	{0} · brûle {1}
 Each log burns {0}; it burns only while a dish cooks	Chaque bûche brûle {0}, seulement pendant qu'un plat cuit
 What one dish gives the one who eats it	Ce qu'un plat apporte à qui le mange
-The calories players spend cooking it, put in from the queue	Les calories que les joueurs dépensent pour le cuisiner, ajoutées depuis la file
+The calories players spend making it, put in from the queue	Les calories que les joueurs dépensent pour le faire, ajoutées depuis la file
 
 # Campfire bars, claimed land in the world
 {0} / {1} kcal	{0} / {1} kcal
@@ -563,3 +563,39 @@ Claimed land shown (C)	Terres revendiquées affichées (C)
 Claimed land hidden (C)	Terres revendiquées masquées (C)
 Show claimed land in the world (C while playing)	Afficher les terres revendiquées dans le monde (C en jeu)
 Claimed land	Terres revendiquées
+
+# Meat: knife, butcher's table, meats, dishes
+Knife	Couteau
+Butcher's table	Établi de boucher
+Hide	Peau
+Bones	Os
+Animal fat	Graisse animale
+Small game meat	Viande de petit gibier
+Game meat	Viande de gibier
+Large game meat	Viande de gros gibier
+Poultry	Volaille
+Fish fillet	Filet de poisson
+Raw meat	Viande crue
+Small game skewer	Brochette de petit gibier
+Roast game	Rôti de gibier
+Large roast	Gros rôti
+Grilled poultry	Volaille grillée
+Grilled fish	Poisson grillé
+Hunter's stew	Ragoût du chasseur
+Bone broth	Bouillon d'os
+Butchers a carcass where it lies (hold it and right click on it) or in your bag (right click it here): half its meat, nothing else. A butcher's table takes it all, with the hide, bones and fat.	Découpe une carcasse là où elle gît (en main, clic droit dessus) ou dans votre sac (clic droit dessus ici) : la moitié de sa viande, rien d'autre. Un établi de boucher prend tout, avec la peau, les os et la graisse.
+Cuts carcasses up into meat, hide, bones and fat. Queue a carcass and put calories into it. Carcasses come from your bag and the chests linked to it (those of its claimed zone), and what it cuts goes into them.	Découpe les carcasses en viande, peau, os et graisse. Mettez une carcasse en file et apportez-lui des calories. Les carcasses viennent de votre sac et des coffres liés à l'établi (ceux de sa zone revendiquée), et ce qu'il découpe y va.
+The skin of a butchered animal. Of no use yet: kept for leather goods to come.	La peau d'un animal découpé. Sans usage pour l'instant : gardée pour de futurs objets en cuir.
+From a butchered animal. Boiled with a cabbage on a campfire into a broth.	D'un animal découpé. Bouilli avec un chou sur un feu de camp, il donne un bouillon.
+From a butchered animal. Roasted with game meat on a campfire.	D'un animal découpé. Rôtie avec de la viande de gibier sur un feu de camp.
+Raw: it is not eaten as it is. Cook it on a campfire.	Crue : elle ne se mange pas telle quelle. Cuisez-la sur un feu de camp.
+Carcasses	Carcasses
+Nothing queued: choose a carcass, then Add to the queue.	Rien en file : choisissez une carcasse, puis Ajouter à la file.
+Butchering	Découpe
+Cut up on the butcher's table: its meat, hide, bones and fat go into the linked chests. A knife in the field takes only half its meat.	Découpée sur l'établi de boucher : sa viande, sa peau, ses os et sa graisse vont dans les coffres liés. Un couteau dans les champs ne prend que la moitié de sa viande.
+No linked chest: what it cuts up needs one to go into	Aucun coffre lié : ce qu'il découpe doit aller dans un coffre
+Needs calories to butcher	Il faut des calories pour découper
+Butchering… {0} s	Découpe… {0} s
+Gives	Donne
+Butcher's table · {0}	Établi de boucher · {0}
+Butcher's table · {0} · working	Établi de boucher · {0} · au travail

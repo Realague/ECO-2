@@ -65,5 +65,8 @@ namespace Voxel.Core
                 default: return Items.None;
             }
         }
+
+        // A carcass is butchered in the field with a knife (Butchery.FieldMeat).
+        public const int ToButcher = Items.Knife;
     }
 }

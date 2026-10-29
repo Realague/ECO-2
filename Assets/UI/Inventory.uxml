@@ -158,7 +158,7 @@
                         </ui:VisualElement>
                         <ui:VisualElement class="details-hint">
                             <ui:VisualElement class="sheet-key"><ui:Label text="Right click" class="sheet-key-text" /></ui:VisualElement>
-                            <ui:Label text="eat food, empty a hotbar slot" class="details-hint-text" />
+                            <ui:Label text="eat food, butcher a carcass (knife), empty a hotbar slot" class="details-hint-text" />
                         </ui:VisualElement>
                         <ui:VisualElement class="details-hint">
                             <ui:VisualElement class="sheet-key"><ui:Label text="Tab" class="sheet-key-text" /></ui:VisualElement>

@@ -20,6 +20,7 @@ namespace Voxel.Client
         private const string FelledMessage = "Eco.Felled";
         private const string HarvestMessage = "Eco.Harvest";
         private const string TakeCarcassMessage = "Eco.TakeCarcass";
+        private const string ButcherMessage = "Eco.Butcher";
         private const string CommandMessage = "Eco.Command";
         private const string AnimalsMessage = "Eco.Animals";
         private const string CensusRequestMessage = "Eco.CensusRequest";
@@ -220,6 +221,20 @@ namespace Voxel.Client
                 }
             }
 
+            // Butchering names its animals by index, and sizes them by their health (Butchery).
+            foreach (ButcheredAnimal animal in Butchery.Animals)
+            {
+                AnimalSpeciesAsset asset = animal.Index < animalAssets.Length ? animalAssets[animal.Index] : null;
+                if (asset == null || asset.name != animal.Asset)
+                {
+                    Debug.LogError($"Animal species {animal.Index} should be {animal.Asset} (Butchery.Animals).");
+                }
+                else if (Butchery.SizeFor(asset.Health) != animal.Size)
+                {
+                    Debug.LogWarning($"{animal.Asset}'s health ({asset.Health}) no longer matches its size in Butchery.Animals ({animal.Size}).");
+                }
+            }
+
             // A server without a display simulates plants and animals but does not draw them.
             bool rendering = !Application.isBatchMode;
             if (rendering) plantRenderer = new PlantRenderer(speciesAssets);
@@ -287,6 +302,7 @@ namespace Voxel.Client
 
             Messaging.RegisterNamedMessageHandler(HarvestMessage, OnHarvestRequest);
             Messaging.RegisterNamedMessageHandler(TakeCarcassMessage, OnTakeCarcass);
+            Messaging.RegisterNamedMessageHandler(ButcherMessage, OnButcher);
             Messaging.RegisterNamedMessageHandler(CommandMessage, OnCommand);
             Messaging.RegisterNamedMessageHandler(CensusRequestMessage, OnCensusRequest);
             networkManager.OnClientConnectedCallback += OnClientConnected;
@@ -808,6 +824,56 @@ namespace Voxel.Client
             reader.ReadValueSafe(out int x);
             reader.ReadValueSafe(out int z);
             TakeCarcass(senderId, x, z);
+        }
+
+        // The local player butchers the carcass lying in a column with a knife: half its meat
+        // (Butchery.FieldMeat) into the bag, the carcass gone.
+        public void RequestButcherCarcass(int x, int z)
+        {
+            if (!running) return;
+
+            if (ecosystem != null)
+            {
+                ButcherCarcass(networkManager.LocalClientId, x, z);
+                return;
+            }
+
+            using (var writer = new FastBufferWriter(2 * sizeof(int), Allocator.Temp))
+            {
+                writer.WriteValueSafe(x);
+                writer.WriteValueSafe(z);
+                Messaging.SendNamedMessage(ButcherMessage, NetworkManager.ServerClientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
+            }
+        }
+
+        // Server side: a carcass within reach, still worth taking, butchered by a player who owns a knife
+        // (InventorySync.ButcherWithKnife checks the knife, hunger and room).
+        private void ButcherCarcass(ulong clientId, int x, int z)
+        {
+            if (ecosystem == null || !networkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client) || client.PlayerObject == null) return;
+
+            int species = -1;
+            foreach (Carcass carcass in ecosystem.Carcasses)
+            {
+                if (carcass.X == x && carcass.Z == z) species = carcass.SpeciesIndex;
+            }
+
+            if (species < 0) return;
+
+            Vector3 eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;
+            var centre = new Vector3(x + 0.5f, eyes.y, z + 0.5f);
+            float reach = PlayerRules.Reach + BlockEditRules.ReachTolerance + 1f;
+            if ((centre - eyes).sqrMagnitude > reach * reach) return;
+            if (!claimSync.Check(clientId, x, z)) return;
+
+            if (inventorySync.ButcherWithKnife(clientId, species, Items.None, () => ecosystem.TryTakeCarcass(x, z, CarcassMinMeat, out _))) animalRevision++;
+        }
+
+        private void OnButcher(ulong senderId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out int x);
+            reader.ReadValueSafe(out int z);
+            ButcherCarcass(senderId, x, z);
         }
 
         // The last census received (SpeciesCensus), for the map's species layers.

@@ -62,16 +62,23 @@ namespace Voxel.Core
     public sealed class Recipe
     {
         public Recipe(int output, int outputCount, float seconds, float calories, params Ingredient[] ingredients)
+            : this(new[] { (output, outputCount) }, seconds, calories, ingredients)
         {
-            Output = output;
-            OutputCount = outputCount;
+        }
+
+        // A recipe that makes several things at once (a butcher's table: meat, hide, bones, fat).
+        public Recipe((int Item, int Count)[] outputs, float seconds, float calories, params Ingredient[] ingredients)
+        {
+            Outputs = outputs;
             Seconds = seconds;
             Calories = calories;
             Ingredients = ingredients;
         }
 
-        public int Output { get; }
-        public int OutputCount { get; }
+        // What it makes; Output and OutputCount are the first (the only one but at a butcher's table).
+        public IReadOnlyList<(int Item, int Count)> Outputs { get; }
+        public int Output => Outputs[0].Item;
+        public int OutputCount => Outputs[0].Count;
 
         // How long it takes, in real seconds, and what it burns once made.
         public float Seconds { get; }
@@ -80,7 +87,8 @@ namespace Voxel.Core
     }
 
     // What players craft from their bag (CraftingSync): the basic tools, arrows, torches, storage and
-    // the campfire, from wood and rock; and what campfires cook (Cooking). For an ingredient of a group the player chooses the item that goes in (a
+    // the stations, from wood and rock; what campfires cook (Cooking) and what butcher's tables cut up
+    // (Butchery). For an ingredient of a group the player chooses the item that goes in (a
     // choice per ingredient: Items.None for Auto, which takes from what they have most of first, the
     // lowest item first when even, so it is the same on every machine and rare woods are kept; a
     // chosen item must cover the whole count by itself). A recipe's index travels on the network.
@@ -98,12 +106,18 @@ namespace Voxel.Core
             new Recipe(Blocks.Torch, 4, 2f, 50f, new Ingredient(IngredientGroup.Wood, 4)),
             new Recipe(Items.SmallStockpile, 1, 5f, 200f, new Ingredient(IngredientGroup.Wood, 10)),
             new Recipe(Items.Chest, 1, 6f, 250f, new Ingredient(IngredientGroup.Wood, 10)),
-            new Recipe(Items.Campfire, 1, 5f, 200f, new Ingredient(IngredientGroup.Stone, 12), new Ingredient(IngredientGroup.Wood, 6))
+            new Recipe(Items.Campfire, 1, 5f, 200f, new Ingredient(IngredientGroup.Stone, 12), new Ingredient(IngredientGroup.Wood, 6)),
+            new Recipe(Items.Knife, 1, 2f, 50f, new Ingredient(IngredientGroup.Wood, 2), new Ingredient(IngredientGroup.Stone, 2)),
+            new Recipe(Items.ButcherTable, 1, 6f, 250f, new Ingredient(IngredientGroup.Wood, 10), new Ingredient(IngredientGroup.Stone, 4))
         };
 
-        // What a campfire cooks (Campfire): one recipe per dish, in Dishes.All's order; there Calories is
+        // What a campfire cooks (Station): one recipe per dish, in Dishes.All's order; there Calories is
         // the work players put in and Seconds the time it then cooks.
         public static readonly IReadOnlyList<Recipe> Cooking = CookingRecipes();
+
+        // What a butcher's table cuts up: one recipe per animal species, in Butchery.Animals' order,
+        // each making several things.
+        public static readonly IReadOnlyList<Recipe> Butchery = Voxel.Core.Butchery.Recipes();
 
         private static Recipe[] CookingRecipes()
         {

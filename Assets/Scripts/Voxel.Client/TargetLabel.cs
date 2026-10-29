@@ -93,6 +93,12 @@ namespace Voxel.Client
                 return storageSync.IsPublic(storageId) ? Loc.T("{0} · public", fire) : fire;
             }
 
+            if (kind == StorageKind.ButcherTable)
+            {
+                string table = storageSync.IsBurning(storageId) ? Loc.T("Butcher's table · {0} · working", whose) : Loc.T("Butcher's table · {0}", whose);
+                return storageSync.IsPublic(storageId) ? Loc.T("{0} · public", table) : table;
+            }
+
             string name = kind == StorageKind.Chest
                 ? Loc.T("Chest · {0}", whose)
                 : kind == StorageKind.SmallStockpile

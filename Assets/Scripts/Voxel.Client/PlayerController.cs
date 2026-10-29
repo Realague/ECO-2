@@ -596,8 +596,16 @@ namespace Voxel.Client
                     if (claimSync.LocalCheck(pickup.X, pickup.Z)) bowSync.RequestPickup(pickup.Id);
                     return true;
                 case PickupKind.Carcass:
+                    // With a knife in hand it is butchered where it lies (half its meat), else taken whole.
+                    bool knife = hotbar.SelectedItem == ToolRules.ToButcher;
                     if (pickup.Meat < EcosystemSync.CarcassMinMeat) hotbar.ShowMessage("Too far gone to take");
-                    else if (claimSync.LocalCheck(pickup.X, pickup.Z)) ecosystemSync.RequestTakeCarcass(pickup.X, pickup.Z);
+                    else if (knife && hungerSync.Stomach.IsStarving) hotbar.ShowMessage(InventorySync.TooHungryMessage);
+                    else if (claimSync.LocalCheck(pickup.X, pickup.Z))
+                    {
+                        if (knife) ecosystemSync.RequestButcherCarcass(pickup.X, pickup.Z);
+                        else ecosystemSync.RequestTakeCarcass(pickup.X, pickup.Z);
+                    }
+
                     return true;
                 default:
                     return false;

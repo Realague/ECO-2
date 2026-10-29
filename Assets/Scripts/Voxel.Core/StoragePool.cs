@@ -60,6 +60,36 @@ namespace Voxel.Core
             return (int)Math.Min(int.MaxValue, room);
         }
 
+        // Whether the chests have room for all of these together (what a station makes at once), each
+        // put in order as AddToChests would.
+        public static bool ChestRoomFor(IReadOnlyList<Storage> chests, IReadOnlyList<(int Item, int Count)> items, ItemWeights weights)
+        {
+            var copies = new Inventory[chests.Count];
+            for (int i = 0; i < copies.Length; i++)
+            {
+                copies[i] = new Inventory();
+                copies[i].CopyFrom(chests[i].Contents);
+            }
+
+            foreach ((int item, int count) in items)
+            {
+                int left = count;
+                foreach (Inventory copy in copies)
+                {
+                    int put = Math.Min(left, StorageRules.ChestRoom(copy, item, weights));
+                    if (put <= 0) continue;
+
+                    copy.Add(item, put);
+                    left -= put;
+                    if (left == 0) break;
+                }
+
+                if (left > 0) return false;
+            }
+
+            return true;
+        }
+
         // Puts what fits into the chests in order. Returns how many.
         public static int AddToChests(IReadOnlyList<Storage> chests, int item, int count, ItemWeights weights)
         {

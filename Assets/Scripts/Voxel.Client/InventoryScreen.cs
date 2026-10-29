@@ -453,6 +453,15 @@ namespace Voxel.Client
             slot.style.height = slotSize;
         }
 
+        // A carcass right clicked in the grid is butchered with a knife from the bag (half its meat);
+        // the client says first what is missing.
+        private void Butcher(int carcass)
+        {
+            if (!inventorySync.Inventory.Has(ToolRules.ToButcher)) hotbar.ShowMessage(PlayerController.MissingToolMessage(ToolRules.ToButcher));
+            else if (hungerSync.Stomach.IsStarving) hotbar.ShowMessage(InventorySync.TooHungryMessage);
+            else inventorySync.RequestButcher(carcass);
+        }
+
         private VisualElement MakeItemSlot(int item, int count)
         {
             var slot = new VisualElement { userData = item };
@@ -476,7 +485,8 @@ namespace Voxel.Client
                 // A right click eats one, if it is food.
                 if (e.button == 1)
                 {
-                    if (hungerSync.TryEat(item, out bool tooFull) && tooFull) hotbar.ShowMessage("Too full to eat");
+                    if (Items.IsCarcass(item)) Butcher(item);
+                    else if (hungerSync.TryEat(item, out bool tooFull) && tooFull) hotbar.ShowMessage("Too full to eat");
                     return;
                 }
 

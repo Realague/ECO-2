@@ -4,23 +4,30 @@ using System.IO;
 
 namespace Voxel.Core
 {
-    // What a campfire is doing, for its window and its flames.
-    public enum CampfireStatus : byte
+    // What a station is doing, for its window (and a campfire's flames).
+    public enum StationStatus : byte
     {
         Idle,
-        Cooking,
+        Working,
         NeedsLabour,
         NoFuel,
         NoRoom,
         NoIngredients
     }
 
-    // An order on a campfire: so many of a dish (its recipe in Recipes.Cooking), cooked one after
-    // another. The work still to put in is the whole order's (calories); a dish cooks once its own share
-    // is in. Stocked is how many dishes' ingredients were taken (given back if it is cancelled): those
-    // that could be when it was queued, the others taken from the linked chests when their turn comes.
-    public sealed class CookJob
+    // An order on a station: so many of a recipe (its index in the station's recipes), made one after
+    // another. The work still to put in is the whole order's (calories); one is made once its own share
+    // is in. Stocked is how many ingredients were taken (given back if it is cancelled): those that
+    // could be when it was queued, the others taken from the linked chests when their turn comes.
+    public sealed class StationJob
     {
+        private readonly IReadOnlyList<Recipe> recipes;
+
+        public StationJob(IReadOnlyList<Recipe> recipes)
+        {
+            this.recipes = recipes;
+        }
+
         public int Id;
         public int Recipe;
         public int Count;
@@ -29,21 +36,23 @@ namespace Voxel.Core
         public float SecondsLeft;
         public string CreatorId;
 
+        public Recipe Made => recipes[Recipe];
+
         public bool HasLabour => LabourLeft <= 0f;
 
-        // Whether the work of the dish at the front of the order is all in.
-        public bool UnitPaid => LabourLeft <= Recipes.Cooking[Recipe].Calories * (Count - 1) + 1e-3f;
+        // Whether the work of the one at the front of the order is all in.
+        public bool UnitPaid => LabourLeft <= Made.Calories * (Count - 1) + 1e-3f;
 
-        // Whether the dish at the front has started cooking.
-        public bool Started => SecondsLeft < Recipes.Cooking[Recipe].Seconds - 1e-4f;
+        // Whether the one at the front has started.
+        public bool Started => SecondsLeft < Made.Seconds - 1e-4f;
 
-        // What was taken for it and not cooked yet.
+        // What was taken for it and not made yet.
         public List<KeyValuePair<int, int>> Held()
         {
             var held = new List<KeyValuePair<int, int>>();
             if (Stocked <= 0) return held;
 
-            foreach (Ingredient ingredient in Recipes.Cooking[Recipe].Ingredients)
+            foreach (Ingredient ingredient in Made.Ingredients)
             {
                 held.Add(new KeyValuePair<int, int>(ingredient.Item, ingredient.Count * Stocked));
             }
@@ -52,19 +61,34 @@ namespace Voxel.Core
         }
     }
 
-    // A campfire's wood and its queue of orders, in real time (the server ticks it every frame, never by
-    // the simulation's clock). Players queue orders and put calories into them; the first dish whose
-    // work is in and whose ingredients are there cooks, burning wood (a log lasts Fuels.SecondsOf it, a
-    // new one taken when it is out) only while it cooks, and only while what it makes has somewhere to
-    // go (canDeliver); else it waits.
-    public sealed class Campfire
+    // A station's queue of orders, in real time (the server ticks it every frame, never by the
+    // simulation's clock): a campfire, which cooks (Recipes.Cooking) and burns wood, or a butcher's
+    // table, which cuts carcasses up (Recipes.Butchery). Players queue orders and put calories into
+    // them; the first whose work is in and whose ingredients are there is made, only while what it makes
+    // has somewhere to go (canDeliver), and on a campfire burning wood (a log lasts Fuels.SecondsOf it,
+    // a new one taken when it is out) only while it cooks; else it waits.
+    public sealed class Station
     {
         public const int MaxFuel = 20;
         public const int MaxJobs = 8;
         public const int MaxCount = 50;
 
-        private readonly List<CookJob> jobs = new List<CookJob>();
+        private readonly List<StationJob> jobs = new List<StationJob>();
         private int nextJobId = 1;
+
+        public Station(IReadOnlyList<Recipe> recipes, bool burnsFuel)
+        {
+            Recipes = recipes;
+            BurnsFuel = burnsFuel;
+        }
+
+        public static Station Campfire() => new Station(Voxel.Core.Recipes.Cooking, true);
+
+        public static Station ButcherTable() => new Station(Voxel.Core.Recipes.Butchery, false);
+
+        public IReadOnlyList<Recipe> Recipes { get; }
+
+        public bool BurnsFuel { get; }
 
         // The wood laid by the fire (any wood), and how long the log alight still burns.
         public readonly Inventory Fuel = new Inventory();
@@ -74,9 +98,9 @@ namespace Voxel.Core
         // How long the log alight burns in all (not saved: after a load, the longest it can be).
         public float LogSeconds { get; private set; } = Fuels.WoodSeconds;
 
-        public CampfireStatus Status { get; private set; }
+        public StationStatus Status { get; private set; }
 
-        public IReadOnlyList<CookJob> Jobs => jobs;
+        public IReadOnlyList<StationJob> Jobs => jobs;
 
         public int FuelCount
         {
@@ -94,18 +118,18 @@ namespace Voxel.Core
 
         public bool IsEmpty => jobs.Count == 0 && FuelCount == 0;
 
-        // The order that cooks now, or would once it has wood and room: one whose dish has started, else
-        // the first whose dish is paid for and has its ingredients.
-        public CookJob Next
+        // The order being made now, or that would be once it has wood and room: one that has started,
+        // else the first whose front one is paid for and has its ingredients.
+        public StationJob Next
         {
             get
             {
-                foreach (CookJob job in jobs)
+                foreach (StationJob job in jobs)
                 {
                     if (job.UnitPaid && job.Stocked > 0 && job.Started) return job;
                 }
 
-                foreach (CookJob job in jobs)
+                foreach (StationJob job in jobs)
                 {
                     if (job.UnitPaid && job.Stocked > 0) return job;
                 }
@@ -132,7 +156,7 @@ namespace Voxel.Core
         // Lays fuel by the fire, what fits. Returns how many.
         public int AddFuel(int wood, int count)
         {
-            if (!Fuels.IsFuel(wood) || count <= 0) return 0;
+            if (!BurnsFuel || !Fuels.IsFuel(wood) || count <= 0) return 0;
 
             int added = Math.Min(count, MaxFuel - FuelCount);
             if (added > 0) Fuel.Add(wood, added);
@@ -147,28 +171,28 @@ namespace Voxel.Core
             return Math.Max(0, taken);
         }
 
-        // Queues an order of count dishes, stocked of them with their ingredients taken; null if the
-        // queue is full, the count out of range or there is no such recipe.
-        public CookJob Queue(int recipe, int count, string creatorId, int stocked)
+        // Queues an order of count, stocked of them with their ingredients taken; null if the queue is
+        // full, the count out of range or there is no such recipe.
+        public StationJob Queue(int recipe, int count, string creatorId, int stocked)
         {
-            if (jobs.Count >= MaxJobs || recipe < 0 || recipe >= Recipes.Cooking.Count || count < 1 || count > MaxCount) return null;
+            if (jobs.Count >= MaxJobs || recipe < 0 || recipe >= Recipes.Count || count < 1 || count > MaxCount) return null;
 
-            Recipe cooking = Recipes.Cooking[recipe];
-            var job = new CookJob
+            Recipe made = Recipes[recipe];
+            var job = new StationJob(Recipes)
             {
                 Id = nextJobId++,
                 Recipe = recipe,
                 Count = count,
                 Stocked = Math.Max(0, Math.Min(count, stocked)),
-                LabourLeft = cooking.Calories * count,
-                SecondsLeft = cooking.Seconds,
+                LabourLeft = made.Calories * count,
+                SecondsLeft = made.Seconds,
                 CreatorId = creatorId ?? ""
             };
             jobs.Add(job);
             return job;
         }
 
-        public bool TryGetJob(int id, out CookJob job)
+        public bool TryGetJob(int id, out StationJob job)
         {
             job = jobs.Find(j => j.Id == id);
             return job != null;
@@ -177,7 +201,7 @@ namespace Voxel.Core
         // Puts calories into an order, no more than it still needs. Returns how many went in.
         public float AddLabour(int jobId, float calories)
         {
-            if (calories <= 0f || !TryGetJob(jobId, out CookJob job)) return 0f;
+            if (calories <= 0f || !TryGetJob(jobId, out StationJob job)) return 0f;
 
             float added = Math.Min(calories, job.LabourLeft);
             job.LabourLeft -= added;
@@ -187,17 +211,17 @@ namespace Voxel.Core
 
         public bool Remove(int jobId) => jobs.RemoveAll(j => j.Id == jobId) > 0;
 
-        // Cooks for a while. A dish paid for whose ingredients were not taken asks for them
-        // (takeIngredients: one dish's, all or nothing). Returns the order of which a dish was finished,
-        // if one was (at most one a call, so that the caller delivers it before the next asks for room),
-        // else null.
-        public CookJob Tick(float seconds, Func<int, int, bool> canDeliver, Func<int, bool> takeIngredients = null)
+        // Works for a while. An order paid for whose ingredients were not taken asks for them
+        // (takeIngredients: one's, all or nothing). canDeliver says whether everything the recipe makes
+        // has room. Returns the order of which one was finished, if one was (at most one a call, so that
+        // the caller delivers it before the next asks for room), else null.
+        public StationJob Tick(float seconds, Func<Recipe, bool> canDeliver, Func<int, bool> takeIngredients = null)
         {
-            CookJob job = Next;
+            StationJob job = Next;
             if (job == null)
             {
                 bool paid = false;
-                foreach (CookJob candidate in jobs)
+                foreach (StationJob candidate in jobs)
                 {
                     if (!candidate.UnitPaid) continue;
 
@@ -211,35 +235,40 @@ namespace Voxel.Core
 
                 if (job == null)
                 {
-                    Status = paid ? CampfireStatus.NoIngredients : jobs.Count > 0 ? CampfireStatus.NeedsLabour : CampfireStatus.Idle;
+                    Status = paid ? StationStatus.NoIngredients : jobs.Count > 0 ? StationStatus.NeedsLabour : StationStatus.Idle;
                     return null;
                 }
             }
 
-            Recipe recipe = Recipes.Cooking[job.Recipe];
-            if (canDeliver != null && !canDeliver(recipe.Output, recipe.OutputCount))
+            Recipe recipe = job.Made;
+            if (canDeliver != null && !canDeliver(recipe))
             {
-                Status = CampfireStatus.NoRoom;
+                Status = StationStatus.NoRoom;
                 return null;
             }
 
             while (seconds > 0f)
             {
-                if (Burning <= 0f)
+                float step = Math.Min(seconds, job.SecondsLeft);
+                if (BurnsFuel)
                 {
-                    int log = TakeLog();
-                    if (log == Items.None)
+                    if (Burning <= 0f)
                     {
-                        Status = CampfireStatus.NoFuel;
-                        return null;
+                        int log = TakeLog();
+                        if (log == Items.None)
+                        {
+                            Status = StationStatus.NoFuel;
+                            return null;
+                        }
+
+                        LogSeconds = Fuels.SecondsOf(log);
+                        Burning += LogSeconds;
                     }
 
-                    LogSeconds = Fuels.SecondsOf(log);
-                    Burning += LogSeconds;
+                    step = Math.Min(step, Burning);
+                    Burning -= step;
                 }
 
-                float step = Math.Min(seconds, Math.Min(Burning, job.SecondsLeft));
-                Burning -= step;
                 job.SecondsLeft -= step;
                 seconds -= step;
                 if (job.SecondsLeft <= 1e-4f)
@@ -248,12 +277,12 @@ namespace Voxel.Core
                     job.Stocked--;
                     job.SecondsLeft = recipe.Seconds;
                     if (job.Count <= 0) jobs.Remove(job);
-                    Status = Next != null ? CampfireStatus.Cooking : jobs.Count > 0 ? CampfireStatus.NeedsLabour : CampfireStatus.Idle;
+                    Status = Next != null ? StationStatus.Working : jobs.Count > 0 ? StationStatus.NeedsLabour : StationStatus.Idle;
                     return job;
                 }
             }
 
-            Status = CampfireStatus.Cooking;
+            Status = StationStatus.Working;
             return null;
         }
 
@@ -286,7 +315,7 @@ namespace Voxel.Core
             }
 
             writer.Write(jobs.Count);
-            foreach (CookJob job in jobs)
+            foreach (StationJob job in jobs)
             {
                 writer.Write(job.Id);
                 writer.Write(job.Recipe);
@@ -298,7 +327,7 @@ namespace Voxel.Core
             }
         }
 
-        // Throws InvalidDataException if it cannot be a campfire. An order whose recipe no longer exists
+        // Throws InvalidDataException if it cannot be a station. An order whose recipe no longer exists
         // is dropped. In format 2 a dish was an order of one, with what was taken for it.
         public void Read(BinaryReader reader, int format)
         {
@@ -306,21 +335,21 @@ namespace Voxel.Core
             Burning = Math.Max(0f, reader.ReadSingle());
             LogSeconds = Math.Max(Burning, Fuels.WoodSeconds);
             int fuel = reader.ReadInt32();
-            if (fuel < 0) throw new InvalidDataException("Invalid campfire wood.");
+            if (fuel < 0) throw new InvalidDataException("Invalid station fuel.");
 
             for (int i = 0; i < fuel; i++)
             {
                 int item = Items.Upgrade(reader.ReadInt32());
                 int logs = reader.ReadInt32();
-                if (logs > 0 && Fuels.IsFuel(item)) Fuel.Add(item, logs);
+                if (logs > 0 && BurnsFuel && Fuels.IsFuel(item)) Fuel.Add(item, logs);
             }
 
             int queued = reader.ReadInt32();
-            if (queued < 0 || queued > MaxJobs) throw new InvalidDataException("Invalid campfire queue.");
+            if (queued < 0 || queued > MaxJobs) throw new InvalidDataException("Invalid station queue.");
 
             for (int i = 0; i < queued; i++)
             {
-                var job = new CookJob { Id = reader.ReadInt32(), Recipe = reader.ReadInt32() };
+                var job = new StationJob(Recipes) { Id = reader.ReadInt32(), Recipe = reader.ReadInt32() };
                 if (format >= 3)
                 {
                     job.Count = reader.ReadInt32();
@@ -333,7 +362,7 @@ namespace Voxel.Core
                 if (format < 3)
                 {
                     int taken = reader.ReadInt32();
-                    if (taken < 0) throw new InvalidDataException("Invalid campfire dish.");
+                    if (taken < 0) throw new InvalidDataException("Invalid station order.");
 
                     for (int t = 0; t < taken; t++)
                     {
@@ -345,9 +374,9 @@ namespace Voxel.Core
                     job.Stocked = taken > 0 ? 1 : 0;
                 }
 
-                if (job.Count < 1 || job.Count > MaxCount || job.Stocked < 0 || job.Stocked > job.Count) throw new InvalidDataException("Invalid campfire order.");
+                if (job.Count < 1 || job.Count > MaxCount || job.Stocked < 0 || job.Stocked > job.Count) throw new InvalidDataException("Invalid station order.");
 
-                if (job.Recipe >= 0 && job.Recipe < Recipes.Cooking.Count) jobs.Add(job);
+                if (job.Recipe >= 0 && job.Recipe < Recipes.Count) jobs.Add(job);
                 if (job.Id >= nextJobId) nextJobId = job.Id + 1;
             }
         }

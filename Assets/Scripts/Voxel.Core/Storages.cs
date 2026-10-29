@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Voxel.Core
 {
-    // A chest, a stockpile or a campfire placed in the world: where (a chest's or campfire's cell, a
+    // A chest, a stockpile or a station placed in the world: where (a chest's or station's cell, a
     // stockpile's corner, at the height of the cells above the ground), facing which way, whose (the
     // player id of who placed it), who else may open it, and what it holds.
     public sealed class Storage
@@ -22,8 +22,8 @@ namespace Voxel.Core
         // A stockpile's piles (null for the others).
         public readonly StockpilePiles Piles;
 
-        // A campfire's wood and queue (null for the others).
-        public readonly Campfire Campfire;
+        // A station's queue, and a campfire's wood (null for the others).
+        public readonly Station Station;
 
         public Storage(int id, StorageKind kind, BlockPos position, int facing, string ownerId)
         {
@@ -33,7 +33,8 @@ namespace Voxel.Core
             Facing = facing;
             OwnerId = ownerId;
             if (kind == StorageKind.Chest) Contents = new Inventory();
-            else if (kind == StorageKind.Campfire) Campfire = new Campfire();
+            else if (kind == StorageKind.Campfire) Station = Station.Campfire();
+            else if (kind == StorageKind.ButcherTable) Station = Station.ButcherTable();
             else Piles = new StockpilePiles(kind);
         }
 
@@ -44,7 +45,8 @@ namespace Voxel.Core
                 switch (Kind)
                 {
                     case StorageKind.Chest: return Contents.DistinctCount == 0;
-                    case StorageKind.Campfire: return Campfire.IsEmpty;
+                    case StorageKind.Campfire:
+                    case StorageKind.ButcherTable: return Station.IsEmpty;
                     default: return Piles.IsEmpty;
                 }
             }
@@ -54,10 +56,10 @@ namespace Voxel.Core
 
         public int CellCount => StorageRules.IsSingleCell(Kind) ? 1 : StorageRules.PileCountOf(Kind);
 
-        // A cell it covers (0 to CellCount - 1): a chest's or campfire's own, or a stockpile's piles in order.
+        // A cell it covers (0 to CellCount - 1): a chest's or station's own, or a stockpile's piles in order.
         public BlockPos Cell(int index) => StorageRules.IsSingleCell(Kind) ? Position : StorageRules.PileCell(Position, index, StorageRules.SideOf(Kind));
 
-        // Whether a cell it covers is solid: a chest or a campfire always, a stockpile's pile when it holds something.
+        // Whether a cell it covers is solid: a chest or a station always, a stockpile's pile when it holds something.
         public bool IsSolidAt(int index) => StorageRules.IsSingleCell(Kind) || Piles.CountAt(index) > 0;
     }
 
@@ -67,8 +69,9 @@ namespace Voxel.Core
     {
         private const uint Magic = 0x524F5453; // "STOR"
         // Format 2 adds campfires (their wood and queue after them), format 3 orders of several
-        // dishes (Campfire.Write); formats 1 and 2 still load.
-        private const int FormatVersion = 3;
+        // dishes (Station.Write), format 4 butcher's tables (the same as a campfire after them);
+        // formats 1 to 3 still load.
+        private const int FormatVersion = 4;
 
         private readonly Dictionary<int, Storage> storages = new Dictionary<int, Storage>();
 
@@ -171,9 +174,9 @@ namespace Voxel.Core
                             writer.Write(entry.Value);
                         }
                     }
-                    else if (storage.Kind == StorageKind.Campfire)
+                    else if (StorageRules.IsStation(storage.Kind))
                     {
-                        storage.Campfire.Write(writer);
+                        storage.Station.Write(writer);
                     }
                     else
                     {
@@ -208,6 +211,7 @@ namespace Voxel.Core
                     if (id <= 0 || id >= store.nextId || store.storages.ContainsKey(id)) throw new InvalidDataException($"Invalid storage id {id}.");
                     if (!StorageRules.IsKind(kind) || facing > 3 || ownerId.Length == 0) throw new InvalidDataException($"Invalid storage {id}.");
                     if (format < 2 && kind == (byte)StorageKind.Campfire) throw new InvalidDataException($"Campfire {id} in a save from before campfires.");
+                    if (format < 4 && kind == (byte)StorageKind.ButcherTable) throw new InvalidDataException($"Butcher's table {id} in a save from before them.");
 
                     var storage = new Storage(id, (StorageKind)kind, position, facing, ownerId);
                     int allowed = reader.ReadInt32();
@@ -230,9 +234,9 @@ namespace Voxel.Core
                             if (amount > 0 && StorageRules.AcceptsInChest(item)) storage.Contents.Add(item, amount);
                         }
                     }
-                    else if (storage.Kind == StorageKind.Campfire)
+                    else if (StorageRules.IsStation(storage.Kind))
                     {
-                        storage.Campfire.Read(reader, format);
+                        storage.Station.Read(reader, format);
                     }
                     else
                     {

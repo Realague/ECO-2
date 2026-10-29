@@ -9,8 +9,10 @@ namespace Voxel.Core
         Stockpile = 2,
         SmallStockpile = 3,
 
-        // Not storage but placed like it (one cell, like a chest): a station that cooks (Campfire).
-        Campfire = 4
+        // Not storage but placed like it (one cell, like a chest): stations (Station), one that cooks
+        // and one where carcasses are cut up.
+        Campfire = 4,
+        ButcherTable = 5
     }
 
     // What storage holds and where it may stand. A chest stands in one cell on top of a solid block
@@ -33,12 +35,15 @@ namespace Voxel.Core
         public const int SmallStockpileSide = 2;
         public const int SmallPileSize = 20;
 
-        public static bool IsKind(byte kind) => kind >= (byte)StorageKind.Chest && kind <= (byte)StorageKind.Campfire;
+        public static bool IsKind(byte kind) => kind >= (byte)StorageKind.Chest && kind <= (byte)StorageKind.ButcherTable;
 
-        // Whether it stands in one cell like a chest (a chest or a campfire), rather than on a patch.
+        // Whether it stands in one cell like a chest (a chest or a station), rather than on a patch.
         public static bool IsSingleCell(StorageKind kind) => !IsStockpile(kind);
 
         public static bool IsStockpile(StorageKind kind) => kind == StorageKind.Stockpile || kind == StorageKind.SmallStockpile;
+
+        // A campfire or a butcher's table: a queue of orders, not storage (Storage.Station).
+        public static bool IsStation(StorageKind kind) => kind == StorageKind.Campfire || kind == StorageKind.ButcherTable;
 
         // A stockpile's side in cells, its number of piles, the blocks a pile holds and in all.
         public static int SideOf(StorageKind kind) => kind == StorageKind.SmallStockpile ? SmallStockpileSide : StockpileSide;
@@ -56,6 +61,7 @@ namespace Voxel.Core
                 case StorageKind.Chest: return Items.Chest;
                 case StorageKind.SmallStockpile: return Items.SmallStockpile;
                 case StorageKind.Campfire: return Items.Campfire;
+                case StorageKind.ButcherTable: return Items.ButcherTable;
                 default: return Items.Stockpile;
             }
         }
@@ -67,6 +73,7 @@ namespace Voxel.Core
                 case Items.Chest: kind = StorageKind.Chest; break;
                 case Items.SmallStockpile: kind = StorageKind.SmallStockpile; break;
                 case Items.Campfire: kind = StorageKind.Campfire; break;
+                case Items.ButcherTable: kind = StorageKind.ButcherTable; break;
                 default: kind = StorageKind.Stockpile; break;
             }
 

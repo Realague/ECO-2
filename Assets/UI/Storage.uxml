@@ -5,7 +5,8 @@
 
     <!-- StorageScreen fills both sides (the player's bag, the storage's items or piles, PoolView), the
          weight or fill of the storage, and moves the dragged item's ghost. A campfire has three tabs:
-         its cooking (CampfirePage), the bag and its linked chests, the bag and its wood. -->
+         its cooking (StationPage), the bag and its linked chests, the bag and its wood; a butcher's
+         table two: its butchering (the same page) and the bag and its linked chests. -->
     <ui:VisualElement name="screen" class="screen inventory-screen storage-screen">
         <ui:VisualElement class="inventory-tabs">
             <ui:Button name="tab-storage" class="inventory-tab inventory-tab--selected">
@@ -13,8 +14,8 @@
                 <ui:Label name="tab-storage-text" text="Chest" class="inventory-tab-text" />
             </ui:Button>
             <ui:Button name="tab-cooking" class="inventory-tab">
-                <ui:VisualElement class="icon icon--fire inventory-tab-icon" />
-                <ui:Label text="Cooking" class="inventory-tab-text" />
+                <ui:VisualElement name="tab-cooking-icon" class="icon icon--fire inventory-tab-icon" />
+                <ui:Label name="tab-cooking-text" text="Cooking" class="inventory-tab-text" />
             </ui:Button>
             <ui:Button name="tab-fire-inventory" class="inventory-tab">
                 <ui:VisualElement class="icon icon--backpack inventory-tab-icon" />
@@ -110,22 +111,22 @@
             </ui:VisualElement>
         </ui:VisualElement>
 
-        <!-- A campfire's cooking (CampfirePage), laid out as the inventory's crafting tab: the dishes and
-             the queue, then the chosen dish's sheet. -->
+        <!-- A station's work (StationPage), laid out as the inventory's crafting tab: what it makes and
+             the queue, then the chosen recipe's sheet. -->
         <ui:VisualElement name="cooking-page" class="inventory-frame">
             <ui:VisualElement class="inventory-left">
                 <ui:VisualElement class="crafting-page">
                     <ui:VisualElement class="items-heading">
-                        <ui:Label text="Dishes" class="column-title items-title" />
-                        <ui:Label name="fire-linked" class="fire-linked" tooltip="Ingredients are taken from your bag, then from the linked chests (those of the campfire's claimed zone; off claimed land, the public chests within 8 blocks), and dishes go into them." />
-                        <ui:VisualElement class="carry-count" tooltip="Wood by the fire (20 at most): it burns only while a dish cooks, 30 s a log">
+                        <ui:Label name="fire-recipes-title" text="Dishes" class="column-title items-title" />
+                        <ui:Label name="fire-linked" class="fire-linked" tooltip="Ingredients are taken from your bag, then from the linked chests (those of the same claimed zone; off claimed land, the public chests within 8 blocks), and what is made goes into them." />
+                        <ui:VisualElement name="fire-fuel-box" class="carry-count" tooltip="Wood by the fire (20 at most): it burns only while a dish cooks, 30 s a log">
                             <ui:VisualElement class="icon icon--category-wood carry-count-icon" />
                             <ui:Label name="fire-fuel" class="carry-count-text" />
                         </ui:VisualElement>
-                        <ui:VisualElement class="fire-burn" tooltip="What is left of the log alight">
+                        <ui:VisualElement name="fire-burn" class="fire-burn" tooltip="What is left of the log alight">
                             <ui:VisualElement name="fire-burn-fill" class="fire-burn-fill" />
                         </ui:VisualElement>
-                        <ui:VisualElement class="carry-count fire-calories" tooltip="Your calories: the work put into dishes burns them">
+                        <ui:VisualElement class="carry-count fire-calories" tooltip="Your calories: the work put into orders burns them">
                             <ui:VisualElement class="icon icon--fire carry-count-icon" />
                             <ui:Label name="fire-calories" class="carry-count-text" />
                         </ui:VisualElement>
@@ -161,46 +162,53 @@
                             <ui:Label text="Duration" class="details-line-label" />
                             <ui:Label name="fire-sheet-duration" class="details-line-value" />
                         </ui:VisualElement>
-                        <ui:VisualElement class="details-line" tooltip="The calories players spend cooking it, put in from the queue">
+                        <ui:VisualElement class="details-line" tooltip="The calories players spend making it, put in from the queue">
                             <ui:VisualElement class="icon icon--fire details-line-icon" />
                             <ui:Label text="Work" class="details-line-label" />
                             <ui:Label name="fire-sheet-work" class="details-line-value" />
                         </ui:VisualElement>
+                        <!-- What a butcher's table makes of the carcass, each with its count. -->
+                        <ui:VisualElement name="fire-sheet-outputs-box">
+                            <ui:Label text="Gives" class="details-section" />
+                            <ui:VisualElement name="fire-sheet-outputs" />
+                        </ui:VisualElement>
                         <!-- What one dish gives: as the inventory's details show a food. -->
-                        <ui:VisualElement class="details-line">
-                            <ui:VisualElement class="icon icon--scales details-line-icon" />
-                            <ui:Label text="Weight" class="details-line-label" />
-                            <ui:Label name="fire-sheet-weight" class="details-line-value" />
-                        </ui:VisualElement>
-                        <ui:VisualElement class="details-line" tooltip="What one dish gives the one who eats it">
-                            <ui:VisualElement class="icon icon--category-food details-line-icon" />
-                            <ui:Label text="Calories" class="details-line-label" />
-                            <ui:Label name="fire-sheet-calories" class="details-line-value" />
-                        </ui:VisualElement>
-                        <ui:Label text="Nutrition" class="details-section" />
-                        <ui:VisualElement class="nutrient">
-                            <ui:VisualElement class="stomach-dot stomach-dot--carbs" />
-                            <ui:Label text="Carbs" class="nutrient-name" />
-                            <ui:VisualElement class="nutrient-bar"><ui:VisualElement name="fire-sheet-nutrient-bar-0" class="nutrient-fill stomach-dot--carbs" /></ui:VisualElement>
-                            <ui:Label name="fire-sheet-nutrient-0" class="nutrient-value" />
-                        </ui:VisualElement>
-                        <ui:VisualElement class="nutrient">
-                            <ui:VisualElement class="stomach-dot stomach-dot--protein" />
-                            <ui:Label text="Protein" class="nutrient-name" />
-                            <ui:VisualElement class="nutrient-bar"><ui:VisualElement name="fire-sheet-nutrient-bar-1" class="nutrient-fill stomach-dot--protein" /></ui:VisualElement>
-                            <ui:Label name="fire-sheet-nutrient-1" class="nutrient-value" />
-                        </ui:VisualElement>
-                        <ui:VisualElement class="nutrient">
-                            <ui:VisualElement class="stomach-dot stomach-dot--fat" />
-                            <ui:Label text="Fat" class="nutrient-name" />
-                            <ui:VisualElement class="nutrient-bar"><ui:VisualElement name="fire-sheet-nutrient-bar-2" class="nutrient-fill stomach-dot--fat" /></ui:VisualElement>
-                            <ui:Label name="fire-sheet-nutrient-2" class="nutrient-value" />
-                        </ui:VisualElement>
-                        <ui:VisualElement class="nutrient">
-                            <ui:VisualElement class="stomach-dot stomach-dot--vitamins" />
-                            <ui:Label text="Vitamins" class="nutrient-name" />
-                            <ui:VisualElement class="nutrient-bar"><ui:VisualElement name="fire-sheet-nutrient-bar-3" class="nutrient-fill stomach-dot--vitamins" /></ui:VisualElement>
-                            <ui:Label name="fire-sheet-nutrient-3" class="nutrient-value" />
+                        <ui:VisualElement name="fire-sheet-food">
+                            <ui:VisualElement class="details-line">
+                                <ui:VisualElement class="icon icon--scales details-line-icon" />
+                                <ui:Label text="Weight" class="details-line-label" />
+                                <ui:Label name="fire-sheet-weight" class="details-line-value" />
+                            </ui:VisualElement>
+                            <ui:VisualElement class="details-line" tooltip="What one dish gives the one who eats it">
+                                <ui:VisualElement class="icon icon--category-food details-line-icon" />
+                                <ui:Label text="Calories" class="details-line-label" />
+                                <ui:Label name="fire-sheet-calories" class="details-line-value" />
+                            </ui:VisualElement>
+                            <ui:Label text="Nutrition" class="details-section" />
+                            <ui:VisualElement class="nutrient">
+                                <ui:VisualElement class="stomach-dot stomach-dot--carbs" />
+                                <ui:Label text="Carbs" class="nutrient-name" />
+                                <ui:VisualElement class="nutrient-bar"><ui:VisualElement name="fire-sheet-nutrient-bar-0" class="nutrient-fill stomach-dot--carbs" /></ui:VisualElement>
+                                <ui:Label name="fire-sheet-nutrient-0" class="nutrient-value" />
+                            </ui:VisualElement>
+                            <ui:VisualElement class="nutrient">
+                                <ui:VisualElement class="stomach-dot stomach-dot--protein" />
+                                <ui:Label text="Protein" class="nutrient-name" />
+                                <ui:VisualElement class="nutrient-bar"><ui:VisualElement name="fire-sheet-nutrient-bar-1" class="nutrient-fill stomach-dot--protein" /></ui:VisualElement>
+                                <ui:Label name="fire-sheet-nutrient-1" class="nutrient-value" />
+                            </ui:VisualElement>
+                            <ui:VisualElement class="nutrient">
+                                <ui:VisualElement class="stomach-dot stomach-dot--fat" />
+                                <ui:Label text="Fat" class="nutrient-name" />
+                                <ui:VisualElement class="nutrient-bar"><ui:VisualElement name="fire-sheet-nutrient-bar-2" class="nutrient-fill stomach-dot--fat" /></ui:VisualElement>
+                                <ui:Label name="fire-sheet-nutrient-2" class="nutrient-value" />
+                            </ui:VisualElement>
+                            <ui:VisualElement class="nutrient">
+                                <ui:VisualElement class="stomach-dot stomach-dot--vitamins" />
+                                <ui:Label text="Vitamins" class="nutrient-name" />
+                                <ui:VisualElement class="nutrient-bar"><ui:VisualElement name="fire-sheet-nutrient-bar-3" class="nutrient-fill stomach-dot--vitamins" /></ui:VisualElement>
+                                <ui:Label name="fire-sheet-nutrient-3" class="nutrient-value" />
+                            </ui:VisualElement>
                         </ui:VisualElement>
                     </ui:ScrollView>
 

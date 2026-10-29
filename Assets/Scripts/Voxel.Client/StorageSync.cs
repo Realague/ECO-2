@@ -23,14 +23,14 @@ namespace Voxel.Client
         // Only found by the client, which then says whose land it is (ClaimSync); the server tells it.
         Claimed = 9,
 
-        // A campfire's (StorageSync.Campfire.cs).
+        // A station's (StorageSync.Stations.cs).
         QueueFull = 10,
         MissingIngredients = 11,
         NoRoomToGiveBack = 12,
         FuelFull = 13
     }
 
-    // A chest or stockpile of the open pool, or a chest linked to the open campfire, as the server last
+    // A chest or stockpile of the open pool, or a chest linked to the open station, as the server last
     // sent it: a chest's items, or a stockpile's piles.
     public sealed class StorageMember
     {
@@ -48,8 +48,9 @@ namespace Voxel.Client
     // others and pick it up once empty (anyone, while it is public). Every
     // machine knows where each one stands, whose it is, whether it is open and a stockpile's piles (to
     // draw them and collide with them); only the players who opened one get what a chest holds and its
-    // access list. Nothing sprouts where storage stands (Ecosystem.BlockColumn). Campfires are placed,
-    // owned, opened and picked up the same way; what they do is in StorageSync.Campfire.cs.
+    // access list. Nothing sprouts where storage stands (Ecosystem.BlockColumn). Stations (campfires,
+    // butcher's tables) are placed, owned, opened and picked up the same way; what they do is in
+    // StorageSync.Stations.cs.
     public partial class StorageSync : MonoBehaviour
     {
         private const string AllMessage = "Store.All";
@@ -238,10 +239,10 @@ namespace Voxel.Client
                 case StorageRefusal.NotAccepted: return "It doesn't go in there";
                 case StorageRefusal.TooHungry: return InventorySync.TooHungryMessage;
                 case StorageRefusal.Claimed: return ClaimSync.TextOf(ClaimRefusal.None, "");
-                case StorageRefusal.QueueFull: return Loc.T("The queue is full ({0})", Campfire.MaxJobs);
+                case StorageRefusal.QueueFull: return Loc.T("The queue is full ({0})", Station.MaxJobs);
                 case StorageRefusal.MissingIngredients: return "Missing ingredients";
                 case StorageRefusal.NoRoomToGiveBack: return "No room to give back the ingredients";
-                case StorageRefusal.FuelFull: return Loc.T("The fire holds {0} wood at most", Campfire.MaxFuel);
+                case StorageRefusal.FuelFull: return Loc.T("The fire holds {0} wood at most", Station.MaxFuel);
                 default: return "No room here";
             }
         }
@@ -266,7 +267,7 @@ namespace Voxel.Client
             Messaging.RegisterNamedMessageHandler(CloseMessage, OnClose);
             Messaging.RegisterNamedMessageHandler(MoveMessage, OnMove);
             Messaging.RegisterNamedMessageHandler(PickupMessage, OnPickup);
-            StartCampfireServer();
+            StartStationServer();
             networkManager.OnClientConnectedCallback += OnClientConnected;
             networkManager.OnClientDisconnectCallback += OnClientDisconnected;
             claimSync.ClaimsChanged += OnClaimsChanged;
@@ -283,7 +284,7 @@ namespace Voxel.Client
             Messaging.RegisterNamedMessageHandler(ContentsMessage, OnContents);
             Messaging.RegisterNamedMessageHandler(ClosedMessage, OnClosed);
             Messaging.RegisterNamedMessageHandler(RefusedMessage, OnRefused);
-            StartCampfireClient();
+            StartStationClient();
         }
 
         public void Stop()
@@ -305,7 +306,7 @@ namespace Voxel.Client
             viewers.Clear();
             openedBy.Clear();
             OpenedId = 0;
-            StopCampfires();
+            StopStations();
             views?.Clear();
             running = false;
         }
@@ -551,7 +552,7 @@ namespace Voxel.Client
                 CheckViewers();
             }
 
-            if (IsServer) TickCampfires(Time.unscaledDeltaTime);
+            if (IsServer) TickStations(Time.unscaledDeltaTime);
 
             if (Application.isBatchMode) return;
 
@@ -652,8 +653,8 @@ namespace Voxel.Client
             watching.Add(clientId);
             SendContents(clientId, storage);
 
-            // A chest's lid rises while it is open; a campfire's flag is whether it burns.
-            if (storage.Kind != StorageKind.Campfire) SetOpen(storage, true);
+            // A chest's lid rises while it is open; a station's flag is whether it works.
+            if (!StorageRules.IsStation(storage.Kind)) SetOpen(storage, true);
         }
 
         private void Close(ulong clientId, int storageId)
@@ -667,7 +668,7 @@ namespace Voxel.Client
             if (watching.Count > 0) return;
 
             viewers.Remove(storageId);
-            if (store.TryGet(storageId, out Storage storage) && storage.Kind != StorageKind.Campfire) SetOpen(storage, false);
+            if (store.TryGet(storageId, out Storage storage) && !StorageRules.IsStation(storage.Kind)) SetOpen(storage, false);
         }
 
         // The server closes a player's storage (it went, they left its reach or lost access).
@@ -689,7 +690,7 @@ namespace Voxel.Client
         {
             if (count <= 0 || !store.TryGet(storageId, out Storage storage) || !registry.TryGetPlayerId(clientId, out string playerId)) return;
             if (!CanUse(playerId, storage) || !InReach(clientId, storage)) return;
-            if (storage.Kind == StorageKind.Campfire) return;
+            if (StorageRules.IsStation(storage.Kind)) return;
 
             List<Storage> pool = PoolOf(storage);
             if (MoveWithin(clientId, pool, storage.Kind == StorageKind.Chest, deposit, itemOrPile, count, member, byItem)) Changed(storage, pool);
@@ -779,12 +780,12 @@ namespace Voxel.Client
                 return;
             }
 
-            // What it holds goes to the rest of its pool, if it all fits there; a campfire's wood goes
+            // What it holds goes to the rest of its pool, if it all fits there; a station's wood goes
             // back to the bag, once nothing is queued.
             List<Storage> pool = PoolOf(storage);
             pool.Remove(storage);
-            bool emptied = storage.Kind == StorageKind.Campfire
-                ? TryEmptyCampfire(clientId, storage)
+            bool emptied = StorageRules.IsStation(storage.Kind)
+                ? TryEmptyStation(clientId, storage)
                 : StoragePool.TryEmptyInto(storage, pool, ecosystemSync.ItemWeights);
             if (!emptied)
             {
@@ -832,8 +833,8 @@ namespace Voxel.Client
                 if (StorageRules.IsStockpile(member.Kind)) BroadcastState(member);
             }
 
-            // Campfires open in a window show what their linked chests hold.
-            if (storage.Kind == StorageKind.Chest) RefreshFiresLinkedTo(pool);
+            // Stations open in a window show what their linked chests hold.
+            if (storage.Kind == StorageKind.Chest) RefreshStationsLinkedTo(pool);
         }
 
         // Plots changed hands: the pools may have too (a zone grown, split or given up), and the
@@ -874,9 +875,9 @@ namespace Voxel.Client
         // added up, a stockpile pool's piles one stockpile after another).
         private void SendContents(ulong clientId, Storage storage)
         {
-            if (storage.Kind == StorageKind.Campfire)
+            if (StorageRules.IsStation(storage.Kind))
             {
-                SendCampfire(clientId, storage);
+                SendStation(clientId, storage);
                 return;
             }
 
@@ -898,7 +899,7 @@ namespace Voxel.Client
             });
         }
 
-        // Each storage of a pool (or each chest linked to a campfire), one after another: its id and kind,
+        // Each storage of a pool (or each chest linked to a station), one after another: its id and kind,
         // then a chest's items or a stockpile's piles (large and small stockpiles have their own).
         private static void WriteMembers(FastBufferWriter writer, List<Storage> pool)
         {
@@ -933,7 +934,7 @@ namespace Voxel.Client
             {
                 reader.ReadValueSafe(out int id);
                 reader.ReadValueSafe(out byte kind);
-                if (!StorageRules.IsKind(kind) || kind == (byte)StorageKind.Campfire) return null;
+                if (!StorageRules.IsKind(kind) || StorageRules.IsStation((StorageKind)kind)) return null;
 
                 var member = new StorageMember { Id = id, Kind = (StorageKind)kind };
                 if (StorageRules.IsStockpile(member.Kind))
@@ -1021,7 +1022,7 @@ namespace Voxel.Client
         private List<Storage> PoolOf(Storage storage)
         {
             var pool = new List<Storage>();
-            if (storage.Kind == StorageKind.Campfire || !TryLandOf(storage, out int x, out int z))
+            if (StorageRules.IsStation(storage.Kind) || !TryLandOf(storage, out int x, out int z))
             {
                 pool.Add(storage);
                 return pool;
@@ -1038,7 +1039,7 @@ namespace Voxel.Client
             return pool;
         }
 
-        // What shares with what: chests together, stockpiles (large and small) together, and a campfire
+        // What shares with what: chests together, stockpiles (large and small) together, and a station
         // with nothing.
         private static int PoolClassOf(StorageKind kind) => StorageRules.IsStockpile(kind) ? 1 : kind == StorageKind.Chest ? 0 : 2;
 

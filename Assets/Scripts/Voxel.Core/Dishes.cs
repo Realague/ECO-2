@@ -29,12 +29,14 @@ namespace Voxel.Core
     }
 
     // How a dish's icon is drawn (ItemIconBuilder): pieces of its main crop on a plate, a flat bread,
-    // or a bowl filled with a colour.
+    // a bowl filled with a colour, a roast of that colour on a plate, or chunks of it on a skewer.
     public enum DishLook : byte
     {
         Plate,
         Bread,
-        Bowl
+        Bowl,
+        Roast,
+        Skewer
     }
 
     // A dish: what it is called, weighs and feeds, what it is cooked from on a campfire, the work it
@@ -62,7 +64,7 @@ namespace Voxel.Core
         public DishLook Look { get; }
         public int MainSpecies { get; }
 
-        // A bowl's filling, as 0xRRGGBB.
+        // A bowl's filling, or the meat of a roast or skewer, as 0xRRGGBB.
         public uint BowlColour { get; }
         public IReadOnlyList<Ingredient> Ingredients { get; }
     }
@@ -90,7 +92,23 @@ namespace Voxel.Core
             new Dish("Roasted squash", 0.8f, new Nutrition(600, 6, 6, 8, 8), 250, 25f, DishLook.Plate, CropSpecies.Butternut, 0,
                 Crop(CropSpecies.Butternut, 1), Crop(CropSpecies.Sunflower, 2)),
             new Dish("Mushroom skewer", 0.2f, new Nutrition(160, 2, 9, 0, 8), 100, 10f, DishLook.Plate, CropSpecies.Mushroom, 0,
-                Crop(CropSpecies.Mushroom, 3))
+                Crop(CropSpecies.Mushroom, 3)),
+
+            // Meat (raw meat is not eaten): rich in protein and fat, what the crops lack.
+            new Dish("Small game skewer", 0.3f, new Nutrition(450, 0, 13, 5, 1), 150, 15f, DishLook.Skewer, -1, 0x9A5A3Au,
+                Meat(MeatKind.SmallGame, 2)),
+            new Dish("Roast game", 0.6f, new Nutrition(900, 0, 12, 9, 1), 300, 25f, DishLook.Roast, -1, 0x7E4027u,
+                Meat(MeatKind.Game, 2), new Ingredient(Items.Fat, 1)),
+            new Dish("Large roast", 0.8f, new Nutrition(1100, 0, 14, 8, 0), 350, 30f, DishLook.Roast, -1, 0x6A3320u,
+                Meat(MeatKind.LargeGame, 2)),
+            new Dish("Grilled poultry", 0.4f, new Nutrition(600, 0, 13, 6, 1), 200, 20f, DishLook.Roast, -1, 0xC08A4Eu,
+                Meat(MeatKind.Poultry, 2)),
+            new Dish("Grilled fish", 0.4f, new Nutrition(500, 0, 12, 5, 3), 150, 15f, DishLook.Roast, -1, 0xD8B48Au,
+                Meat(MeatKind.Fish, 2)),
+            new Dish("Hunter's stew", 0.7f, new Nutrition(900, 6, 10, 5, 6), 300, 25f, DishLook.Bowl, CropSpecies.Potato, 0x6E3B22u,
+                Meat(MeatKind.LargeGame, 1), Crop(CropSpecies.Potato, 1), Crop(CropSpecies.Carrot, 1)),
+            new Dish("Bone broth", 0.5f, new Nutrition(300, 1, 8, 3, 8), 200, 30f, DishLook.Bowl, CropSpecies.Cabbage, 0xC9A66Bu,
+                new Ingredient(Items.Bones, 2), Crop(CropSpecies.Cabbage, 1))
         };
 
         public static bool TryGet(int item, out Dish dish)
@@ -108,5 +126,7 @@ namespace Voxel.Core
         public static Nutrition FoodOf(int item) => TryGet(item, out Dish dish) ? dish.Food : default;
 
         private static Ingredient Crop(int species, int count) => new Ingredient(Items.Produce(species), count);
+
+        private static Ingredient Meat(MeatKind kind, int count) => new Ingredient(Items.Meat(kind), count);
     }
 }

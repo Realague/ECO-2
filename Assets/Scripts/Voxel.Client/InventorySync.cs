@@ -34,6 +34,7 @@ namespace Voxel.Client
         private const string GiveMessage = "Inv.Give";
         private const string PlantMessage = "Inv.Plant";
         private const string HotbarMessage = "Inv.Hotbar";
+        private const string ButcherMessage = "Inv.Butcher";
 
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private EcosystemSync ecosystemSync;
@@ -78,6 +79,7 @@ namespace Voxel.Client
             Messaging.RegisterNamedMessageHandler(GiveMessage, OnGive);
             Messaging.RegisterNamedMessageHandler(PlantMessage, OnPlant);
             Messaging.RegisterNamedMessageHandler(HotbarMessage, OnHotbar);
+            Messaging.RegisterNamedMessageHandler(ButcherMessage, OnButcher);
             networkManager.OnClientConnectedCallback += OnClientConnected;
 
             // The host's own player connected before this was listening.
@@ -232,6 +234,51 @@ namespace Voxel.Client
             else Send(PlantMessage, seed, x, z);
         }
 
+        // Butchers a carcass from the bag with a knife: half its meat (Butchery.FieldMeat).
+        public void RequestButcher(int carcass)
+        {
+            if (!running) return;
+
+            if (registry != null) ButcherFromBag(networkManager.LocalClientId, carcass);
+            else Send(ButcherMessage, carcass);
+        }
+
+        // Server side: butchers a carcass of an animal species with a knife (Butchery.FieldMeat). The
+        // player must own a knife, not be starving and have room for some of the meat (once the carcass,
+        // when it is in their bag, is out of it); then take() removes the carcass, the meat goes into the
+        // bag and the work burns their calories. Returns whether it was butchered.
+        internal bool ButcherWithKnife(ulong clientId, int species, int carcassInBag, Func<bool> take)
+        {
+            if (registry == null || !registry.TryGetState(clientId, out PlayerState state) || !Butchery.TryGetAnimal(species, out ButcheredAnimal animal)) return false;
+            if (!state.Inventory.Has(ToolRules.ToButcher) || state.Stomach.IsStarving) return false;
+
+            int meat = Items.Meat(animal.Meat);
+            var bag = new Inventory();
+            bag.CopyFrom(state.Inventory);
+            if (carcassInBag != Items.None && !bag.TryRemove(carcassInBag)) return false;
+
+            int count = Math.Min(Butchery.FieldMeat(animal), CarryLimits.Room(bag, meat, ecosystemSync.ItemWeights));
+            if (count <= 0)
+            {
+                TellFull(clientId, ReasonFor(meat));
+                return false;
+            }
+
+            if (!take()) return false;
+
+            Receive(state, meat, count);
+            state.Stomach.Burn(Butchery.LabourOf(animal));
+            Publish(clientId);
+            return true;
+        }
+
+        private void ButcherFromBag(ulong clientId, int carcass)
+        {
+            if (!Items.IsCarcass(carcass) || !registry.TryGetState(clientId, out PlayerState state)) return;
+
+            ButcherWithKnife(clientId, Items.CarcassSpecies(carcass), carcass, () => state.Inventory.TryRemove(carcass));
+        }
+
         private bool TryGetLocalState(out PlayerState state)
         {
             state = null;
@@ -326,6 +373,15 @@ namespace Voxel.Client
                     if (!state.Inventory.Has(Items.Arrow)) state.Hotbar.Place(Items.Arrow);
                     state.Inventory.Add(Items.Arrow, StartingArrows);
                     state.ReceivedTools = true;
+                    state.ReceivedKnife = true;
+                }
+
+                // And a knife once, players from before knives.
+                if (!state.ReceivedKnife)
+                {
+                    if (!state.Inventory.Has(Items.Knife)) state.Hotbar.Place(Items.Knife);
+                    state.Inventory.Add(Items.Knife, 1);
+                    state.ReceivedKnife = true;
                 }
 
                 // And a chest and a small stockpile once, players from before storage too (those who
@@ -416,6 +472,12 @@ namespace Voxel.Client
             reader.ReadValueSafe(out int x);
             reader.ReadValueSafe(out int z);
             Plant(senderId, seed, x, z);
+        }
+
+        private void OnButcher(ulong senderId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out int carcass);
+            ButcherFromBag(senderId, carcass);
         }
 
         private void OnHotbar(ulong senderId, FastBufferReader reader)

@@ -331,7 +331,7 @@ namespace Voxel.Client
 
             // A shovel is held near the top of its handle, blade ahead: turned end over end about the grip.
             bool byTheTop = tool == Items.Shovel;
-            float grip = byTheTop ? ShovelGripHeight : ToolShapes.GripHeight;
+            float grip = byTheTop ? ShovelGripHeight : ToolShapes.GripOf(tool);
             var submeshes = new List<(Vector3, Vector3)>[] { new List<(Vector3, Vector3)>(), new List<(Vector3, Vector3)>(), new List<(Vector3, Vector3)>() };
             foreach (ToolShapes.Box box in ToolShapes.Of(tool))
             {

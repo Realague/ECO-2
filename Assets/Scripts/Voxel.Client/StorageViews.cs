@@ -42,6 +42,7 @@ namespace Voxel.Client
         private readonly Mesh smallFrame;
         private readonly Mesh outline;
         private readonly Mesh campfire;
+        private readonly Mesh butcherTable;
         private readonly Mesh flame;
         private readonly RenderParams flameLook;
         private readonly Dictionary<int, float> lidAngles = new Dictionary<int, float>();
@@ -82,6 +83,7 @@ namespace Voxel.Client
             smallFrame = BoxMesh.Build("SmallStockpileFrame", new[] { FrameBoxes(StorageRules.SmallStockpileSide) });
             outline = BoxMesh.Build("StorageOutline", new[] { OutlineBoxes() });
             campfire = BoxMesh.Build("Campfire", new[] { CampfireShapes.Logs, CampfireShapes.Stones });
+            butcherTable = BoxMesh.Build("ButcherTable", new[] { ButcherTableShapes.Wood, ButcherTableShapes.Iron });
             flame = BoxMesh.Build("CampfireFlame", new[] { new List<(Vector3, Vector3)> { (new Vector3(0f, 0.5f, 0f), Vector3.one) } });
         }
 
@@ -98,7 +100,17 @@ namespace Voxel.Client
             seen.Add(storage.Id);
             if (storage.Kind == StorageKind.Chest) DrawChest(storage, open);
             else if (storage.Kind == StorageKind.Campfire) DrawCampfire(storage, open);
+            else if (storage.Kind == StorageKind.ButcherTable) DrawButcherTable(storage);
             else DrawStockpile(storage);
+        }
+
+        // A table and its cleaver, turned the way it was placed.
+        private void DrawButcherTable(Storage storage)
+        {
+            var foot = new Vector3(storage.Position.X + 0.5f, storage.Position.Y, storage.Position.Z + 0.5f);
+            Matrix4x4 at = Matrix4x4.TRS(foot, Quaternion.Euler(0f, storage.Facing * 90f, 0f), Vector3.one);
+            Graphics.RenderMesh(wood, butcherTable, 0, at);
+            Graphics.RenderMesh(iron, butcherTable, 1, at);
         }
 
         // Stones and logs, and while it burns a flame that flickers (two crossed boxes, each its own pace).

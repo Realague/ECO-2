@@ -6,16 +6,16 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // The window of an opened chest, stockpile or campfire (Assets/UI/Storage.uxml), in the inventory's
+    // The window of an opened chest, stockpile or station (Assets/UI/Storage.uxml), in the inventory's
     // look. For a chest or stockpile: the player's bag on the left (what the storage does not take
     // greyed), the storage on the right, each on its own card: what its pool holds (the chests or
     // stockpiles of its claimed zone together, StoragePool), merged or each storage on its own card
     // (PoolView), with a chest pool's weight out of 150 kg a chest or a stockpile pool's fill. For a
-    // campfire, three tabs: its cooking (CampfirePage), the bag beside its linked chests, and the bag
-    // beside its wood. Items move by dragging them to the other side (the whole stack; dropped on a
+    // campfire, three tabs: its cooking (StationPage), the bag beside its linked chests, and the bag
+    // beside its wood; for a butcher's table, the first two (its butchering). Items move by dragging them to the other side (the whole stack; dropped on a
     // storage's card, into that one), Shift + click (the whole stack) or a right click (one); the server
     // decides (StorageSync). Its owner, or anyone while it is public, can pick it up (what it holds goes
-    // to the rest of its pool; a campfire, with nothing queued, its wood to the bag). Who may open it
+    // to the rest of its pool; a station, with nothing queued, a campfire's wood to the bag). Who may open it
     // follows the land (StorageSync.CanUse). It opens when the server lets the player open what they
     // right clicked, and closes with Escape or Tab, when the player walks away (the server closes it)
     // or loses access. While it is open the mouse is free and the player stands still (HoldsInput).
@@ -36,7 +36,7 @@ namespace Voxel.Client
 
         private static StorageScreen instance;
 
-        // What the window shows: a chest pool, a stockpile pool, or one of a campfire's three tabs.
+        // What the window shows: a chest pool, a stockpile pool, or one of a station's tabs.
         private enum Mode
         {
             Chests,
@@ -50,6 +50,8 @@ namespace Voxel.Client
         private Button storageTab;
         private Label storageTabText;
         private Button cookingTab;
+        private Label cookingTabText;
+        private VisualElement cookingTabIcon;
         private Button linkedTab;
         private Button fuelTab;
         private Label owner;
@@ -72,12 +74,12 @@ namespace Voxel.Client
         private Label fuelHovered;
         private VisualElement bagWell;
         private VisualElement storeWell;
-        private CampfirePage campfire;
+        private StationPage stationPage;
         private PoolView pool;
         private VisualElement ghost;
         private ItemGrid bagGrid;
 
-        // The campfire tab chosen (Cooking when a campfire opens).
+        // The station tab chosen (Cooking when a station opens).
         private Mode fireTab = Mode.Cooking;
 
         private int pendingId;
@@ -100,7 +102,7 @@ namespace Voxel.Client
         // Also true on the frame it closes, so that its key does nothing else.
         public static bool HoldsInput => instance != null && (instance.openId != 0 || Time.frameCount == instance.closedFrame);
 
-        private Mode CurrentMode => storageSync.OpenedKind == StorageKind.Campfire ? fireTab
+        private Mode CurrentMode => StorageRules.IsStation(storageSync.OpenedKind) ? fireTab
             : storageSync.OpenedKind == StorageKind.Chest ? Mode.Chests : Mode.Stockpiles;
 
         private void Awake()
@@ -115,6 +117,8 @@ namespace Voxel.Client
             storageTab = root.Q<Button>("tab-storage");
             storageTabText = root.Q<Label>("tab-storage-text");
             cookingTab = root.Q<Button>("tab-cooking");
+            cookingTabText = root.Q<Label>("tab-cooking-text");
+            cookingTabIcon = root.Q("tab-cooking-icon");
             linkedTab = root.Q<Button>("tab-fire-inventory");
             fuelTab = root.Q<Button>("tab-fuel");
             owner = root.Q<Label>("storage-owner");
@@ -137,7 +141,7 @@ namespace Voxel.Client
             fuelHovered = root.Q<Label>("fuel-hovered");
             bagWell = root.Q("bag-well");
             storeWell = root.Q("store-well");
-            campfire = new CampfirePage(root, storageSync, inventorySync, hungerSync, ecosystemSync);
+            stationPage = new StationPage(root, storageSync, inventorySync, hungerSync, ecosystemSync);
             pool = new PoolView(root, storageSync, ecosystemSync, MinimumRows);
             ghost = root.Q("drag-ghost");
 
@@ -158,7 +162,7 @@ namespace Voxel.Client
             storageSync.OpenedChanged += OnOpenedChanged;
             storageSync.OpenedClosed += OnOpenedClosed;
             storageSync.Refused += OnRefused;
-            Loc.Changed += campfire.Retranslate;
+            Loc.Changed += stationPage.Retranslate;
 
             screen.style.display = DisplayStyle.None;
             if (Application.isBatchMode) enabled = false;
@@ -167,7 +171,7 @@ namespace Voxel.Client
         private void OnDestroy()
         {
             if (instance == this) instance = null;
-            if (campfire != null) Loc.Changed -= campfire.Retranslate;
+            if (stationPage != null) Loc.Changed -= stationPage.Retranslate;
             if (storageSync == null) return;
 
             storageSync.OpenedChanged -= OnOpenedChanged;
@@ -196,11 +200,11 @@ namespace Voxel.Client
 
             if (openId == 0) return;
 
-            // A count typed on the campfire's sheet: the keys are its own, Escape leaves the field first.
+            // A count typed on the station's sheet: the keys are its own, Escape leaves the field first.
             Keyboard keyboard = Keyboard.current;
-            if (campfire.IsTyping)
+            if (stationPage.IsTyping)
             {
-                if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame) campfire.Blur();
+                if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame) stationPage.Blur();
             }
             else if (keyboard != null && (keyboard.escapeKey.wasPressedThisFrame || keyboard.tabKey.wasPressedThisFrame))
             {
@@ -260,12 +264,18 @@ namespace Voxel.Client
         private void Refresh()
         {
             Mode mode = CurrentMode;
-            bool fire = storageSync.OpenedKind == StorageKind.Campfire;
-            storageTab.style.display = fire ? DisplayStyle.None : DisplayStyle.Flex;
-            storageTabText.text = Loc.T(Items.NameOf(StorageRules.ItemOf(storageSync.OpenedKind)));
-            ShowTab(cookingTab, fire, mode == Mode.Cooking);
-            ShowTab(linkedTab, fire, mode == Mode.Linked);
-            ShowTab(fuelTab, fire, mode == Mode.Fuel);
+            StorageKind kind = storageSync.OpenedKind;
+            bool station = StorageRules.IsStation(kind);
+            bool butchery = kind == StorageKind.ButcherTable;
+            storageTab.style.display = station ? DisplayStyle.None : DisplayStyle.Flex;
+            storageTabText.text = Loc.T(Items.NameOf(StorageRules.ItemOf(kind)));
+            cookingTabText.text = butchery ? Loc.T("Butchering") : Loc.T("Cooking");
+            cookingTabIcon.EnableInClassList("icon--fire", !butchery);
+            cookingTabIcon.EnableInClassList("icon--category-tools", butchery);
+            ShowTab(cookingTab, station, mode == Mode.Cooking);
+            ShowTab(linkedTab, station, mode == Mode.Linked);
+            ShowTab(fuelTab, station && !butchery, mode == Mode.Fuel);
+            if (station) stationPage.ShowKind(kind);
 
             storagePage.style.display = mode == Mode.Cooking ? DisplayStyle.None : DisplayStyle.Flex;
             cookingPage.style.display = mode == Mode.Cooking ? DisplayStyle.Flex : DisplayStyle.None;
@@ -273,7 +283,7 @@ namespace Voxel.Client
             ShowPickup(mode);
             if (mode == Mode.Cooking)
             {
-                campfire.Refresh();
+                stationPage.Refresh();
                 return;
             }
 
@@ -288,7 +298,7 @@ namespace Voxel.Client
             storeFillIcon.EnableInClassList("icon--backpack", mode == Mode.Stockpiles);
             storeFillIcon.EnableInClassList("icon--category-wood", mode == Mode.Fuel);
             bool noChest = mode == Mode.Linked && storageSync.OpenedLinkedChests == 0;
-            storeEmpty.text = noChest ? Loc.T("No linked chest: place a chest on the campfire's claimed land, or a public chest within 8 blocks off claimed land.") : "";
+            storeEmpty.text = noChest ? Loc.T("No linked chest: place a chest on the same claimed land, or a public chest within 8 blocks off claimed land.") : "";
             storeEmpty.style.display = noChest ? DisplayStyle.Flex : DisplayStyle.None;
 
             string side;
@@ -316,8 +326,8 @@ namespace Voxel.Client
                     break;
                 default:
                     pool.ShowSingle(storageSync.OpenedFuelContents);
-                    storeFill.text = $"{storageSync.OpenedFuel} / {Campfire.MaxFuel}";
-                    ShowShare(storeFill, (float)storageSync.OpenedFuel / Campfire.MaxFuel);
+                    storeFill.text = $"{storageSync.OpenedFuel} / {Station.MaxFuel}";
+                    ShowShare(storeFill, (float)storageSync.OpenedFuel / Station.MaxFuel);
                     storeBurnFill.style.width = Length.Percent(Mathf.Clamp01(storageSync.OpenedBurning / storageSync.OpenedLogSeconds) * 100f);
                     side = Loc.T("By the fire");
                     break;
@@ -373,7 +383,7 @@ namespace Voxel.Client
         }
 
         // Its owner, or anyone while it is public, picks it up: empty, or with what it holds poured into
-        // the rest of its pool (the server checks); a campfire with nothing queued.
+        // the rest of its pool (the server checks); a station with nothing queued.
         private void ShowPickup(Mode mode)
         {
             pickup.style.display = storageSync.OpenedIsOwner || storageSync.IsPublic(openId) ? DisplayStyle.Flex : DisplayStyle.None;

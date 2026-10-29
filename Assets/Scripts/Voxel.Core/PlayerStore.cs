@@ -37,20 +37,24 @@ namespace Voxel.Core
 
         // Whether they were given their starting torches (format 8): once only.
         public bool ReceivedTorches;
+
+        // Whether they were given a knife (format 9): once only, for players from before knives (new
+        // players get it with their tools).
+        public bool ReceivedKnife;
     }
 
     // The state of every player known to the server, by player id.
     public sealed class PlayerStore
     {
         private const uint Magic = 0x504F4345; // "ECOP"
-        private const int FormatVersion = 8;
+        private const int FormatVersion = 9;
 
         // Older formats still load. Without inventory, the player keeps their position; without
         // appearance, they choose one at their next connection; without a hotbar, theirs starts empty
         // (the server fills it with what they own); without a stomach, theirs starts half full;
         // without tools, they get them at their next connection; without a name or storage, they choose
-        // a name and get a chest and a stockpile at their next connection; without torches, they get
-        // them at their next connection.
+        // a name and get a chest and a stockpile at their next connection; without torches or a knife,
+        // they get them at their next connection.
         private const int FormatWithoutInventory = 1;
         private const int FormatWithoutAppearance = 2;
         private const int FormatWithoutHotbar = 3;
@@ -58,6 +62,7 @@ namespace Voxel.Core
         private const int FormatWithoutTools = 5;
         private const int FormatWithoutName = 6;
         private const int FormatWithoutTorches = 7;
+        private const int FormatWithoutKnife = 8;
 
         private readonly Dictionary<string, PlayerState> players = new Dictionary<string, PlayerState>();
 
@@ -130,6 +135,7 @@ namespace Voxel.Core
                     writer.Write(state.Name ?? "");
                     writer.Write(state.ReceivedStorage);
                     writer.Write(state.ReceivedTorches);
+                    writer.Write(state.ReceivedKnife);
                 }
             }
         }
@@ -205,7 +211,8 @@ namespace Voxel.Core
                         state.ReceivedStorage = reader.ReadBoolean();
                     }
 
-                    if (formatVersion >= FormatVersion) state.ReceivedTorches = reader.ReadBoolean();
+                    if (formatVersion >= FormatWithoutKnife) state.ReceivedTorches = reader.ReadBoolean();
+                    if (formatVersion >= FormatVersion) state.ReceivedKnife = reader.ReadBoolean();
 
                     store.Set(playerId, state);
                 }

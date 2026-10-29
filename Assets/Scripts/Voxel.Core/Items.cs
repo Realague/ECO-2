@@ -21,23 +21,32 @@ namespace Voxel.Core
         // The small stockpile (80 blocks), the one players are given.
         public const int SmallStockpile = 105;
 
-        // A campfire, placed like storage: a station where dishes are cooked (Campfire, crafted).
+        // A campfire, placed like storage: a station where dishes are cooked (Station, crafted).
         public const int Campfire = 106;
 
-        public static bool IsStorage(int item) => item == Chest || item == Stockpile || item == SmallStockpile || item == Campfire;
+        // A butcher's table, placed like storage: a station where carcasses are cut up (Butchery, crafted).
+        public const int ButcherTable = 107;
 
-        // Tools: each player gets one of each at their first connection (there is no crafting), and
-        // breaking, felling, harvesting annuals, tilling and hunting each need theirs (ToolRules).
+        public static bool IsStorage(int item) => item >= Chest && item <= ButcherTable;
+
+        // Tools: each player gets one of each at their first connection, and breaking, felling,
+        // harvesting, tilling, hunting and butchering each need theirs (ToolRules).
         public const int Shovel = 110;
         public const int Pickaxe = 111;
         public const int Axe = 112;
         public const int Scythe = 113;
         public const int Hoe = 114;
         public const int Bow = 115;
+        public const int Knife = 116;
         private const int FirstTool = Shovel;
-        private const int LastTool = Bow;
+        private const int LastTool = Knife;
 
-        public static readonly int[] Tools = { Shovel, Pickaxe, Axe, Scythe, Hoe, Bow };
+        public static readonly int[] Tools = { Shovel, Pickaxe, Axe, Scythe, Hoe, Bow, Knife };
+
+        // What a butcher's table gives besides the meat (Butchery). No use yet but the bones' broth.
+        public const int Hide = 120;
+        public const int Bones = 121;
+        public const int Fat = 122;
 
         // One seed per plant species: FirstSeed + index of the species.
         public const int MaxSeedSpecies = 100;
@@ -55,13 +64,16 @@ namespace Voxel.Core
         public const int OakSpecies = 0;
 
         // One carcass per animal species, what a player picks up where an animal died: FirstCarcass +
-        // index of the animal species, named after it ("Deer carcass"). Not yet of any use (butchering will come).
+        // index of the animal species, named after it ("Deer carcass"). Butchered into meat (Butchery).
         public const int MaxCarcassSpecies = 100;
         private const int FirstCarcass = 500;
 
         // One item per dish cooked on a campfire: FirstDish + its index in Dishes.All.
         public const int MaxDishes = 100;
         private const int FirstDish = 600;
+
+        // One raw meat per kind (MeatKind): FirstMeat + the kind. Eaten only once cooked.
+        private const int FirstMeat = 700;
 
         public static int OfBlock(ushort block) => Blocks.TypeOf(block);
 
@@ -103,6 +115,12 @@ namespace Voxel.Core
 
         public static int DishIndex(int item) => item - FirstDish;
 
+        public static int Meat(MeatKind kind) => FirstMeat + (int)kind;
+
+        public static bool IsMeat(int item) => item >= FirstMeat && item < FirstMeat + Butchery.MeatKindCount;
+
+        public static MeatKind MeatKindOf(int item) => (MeatKind)(item - FirstMeat);
+
         // What an item read from a save of an earlier version is now (the one wood became oak wood).
         public static int Upgrade(int item) => item == LegacyWood ? WoodOf(OakSpecies) : item;
 
@@ -110,7 +128,7 @@ namespace Voxel.Core
 
         public static bool IsValid(int item) =>
             IsBlock(item) || IsWood(item) || item == Straw || item == Arrow || IsStorage(item) || IsTool(item) || IsSeed(item) || IsProduce(item) || IsCarcass(item)
-            || (IsDish(item) && DishIndex(item) < Dishes.All.Count);
+            || (IsDish(item) && DishIndex(item) < Dishes.All.Count) || IsMeat(item) || item == Hide || item == Bones || item == Fat;
 
         // What a broken block yields. Grass and tilled soil cannot be picked up: they give dirt.
         public static int DropOf(ushort block)
@@ -155,14 +173,20 @@ namespace Voxel.Core
                 case Stockpile: return "Stockpile";
                 case SmallStockpile: return "Small stockpile";
                 case Campfire: return "Campfire";
+                case ButcherTable: return "Butcher's table";
                 case Shovel: return "Shovel";
                 case Pickaxe: return "Pickaxe";
                 case Axe: return "Axe";
                 case Scythe: return "Scythe";
                 case Hoe: return "Hoe";
                 case Bow: return "Bow";
+                case Knife: return "Knife";
+                case Hide: return "Hide";
+                case Bones: return "Bones";
+                case Fat: return "Animal fat";
                 default:
                     if (Dishes.TryGet(item, out Dish dish)) return dish.Name;
+                    if (IsMeat(item)) return Butchery.MeatName(MeatKindOf(item));
                     return IsSeed(item) ? "Seed" : IsProduce(item) ? "Crop" : IsWood(item) ? "Wood" : IsCarcass(item) ? "Carcass" : "Unknown item";
             }
         }

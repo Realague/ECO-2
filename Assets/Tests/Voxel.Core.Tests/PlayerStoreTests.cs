@@ -209,6 +209,48 @@ namespace Voxel.Core.Tests
             Assert.IsFalse(state.ReceivedStorage);
         }
 
+        // A save from before knives (format 8): the torches given are kept, the knife is to be given.
+        [Test]
+        public void Read_SaveWithoutKnife_KeepsTheTorchesAndLeavesTheKnifeToGive()
+        {
+            var stream = new MemoryStream();
+            using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, true))
+            {
+                writer.Write(0x504F4345u);
+                writer.Write(8);
+                writer.Write(1);
+                writer.Write("alice");
+                writer.Write(1f);
+                writer.Write(2f);
+                writer.Write(3f);
+                writer.Write(90f);
+                writer.Write((byte)Speciality.None);
+                writer.Write(0);
+                writer.Write(Appearance.NotChosen);
+                for (int slot = 0; slot < Hotbar.SlotCount; slot++) writer.Write(Items.None);
+                new Stomach().Write(writer);
+                writer.Write(true);
+                writer.Write("Alice");
+                writer.Write(true);
+                writer.Write(true);
+            }
+
+            stream.Position = 0;
+            PlayerStore loaded = PlayerStore.Read(stream);
+
+            Assert.IsTrue(loaded.TryGet("alice", out PlayerState state));
+            Assert.IsTrue(state.ReceivedTorches);
+            Assert.IsFalse(state.ReceivedKnife);
+
+            state.ReceivedKnife = true;
+            var again = new MemoryStream();
+            loaded.Write(again);
+            again.Position = 0;
+            Assert.IsTrue(PlayerStore.Read(again).TryGet("alice", out PlayerState read));
+            Assert.IsTrue(read.ReceivedKnife);
+            Assert.IsTrue(read.ReceivedTorches);
+        }
+
         // A save from before hunger (format 4): everything else is kept, the stomach starts half full.
         [Test]
         public void Read_SaveWithoutStomach_KeepsTheRestWithAStartingStomach()

@@ -195,7 +195,7 @@ namespace Voxel.Client
         }
 
         // Every item a player may hold: blocks (not water), what is crafted, each species' seeds, wood
-        // and crop, each animal's carcass, the dishes.
+        // and crop, each animal's carcass, the meats and what butchering gives, the dishes.
         private IEnumerable<int> GivableItems()
         {
             for (int type = 1; type <= Blocks.LastType; type++)
@@ -203,14 +203,19 @@ namespace Voxel.Client
                 if (type != Blocks.Water && Items.IsValid(type)) yield return type;
             }
 
-            foreach (int item in new[] { Items.Straw, Items.Arrow, Items.Chest, Items.Stockpile, Items.SmallStockpile, Items.Campfire })
+            foreach (int item in new[] { Items.Straw, Items.Arrow, Items.Chest, Items.Stockpile, Items.SmallStockpile, Items.Campfire, Items.ButcherTable, Items.Hide, Items.Bones, Items.Fat })
             {
                 yield return item;
             }
 
-            for (int tool = Items.Shovel; tool <= Items.Bow; tool++)
+            foreach (int tool in Items.Tools)
             {
-                if (Items.IsTool(tool)) yield return tool;
+                yield return tool;
+            }
+
+            for (int kind = 0; kind < Butchery.MeatKindCount; kind++)
+            {
+                yield return Items.Meat((MeatKind)kind);
             }
 
             for (int species = 0; species < ecosystemSync.PlantSpeciesCount; species++)

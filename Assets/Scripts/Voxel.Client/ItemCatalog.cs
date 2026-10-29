@@ -44,9 +44,11 @@ namespace Voxel.Client
         {
             if (Items.IsTool(item) || item == Items.Arrow || Items.IsStorage(item) || item == Blocks.Torch) return ItemCategory.Tools;
             if (Items.IsSeed(item)) return ItemCategory.Seeds;
-            if (Items.IsProduce(item) || Items.IsDish(item)) return ItemCategory.Food;
+            if (Items.IsProduce(item) || Items.IsDish(item) || Items.IsMeat(item)) return ItemCategory.Food;
             if (Items.IsWood(item)) return ItemCategory.Wood;
-            return Items.IsCarcass(item) || item == Items.Straw ? ItemCategory.Materials : ItemCategory.Blocks;
+            return Items.IsCarcass(item) || item == Items.Straw || item == Items.Hide || item == Items.Bones || item == Items.Fat
+                ? ItemCategory.Materials
+                : ItemCategory.Blocks;
         }
 
         public static string CategoryName(ItemCategory category)
@@ -68,10 +70,10 @@ namespace Voxel.Client
             switch (CategoryOf(item))
             {
                 case ItemCategory.Seeds: return Loc.T("Seed");
-                case ItemCategory.Food: return Loc.T(Items.IsDish(item) ? "Dish" : "Food");
+                case ItemCategory.Food: return Loc.T(Items.IsDish(item) ? "Dish" : Items.IsMeat(item) ? "Raw meat" : "Food");
                 case ItemCategory.Materials: return Loc.T(Items.IsCarcass(item) ? "Carcass" : "Material");
                 case ItemCategory.Tools:
-                    if (item == Items.Campfire) return Loc.T("Station");
+                    if (item == Items.Campfire || item == Items.ButcherTable) return Loc.T("Station");
                     return Loc.T(item == Items.Arrow ? "Ammunition" : Items.IsStorage(item) ? "Storage" : item == Blocks.Torch ? "Light" : "Tool");
                 case ItemCategory.Wood: return Loc.T("Wood");
                 default: return Loc.T("Block");
@@ -108,7 +110,7 @@ namespace Voxel.Client
                     : WithPlant("Harvested from {1} plants when they are ripe. It cannot be eaten.", species, ecosystemSync);
             }
 
-            if (Items.IsDish(item)) return Loc.T("Cooked on a campfire: it feeds more than the crops it is made from, and in a better balance. Right click it here, or hold it and right click, to eat it.");
+            if (Items.IsDish(item)) return Loc.T("Cooked on a campfire: it feeds more than what it is made from, and in a better balance. Right click it here, or hold it and right click, to eat it.");
 
             switch (item)
             {
@@ -118,16 +120,22 @@ namespace Voxel.Client
                 case Items.Scythe: return Loc.T("Cuts grass, reeds and ferns, and harvests oats, wheat, maize, sunflowers and rice (right click on a ripe one). Other crops are picked by hand.");
                 case Items.Hoe: return Loc.T("Tills grass, dirt, mud or clay (right click): seeds only grow on tilled soil.");
                 case Items.Bow: return Loc.T("Hunts animals. Hold the left button to draw, let go to shoot; a shot in the head does double damage.");
+                case Items.Knife: return Loc.T("Butchers a carcass where it lies (hold it and right click on it) or in your bag (right click it here): half its meat, nothing else. A butcher's table takes it all, with the hide, bones and fat.");
+                case Items.ButcherTable: return Loc.T("Cuts carcasses up into meat, hide, bones and fat. Queue a carcass and put calories into it. Carcasses come from your bag and the chests linked to it (those of its claimed zone), and what it cuts goes into them.");
+                case Items.Hide: return Loc.T("The skin of a butchered animal. Of no use yet: kept for leather goods to come.");
+                case Items.Bones: return Loc.T("From a butchered animal. Boiled with a cabbage on a campfire into a broth.");
+                case Items.Fat: return Loc.T("From a butchered animal. Roasted with game meat on a campfire.");
                 case Items.Arrow: return Loc.T("Shot with the bow. An arrow lies where it lands: right click on it to pick it up.");
                 case Items.Chest: return Loc.T("Holds tools, seeds, food and the like, up to 150 kg. Hold it and right click on the ground to place it; right click on it to open it. Only you and the players you allow can open it.");
                 case Blocks.Torch: return Loc.T("Lights what is around it, day and night. Hold it and right click on the top or the side of a block to set it there; hit it, with anything in hand, to take it down.");
                 case Items.Stockpile: return Loc.T("Holds blocks and wood: nine piles of 27 on a patch of flat ground, 3 by 3. Hold it and right click to place it in front of you; right click on it to open it.");
                 case Items.SmallStockpile: return Loc.T("Holds blocks and wood: four piles of 20 on a patch of flat ground, 2 by 2. Hold it and right click to place it in front of you; right click on it to open it.");
-                case Items.Campfire: return Loc.T("Cooks dishes from crops. Queue a dish, put calories into it, and lay wood by the fire: it burns only while it cooks. Ingredients come from your bag and the chests linked to it (those of its claimed zone), and dishes go into them.");
+                case Items.Campfire: return Loc.T("Cooks dishes from crops and meat. Queue a dish, put calories into it, and lay wood by the fire: it burns only while it cooks. Ingredients come from your bag and the chests linked to it (those of its claimed zone), and dishes go into them.");
             }
 
-            if (Items.IsWood(item)) return WithPlant("From {2} once felled: each log on the ground gives one. Counted with the blocks, and kept on a stockpile.", Items.WoodSpecies(item), ecosystemSync);
-            if (Items.IsCarcass(item)) return WithAnimal("The body of {2}, taken from the ground while at least half of it was left. Of no use yet: it will be butchered later.", Items.CarcassSpecies(item), ecosystemSync);
+            if (Items.IsWood(item)) return WithPlant("From {2} once felled: each log on the ground gives three. Counted with the blocks, and kept on a stockpile.", Items.WoodSpecies(item), ecosystemSync);
+            if (Items.IsCarcass(item)) return WithAnimal("The body of {2}, taken from the ground while at least half of it was left. Butcher it with a knife (right click it here) for half its meat, or on a butcher's table for all of it, with the hide, bones and fat.", Items.CarcassSpecies(item), ecosystemSync);
+            if (Items.IsMeat(item)) return Loc.T("Raw: it is not eaten as it is. Cook it on a campfire.");
             if (item == Items.Straw) return Loc.T("Left over when wheat is harvested.");
             return Loc.T("A building block. Hold it and right click to place it.");
         }
@@ -168,7 +176,12 @@ namespace Voxel.Client
             if (item == Items.Stockpile) return "Stockpile";
             if (item == Items.SmallStockpile) return "SmallStockpile";
             if (item == Items.Campfire) return "Campfire";
-            if (Dishes.TryGet(item, out Dish dish)) return $"Dish_{dish.Name.Replace(" ", "")}";
+            if (item == Items.ButcherTable) return "ButcherTable";
+            if (item == Items.Hide) return "Hide";
+            if (item == Items.Bones) return "Bones";
+            if (item == Items.Fat) return "Fat";
+            if (Items.IsMeat(item)) return $"Meat_{Items.MeatKindOf(item)}";
+            if (Dishes.TryGet(item, out Dish dish)) return $"Dish_{dish.Name.Replace(" ", "").Replace("'", "")}";
             if (item == Blocks.Torch) return "Torch";
             if (Items.IsTool(item)) return $"Tool_{Items.NameOf(item)}";
             return $"Block_{item}";

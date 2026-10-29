@@ -26,8 +26,11 @@ namespace Voxel.Client
             }
         }
 
-        // Where a hand holds the tool, up its handle.
+        // Where a hand holds the tool, up its handle (a knife's handle is short: held by its middle).
         public const float GripHeight = 0.3f;
+        public const float KnifeGripHeight = 0.07f;
+
+        public static float GripOf(int item) => item == Items.Knife ? KnifeGripHeight : GripHeight;
 
         private static readonly Box[] Shovel =
         {
@@ -74,6 +77,15 @@ namespace Voxel.Client
             new Box(Stuff.Light, -0.2f, 0.6f, 0f, 0.014f, 1.14f, 0.014f)
         };
 
+        // A short handle, a guard, and a blade with its edge toward +x.
+        private static readonly Box[] Knife =
+        {
+            new Box(Stuff.Wood, 0f, 0.07f, 0f, 0.045f, 0.14f, 0.04f),
+            new Box(Stuff.Iron, 0f, 0.15f, 0f, 0.085f, 0.022f, 0.05f),
+            new Box(Stuff.Iron, 0.008f, 0.29f, 0f, 0.06f, 0.26f, 0.012f),
+            new Box(Stuff.Iron, 0.002f, 0.44f, 0f, 0.035f, 0.05f, 0.011f)
+        };
+
         private static readonly Box[] Arrow =
         {
             new Box(Stuff.Wood, 0f, 0.55f, 0f, 0.04f, 1f, 0.04f),
@@ -93,6 +105,7 @@ namespace Voxel.Client
                 case Items.Scythe: return Scythe;
                 case Items.Hoe: return Hoe;
                 case Items.Bow: return Bow;
+                case Items.Knife: return Knife;
                 case Items.Arrow: return Arrow;
                 default: return Array.Empty<Box>();
             }

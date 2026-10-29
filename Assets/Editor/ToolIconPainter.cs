@@ -626,6 +626,19 @@ internal static class ToolIconPainter
                 };
             }
 
+            case Items.Knife:
+                // A leather-wrapped handle, a guard, and a long blade, its edge toward -x curving up to the point.
+                return new List<Shape>
+                {
+                    new Rod(Wood, 0f, -62f, 0f, -8f, 6f),
+                    new Rod(Leather, 0f, -54f, 0f, -16f, 6.8f),
+                    new Disc(Brass, 0f, -60f, 3.4f),
+                    new Plate(Steel, V(6f, -2f), V(6f, 46f), V(2f, 62f), V(-4f, 72f), V(-9f, 52f), V(-11f, 26f), V(-10f, -2f)),
+                    new Rod(DarkSteel, 2.5f, 4f, 2.5f, 50f, 1f) { Outline = 0f },
+                    new Plate(DarkSteel, V(-15f, -10f), V(13f, -10f), V(13f, -3f), V(-15f, -3f)),
+                    new Disc(Brass, 0f, -30f, 1.8f)
+                };
+
             case Items.Arrow:
                 return new List<Shape>
                 {

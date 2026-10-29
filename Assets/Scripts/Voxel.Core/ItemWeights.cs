@@ -13,6 +13,11 @@ namespace Voxel.Core
         public const float SmallStockpile = 1f;
         public const float Campfire = 5f;
         public const float Torch = 0.1f;
+        public const float ButcherTable = 6f;
+        public const float Meat = 0.3f;
+        public const float Hide = 0.5f;
+        public const float Bones = 0.2f;
+        public const float Fat = 0.2f;
 
         private readonly float[] produce;
         private readonly float[] carcasses;
@@ -44,6 +49,11 @@ namespace Voxel.Core
             if (item == Items.Stockpile) return Stockpile;
             if (item == Items.SmallStockpile) return SmallStockpile;
             if (item == Items.Campfire) return Campfire;
+            if (item == Items.ButcherTable) return ButcherTable;
+            if (Items.IsMeat(item)) return Meat;
+            if (item == Items.Hide) return Hide;
+            if (item == Items.Bones) return Bones;
+            if (item == Items.Fat) return Fat;
             if (Dishes.TryGet(item, out Dish dish)) return dish.Weight;
             if (item == Blocks.Torch) return Torch;
             if (Items.IsSeed(item)) return Seed;
@@ -55,6 +65,7 @@ namespace Voxel.Core
                 case Items.Scythe: return 1f;
                 case Items.Hoe: return 0.8f;
                 case Items.Bow: return 0.5f;
+                case Items.Knife: return 0.3f;
             }
 
             if (Items.IsProduce(item))
