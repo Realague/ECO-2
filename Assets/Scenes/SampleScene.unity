@@ -383,6 +383,7 @@ GameObject:
   - component: {fileID: 408005230}
   - component: {fileID: 408005233}
   - component: {fileID: 408005234}
+  - component: {fileID: 408005235}
   m_Layer: 0
   m_Name: HotbarUI
   m_TagString: Untagged
@@ -476,6 +477,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.CarryHud
   document: {fileID: 408005231}
+  inventorySync: {fileID: 490447450}
+  ecosystemSync: {fileID: 490447448}
+--- !u!114 &408005235
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 408005229}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 421850bd63779cb4186fc17a1f22e577, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.BuildingHud
+  document: {fileID: 408005231}
+  hotbar: {fileID: 408005230}
   inventorySync: {fileID: 490447450}
   ecosystemSync: {fileID: 490447448}
 --- !u!1 &410087039
@@ -1542,6 +1559,8 @@ MonoBehaviour:
   torchWoodMaterial: {fileID: 2100000, guid: d6c58eacd8d934e44917e6d85ca61461, type: 2}
   torchHeadMaterial: {fileID: 2100000, guid: 0fc4334f11bd8a64da85d0e91993fb93, type: 2}
   torchFlameMaterial: {fileID: 2100000, guid: 6844c1b69698da5458e6978e203ff065, type: 2}
+  doorWoodMaterial: {fileID: 2100000, guid: 17965ac439377474abca152ff17c9021, type: 2}
+  doorIronMaterial: {fileID: 2100000, guid: 582f92c22b627724db3f3da36c5b3b4f, type: 2}
 --- !u!4 &1566503040
 Transform:
   m_ObjectHideFlags: 0
@@ -1784,6 +1803,7 @@ MonoBehaviour:
   inventoryScreen: {fileID: 1141440427}
   bowSync: {fileID: 490447455}
   claimSync: {fileID: 490447459}
+  inventorySync: {fileID: 490447450}
 --- !u!114 &1863226320
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2061,6 +2081,7 @@ MonoBehaviour:
   mapScreen: {fileID: 822296572}
   inventoryScreen: {fileID: 1141440427}
   hotbar: {fileID: 408005230}
+  inventorySync: {fileID: 490447450}
   document: {fileID: 2081992071}
 --- !u!114 &2081992071
 MonoBehaviour:

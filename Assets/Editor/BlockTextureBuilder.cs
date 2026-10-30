@@ -80,6 +80,8 @@ namespace Voxel.EditorTools
 
         private static Color TileColour(int tile, int x, int y)
         {
+            if (tile >= FirstPlanksTile) return WoodColour(tile, x, y);
+
             return IsPainted(tile) ? PaintedColour(tile, x, y) : BaseColor(tile, x, y) * (0.9f + 0.1f * Noise(tile, x, y));
         }
 

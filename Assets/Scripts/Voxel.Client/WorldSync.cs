@@ -13,7 +13,10 @@ namespace Voxel.Client
     {
         Placed,
         Broken,
-        Tilled
+        Tilled,
+
+        // A construction block taken back with a hammer (as well as Broken).
+        TakenBack
     }
 
     // Synchronises the world between the server and the clients with named messages.
@@ -27,6 +30,16 @@ namespace Voxel.Client
         private const string ChunksMessage = "World.Chunks";
         private const string SetBlockRequestMessage = "World.SetBlockRequest";
         private const string TillRequestMessage = "World.Till";
+
+        // A door set up (its lower half, closed, with its facing) or opened and closed (Blocks.Air).
+        private const string DoorRequestMessage = "World.Door";
+
+        // A hammer builds a line of construction blocks (both ends and the block), or takes one back.
+        private const string BuildRequestMessage = "World.Build";
+        private const string UnbuildRequestMessage = "World.Unbuild";
+
+        // Server side: one hammer action a player at most this often, a line counting as one.
+        private const float HammerInterval = 0.2f;
         private const string BlockChangedMessage = "World.BlockChanged";
 
         // One batch of chunks per client and per network tick, so as not to flood the connection.
@@ -82,6 +95,9 @@ namespace Voxel.Client
 
             Messaging.RegisterNamedMessageHandler(SetBlockRequestMessage, OnSetBlockRequest);
             Messaging.RegisterNamedMessageHandler(TillRequestMessage, OnTillRequest);
+            Messaging.RegisterNamedMessageHandler(DoorRequestMessage, OnDoorRequest);
+            Messaging.RegisterNamedMessageHandler(BuildRequestMessage, OnBuildRequest);
+            Messaging.RegisterNamedMessageHandler(UnbuildRequestMessage, OnUnbuildRequest);
             networkManager.OnClientConnectedCallback += OnClientConnected;
             networkManager.OnClientDisconnectCallback += OnClientDisconnected;
             networkManager.NetworkTickSystem.Tick += SendChunkBatches;
@@ -134,16 +150,18 @@ namespace Voxel.Client
             SendBlock(SetBlockRequestMessage, NetworkManager.ServerClientId, pos, block);
         }
 
-        // Placing only: a block is broken by hits (MiningSync), never by a request to set air.
-        private bool TryApplyEdit(ulong clientId, BlockPos pos, ushort block)
+        // Placing only: a block is broken by hits (MiningSync), never by a request to set air. A
+        // construction block needs a hammer (extraReach: for the cells of a line built with it).
+        private bool TryApplyEdit(ulong clientId, BlockPos pos, ushort block, float extraReach = 0f)
         {
             if (inventorySync.IsStarving(clientId)) return false;
 
-            if (!Blocks.IsPlaceable(block) || !IsEditAllowed(clientId, pos, block)) return false;
+            if (!Blocks.IsPlaceable(block) || !IsEditAllowed(clientId, pos, block, extraReach)) return false;
+            if (Blocks.IsConstruction(block) && !inventorySync.Owns(clientId, Items.Hammer)) return false;
             if (!claimSync.Check(clientId, pos.X, pos.Z)) return false;
 
-            // Placing a block takes it from the player's inventory.
-            if (!inventorySync.TryConsume(clientId, Items.OfBlock(block))) return false;
+            // Placing a block takes it from the player's inventory (not in creative mode).
+            if (!inventorySync.TryConsumePlaced(clientId, Items.OfBlock(block))) return false;
 
             serverWorld.SetBlock(pos, block);
             EditApplied?.Invoke(clientId, EditKind.Placed);
@@ -154,9 +172,9 @@ namespace Voxel.Client
         // inventory, so a player who cannot carry it cannot break it; and it needs the right tool,
         // which the server cannot see in hand (the hotbar's choice is the client's): the player must
         // at least own it.
-        internal bool TryBreak(ulong clientId, BlockPos pos)
+        internal bool TryBreak(ulong clientId, BlockPos pos, float extraReach = 0f)
         {
-            if (serverWorld == null || !IsEditAllowed(clientId, pos, Blocks.Air)) return false;
+            if (serverWorld == null || !IsEditAllowed(clientId, pos, Blocks.Air, extraReach)) return false;
             if (!CanBreakOnClaims(clientId, pos)) return false;
 
             ushort previous = serverWorld.GetBlock(pos);
@@ -172,6 +190,18 @@ namespace Voxel.Client
 
             serverWorld.SetBlock(pos, Blocks.Air);
             inventorySync.Give(clientId, drop, 1);
+
+            // A door goes whole, both halves for one door.
+            if (Blocks.IsDoor(previous)) RemoveDoorHalf(Doors.OtherHalf(pos, previous));
+
+            // A door standing on it falls: whoever broke it gets it back.
+            if (Doors.TryFindHeldBy(serverWorld, pos, out BlockPos fallen))
+            {
+                ushort door = serverWorld.GetBlock(fallen);
+                serverWorld.SetBlock(fallen, Blocks.Air);
+                RemoveDoorHalf(Doors.OtherHalf(fallen, door));
+                inventorySync.Give(clientId, Blocks.Door, 1);
+            }
 
             // The torches it held fall: whoever broke it gets them back, what they can carry.
             heldTorches.Clear();
@@ -212,12 +242,270 @@ namespace Voxel.Client
             return true;
         }
 
-        // Client side: a block the local player's last hit should break, shown broken at once; the
-        // server sends it back (SendRealBlock) if it disagrees.
+        private void RemoveDoorHalf(BlockPos pos)
+        {
+            if (serverWorld.InBounds(pos.X, pos.Y, pos.Z) && Blocks.IsDoor(serverWorld.GetBlock(pos))) serverWorld.SetBlock(pos, Blocks.Air);
+        }
+
+        // Client side: a block the local player's last hit should break, shown broken at once (a door
+        // whole); the server sends it back (SendRealBlock) if it disagrees.
         internal void PredictBreak(BlockPos pos)
         {
-            if (ready && serverWorld == null) voxelWorld.World.SetBlock(pos, Blocks.Air);
+            if (!ready || serverWorld != null) return;
+
+            World world = voxelWorld.World;
+            ushort block = world.GetBlock(pos);
+            world.SetBlock(pos, Blocks.Air);
+            if (!Blocks.IsDoor(block)) return;
+
+            BlockPos other = Doors.OtherHalf(pos, block);
+            if (world.InBounds(other.X, other.Y, other.Z) && Blocks.IsDoor(world.GetBlock(other))) world.SetBlock(other, Blocks.Air);
         }
+
+        // The local player sets up a door with its lower half at pos, facing the way they look: both
+        // halves, closed, for one door from the bag. Shown at once on a client, as for any edit.
+        public void RequestPlaceDoor(BlockPos pos, int facing)
+        {
+            if (!ready) return;
+
+            ushort lower = Doors.Make(facing, false, false);
+            if (serverWorld != null)
+            {
+                TryPlaceDoor(networkManager.LocalClientId, pos, lower);
+                return;
+            }
+
+            voxelWorld.World.SetBlock(pos, lower);
+            voxelWorld.World.SetBlock(pos.X, pos.Y + 1, pos.Z, Doors.Make(facing, false, true));
+            SendBlock(DoorRequestMessage, NetworkManager.ServerClientId, pos, lower);
+        }
+
+        // The local player opens or closes the door one of whose halves is at pos.
+        public void RequestToggleDoor(BlockPos pos)
+        {
+            if (!ready) return;
+
+            if (serverWorld != null)
+            {
+                TryToggleDoor(networkManager.LocalClientId, pos);
+                return;
+            }
+
+            World world = voxelWorld.World;
+            ushort block = world.GetBlock(pos);
+            if (!Blocks.IsDoor(block)) return;
+
+            BlockPos lower = Doors.LowerHalf(pos, block);
+            ToggleHalf(world, lower);
+            ToggleHalf(world, new BlockPos(lower.X, lower.Y + 1, lower.Z));
+            SendBlock(DoorRequestMessage, NetworkManager.ServerClientId, pos, Blocks.Air);
+        }
+
+        // The local player builds with a hammer: the block (in its shape) in every free cell of the line
+        // from start to end (BuildLines; start and end the same for one), as far as their bag holds it.
+        // Shown at once on a client; the server sends back what it refused.
+        public void RequestBuild(BlockPos start, BlockPos end, ushort block)
+        {
+            if (!ready || !Blocks.IsConstruction(block) || Blocks.IsDoor(block)) return;
+
+            if (serverWorld != null)
+            {
+                Build(networkManager.LocalClientId, start, end, block);
+                return;
+            }
+
+            BuildLines.Cells(start, end, lineCells);
+            int left = inventorySync.Creative ? int.MaxValue : inventorySync.Inventory.Count(Items.OfBlock(block));
+            foreach (BlockPos cell in lineCells)
+            {
+                if (left <= 0) break;
+                if (!voxelWorld.World.InBounds(cell.X, cell.Y, cell.Z) || !Blocks.IsReplaceable(voxelWorld.World.GetBlock(cell))) continue;
+
+                voxelWorld.World.SetBlock(cell, block);
+                left--;
+            }
+
+            SendLine(BuildRequestMessage, start, end, block);
+        }
+
+        // The local player takes back with a hammer the construction blocks of the line from start to
+        // end (start and end the same for one). Shown at once on a client, as a break.
+        public void RequestUnbuild(BlockPos start, BlockPos end)
+        {
+            if (!ready) return;
+
+            if (serverWorld != null)
+            {
+                Unbuild(networkManager.LocalClientId, start, end);
+                return;
+            }
+
+            BuildLines.Cells(start, end, lineCells);
+            foreach (BlockPos cell in lineCells)
+            {
+                if (voxelWorld.World.InBounds(cell.X, cell.Y, cell.Z) && Blocks.IsConstruction(voxelWorld.World.GetBlock(cell))) PredictBreak(cell);
+            }
+
+            SendLine(UnbuildRequestMessage, start, end, Blocks.Air);
+        }
+
+        private readonly List<BlockPos> lineCells = new List<BlockPos>();
+        private readonly Dictionary<ulong, float> lastHammer = new Dictionary<ulong, float>();
+
+        // Server side: whether a player may use their hammer now (one action per HammerInterval).
+        private bool MayHammer(ulong clientId)
+        {
+            float now = Time.unscaledTime;
+            if (lastHammer.TryGetValue(clientId, out float last) && now - last < HammerInterval) return false;
+
+            lastHammer[clientId] = now;
+            return true;
+        }
+
+        // Each cell of the line through TryApplyEdit (reach allowing for the line's length); the cells
+        // refused go back to the requester as they really are.
+        private void Build(ulong clientId, BlockPos start, BlockPos end, ushort block)
+        {
+            BuildLines.Cells(start, end, lineCells);
+            bool allowed = Blocks.IsConstruction(block) && !Blocks.IsDoor(block) && Blocks.IsValid(block) && MayHammer(clientId);
+            foreach (BlockPos cell in lineCells)
+            {
+                if (allowed && TryApplyEdit(clientId, cell, block, BuildLines.MaxLength)) continue;
+
+                if (clientId != networkManager.LocalClientId && serverWorld.InBounds(cell.X, cell.Y, cell.Z)) SendBlock(BlockChangedMessage, clientId, cell, serverWorld.GetBlock(cell));
+            }
+        }
+
+        // Each construction block of the line taken back (TryBreak, which wants the hammer they need),
+        // at once; other blocks are left. A starving player takes nothing back.
+        private void Unbuild(ulong clientId, BlockPos start, BlockPos end)
+        {
+            BuildLines.Cells(start, end, lineCells);
+            bool allowed = !inventorySync.IsStarving(clientId) && MayHammer(clientId);
+            foreach (BlockPos cell in lineCells)
+            {
+                if (!serverWorld.InBounds(cell.X, cell.Y, cell.Z)) continue;
+
+                ushort block = serverWorld.GetBlock(cell);
+                if (!Blocks.IsConstruction(block)) continue;
+                if (allowed && !storageSync.StandsOn(cell) && TryBreak(clientId, cell, BuildLines.MaxLength))
+                {
+                    EditApplied?.Invoke(clientId, EditKind.TakenBack);
+                    continue;
+                }
+
+                SendRealBlock(clientId, cell);
+                if (Blocks.IsDoor(block)) SendRealBlock(clientId, Doors.OtherHalf(cell, block));
+            }
+        }
+
+        private void SendLine(string messageName, BlockPos start, BlockPos end, ushort block)
+        {
+            using (var writer = new FastBufferWriter(6 * sizeof(int) + sizeof(ushort), Allocator.Temp))
+            {
+                writer.WriteValueSafe(start.X);
+                writer.WriteValueSafe(start.Y);
+                writer.WriteValueSafe(start.Z);
+                writer.WriteValueSafe(end.X);
+                writer.WriteValueSafe(end.Y);
+                writer.WriteValueSafe(end.Z);
+                writer.WriteValueSafe(block);
+                Messaging.SendNamedMessage(messageName, NetworkManager.ServerClientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
+            }
+        }
+
+        private static void ReadLine(FastBufferReader reader, out BlockPos start, out BlockPos end, out ushort block)
+        {
+            reader.ReadValueSafe(out int sx);
+            reader.ReadValueSafe(out int sy);
+            reader.ReadValueSafe(out int sz);
+            reader.ReadValueSafe(out int ex);
+            reader.ReadValueSafe(out int ey);
+            reader.ReadValueSafe(out int ez);
+            reader.ReadValueSafe(out block);
+            start = new BlockPos(sx, sy, sz);
+            end = new BlockPos(ex, ey, ez);
+        }
+
+        private void OnBuildRequest(ulong senderId, FastBufferReader reader)
+        {
+            ReadLine(reader, out BlockPos start, out BlockPos end, out ushort block);
+            Build(senderId, start, end, block);
+        }
+
+        private void OnUnbuildRequest(ulong senderId, FastBufferReader reader)
+        {
+            ReadLine(reader, out BlockPos start, out BlockPos end, out _);
+            Unbuild(senderId, start, end);
+        }
+
+        private static void ToggleHalf(World world, BlockPos pos)
+        {
+            ushort block = world.GetBlock(pos);
+            if (Blocks.IsDoor(block)) world.SetBlock(pos, Doors.Toggled(block));
+        }
+
+        // Within reach, on solid ground with room for both halves, free of storage, players and
+        // animals, on land the player may act on, with a door in the bag.
+        private bool TryPlaceDoor(ulong clientId, BlockPos pos, ushort lower)
+        {
+            if (inventorySync.IsStarving(clientId) || !Blocks.IsDoor(lower) || Doors.IsUpper(lower) || Doors.IsOpen(lower)) return false;
+            if (!TryGetEyes(clientId, out Vector3 eyes) || !BlockEditRules.IsInReach(eyes.ToNumerics(), pos)) return false;
+            if (!Doors.CanStand(serverWorld, pos)) return false;
+
+            var upper = new BlockPos(pos.X, pos.Y + 1, pos.Z);
+            if (storageSync != null && (storageSync.IsCovered(pos) || storageSync.IsCovered(upper))) return false;
+            if (IsOccupied(pos) || IsOccupied(upper)) return false;
+            if (!claimSync.Check(clientId, pos.X, pos.Z)) return false;
+            if (!inventorySync.Owns(clientId, Items.Hammer) || !inventorySync.TryConsumePlaced(clientId, Blocks.Door)) return false;
+
+            serverWorld.SetBlock(pos, lower);
+            serverWorld.SetBlock(upper, Doors.Make(Doors.FacingOf(lower), false, true));
+            EditApplied?.Invoke(clientId, EditKind.Placed);
+            return true;
+        }
+
+        // Within reach, on land the player may act on; closed only while nobody stands in it.
+        private bool TryToggleDoor(ulong clientId, BlockPos pos)
+        {
+            ushort block = serverWorld.GetBlock(pos);
+            if (!Blocks.IsDoor(block)) return false;
+            if (!TryGetEyes(clientId, out Vector3 eyes) || !BlockEditRules.IsInReach(eyes.ToNumerics(), pos)) return false;
+
+            BlockPos lower = Doors.LowerHalf(pos, block);
+            var upper = new BlockPos(lower.X, lower.Y + 1, lower.Z);
+            if (!Blocks.IsDoor(serverWorld.GetBlock(lower)) || !Blocks.IsDoor(serverWorld.GetBlock(upper))) return false;
+            if (!claimSync.Check(clientId, lower.X, lower.Z)) return false;
+            if (Doors.IsOpen(block) && (IsOccupied(lower) || IsOccupied(upper))) return false;
+
+            serverWorld.SetBlock(lower, Doors.Toggled(serverWorld.GetBlock(lower)));
+            serverWorld.SetBlock(upper, Doors.Toggled(serverWorld.GetBlock(upper)));
+            return true;
+        }
+
+        private void OnDoorRequest(ulong senderId, FastBufferReader reader)
+        {
+            ReadBlock(reader, out BlockPos pos, out ushort block);
+            bool placing = Blocks.IsDoor(block);
+            if (placing ? TryPlaceDoor(senderId, pos, block) : TryToggleDoor(senderId, pos)) return;
+
+            // Refusal: the real state of both cells goes back to the requester.
+            ushort current = serverWorld.GetBlock(pos);
+            BlockPos other = placing ? new BlockPos(pos.X, pos.Y + 1, pos.Z) : Blocks.IsDoor(current) ? Doors.OtherHalf(pos, current) : new BlockPos(pos.X, pos.Y + 1, pos.Z);
+            SendBlock(BlockChangedMessage, senderId, pos, current);
+            if (serverWorld.InBounds(other.X, other.Y, other.Z)) SendBlock(BlockChangedMessage, senderId, other, serverWorld.GetBlock(other));
+        }
+
+        private bool TryGetEyes(ulong clientId, out Vector3 eyes)
+        {
+            eyes = Vector3.zero;
+            if (!networkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client) || client.PlayerObject == null) return false;
+
+            eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;
+            return true;
+        }
+
+        private bool IsOccupied(BlockPos pos) => IsInsideAnyPlayer(pos) || ecosystemSync.IsAnimalInside(pos);
 
         // Server side: tells a client the real state of a block, undoing a break it anticipated.
         internal void SendRealBlock(ulong clientId, BlockPos pos)
@@ -282,28 +570,29 @@ namespace Voxel.Client
             }
         }
 
-        private bool IsEditAllowed(ulong clientId, BlockPos pos, ushort block)
+        private bool IsEditAllowed(ulong clientId, BlockPos pos, ushort block, float extraReach = 0f)
         {
             if (!networkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client)) return false;
             if (client.PlayerObject == null) return false;
 
             Vector3 eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;
-            if (!BlockEditRules.IsAllowed(serverWorld, eyes.ToNumerics(), pos, block)) return false;
+            if (!BlockEditRules.IsAllowed(serverWorld, eyes.ToNumerics(), pos, block, extraReach)) return false;
 
             // A block is never placed inside storage, a player or an animal.
             if (storageSync != null && storageSync.IsCovered(pos)) return false;
 
-            return !Blocks.IsSolid(block) || (!IsInsideAnyPlayer(pos) && !ecosystemSync.IsAnimalInside(pos));
+            return !Blocks.IsSolid(block) || (!IsInsideAnyPlayer(pos, block) && !ecosystemSync.IsAnimalInside(pos));
         }
 
-        private bool IsInsideAnyPlayer(BlockPos pos)
+        // Whether a player stands where a block (of that shape, Shapes) set at pos would be.
+        private bool IsInsideAnyPlayer(BlockPos pos, ushort block = Blocks.Stone)
         {
             foreach (NetworkClient client in networkManager.ConnectedClientsList)
             {
                 if (client.PlayerObject == null) continue;
 
                 System.Numerics.Vector3 feet = client.PlayerObject.transform.position.ToNumerics();
-                if (VoxelCollision.IntersectsBlock(feet, PlayerRules.HalfWidth, PlayerRules.Height, pos)) return true;
+                if (VoxelCollision.IntersectsBlock(serverWorld, feet, PlayerRules.HalfWidth, PlayerRules.Height, pos, block)) return true;
             }
 
             return false;

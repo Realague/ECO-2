@@ -13,6 +13,8 @@ namespace Voxel.Core
         public const float SmallStockpile = 1f;
         public const float Campfire = 5f;
         public const float Torch = 0.1f;
+        public const float Door = 3f;
+        public const float CarpentryTable = 8f;
         public const float ButcherTable = 6f;
         public const float Meat = 0.3f;
         public const float Hide = 0.5f;
@@ -56,6 +58,8 @@ namespace Voxel.Core
             if (item == Items.Fat) return Fat;
             if (Dishes.TryGet(item, out Dish dish)) return dish.Weight;
             if (item == Blocks.Torch) return Torch;
+            if (item == Blocks.Door) return Door;
+            if (item == Items.CarpentryTable) return CarpentryTable;
             if (Items.IsSeed(item)) return Seed;
             switch (item)
             {
@@ -66,6 +70,7 @@ namespace Voxel.Core
                 case Items.Hoe: return 0.8f;
                 case Items.Bow: return 0.5f;
                 case Items.Knife: return 0.3f;
+                case Items.Hammer: return 1f;
             }
 
             if (Items.IsProduce(item))

@@ -36,6 +36,14 @@ namespace Voxel.Client
         private static readonly Color UnderwaterFog = new Color(0.10f, 0.28f, 0.42f);
         private const float NightUnderwaterShare = 0.08f;
 
+        // Climbing a ladder, up or down (blocks a second).
+        private const float ClimbSpeed = 3f;
+
+        // Flying in creative mode: two presses on Space this close switch it; speeds.
+        private const float DoubleTapSeconds = 0.3f;
+        private const float FlyVerticalSpeed = 8f;
+        private const float FlySpeedShare = 2f;
+
         // A click during a swing is kept this long, and strikes as soon as the swing is over.
         private const float StrikeQueueSeconds = 0.25f;
 
@@ -60,6 +68,8 @@ namespace Voxel.Client
         private AppearanceMenu appearanceMenu;
         private MapScreen mapScreen;
         private PickupHalo pickupHalo;
+        private BuildingHud building;
+        private BuildPreview buildPreview;
         private World world;
         private Transform cameraTransform;
         private Vector3 velocity;
@@ -73,6 +83,13 @@ namespace Voxel.Client
 
         // The last move was stopped by a block on the side.
         private bool againstWall;
+
+        // Flying (creative mode), and when Space was last pressed (-1: not lately), for a double press.
+        private bool flying;
+        private float lastSpacePress = -1f;
+
+        // Whether the local player flies (creative mode, a double press on Space).
+        public bool IsFlying => flying;
         private readonly List<BlockPos> heldTorches = new List<BlockPos>();
         private (bool enabled, Color colour, FogMode mode, float density) airFog;
 
@@ -102,6 +119,8 @@ namespace Voxel.Client
             appearanceMenu = FindAnyObjectByType<AppearanceMenu>();
             mapScreen = FindAnyObjectByType<MapScreen>();
             pickupHalo = FindAnyObjectByType<PickupHalo>();
+            building = FindAnyObjectByType<BuildingHud>();
+            buildPreview = new BuildPreview();
             cameraTransform = Camera.main.transform;
             enabled = true;
         }
@@ -171,13 +190,18 @@ namespace Voxel.Client
                 return;
             }
 
+            // Escape first drops a line the hammer was laying out, then frees the mouse.
             if (hasDevices && keyboard.escapeKey.wasPressedThisFrame)
             {
-                Cursor.lockState = CursorLockMode.None;
+                if (building != null && building.HasLineStart) building.ClearLine();
+                else Cursor.lockState = CursorLockMode.None;
             }
 
             bool hasControl = hasDevices && Cursor.lockState == CursorLockMode.Locked;
-            if (hasControl)
+
+            // The hammer's wheel takes the mouse while it is open: the view stays still and clicks choose there.
+            bool wheelOpen = building != null && building.WheelOpen;
+            if (hasControl && !wheelOpen)
             {
                 Look(mouse);
             }
@@ -188,8 +212,9 @@ namespace Voxel.Client
 
             if (hasControl)
             {
-                Interact(mouse);
+                if (!wheelOpen) Interact(mouse);
                 PreviewStorage();
+                PreviewBuild();
                 HighlightPickup();
             }
             else
@@ -346,6 +371,13 @@ namespace Voxel.Client
                 return;
             }
 
+            // A right click on a door opens or closes it, whatever is in hand (its panel, open or not).
+            if (VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, true, out VoxelHit thin) && Blocks.IsDoor(world.GetBlock(thin.Block)))
+            {
+                if (claimSync.LocalCheck(thin.Block.X, thin.Block.Z)) worldSync.RequestToggleDoor(thin.Block);
+                return;
+            }
+
             // A right click picks the targeted crop if it is ripe, else picks up the log or arrow
             // pointed at, else eats held food, else uses the held item.
             if (ecosystemSync.TryHarvestAimed(origin, direction, reachedDistance, held, out int missing))
@@ -362,7 +394,7 @@ namespace Voxel.Client
             if (!blockHit) return;
 
             // Nor to till, sow or build: only eating, harvesting and picking up are left to them.
-            if (hungerSync.Stomach.IsStarving && (held == Items.Hoe || Items.IsSeed(held) || Items.IsStorage(held) || Items.IsBlock(held)))
+            if (hungerSync.Stomach.IsStarving && (held == Items.Hoe || held == Items.Hammer || Items.IsSeed(held) || Items.IsStorage(held) || Items.IsBlock(held)))
             {
                 hotbar.ShowMessage(InventorySync.TooHungryMessage);
                 return;
@@ -421,7 +453,21 @@ namespace Voxel.Client
                 return;
             }
 
+            // The hammer builds the construction block chosen in its panel (BuildingHud).
+            if (held == Items.Hammer)
+            {
+                Build(hit);
+                return;
+            }
+
             if (!Items.IsBlock(held) || !inventorySync.Inventory.Has(held)) return;
+
+            // Planks, logs and doors go up with a hammer only.
+            if (Blocks.IsConstruction(Items.BlockOf(held)))
+            {
+                hotbar.ShowMessage("You need a hammer to build");
+                return;
+            }
 
             BlockPos target = hit.Block + hit.Normal;
             if (!claimSync.LocalCheck(target.X, target.Z)) return;
@@ -438,6 +484,7 @@ namespace Voxel.Client
                 if (Blocks.TypeOf(world.GetBlock(target)) == Blocks.Air && !storageSync.IsCovered(target)) worldSync.RequestSetBlock(target, torch);
                 return;
             }
+
             bool insidePlayer = VoxelCollision.IntersectsBlock(
                 transform.position.ToNumerics(), PlayerRules.HalfWidth, PlayerRules.Height, target);
             if (target != hit.Block && !insidePlayer && !storageSync.IsCovered(target))
@@ -445,6 +492,165 @@ namespace Voxel.Client
                 worldSync.RequestSetBlock(target, Items.BlockOf(held));
             }
         }
+
+        // A right click with the hammer: the chosen block in the chosen shape over the aimed face, facing
+        // the way the player looks; in line mode the first click sets where the line starts and the
+        // second builds it, as far as the bag holds the block (the server checks every cell).
+        private void Build(VoxelHit hit)
+        {
+            if (building == null) return;
+
+            if (building.Block == Items.None)
+            {
+                hotbar.ShowMessage("No construction block in the bag");
+                return;
+            }
+
+            BlockPos target = hit.Block + hit.Normal;
+            int facing = StorageRules.FacingOf(transform.eulerAngles.y);
+
+            // A door stands on the top of the aimed block, two cells high, and is set up one at a time.
+            if (building.Block == Blocks.Door)
+            {
+                if (!claimSync.LocalCheck(target.X, target.Z)) return;
+
+                var above = new BlockPos(target.X, target.Y + 1, target.Z);
+                bool inside = VoxelCollision.IntersectsBlock(transform.position.ToNumerics(), PlayerRules.HalfWidth, PlayerRules.Height, target)
+                    || VoxelCollision.IntersectsBlock(transform.position.ToNumerics(), PlayerRules.HalfWidth, PlayerRules.Height, above);
+                if (hit.Normal.Y != 1 || !Doors.CanStand(world, target)) hotbar.ShowMessage("A door stands on the ground, with room for two blocks");
+                else if (!inside && !storageSync.IsCovered(target) && !storageSync.IsCovered(above)) worldSync.RequestPlaceDoor(target, facing);
+                return;
+            }
+
+            ushort block = building.BlockToPlace(transform.eulerAngles.y);
+            if (building.LineMode)
+            {
+                if (!building.HasLineStart || building.LineTakesBack)
+                {
+                    building.StartLine(target, false);
+                    return;
+                }
+
+                BlockPos start = building.LineStart;
+                building.ClearLine();
+                if (claimSync.LocalCheck(start.X, start.Z) && claimSync.LocalCheck(target.X, target.Z)) worldSync.RequestBuild(start, target, block);
+                return;
+            }
+
+            if (!claimSync.LocalCheck(target.X, target.Z)) return;
+            if (CanBuildAt(target, block)) worldSync.RequestBuild(target, target, block);
+        }
+
+        // Whether a block would go into a cell: free (air or water), nothing of the player in its boxes,
+        // no storage there.
+        private bool CanBuildAt(BlockPos cell, ushort block)
+        {
+            return world.InBounds(cell.X, cell.Y, cell.Z) && Blocks.IsReplaceable(world.GetBlock(cell)) && !storageSync.IsCovered(cell)
+                && !VoxelCollision.IntersectsBlock(world, transform.position.ToNumerics(), PlayerRules.HalfWidth, PlayerRules.Height, cell, block);
+        }
+
+        // A left click with the hammer on a construction block takes it back at once (a door whole); in
+        // line mode the first click sets where the line starts and the second takes back the line's
+        // construction blocks. Returns false if the player aims at none.
+        private bool Unbuild(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction)
+        {
+            if (!TryAimConstruction(origin, direction, out BlockPos aimed)) return false;
+
+            if (inventorySync.LocalRoomFor(Items.DropOf(world.GetBlock(aimed))) <= 0)
+            {
+                inventorySync.TellLocalFull(InventorySync.ReasonFor(Items.DropOf(world.GetBlock(aimed))));
+                return true;
+            }
+
+            if (building != null && building.LineMode)
+            {
+                if (!building.HasLineStart || !building.LineTakesBack)
+                {
+                    building.StartLine(aimed, true);
+                    miningSync.TryStartSwing(model, false);
+                    return true;
+                }
+
+                BlockPos start = building.LineStart;
+                building.ClearLine();
+                if (claimSync.LocalCheck(start.X, start.Z) && claimSync.LocalCheck(aimed.X, aimed.Z) && miningSync.TryStartSwing(model, false))
+                {
+                    worldSync.RequestUnbuild(start, aimed);
+                }
+
+                return true;
+            }
+
+            if (storageSync.StandsOn(aimed))
+            {
+                hotbar.ShowMessage("Something stands on it");
+                return true;
+            }
+
+            if (CanBreakOnClaims(aimed) && miningSync.TryStartSwing(model, false)) worldSync.RequestUnbuild(aimed, aimed);
+            return true;
+        }
+
+        // The construction block the player aims at within reach (a door's panel too), if any.
+        private bool TryAimConstruction(System.Numerics.Vector3 origin, System.Numerics.Vector3 direction, out BlockPos aimed)
+        {
+            aimed = hitNone;
+            if (!VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, true, out VoxelHit hit) || !Blocks.IsConstruction(world.GetBlock(hit.Block))) return false;
+
+            aimed = hit.Block;
+            return true;
+        }
+
+        private static readonly BlockPos hitNone = new BlockPos(0, 0, 0);
+
+        // While the hammer is in hand, where it would build (green, red where a block cannot go or the
+        // bag runs out), or the line it would take back (red); the length goes to its panel.
+        private void PreviewBuild()
+        {
+            if (building == null || buildPreview == null || !building.HammerInHand) return;
+
+            System.Numerics.Vector3 origin = cameraTransform.position.ToNumerics();
+            System.Numerics.Vector3 direction = cameraTransform.forward.ToNumerics();
+            building.LineLength = 0;
+            if (building.HasLineStart && building.LineTakesBack)
+            {
+                if (!TryAimConstruction(origin, direction, out BlockPos end)) end = building.LineStart;
+
+                BuildLines.Cells(building.LineStart, end, previewCells);
+                building.LineLength = previewCells.Count;
+                foreach (BlockPos cell in previewCells)
+                {
+                    ushort there = world.GetBlock(cell);
+                    if (Blocks.IsConstruction(there)) buildPreview.AddBlock(world, cell, there, false);
+                }
+            }
+            else if (building.Block != Items.None && VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, out VoxelHit hit))
+            {
+                BlockPos target = hit.Block + hit.Normal;
+                ushort block = building.BlockToPlace(transform.eulerAngles.y);
+                if (building.HasLineStart) BuildLines.Cells(building.LineStart, target, previewCells);
+                else
+                {
+                    previewCells.Clear();
+                    previewCells.Add(target);
+                }
+
+                building.LineLength = building.HasLineStart ? previewCells.Count : 0;
+                int left = inventorySync.Creative ? int.MaxValue : inventorySync.Inventory.Count(building.Block);
+                foreach (BlockPos cell in previewCells)
+                {
+                    if (!world.InBounds(cell.X, cell.Y, cell.Z) || !Blocks.IsReplaceable(world.GetBlock(cell))) continue;
+
+                    bool valid = left > 0 && (Blocks.IsDoor(block) || CanBuildAt(cell, block));
+                    if (valid) left--;
+                    buildPreview.AddBlock(world, cell, block, valid);
+                }
+            }
+
+            buildPreview.Render();
+        }
+
+        private readonly List<BlockPos> previewCells = new List<BlockPos>();
 
         // One hit with the held tool on what the player aims at: the plant in front (or animals: the
         // bow), else the block, if it is the right tool (a shovel for soft ground, a pickaxe for anything
@@ -458,6 +664,9 @@ namespace Voxel.Client
                 if (Items.IsTool(held)) hotbar.ShowMessage(InventorySync.TooHungryMessage);
                 return;
             }
+
+            // The hammer takes construction blocks back, before anything in front of them is struck.
+            if (held == Items.Hammer && Unbuild(origin, direction)) return;
 
             if (ecosystemSync.TryStrike(origin, direction, reachedDistance, held, out int missing, out int plantId, out float distance))
             {
@@ -480,7 +689,7 @@ namespace Voxel.Client
                 {
                     // A torch comes down by hand, whatever is held.
                     int tool = ToolRules.ToBreak(aimed);
-                    if (tool != Items.None && held != tool)
+                    if (tool != Items.None && held != tool && !inventorySync.Creative)
                     {
                         TellMissing(tool);
                         return;
@@ -648,6 +857,29 @@ namespace Voxel.Client
             return normal.Z > 0 ? 4 : 5;
         }
 
+        // Flying (creative mode): no gravity, Space goes up and Shift down, twice as fast across; blocks
+        // still stop the player. Coming down onto the ground lands them.
+        private void Fly(Vector3 direction, bool up, bool down, float deltaTime)
+        {
+            Vector3 across = direction.normalized * moveSpeed * FlySpeedShare;
+            velocity = new Vector3(across.x, up ? FlyVerticalSpeed : down ? -FlyVerticalSpeed : 0f, across.z);
+
+            MoveResult result = VoxelCollision.Move(
+                world,
+                transform.position.ToNumerics(),
+                PlayerRules.HalfWidth,
+                PlayerRules.Height,
+                (velocity * deltaTime).ToNumerics(),
+                storageSync != null ? storageSync.IsSolid : (System.Func<int, int, int, bool>)null,
+                ecosystemSync);
+
+            transform.position = result.Position.ToUnity();
+            grounded = result.Grounded;
+            againstWall = result.HitWall;
+            if (grounded && velocity.y < 0f) flying = false;
+            if (grounded || result.HitCeiling) velocity.y = 0f;
+        }
+
         private void Move(Keyboard keyboard, bool hasControl)
         {
             float deltaTime = Mathf.Min(Time.deltaTime, MaxDeltaTime);
@@ -665,6 +897,28 @@ namespace Voxel.Client
 
             bool swimming = IsWaterAt(transform.position + Vector3.up * SwimDepth);
             bool spacePressed = hasControl && keyboard.spaceKey.isPressed;
+
+            // In creative mode a double press on Space switches flight on or off.
+            if (!inventorySync.Creative) flying = false;
+            else if (hasControl && keyboard.spaceKey.wasPressedThisFrame)
+            {
+                if (lastSpacePress >= 0f && Time.unscaledTime - lastSpacePress < DoubleTapSeconds)
+                {
+                    flying = !flying;
+                    lastSpacePress = -1f;
+                    velocity.y = 0f;
+                }
+                else
+                {
+                    lastSpacePress = Time.unscaledTime;
+                }
+            }
+
+            if (flying)
+            {
+                Fly(direction, spacePressed, hasControl && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed), deltaTime);
+                return;
+            }
 
             // A starving player walks slower and jumps just high enough to climb a block.
             bool starving = hungerSync.Stomach.IsStarving;
@@ -685,10 +939,21 @@ namespace Voxel.Client
             bool climbingOut = swimming && spacePressed && againstWall && direction != Vector3.zero;
             if (climbingOut) velocity.y = Mathf.Max(velocity.y, Mathf.Sqrt(2f * gravity * jump));
 
+            // On a ladder there is no falling: Space, or walking into it, climbs; Shift climbs down;
+            // else the player holds on where they are.
+            bool climbing = !swimming && Shapes.TouchesLadder(world, transform.position.ToNumerics(), PlayerRules.HalfWidth, PlayerRules.Height);
+            bool climbDown = hasControl && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed);
+            bool climbUp = spacePressed || (againstWall && direction != Vector3.zero);
+            if (climbing && !(grounded && !climbUp))
+            {
+                velocity.y = climbDown ? -ClimbSpeed : climbUp ? ClimbSpeed : 0f;
+            }
+
             // Vertical move with the average of the speeds before and after gravity: exact for a
             // constant acceleration, so jump height does not depend on the frame rate.
             float nextVerticalSpeed;
-            if (!swimming || climbingOut) nextVerticalSpeed = Mathf.Max(velocity.y - gravity * deltaTime, -MaxFallSpeed);
+            if (climbing && !(grounded && !climbUp)) nextVerticalSpeed = velocity.y;
+            else if (!swimming || climbingOut) nextVerticalSpeed = Mathf.Max(velocity.y - gravity * deltaTime, -MaxFallSpeed);
             else if (spacePressed) nextVerticalSpeed = Mathf.MoveTowards(velocity.y, SwimUpSpeed, SwimUpAcceleration * deltaTime);
             else nextVerticalSpeed = Mathf.Max(velocity.y - gravity * WaterGravityShare * deltaTime, -MaxSinkSpeed);
 

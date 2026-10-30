@@ -77,6 +77,9 @@ namespace Eco.Sim
         private const int ColumnHeightBits = 12;
         private const int ColumnHeightMask = (1 << ColumnHeightBits) - 1;
         private const int WetColumn = 1 << (2 * ColumnHeightBits);
+
+        // A column topped by a wall, a post or a fence (Shapes.StopsAnimals): no animal stands there.
+        private const int BarrierColumn = 1 << (2 * ColumnHeightBits + 1);
         private int[] columnInfo;
 
         // Snapshot: no longer valid after a Step or a RemoveAnimal.
@@ -679,6 +682,8 @@ namespace Eco.Sim
             if ((uint)x >= (uint)world.SizeX || (uint)z >= (uint)world.SizeZ) return false;
 
             int info = ColumnInfo(ColumnIndex(x, z), x, z);
+            if ((info & BarrierColumn) != 0) return false;
+
             return AnimalMoves.GroundFor(habitat, ColumnTopOf(info), (info & WetColumn) != 0, ColumnBedOf(info), out y) && y < world.SizeY;
         }
 
@@ -717,7 +722,8 @@ namespace Eco.Sim
             int top = world.GetTopHeight(x, z);
             bool wet = top > 0 && world.IsWater(x, top - 1, z);
             int bed = wet ? world.GetSurfaceHeight(x, z) : top;
-            info = (top + 1) | (bed << ColumnHeightBits) | (wet ? WetColumn : 0);
+            bool barrier = top > 0 && Shapes.StopsAnimals(world.GetBlock(x, top - 1, z));
+            info = (top + 1) | (bed << ColumnHeightBits) | (wet ? WetColumn : 0) | (barrier ? BarrierColumn : 0);
             columnInfo[column] = info;
             return info;
         }

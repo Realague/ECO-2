@@ -40,6 +40,49 @@ namespace Voxel.Client
         private static readonly Dictionary<int, Texture2D> Icons = new Dictionary<int, Texture2D>();
         private static readonly Dictionary<ItemCategory, Texture2D> MissingIcons = new Dictionary<ItemCategory, Texture2D>();
 
+        // Every item a player may hold: blocks (not water), what is crafted, each species' seeds, wood
+        // and crop, each animal's carcass, the meats and what butchering gives, the dishes (/give and the
+        // creative catalog).
+        public static IEnumerable<int> AllItems(EcosystemSync ecosystemSync)
+        {
+            for (int type = 1; type <= Blocks.LastType; type++)
+            {
+                if (type != Blocks.Water && Items.IsValid(type)) yield return type;
+            }
+
+            foreach (int item in new[] { Items.Straw, Items.Arrow, Items.Chest, Items.Stockpile, Items.SmallStockpile, Items.Campfire, Items.ButcherTable, Items.CarpentryTable, Items.Hide, Items.Bones, Items.Fat })
+            {
+                yield return item;
+            }
+
+            foreach (int tool in Items.Tools)
+            {
+                yield return tool;
+            }
+
+            for (int kind = 0; kind < Butchery.MeatKindCount; kind++)
+            {
+                yield return Items.Meat((MeatKind)kind);
+            }
+
+            for (int species = 0; species < ecosystemSync.PlantSpeciesCount; species++)
+            {
+                yield return Items.Seed(species);
+                if (ecosystemSync.IsTree(species)) yield return Items.WoodOf(species);
+                if (ecosystemSync.IsCrop(species)) yield return Items.Produce(species);
+            }
+
+            for (int animal = 0; animal < ecosystemSync.AnimalSpeciesCount; animal++)
+            {
+                yield return Items.Carcass(animal);
+            }
+
+            for (int dish = 0; dish < Dishes.All.Count; dish++)
+            {
+                yield return Items.Dish(dish);
+            }
+        }
+
         public static ItemCategory CategoryOf(int item)
         {
             if (Items.IsTool(item) || item == Items.Arrow || Items.IsStorage(item) || item == Blocks.Torch) return ItemCategory.Tools;
@@ -73,10 +116,10 @@ namespace Voxel.Client
                 case ItemCategory.Food: return Loc.T(Items.IsDish(item) ? "Dish" : Items.IsMeat(item) ? "Raw meat" : "Food");
                 case ItemCategory.Materials: return Loc.T(Items.IsCarcass(item) ? "Carcass" : "Material");
                 case ItemCategory.Tools:
-                    if (item == Items.Campfire || item == Items.ButcherTable) return Loc.T("Station");
+                    if (item == Items.Campfire || item == Items.ButcherTable || item == Items.CarpentryTable) return Loc.T("Station");
                     return Loc.T(item == Items.Arrow ? "Ammunition" : Items.IsStorage(item) ? "Storage" : item == Blocks.Torch ? "Light" : "Tool");
                 case ItemCategory.Wood: return Loc.T("Wood");
-                default: return Loc.T("Block");
+                default: return Loc.T(item == Blocks.Door ? "Door" : "Block");
             }
         }
 
@@ -88,8 +131,11 @@ namespace Voxel.Client
             if (Items.IsProduce(item)) return Loc.In("produce", EcosystemSync.DisplayName(ecosystemSync.ProduceName(Items.ProduceSpecies(item))));
             if (Items.IsWood(item)) return WithPlant("{0} wood", Items.WoodSpecies(item), ecosystemSync);
             if (Items.IsCarcass(item)) return WithAnimal("{0} carcass", Items.CarcassSpecies(item), ecosystemSync);
+            if (IsWoodBlock(item)) return WithPlant(WoodBlocks.IsLog((ushort)item) ? "{0} log" : "{0} planks", WoodBlocks.SpeciesOf((ushort)item), ecosystemSync);
             return Loc.Name(Items.NameOf(item));
         }
+
+        private static bool IsWoodBlock(int item) => item > 0 && item <= ushort.MaxValue && WoodBlocks.IsWoodBlock((ushort)item);
 
         // {0}: the species with its English article ("an oak"), {1}: its translated name in lower case.
         public static string DescriptionOf(int item, EcosystemSync ecosystemSync)
@@ -130,6 +176,9 @@ namespace Voxel.Client
                 case Blocks.Torch: return Loc.T("Lights what is around it, day and night. Hold it and right click on the top or the side of a block to set it there; hit it, with anything in hand, to take it down.");
                 case Items.Stockpile: return Loc.T("Holds blocks and wood: nine piles of 27 on a patch of flat ground, 3 by 3. Hold it and right click to place it in front of you; right click on it to open it.");
                 case Items.SmallStockpile: return Loc.T("Holds blocks and wood: four piles of 20 on a patch of flat ground, 2 by 2. Hold it and right click to place it in front of you; right click on it to open it.");
+                case Items.CarpentryTable: return Loc.T("Works wood into planks, logs, doors, the large stockpile and the butcher's table. Queue an order and put calories into it. Wood and stone come from your bag and the chests and stockpiles linked to it (those of its claimed zone), and what it makes goes into them.");
+                case Blocks.Door: return Loc.T("A wooden door, two blocks high, set up with a hammer (choose it with B, hammer in hand, and right click on the ground), facing the way you look; right click on it to open or close it, a hammer blow takes it back. On claimed land only the owner and the players they allow open it.");
+                case Items.Hammer: return Loc.T("Builds with planks, logs and doors: right click to place the block chosen in its panel (B), in the shape chosen (R), one at a time or in lines of up to 16 (V: a first click where the line starts, a second where it ends). A left click takes a building block back at once.");
                 case Items.Campfire: return Loc.T("Cooks dishes from crops and meat. Queue a dish, put calories into it, and lay wood by the fire: it burns only while it cooks. Ingredients come from your bag and the chests linked to it (those of its claimed zone), and dishes go into them.");
             }
 
@@ -137,6 +186,13 @@ namespace Voxel.Client
             if (Items.IsCarcass(item)) return WithAnimal("The body of {2}, taken from the ground while at least half of it was left. Butcher it with a knife (right click it here) for half its meat, or on a butcher's table for all of it, with the hide, bones and fat.", Items.CarcassSpecies(item), ecosystemSync);
             if (Items.IsMeat(item)) return Loc.T("Raw: it is not eaten as it is. Cook it on a campfire.");
             if (item == Items.Straw) return Loc.T("Left over when wheat is harvested.");
+            if (IsWoodBlock(item))
+            {
+                return WithPlant(WoodBlocks.IsLog((ushort)item)
+                    ? "A building block of {1} wood, made at a carpentry table: bark on its sides. Built with a hammer, as a full block, a wall, a post, a floor, a roof, a roof corner, stairs, a fence or a ladder (choose it with B and R, hammer in hand); a hammer blow takes it back."
+                    : "A building block of {1} planks, made at a carpentry table. Built with a hammer, as a full block, a wall, a post, a floor, a roof, a roof corner, stairs, a fence or a ladder (choose it with B and R, hammer in hand); a hammer blow takes it back.", WoodBlocks.SpeciesOf((ushort)item), ecosystemSync);
+            }
+
             return Loc.T("A building block. Hold it and right click to place it.");
         }
 
@@ -177,6 +233,8 @@ namespace Voxel.Client
             if (item == Items.SmallStockpile) return "SmallStockpile";
             if (item == Items.Campfire) return "Campfire";
             if (item == Items.ButcherTable) return "ButcherTable";
+            if (item == Items.CarpentryTable) return "CarpentryTable";
+            if (item == Blocks.Door) return "Door";
             if (item == Items.Hide) return "Hide";
             if (item == Items.Bones) return "Bones";
             if (item == Items.Fat) return "Fat";

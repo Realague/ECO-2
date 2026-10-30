@@ -388,7 +388,7 @@ namespace Voxel.Client
             if ((origin - eyes).sqrMagnitude > OriginTolerance * OriginTolerance) return;
             if (pending.ContainsKey((clientId, shot)) || !inventorySync.Owns(clientId, Items.Bow)) return;
             if (inventorySync.IsStarving(clientId)) return;
-            if (!inventorySync.TryConsume(clientId, Items.Arrow)) return;
+            if (!inventorySync.TryConsumePlaced(clientId, Items.Arrow)) return;
 
             World world = worldSync.World;
             var flight = new PendingShot { Velocity = ArrowFlight.VelocityOf(direction.ToNumerics(), power), Power = power };

@@ -195,7 +195,7 @@ namespace Voxel.Core
                     int ny = y + StepY[direction];
                     int nz = z + StepZ[direction];
                     if (!world.InBounds(nx, ny, nz)) continue;
-                    if (Blocks.IsOpaque(world.GetBlock(nx, ny, nz))) continue;
+                    if (Blocks.BlocksLight(world.GetBlock(nx, ny, nz))) continue;
                     if (level - 1 <= Level(nx, ny, nz)) continue;
 
                     SetLevel(nx, ny, nz, level - 1);

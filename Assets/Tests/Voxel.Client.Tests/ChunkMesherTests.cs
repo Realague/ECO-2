@@ -13,8 +13,9 @@ namespace Voxel.Client.Tests
         // must stay exactly what they are.
         // It changes with what the terrain generator produces (TerrainGenerator.Version, like the
         // terrain fingerprints) or with the mesher's output (faces, light, atlas tiles): then copy the
-        // new value from the failure message, saying why.
-        private const ulong ExpectedWorldMeshes = 0x1E8222675C291800UL;
+        // new value from the failure message, saying why. Last changed when the wood blocks' 57 tiles
+        // made the atlas 81 tiles wide (every texture coordinate moved).
+        private const ulong ExpectedWorldMeshes = 0xA5A60C27902AE740UL;
 
         [Test]
         public void TheReferenceWorld_GivesTheRecordedMeshes()

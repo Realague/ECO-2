@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using Voxel.Core;
 
@@ -44,15 +45,34 @@ namespace Voxel.Client
         public const int MudTile = 22;
         public const int TilledSoilTopTile = 23;
 
-        public const int TileCount = 24;
+        // Then three tiles per wood (WoodBlocks.Species order): its planks, its logs' bark and their rings.
+        public const int FirstPlanksTile = 24;
+        public const int FirstLogSideTile = FirstPlanksTile + WoodBlocks.Count;
+        public const int FirstLogTopTile = FirstLogSideTile + WoodBlocks.Count;
+
+        public const int TileCount = FirstLogTopTile + WoodBlocks.Count;
 
         // The file of each tile, in tile order.
-        public static readonly string[] TileNames =
+        public static readonly string[] TileNames = BuildTileNames();
+
+        private static string[] BuildTileNames()
         {
-            "Granite", "Dirt", "GrassTop", "GrassSide", "Ice", "Basalt", "Limestone", "Marble", "Sandstone",
-            "Slate", "Sand", "Snow", "Gravel", "Clay", "CoalOre", "IronOre", "CopperOre", "TinOre", "GoldOre",
-            "RockSalt", "Flint", "Bedrock", "Mud", "TilledSoilTop"
-        };
+            var names = new List<string>
+            {
+                "Granite", "Dirt", "GrassTop", "GrassSide", "Ice", "Basalt", "Limestone", "Marble", "Sandstone",
+                "Slate", "Sand", "Snow", "Gravel", "Clay", "CoalOre", "IronOre", "CopperOre", "TinOre", "GoldOre",
+                "RockSalt", "Flint", "Bedrock", "Mud", "TilledSoilTop"
+            };
+            foreach (string prefix in new[] { "Planks_", "LogSide_", "LogTop_" })
+            {
+                foreach ((int _, string asset) in WoodBlocks.Species)
+                {
+                    names.Add(prefix + asset);
+                }
+            }
+
+            return names.ToArray();
+        }
 
         // The tile of each block type for all its faces; grass is handled apart.
         private static readonly int[] TypeTiles = BuildTypeTiles();
@@ -84,6 +104,14 @@ namespace Voxel.Client
             // Tilled soil shows its furrows on top, dirt elsewhere.
             if (type == Blocks.TilledSoil) return face == ChunkMesher.TopFace ? TilledSoilTopTile : DirtTile;
 
+            // Planks all over; a log (standing) its rings at both ends, its bark around.
+            if (WoodBlocks.IsPlanks(type)) return FirstPlanksTile + WoodBlocks.WoodOf(type);
+            if (WoodBlocks.IsLog(type))
+            {
+                bool end = face == ChunkMesher.TopFace || face == ChunkMesher.BottomFace;
+                return (end ? FirstLogTopTile : FirstLogSideTile) + WoodBlocks.WoodOf(type);
+            }
+
             return type < TypeTiles.Length ? TypeTiles[type] : GraniteTile;
         }
 
@@ -101,6 +129,7 @@ namespace Voxel.Client
             {
                 case Blocks.Grass: return Grass;
                 case Blocks.Water: return ShallowWater;
+                case Blocks.Door: return TorchWood;
                 default: return meanColours != null ? meanColours[TileFor(block, ChunkMesher.TopFace)] : Unknown;
             }
         }
@@ -116,8 +145,8 @@ namespace Voxel.Client
                 return meanColours != null ? meanColours[DirtTile] : Unknown;
             }
 
-            // A torch has no tile: its chips are of its stick's wood.
-            if (Blocks.IsTorch(block)) return TorchWood;
+            // A torch and a door have no tile: their chips are of their wood.
+            if (Blocks.IsThin(block)) return TorchWood;
 
             return meanColours != null ? meanColours[TileFor(block, face)] : Unknown;
         }

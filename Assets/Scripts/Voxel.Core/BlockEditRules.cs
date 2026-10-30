@@ -10,12 +10,14 @@ namespace Voxel.Core
         // A player's position as known by the server lags a little behind the player's own.
         public const float ReachTolerance = 1.5f;
 
-        public static bool IsAllowed(World world, Vector3 eyePosition, BlockPos pos, ushort block)
+        // extraReach: further than a player reaches, for the cells of a line built with a hammer (BuildLines).
+        public static bool IsAllowed(World world, Vector3 eyePosition, BlockPos pos, ushort block, float extraReach = 0f)
         {
             if (!world.InBounds(pos.X, pos.Y, pos.Z) || !Blocks.IsValid(block)) return false;
 
-            // A player sets a solid block, a torch or air, never water: water only comes from the world itself.
-            if (Blocks.IsWater(block)) return false;
+            // A player sets a solid block, a torch or air, never water: water only comes from the world
+            // itself; nor a door, which is placed and opened by its own rules (Doors, WorldSync).
+            if (Blocks.IsWater(block) || Blocks.IsDoor(block)) return false;
 
             // Placing requires an empty cell (air or water), breaking a block that is there (solid,
             // or a torch): a block is never replaced by another.
@@ -31,7 +33,13 @@ namespace Voxel.Core
             // A torch goes in the open air, held by the block it stands on or hangs from.
             if (Blocks.IsTorch(block) && (Blocks.TypeOf(current) != Blocks.Air || !Torches.HasSupport(world, pos, block))) return false;
 
-            float maxDistance = PlayerRules.Reach + ReachTolerance;
+            return IsInReach(eyePosition, pos, extraReach);
+        }
+
+        // Whether a cell is within a player's reach from their eyes, with the server's tolerance.
+        public static bool IsInReach(Vector3 eyePosition, BlockPos pos, float extraReach = 0f)
+        {
+            float maxDistance = PlayerRules.Reach + ReachTolerance + extraReach;
             return DistanceSquaredToBlock(eyePosition, pos) <= maxDistance * maxDistance;
         }
 

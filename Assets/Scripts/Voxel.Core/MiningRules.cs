@@ -34,6 +34,8 @@ namespace Voxel.Core
         public static int HitsToBreak(ushort block)
         {
             if (!Blocks.IsBreakable(block)) return 0;
+            // A hammer takes what was built back at once.
+            if (Blocks.IsConstruction(block)) return 1;
 
             switch (Blocks.TypeOf(block))
             {

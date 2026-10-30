@@ -221,6 +221,15 @@ namespace Voxel.Client
                 }
             }
 
+            // The wood blocks name their trees by index (WoodBlocks).
+            foreach ((int index, string asset) in WoodBlocks.Species)
+            {
+                if (index >= speciesAssets.Length || speciesAssets[index] == null || speciesAssets[index].name != asset || speciesAssets[index].WoodYield <= 0)
+                {
+                    Debug.LogError($"Plant species {index} should be {asset}, a tree giving wood (WoodBlocks).");
+                }
+            }
+
             // Butchering names its animals by index, and sizes them by their health (Butchery).
             foreach (ButcheredAnimal animal in Butchery.Animals)
             {
@@ -386,8 +395,9 @@ namespace Voxel.Client
 
             if (!plantHit) return false;
 
+            // In creative mode a plant is struck whatever is in hand.
             int tool = ToolFor(plants[plantId]);
-            if (held != tool)
+            if (held != tool && !inventorySync.Creative)
             {
                 missingTool = tool;
                 plantId = 0;
@@ -702,7 +712,7 @@ namespace Voxel.Client
             if (plants[plantId].RipeStage < 1 || speciesAssets[plants[plantId].SpeciesIndex].Harvest == HarvestKind.None) return false;
 
             int tool = HarvestTool(plants[plantId].SpeciesIndex);
-            if (tool != Items.None && held != tool)
+            if (tool != Items.None && held != tool && !inventorySync.Creative)
             {
                 missingTool = tool;
                 return true;

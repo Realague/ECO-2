@@ -251,6 +251,94 @@ namespace Voxel.Core.Tests
             Assert.IsTrue(read.ReceivedTorches);
         }
 
+        // A save from before hammers (format 9): the knife is kept, the hammer is left to give.
+        [Test]
+        public void Read_SaveWithoutHammer_KeepsTheKnifeAndLeavesTheHammerToGive()
+        {
+            var stream = new MemoryStream();
+            using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, true))
+            {
+                writer.Write(0x504F4345u);
+                writer.Write(9);
+                writer.Write(1);
+                writer.Write("alice");
+                writer.Write(1f);
+                writer.Write(2f);
+                writer.Write(3f);
+                writer.Write(90f);
+                writer.Write((byte)Speciality.None);
+                writer.Write(0);
+                writer.Write(Appearance.NotChosen);
+                for (int slot = 0; slot < Hotbar.SlotCount; slot++) writer.Write(Items.None);
+                new Stomach().Write(writer);
+                writer.Write(true);
+                writer.Write("Alice");
+                writer.Write(true);
+                writer.Write(true);
+                writer.Write(true);
+            }
+
+            stream.Position = 0;
+            PlayerStore loaded = PlayerStore.Read(stream);
+
+            Assert.IsTrue(loaded.TryGet("alice", out PlayerState state));
+            Assert.IsTrue(state.ReceivedKnife);
+            Assert.IsFalse(state.ReceivedHammer);
+
+            state.ReceivedHammer = true;
+            var again = new MemoryStream();
+            loaded.Write(again);
+            again.Position = 0;
+            Assert.IsTrue(PlayerStore.Read(again).TryGet("alice", out PlayerState read));
+            Assert.IsTrue(read.ReceivedHammer);
+            Assert.IsTrue(read.ReceivedKnife);
+        }
+
+        // A save from before creative mode (format 10): the hammer is kept, the player plays in survival;
+        // creative mode is saved from then on.
+        [Test]
+        public void Read_SaveWithoutCreative_KeepsTheHammerAndPlaysInSurvival()
+        {
+            var stream = new MemoryStream();
+            using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, true))
+            {
+                writer.Write(0x504F4345u);
+                writer.Write(10);
+                writer.Write(1);
+                writer.Write("alice");
+                writer.Write(1f);
+                writer.Write(2f);
+                writer.Write(3f);
+                writer.Write(90f);
+                writer.Write((byte)Speciality.None);
+                writer.Write(0);
+                writer.Write(Appearance.NotChosen);
+                for (int slot = 0; slot < Hotbar.SlotCount; slot++) writer.Write(Items.None);
+                new Stomach().Write(writer);
+                writer.Write(true);
+                writer.Write("Alice");
+                writer.Write(true);
+                writer.Write(true);
+                writer.Write(true);
+                writer.Write(true);
+            }
+
+            stream.Position = 0;
+            PlayerStore loaded = PlayerStore.Read(stream);
+
+            Assert.IsTrue(loaded.TryGet("alice", out PlayerState state));
+            Assert.IsTrue(state.ReceivedHammer);
+            Assert.IsFalse(state.Creative);
+
+            state.Creative = true;
+            var again = new MemoryStream();
+            loaded.Write(again);
+            again.Position = 0;
+            Assert.IsTrue(PlayerStore.Read(again).TryGet("alice", out PlayerState read));
+            Assert.IsTrue(read.Creative);
+            Assert.IsTrue(read.ReceivedHammer);
+        }
+
         // A save from before hunger (format 4): everything else is kept, the stomach starts half full.
         [Test]
         public void Read_SaveWithoutStomach_KeepsTheRestWithAStartingStomach()

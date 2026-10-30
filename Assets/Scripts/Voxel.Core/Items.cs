@@ -27,7 +27,10 @@ namespace Voxel.Core
         // A butcher's table, placed like storage: a station where carcasses are cut up (Butchery, crafted).
         public const int ButcherTable = 107;
 
-        public static bool IsStorage(int item) => item >= Chest && item <= ButcherTable;
+        // A carpentry table, placed like storage: a station where wood is worked (Recipes.Carpentry).
+        public const int CarpentryTable = 108;
+
+        public static bool IsStorage(int item) => item >= Chest && item <= CarpentryTable;
 
         // Tools: each player gets one of each at their first connection, and breaking, felling,
         // harvesting, tilling, hunting and butchering each need theirs (ToolRules).
@@ -38,10 +41,13 @@ namespace Voxel.Core
         public const int Hoe = 114;
         public const int Bow = 115;
         public const int Knife = 116;
-        private const int FirstTool = Shovel;
-        private const int LastTool = Knife;
 
-        public static readonly int[] Tools = { Shovel, Pickaxe, Axe, Scythe, Hoe, Bow, Knife };
+        // Builds and takes back the construction blocks (Blocks.IsConstruction), in shapes (Shapes).
+        public const int Hammer = 117;
+        private const int FirstTool = Shovel;
+        private const int LastTool = Hammer;
+
+        public static readonly int[] Tools = { Shovel, Pickaxe, Axe, Scythe, Hoe, Bow, Knife, Hammer };
 
         // What a butcher's table gives besides the meat (Butchery). No use yet but the bones' broth.
         public const int Hide = 120;
@@ -167,6 +173,7 @@ namespace Voxel.Core
                 case Blocks.Mud: return "Mud";
                 case Blocks.TilledSoil: return "Tilled soil";
                 case Blocks.Torch: return "Torch";
+                case Blocks.Door: return "Wooden door";
                 case Straw: return "Straw";
                 case Arrow: return "Arrow";
                 case Chest: return "Chest";
@@ -174,6 +181,7 @@ namespace Voxel.Core
                 case SmallStockpile: return "Small stockpile";
                 case Campfire: return "Campfire";
                 case ButcherTable: return "Butcher's table";
+                case CarpentryTable: return "Carpentry table";
                 case Shovel: return "Shovel";
                 case Pickaxe: return "Pickaxe";
                 case Axe: return "Axe";
@@ -181,12 +189,15 @@ namespace Voxel.Core
                 case Hoe: return "Hoe";
                 case Bow: return "Bow";
                 case Knife: return "Knife";
+                case Hammer: return "Hammer";
                 case Hide: return "Hide";
                 case Bones: return "Bones";
                 case Fat: return "Animal fat";
                 default:
                     if (Dishes.TryGet(item, out Dish dish)) return dish.Name;
                     if (IsMeat(item)) return Butchery.MeatName(MeatKindOf(item));
+                    if (item > 0 && item <= ushort.MaxValue && WoodBlocks.IsPlanks((ushort)item)) return "Planks";
+                    if (item > 0 && item <= ushort.MaxValue && WoodBlocks.IsLog((ushort)item)) return "Log";
                     return IsSeed(item) ? "Seed" : IsProduce(item) ? "Crop" : IsWood(item) ? "Wood" : IsCarcass(item) ? "Carcass" : "Unknown item";
             }
         }

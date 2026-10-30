@@ -17,8 +17,10 @@ namespace Voxel.Core
 
     // An order on a station: so many of a recipe (its index in the station's recipes), made one after
     // another. The work still to put in is the whole order's (calories); one is made once its own share
-    // is in. Stocked is how many ingredients were taken (given back if it is cancelled): those that
-    // could be when it was queued, the others taken from the linked chests when their turn comes.
+    // is in. Stocked is how many have their ingredients taken (Taken, the very items, given back if it
+    // is cancelled): those that could be when it was queued, the others taken from the linked storage
+    // when their turn comes. Choices are what goes in for each ingredient of a group (Items.None: Auto,
+    // Recipes.Pick).
     public sealed class StationJob
     {
         private readonly IReadOnlyList<Recipe> recipes;
@@ -35,6 +37,8 @@ namespace Voxel.Core
         public float LabourLeft;
         public float SecondsLeft;
         public string CreatorId;
+        public int[] Choices = new int[0];
+        public readonly Inventory Taken = new Inventory();
 
         public Recipe Made => recipes[Recipe];
 
@@ -47,23 +51,41 @@ namespace Voxel.Core
         public bool Started => SecondsLeft < Made.Seconds - 1e-4f;
 
         // What was taken for it and not made yet.
-        public List<KeyValuePair<int, int>> Held()
-        {
-            var held = new List<KeyValuePair<int, int>>();
-            if (Stocked <= 0) return held;
+        public List<KeyValuePair<int, int>> Held() => new List<KeyValuePair<int, int>>(Taken.Entries);
 
-            foreach (Ingredient ingredient in Made.Ingredients)
+        // Adds what was taken for one or more of it.
+        public void Stock(IEnumerable<(int Item, int Count)> items, int units)
+        {
+            foreach ((int item, int count) in items)
             {
-                held.Add(new KeyValuePair<int, int>(ingredient.Item, ingredient.Count * Stocked));
+                if (count > 0) Taken.Add(item, count);
             }
 
-            return held;
+            Stocked += units;
+        }
+
+        // One is made: its ingredients leave what is held (the same choices pick them).
+        internal void UseOne()
+        {
+            Stocked--;
+            List<(int Item, int Count)> unit = Stocked > 0 ? Voxel.Core.Recipes.Pick(Taken, Made, Choices, 1) : null;
+            if (unit == null)
+            {
+                if (Stocked <= 0) Taken.Clear();
+                return;
+            }
+
+            foreach ((int item, int count) in unit)
+            {
+                Taken.TryRemove(item, count);
+            }
         }
     }
 
     // A station's queue of orders, in real time (the server ticks it every frame, never by the
-    // simulation's clock): a campfire, which cooks (Recipes.Cooking) and burns wood, or a butcher's
-    // table, which cuts carcasses up (Recipes.Butchery). Players queue orders and put calories into
+    // simulation's clock): a campfire, which cooks (Recipes.Cooking) and burns wood, a butcher's table,
+    // which cuts carcasses up (Recipes.Butchery), or a carpentry table, which works wood
+    // (Recipes.Carpentry). Players queue orders and put calories into
     // them; the first whose work is in and whose ingredients are there is made, only while what it makes
     // has somewhere to go (canDeliver), and on a campfire burning wood (a log lasts Fuels.SecondsOf it,
     // a new one taken when it is out) only while it cooks; else it waits.
@@ -85,6 +107,8 @@ namespace Voxel.Core
         public static Station Campfire() => new Station(Voxel.Core.Recipes.Cooking, true);
 
         public static Station ButcherTable() => new Station(Voxel.Core.Recipes.Butchery, false);
+
+        public static Station CarpentryTable() => new Station(Voxel.Core.Recipes.Carpentry, false);
 
         public IReadOnlyList<Recipe> Recipes { get; }
 
@@ -171,9 +195,10 @@ namespace Voxel.Core
             return Math.Max(0, taken);
         }
 
-        // Queues an order of count, stocked of them with their ingredients taken; null if the queue is
-        // full, the count out of range or there is no such recipe.
-        public StationJob Queue(int recipe, int count, string creatorId, int stocked)
+        // Queues an order of count with those choices (null: all Auto), stocked of them with their
+        // ingredients taken (taken: those very items); null if the queue is full, the count out of
+        // range or there is no such recipe.
+        public StationJob Queue(int recipe, int count, string creatorId, IReadOnlyList<int> choices = null, int stocked = 0, IEnumerable<(int Item, int Count)> taken = null)
         {
             if (jobs.Count >= MaxJobs || recipe < 0 || recipe >= Recipes.Count || count < 1 || count > MaxCount) return null;
 
@@ -183,13 +208,40 @@ namespace Voxel.Core
                 Id = nextJobId++,
                 Recipe = recipe,
                 Count = count,
-                Stocked = Math.Max(0, Math.Min(count, stocked)),
                 LabourLeft = made.Calories * count,
                 SecondsLeft = made.Seconds,
-                CreatorId = creatorId ?? ""
+                CreatorId = creatorId ?? "",
+                Choices = ChoicesFor(made, choices)
             };
+            job.Stock(taken ?? Array.Empty<(int, int)>(), Math.Max(0, Math.Min(count, stocked)));
             jobs.Add(job);
             return job;
+        }
+
+        // The same for a recipe whose ingredients are all single items: what stocked of them take.
+        public StationJob Queue(int recipe, int count, string creatorId, int stocked)
+        {
+            var taken = new List<(int Item, int Count)>();
+            if (recipe >= 0 && recipe < Recipes.Count)
+            {
+                foreach (Ingredient ingredient in Recipes[recipe].Ingredients)
+                {
+                    if (!ingredient.IsGroup) taken.Add((ingredient.Item, ingredient.Count * Math.Max(0, Math.Min(count, stocked))));
+                }
+            }
+
+            return Queue(recipe, count, creatorId, null, stocked, taken);
+        }
+
+        private static int[] ChoicesFor(Recipe recipe, IReadOnlyList<int> choices)
+        {
+            var kept = new int[recipe.Ingredients.Count];
+            for (int i = 0; i < kept.Length && choices != null && i < choices.Count; i++)
+            {
+                kept[i] = choices[i];
+            }
+
+            return kept;
         }
 
         public bool TryGetJob(int id, out StationJob job)
@@ -212,10 +264,10 @@ namespace Voxel.Core
         public bool Remove(int jobId) => jobs.RemoveAll(j => j.Id == jobId) > 0;
 
         // Works for a while. An order paid for whose ingredients were not taken asks for them
-        // (takeIngredients: one's, all or nothing). canDeliver says whether everything the recipe makes
-        // has room. Returns the order of which one was finished, if one was (at most one a call, so that
-        // the caller delivers it before the next asks for room), else null.
-        public StationJob Tick(float seconds, Func<Recipe, bool> canDeliver, Func<int, bool> takeIngredients = null)
+        // (takeIngredients: one's, all or nothing, the items taken, or null). canDeliver says whether
+        // everything the recipe makes has room. Returns the order of which one was finished, if one was
+        // (at most one a call, so that the caller delivers it before the next asks for room), else null.
+        public StationJob Tick(float seconds, Func<Recipe, bool> canDeliver, Func<StationJob, List<(int Item, int Count)>> takeIngredients = null)
         {
             StationJob job = Next;
             if (job == null)
@@ -226,9 +278,10 @@ namespace Voxel.Core
                     if (!candidate.UnitPaid) continue;
 
                     paid = true;
-                    if (takeIngredients == null || !takeIngredients(candidate.Recipe)) continue;
+                    List<(int Item, int Count)> taken = takeIngredients?.Invoke(candidate);
+                    if (taken == null) continue;
 
-                    candidate.Stocked = 1;
+                    candidate.Stock(taken, 1);
                     job = candidate;
                     break;
                 }
@@ -274,7 +327,7 @@ namespace Voxel.Core
                 if (job.SecondsLeft <= 1e-4f)
                 {
                     job.Count--;
-                    job.Stocked--;
+                    job.UseOne();
                     job.SecondsLeft = recipe.Seconds;
                     if (job.Count <= 0) jobs.Remove(job);
                     Status = Next != null ? StationStatus.Working : jobs.Count > 0 ? StationStatus.NeedsLabour : StationStatus.Idle;
@@ -324,11 +377,24 @@ namespace Voxel.Core
                 writer.Write(job.LabourLeft);
                 writer.Write(job.SecondsLeft);
                 writer.Write(job.CreatorId);
+                writer.Write(job.Choices.Length);
+                foreach (int choice in job.Choices)
+                {
+                    writer.Write(choice);
+                }
+
+                writer.Write(job.Taken.DistinctCount);
+                foreach (KeyValuePair<int, int> entry in job.Taken.Entries)
+                {
+                    writer.Write(entry.Key);
+                    writer.Write(entry.Value);
+                }
             }
         }
 
         // Throws InvalidDataException if it cannot be a station. An order whose recipe no longer exists
-        // is dropped. In format 2 a dish was an order of one, with what was taken for it.
+        // is dropped. In format 2 a dish was an order of one, with what was taken for it; before format 5
+        // orders kept no choices (every ingredient was one item) and what was taken is the recipe's.
         public void Read(BinaryReader reader, int format)
         {
             nextJobId = reader.ReadInt32();
@@ -361,22 +427,58 @@ namespace Voxel.Core
                 job.CreatorId = reader.ReadString();
                 if (format < 3)
                 {
-                    int taken = reader.ReadInt32();
-                    if (taken < 0) throw new InvalidDataException("Invalid station order.");
+                    int oldTaken = reader.ReadInt32();
+                    if (oldTaken < 0) throw new InvalidDataException("Invalid station order.");
 
-                    for (int t = 0; t < taken; t++)
+                    for (int t = 0; t < oldTaken; t++)
                     {
                         reader.ReadInt32();
                         reader.ReadInt32();
                     }
 
                     job.Count = 1;
-                    job.Stocked = taken > 0 ? 1 : 0;
+                    job.Stocked = oldTaken > 0 ? 1 : 0;
                 }
 
                 if (job.Count < 1 || job.Count > MaxCount || job.Stocked < 0 || job.Stocked > job.Count) throw new InvalidDataException("Invalid station order.");
 
-                if (job.Recipe >= 0 && job.Recipe < Recipes.Count) jobs.Add(job);
+                var taken = new List<(int Item, int Count)>();
+                if (format >= 5)
+                {
+                    int choices = reader.ReadInt32();
+                    if (choices < 0 || choices > 16) throw new InvalidDataException("Invalid station order.");
+
+                    job.Choices = new int[choices];
+                    for (int c = 0; c < choices; c++)
+                    {
+                        job.Choices[c] = reader.ReadInt32();
+                    }
+
+                    int entries = reader.ReadInt32();
+                    if (entries < 0) throw new InvalidDataException("Invalid station order.");
+
+                    for (int e = 0; e < entries; e++)
+                    {
+                        int item = Items.Upgrade(reader.ReadInt32());
+                        int amount = reader.ReadInt32();
+                        if (amount > 0 && Items.IsValid(item)) taken.Add((item, amount));
+                    }
+                }
+
+                bool known = job.Recipe >= 0 && job.Recipe < Recipes.Count;
+                if (known) job.Choices = ChoicesFor(Recipes[job.Recipe], job.Choices);
+                if (known && format < 5)
+                {
+                    foreach (Ingredient ingredient in Recipes[job.Recipe].Ingredients)
+                    {
+                        if (!ingredient.IsGroup) taken.Add((ingredient.Item, ingredient.Count * job.Stocked));
+                    }
+                }
+
+                int stocked = job.Stocked;
+                job.Stocked = 0;
+                job.Stock(taken, stocked);
+                if (known) jobs.Add(job);
                 if (job.Id >= nextJobId) nextJobId = job.Id + 1;
             }
         }

@@ -21,6 +21,7 @@ namespace Voxel.Client
         [SerializeField] private MapScreen mapScreen;
         [SerializeField] private InventoryScreen inventoryScreen;
         [SerializeField] private HotbarHud hotbar;
+        [SerializeField] private InventorySync inventorySync;
         [SerializeField] private UIDocument document;
 
         private VisualElement screen;
@@ -68,8 +69,11 @@ namespace Voxel.Client
             if (storageHit) return StorageName(storageId);
             if (!blockHit) return null;
 
+            // A shaped wood block says its shape: "Oak planks · Wall".
             ushort block = world.GetBlock(hit.Block);
-            return OnLand(WithTool(Loc.Name(Items.NameOf(Blocks.TypeOf(block))), ToolRules.ToBreak(block)), hit.Block.X, hit.Block.Z);
+            string blockName = ItemCatalog.NameOf(Blocks.TypeOf(block), ecosystemSync);
+            if (Shapes.IsShaped(block)) blockName += " · " + BuildingHud.NameOf(Shapes.ShapeOf(block));
+            return OnLand(WithTool(blockName, ToolRules.ToBreak(block)), hit.Block.X, hit.Block.Z);
         }
 
         // What is on someone else's land says so: "Granite · claimed by Alice".
@@ -99,6 +103,12 @@ namespace Voxel.Client
                 return storageSync.IsPublic(storageId) ? Loc.T("{0} · public", table) : table;
             }
 
+            if (kind == StorageKind.CarpentryTable)
+            {
+                string bench = storageSync.IsBurning(storageId) ? Loc.T("Carpentry table · {0} · working", whose) : Loc.T("Carpentry table · {0}", whose);
+                return storageSync.IsPublic(storageId) ? Loc.T("{0} · public", bench) : bench;
+            }
+
             string name = kind == StorageKind.Chest
                 ? Loc.T("Chest · {0}", whose)
                 : kind == StorageKind.SmallStockpile
@@ -120,6 +130,9 @@ namespace Voxel.Client
         private string WithTool(string name, int tool)
         {
             if (name == null || tool == Items.None || hotbar.SelectedItem == tool) return name;
+
+            // In creative mode anything but an animal is struck whatever is in hand.
+            if (inventorySync != null && inventorySync.Creative && tool != Items.Bow) return name;
 
             string toolName = Items.NameOf(tool);
             string english = toolName.ToLowerInvariant();

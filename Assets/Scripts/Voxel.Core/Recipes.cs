@@ -3,12 +3,13 @@ using System.Collections.Generic;
 
 namespace Voxel.Core
 {
-    // What an ingredient may be: one item, or any item of a kind (any wood, any rock).
+    // What an ingredient may be: one item, or any item of a kind (any wood, any rock, any planks).
     public enum IngredientGroup : byte
     {
         None,
         Wood,
-        Stone
+        Stone,
+        Planks
     }
 
     // Why a player cannot craft a recipe, or why an order waits (Busy, TooHungry and QueueFull are
@@ -54,6 +55,7 @@ namespace Voxel.Core
             {
                 case IngredientGroup.Wood: return Items.IsWood(item);
                 case IngredientGroup.Stone: return Recipes.IsStone(item);
+                case IngredientGroup.Planks: return item > 0 && item <= ushort.MaxValue && WoodBlocks.IsPlanks((ushort)item);
                 default: return item == Item && item != Items.None;
             }
         }
@@ -108,7 +110,8 @@ namespace Voxel.Core
             new Recipe(Items.Chest, 1, 6f, 250f, new Ingredient(IngredientGroup.Wood, 10)),
             new Recipe(Items.Campfire, 1, 5f, 200f, new Ingredient(IngredientGroup.Stone, 12), new Ingredient(IngredientGroup.Wood, 6)),
             new Recipe(Items.Knife, 1, 2f, 50f, new Ingredient(IngredientGroup.Wood, 2), new Ingredient(IngredientGroup.Stone, 2)),
-            new Recipe(Items.ButcherTable, 1, 6f, 250f, new Ingredient(IngredientGroup.Wood, 10), new Ingredient(IngredientGroup.Stone, 4))
+            new Recipe(Items.CarpentryTable, 1, 8f, 300f, new Ingredient(IngredientGroup.Wood, 16), new Ingredient(IngredientGroup.Stone, 6)),
+            new Recipe(Items.Hammer, 1, 3f, 100f, new Ingredient(IngredientGroup.Wood, 4), new Ingredient(IngredientGroup.Stone, 2))
         };
 
         // What a campfire cooks (Station): one recipe per dish, in Dishes.All's order; there Calories is
@@ -118,6 +121,26 @@ namespace Voxel.Core
         // What a butcher's table cuts up: one recipe per animal species, in Butchery.Animals' order,
         // each making several things.
         public static readonly IReadOnlyList<Recipe> Butchery = Voxel.Core.Butchery.Recipes();
+
+        // What a carpentry table makes: each wood's planks (2 from a wood) and log (1 from a wood), in
+        // WoodBlocks.Species order, then a door, the large stockpile and the butcher's table.
+        public static readonly IReadOnlyList<Recipe> Carpentry = CarpentryRecipes();
+
+        private static Recipe[] CarpentryRecipes()
+        {
+            var recipes = new List<Recipe>();
+            for (int n = 0; n < WoodBlocks.Count; n++)
+            {
+                var wood = new Ingredient(Items.WoodOf(WoodBlocks.Species[n].Index), 1);
+                recipes.Add(new Recipe(Blocks.FirstPlanks + n, 2, 2f, 20f, wood));
+                recipes.Add(new Recipe(Blocks.FirstLog + n, 1, 2f, 20f, wood));
+            }
+
+            recipes.Add(new Recipe(Blocks.Door, 1, 8f, 150f, new Ingredient(IngredientGroup.Planks, 6)));
+            recipes.Add(new Recipe(Items.Stockpile, 1, 8f, 300f, new Ingredient(IngredientGroup.Wood, 24)));
+            recipes.Add(new Recipe(Items.ButcherTable, 1, 6f, 250f, new Ingredient(IngredientGroup.Wood, 10), new Ingredient(IngredientGroup.Stone, 4)));
+            return recipes.ToArray();
+        }
 
         private static Recipe[] CookingRecipes()
         {
@@ -219,6 +242,44 @@ namespace Voxel.Core
             }
 
             return made;
+        }
+
+        // What units of a recipe take, as concrete items, from what is available (an inventory or bag,
+        // linked storage and all together), with those choices (null: all Auto): a chosen item must
+        // cover the whole count; Auto takes from what is held most of first, the lowest item first when
+        // even (Options). Null if something is missing or a choice is wrong.
+        public static List<(int Item, int Count)> Pick(Inventory available, Recipe recipe, IReadOnlyList<int> choices, int units)
+        {
+            var left = new Inventory();
+            left.CopyFrom(available);
+            var picked = new List<(int Item, int Count)>();
+            for (int i = 0; i < recipe.Ingredients.Count; i++)
+            {
+                Ingredient ingredient = recipe.Ingredients[i];
+                int choice = choices != null && i < choices.Count ? choices[i] : Items.None;
+                int needed = ingredient.Count * units;
+                if (choice != Items.None && (!ingredient.IsGroup || !ingredient.Matches(choice))) return null;
+                if (Have(left, ingredient, choice) < needed) return null;
+
+                if (choice != Items.None || !ingredient.IsGroup)
+                {
+                    int item = choice != Items.None ? choice : ingredient.Item;
+                    left.TryRemove(item, needed);
+                    picked.Add((item, needed));
+                    continue;
+                }
+
+                foreach (int item in Options(left, ingredient))
+                {
+                    int take = Math.Min(needed, left.Count(item));
+                    left.TryRemove(item, take);
+                    picked.Add((item, take));
+                    needed -= take;
+                    if (needed == 0) break;
+                }
+            }
+
+            return picked;
         }
 
         // Takes the ingredients out of an inventory and checks the room left; a refusal may leave it

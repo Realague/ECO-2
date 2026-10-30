@@ -35,6 +35,7 @@ namespace Voxel.Core
             if (kind == StorageKind.Chest) Contents = new Inventory();
             else if (kind == StorageKind.Campfire) Station = Station.Campfire();
             else if (kind == StorageKind.ButcherTable) Station = Station.ButcherTable();
+            else if (kind == StorageKind.CarpentryTable) Station = Station.CarpentryTable();
             else Piles = new StockpilePiles(kind);
         }
 
@@ -46,7 +47,8 @@ namespace Voxel.Core
                 {
                     case StorageKind.Chest: return Contents.DistinctCount == 0;
                     case StorageKind.Campfire:
-                    case StorageKind.ButcherTable: return Station.IsEmpty;
+                    case StorageKind.ButcherTable:
+                    case StorageKind.CarpentryTable: return Station.IsEmpty;
                     default: return Piles.IsEmpty;
                 }
             }
@@ -69,9 +71,10 @@ namespace Voxel.Core
     {
         private const uint Magic = 0x524F5453; // "STOR"
         // Format 2 adds campfires (their wood and queue after them), format 3 orders of several
-        // dishes (Station.Write), format 4 butcher's tables (the same as a campfire after them);
-        // formats 1 to 3 still load.
-        private const int FormatVersion = 4;
+        // dishes (Station.Write), format 4 butcher's tables (the same as a campfire after them), format 5
+        // carpentry tables and each order's choices and what was taken for it;
+        // formats 1 to 4 still load.
+        private const int FormatVersion = 5;
 
         private readonly Dictionary<int, Storage> storages = new Dictionary<int, Storage>();
 
@@ -212,6 +215,7 @@ namespace Voxel.Core
                     if (!StorageRules.IsKind(kind) || facing > 3 || ownerId.Length == 0) throw new InvalidDataException($"Invalid storage {id}.");
                     if (format < 2 && kind == (byte)StorageKind.Campfire) throw new InvalidDataException($"Campfire {id} in a save from before campfires.");
                     if (format < 4 && kind == (byte)StorageKind.ButcherTable) throw new InvalidDataException($"Butcher's table {id} in a save from before them.");
+                    if (format < 5 && kind == (byte)StorageKind.CarpentryTable) throw new InvalidDataException($"Carpentry table {id} in a save from before them.");
 
                     var storage = new Storage(id, (StorageKind)kind, position, facing, ownerId);
                     int allowed = reader.ReadInt32();

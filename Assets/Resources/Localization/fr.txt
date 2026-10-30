@@ -482,14 +482,11 @@ Campfire · {0} · cooking	Feu de camp · {0} · en cuisson
 The queue is full ({0})	La file est pleine ({0})
 No room to give back the ingredients	Pas de place pour rendre les ingrédients
 The fire holds {0} wood at most	Le feu prend {0} bois au plus
-Ingredients are taken from your bag, then from the linked chests (those of the same claimed zone; off claimed land, the public chests within 8 blocks), and what is made goes into them.	Les ingrédients sont pris dans votre sac, puis dans les coffres liés (ceux de la même zone revendiquée ; hors des terres revendiquées, les coffres publics à 8 blocs ou moins), et ce qui est fait y va.
+Ingredients are taken from your bag, then from the linked storage (the chests and stockpiles of the same claimed zone; off claimed land, the public ones within 8 blocks), and what is made goes into it.	Les ingrédients sont pris dans votre sac, puis dans les stockages liés (les coffres et réserves de la même zone revendiquée ; hors des terres revendiquées, ceux qui sont publics à 8 blocs ou moins), et ce qui est fait y va.
 Wood by the fire (20 at most): it burns only while a dish cooks, 30 s a log	Bois près du feu (20 au plus) : il ne brûle que pendant une cuisson, 30 s par bûche
 What is left of the log alight	Ce qui reste de la bûche allumée
 Dishes	Plats
 Queue	File
-No linked chest	Aucun coffre lié
-1 linked chest	1 coffre lié
-{0} linked chests	{0} coffres liés
 Queue ({0} / {1})	File ({0} / {1})
 by {0}	par {0}
 +{0} kcal	+{0} kcal
@@ -497,8 +494,6 @@ Shift + click: all it needs	Maj + clic : tout ce qu'il faut
 Cancel: the ingredients come back, the calories put in are lost	Annuler : les ingrédients reviennent, les calories apportées sont perdues
 Ready: waits its turn	Prêt : attend son tour
 Needs firewood	Il faut du bois
-No linked chest to put it in	Aucun coffre lié où le mettre
-No room in the linked chests	Pas de place dans les coffres liés
 Cooking… {0} s	Cuisson… {0} s
 
 # Queues, quantities, storage views
@@ -514,16 +509,12 @@ Nothing queued: choose a recipe, then Add to the queue.	Rien en file : choisisse
 Nothing queued: choose a dish, then Add to the queue.	Rien en file : choisissez un plat, puis Ajouter à la file.
 Missing ingredients: the order will wait until they are in your bag	Il manque des ingrédients : la commande attendra qu'ils soient dans votre sac
 Missing ingredients: waits until they are in your bag	Il manque des ingrédients : attend qu'ils soient dans votre sac
-Missing ingredients: the order will wait for them in the linked chests	Il manque des ingrédients : la commande les attendra dans les coffres liés
-Missing ingredients: put them in a linked chest	Il manque des ingrédients : mettez-les dans un coffre lié
-No linked chest: dishes need one to go into	Aucun coffre lié : les plats doivent aller dans un coffre
 {0} × {1} = {2}	{0} × {1} = {2}
 {0} to make	{0} à fabriquer
 1 to make	1 à fabriquer
 Crafting… {0} s	Fabrication… {0} s
 Waits its turn	Attend son tour
 ingredients for {0} / {1}	ingrédients pour {0} / {1}
-bag {0} · linked chests {1}	sac {0} · coffres liés {1}
 Work	Travail
 Your calories: the work put into orders burns them	Vos calories : le travail mis dans les commandes les brûle
 Cooking	Cuisine
@@ -593,9 +584,75 @@ Carcasses	Carcasses
 Nothing queued: choose a carcass, then Add to the queue.	Rien en file : choisissez une carcasse, puis Ajouter à la file.
 Butchering	Découpe
 Cut up on the butcher's table: its meat, hide, bones and fat go into the linked chests. A knife in the field takes only half its meat.	Découpée sur l'établi de boucher : sa viande, sa peau, ses os et sa graisse vont dans les coffres liés. Un couteau dans les champs ne prend que la moitié de sa viande.
-No linked chest: what it cuts up needs one to go into	Aucun coffre lié : ce qu'il découpe doit aller dans un coffre
 Needs calories to butcher	Il faut des calories pour découper
 Butchering… {0} s	Découpe… {0} s
 Gives	Donne
 Butcher's table · {0}	Établi de boucher · {0}
 Butcher's table · {0} · working	Établi de boucher · {0} · au travail
+
+# Carpentry table, wood blocks, door
+Carpentry table	Table de menuiserie
+Wooden door	Porte en bois
+Planks	Planches
+Log	Rondin
+{0} planks	Planches de {1}
+{0} log	Rondin de {1}
+Door	Porte
+Carpentry	Menuiserie
+Stockpiles	Réserves
+Works wood into planks, logs, doors, the large stockpile and the butcher's table. Queue an order and put calories into it. Wood and stone come from your bag and the chests and stockpiles linked to it (those of its claimed zone), and what it makes goes into them.	Travaille le bois en planches, rondins, portes, grande réserve et établi de boucher. Mettez une commande en file et apportez-lui des calories. Le bois et la pierre viennent de votre sac et des coffres et réserves liés à la table (ceux de sa zone revendiquée), et ce qu'elle fabrique y va.
+A wooden door, two blocks high, set up with a hammer (choose it with B, hammer in hand, and right click on the ground), facing the way you look; right click on it to open or close it, a hammer blow takes it back. On claimed land only the owner and the players they allow open it.	Une porte en bois, haute de deux blocs, dressée au marteau (choisissez-la avec B, marteau en main, puis clic droit sur le sol), tournée dans la direction de votre regard ; clic droit dessus pour l'ouvrir ou la fermer, un coup de marteau la reprend. Sur une terre revendiquée, seuls le propriétaire et les joueurs qu'il autorise l'ouvrent.
+A building block of {1} wood, made at a carpentry table: bark on its sides. Built with a hammer, as a full block, a wall, a post, a floor, a roof, a roof corner, stairs, a fence or a ladder (choose it with B and R, hammer in hand); a hammer blow takes it back.	Un bloc de construction en bois de {1}, fait à la table de menuiserie : l'écorce sur ses côtés. Il se pose au marteau, en bloc plein, mur, poteau, sol, toit, angle de toit, escalier, barrière ou échelle (choisissez avec B et R, marteau en main) ; un coup de marteau le reprend.
+A building block of {1} planks, made at a carpentry table. Built with a hammer, as a full block, a wall, a post, a floor, a roof, a roof corner, stairs, a fence or a ladder (choose it with B and R, hammer in hand); a hammer blow takes it back.	Un bloc de construction en planches de {1}, fait à la table de menuiserie. Il se pose au marteau, en bloc plein, mur, poteau, sol, toit, angle de toit, escalier, barrière ou échelle (choisissez avec B et R, marteau en main) ; un coup de marteau le reprend.
+No linked storage	Aucun stockage lié
+1 linked storage	1 stockage lié
+{0} linked storages	{0} stockages liés
+bag {0} · linked storage {1}	sac {0} · stockages liés {1}
+No linked chest: what it makes needs one to go into	Aucun coffre lié : ce qu'elle fabrique doit aller dans un coffre
+No linked stockpile: what it makes needs one to go into	Aucune réserve liée : ce qu'elle fabrique doit aller dans une réserve
+Missing ingredients: the order will wait for them in the linked storage	Il manque des ingrédients : la commande les attendra dans les stockages liés
+Needs calories to work	Il faut des calories pour travailler
+Missing ingredients: put them in the linked storage	Il manque des ingrédients : mettez-les dans un stockage lié
+No linked storage to put it in	Aucun stockage lié où le mettre
+No room in the linked storage	Plus de place dans les stockages liés
+Working… {0} s	Travail… {0} s
+No linked stockpile: place a stockpile on the same claimed land, or a public stockpile within 8 blocks off claimed land.	Aucune réserve liée : posez une réserve sur la même terre revendiquée, ou une réserve publique à 8 blocs ou moins hors des terres revendiquées.
+Linked stockpiles ({0})	Réserves liées ({0})
+Linked stockpile	Réserve liée
+Carpentry table · {0}	Table de menuiserie · {0}
+Carpentry table · {0} · working	Table de menuiserie · {0} · au travail
+A door stands on the ground, with room for two blocks	Une porte se dresse sur le sol, avec la place pour deux blocs
+
+# Hammer and building shapes
+Hammer	Marteau
+Builds with planks, logs and doors: right click to place the block chosen in its panel (B), in the shape chosen (R), one at a time or in lines of up to 16 (V: a first click where the line starts, a second where it ends). A left click takes a building block back at once.	Construit avec les planches, les rondins et les portes : clic droit pour poser le bloc choisi dans son panneau (B), dans la forme choisie (R), un à un ou en lignes de 16 au plus (V : un premier clic où la ligne commence, un second où elle finit). Un clic gauche reprend aussitôt un bloc de construction.
+You need a hammer to build	Il faut un marteau pour construire
+No construction block in the bag	Aucun bloc de construction dans le sac
+Full block	Bloc plein
+Wall	Mur
+Post	Poteau
+Floor	Sol
+Flat roof	Toit plat
+Sloped roof	Toit incliné
+Fence	Barrière
+Shape	Forme
+Mode	Mode
+Block by block	Bloc par bloc
+Line	En ligne
+Line · {0} / {1}	En ligne · {0} / {1}
+Shape (hold: menu)	Forme (maintenir : menu)
+Point at one, then release R or click	Pointez-en un, puis relâchez R ou cliquez
+Stairs	Escalier
+Roof corner (outer)	Angle de toit (extérieur)
+Roof corner (inner)	Angle de toit (intérieur)
+Ladder	Échelle
+
+# Creative mode
+Creative	Créatif
+Creative mode	Mode créatif
+Creative mode: on	Mode créatif : activé
+Creative mode: off	Mode créatif : désactivé
+Every item	Tous les objets
+Double Space: fly · one hit breaks anything · no hunger, no carrying limit. Click: a stack, right click: one.	Double Espace : voler · un coup casse tout · ni faim ni limite de port. Clic : une pile, clic droit : un seul.
+Switch creative mode on to take any item for free, fly and break anything in one hit.	Activez le mode créatif pour prendre n'importe quel objet gratuitement, voler et tout casser en un coup.
+Weight {0} kg / ∞	Poids {0} kg / ∞

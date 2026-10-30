@@ -34,6 +34,10 @@ namespace Voxel.Client
         [SerializeField] private Material torchHeadMaterial;
         [SerializeField] private Material torchFlameMaterial;
 
+        // Doors (DoorViews): planks and iron, with GPU instancing.
+        [SerializeField] private Material doorWoodMaterial;
+        [SerializeField] private Material doorIronMaterial;
+
         // Remeshing this many chunks or more at once is shared among the cores (ChunkMeshing).
         private const int ParallelRemeshCount = 16;
 
@@ -48,6 +52,7 @@ namespace Voxel.Client
         private SkyLight skyLight;
         private BlockLight blockLight;
         private TorchViews torchViews;
+        private DoorViews doorViews;
         private string savePath;
         private bool rendering;
 
@@ -70,6 +75,8 @@ namespace Voxel.Client
             {
                 torchViews = new TorchViews(torchWoodMaterial, torchHeadMaterial, torchFlameMaterial);
             }
+
+            if (doorWoodMaterial != null && doorIronMaterial != null) doorViews = new DoorViews(doorWoodMaterial, doorIronMaterial);
         }
 
         // How bright the blocks are drawn at this position, 0 to 1: the curve of the blocks' shader
@@ -82,7 +89,8 @@ namespace Voxel.Client
             int x = Mathf.FloorToInt(position.x);
             int y = Mathf.FloorToInt(position.y);
             int z = Mathf.FloorToInt(position.z);
-            float level = skyLight.Get(x, y, z) / (float)SkyLight.Max;
+            // The cell above too: one holding a shaped block that stops light (a floor stood on) has none.
+            float level = Mathf.Max(skyLight.Get(x, y, z), skyLight.Get(x, y + 1, z)) / (float)SkyLight.Max;
             float curve = level / (3f * (1f - level) + 1f);
             float sky = Mathf.Lerp(darkestSkyLight, 1f, curve);
             float torch = blockLight != null ? TorchGlow(blockLight.Get(x, y, z) / (float)Blocks.TorchLight) : 0f;
@@ -96,6 +104,7 @@ namespace Voxel.Client
         private void LateUpdate()
         {
             if (World != null && torchViews != null && Camera.main != null) torchViews.Render(World, blockLight, Camera.main.transform.position);
+            if (World != null && doorViews != null && Camera.main != null) doorViews.Render(World, Camera.main.transform.position);
             if (dirtyChunks.Count == 0) return;
 
             if (dirtyChunks.Count >= ParallelRemeshCount)
@@ -175,6 +184,7 @@ namespace Voxel.Client
             dirtyChunks.Add(chunk);
             skyLight.UpdateChunk(chunk, dirtyChunks);
             blockLight.UpdateChunk(chunk, dirtyChunks);
+            doorViews?.RefreshChunk(chunk);
 
             // The faces of neighbouring chunks turned toward this one change too.
             foreach (BlockPos offset in NeighbourOffsets)
@@ -202,6 +212,7 @@ namespace Voxel.Client
             dirtyChunks.Clear();
             skyLight = null;
             blockLight = null;
+            doorViews?.Clear();
             World = null;
             savePath = null;
         }
@@ -218,6 +229,7 @@ namespace Voxel.Client
             var timer = System.Diagnostics.Stopwatch.StartNew();
             skyLight = new SkyLight(World);
             blockLight = new BlockLight(World);
+            doorViews?.Reset(World);
             double lightSeconds = timer.Elapsed.TotalSeconds;
 
             World.BlockChanged += OnBlockChanged;
@@ -286,6 +298,7 @@ namespace Voxel.Client
             MarkDirty(pos);
             skyLight.Update(pos, dirtyChunks);
             blockLight.Update(pos, dirtyChunks);
+            doorViews?.Changed(pos, current);
 
             // A block on a chunk edge also changes the visible faces of the neighbouring chunk.
             foreach (BlockPos offset in NeighbourOffsets)

@@ -43,6 +43,7 @@ namespace Voxel.Client
             Stockpiles,
             Cooking,
             Linked,
+            LinkedPiles,
             Fuel
         }
 
@@ -53,6 +54,7 @@ namespace Voxel.Client
         private Label cookingTabText;
         private VisualElement cookingTabIcon;
         private Button linkedTab;
+        private Button linkedPilesTab;
         private Button fuelTab;
         private Label owner;
         private Button pickup;
@@ -120,6 +122,7 @@ namespace Voxel.Client
             cookingTabText = root.Q<Label>("tab-cooking-text");
             cookingTabIcon = root.Q("tab-cooking-icon");
             linkedTab = root.Q<Button>("tab-fire-inventory");
+            linkedPilesTab = root.Q<Button>("tab-fire-stockpiles");
             fuelTab = root.Q<Button>("tab-fuel");
             owner = root.Q<Label>("storage-owner");
             pickup = root.Q<Button>("pickup");
@@ -156,6 +159,7 @@ namespace Voxel.Client
             storageTab.focusable = false;
             Connect(cookingTab, () => ShowFireTab(Mode.Cooking));
             Connect(linkedTab, () => ShowFireTab(Mode.Linked));
+            Connect(linkedPilesTab, () => ShowFireTab(Mode.LinkedPiles));
             Connect(fuelTab, () => ShowFireTab(Mode.Fuel));
             Connect(pickup, () => storageSync.RequestPickup());
 
@@ -267,14 +271,17 @@ namespace Voxel.Client
             StorageKind kind = storageSync.OpenedKind;
             bool station = StorageRules.IsStation(kind);
             bool butchery = kind == StorageKind.ButcherTable;
+            bool carpentry = kind == StorageKind.CarpentryTable;
             storageTab.style.display = station ? DisplayStyle.None : DisplayStyle.Flex;
             storageTabText.text = Loc.T(Items.NameOf(StorageRules.ItemOf(kind)));
-            cookingTabText.text = butchery ? Loc.T("Butchering") : Loc.T("Cooking");
-            cookingTabIcon.EnableInClassList("icon--fire", !butchery);
+            cookingTabText.text = butchery ? Loc.T("Butchering") : carpentry ? Loc.T("Carpentry") : Loc.T("Cooking");
+            cookingTabIcon.EnableInClassList("icon--fire", !butchery && !carpentry);
             cookingTabIcon.EnableInClassList("icon--category-tools", butchery);
+            cookingTabIcon.EnableInClassList("icon--category-wood", carpentry);
             ShowTab(cookingTab, station, mode == Mode.Cooking);
             ShowTab(linkedTab, station, mode == Mode.Linked);
-            ShowTab(fuelTab, station && !butchery, mode == Mode.Fuel);
+            ShowTab(linkedPilesTab, carpentry, mode == Mode.LinkedPiles);
+            ShowTab(fuelTab, kind == StorageKind.Campfire, mode == Mode.Fuel);
             if (station) stationPage.ShowKind(kind);
 
             storagePage.style.display = mode == Mode.Cooking ? DisplayStyle.None : DisplayStyle.Flex;
@@ -292,14 +299,17 @@ namespace Voxel.Client
             ShowCarry(bag);
             bagTitle.text = bagGrid.HoveredItem != Items.None ? ItemCatalog.NameOf(bagGrid.HoveredItem, ecosystemSync) : Loc.T("Your bag");
 
-            storeIcon.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(StorageRules.ItemOf(mode == Mode.Linked ? StorageKind.Chest : storageSync.OpenedKind), ecosystemSync));
+            StorageKind shownKind = mode == Mode.Linked ? StorageKind.Chest : mode == Mode.LinkedPiles ? StorageKind.SmallStockpile : storageSync.OpenedKind;
+            storeIcon.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(StorageRules.ItemOf(shownKind), ecosystemSync));
             storeBurn.style.display = mode == Mode.Fuel ? DisplayStyle.Flex : DisplayStyle.None;
             storeFillIcon.EnableInClassList("icon--scales", mode == Mode.Chests || mode == Mode.Linked);
-            storeFillIcon.EnableInClassList("icon--backpack", mode == Mode.Stockpiles);
+            storeFillIcon.EnableInClassList("icon--backpack", mode == Mode.Stockpiles || mode == Mode.LinkedPiles);
             storeFillIcon.EnableInClassList("icon--category-wood", mode == Mode.Fuel);
             bool noChest = mode == Mode.Linked && storageSync.OpenedLinkedChests == 0;
-            storeEmpty.text = noChest ? Loc.T("No linked chest: place a chest on the same claimed land, or a public chest within 8 blocks off claimed land.") : "";
-            storeEmpty.style.display = noChest ? DisplayStyle.Flex : DisplayStyle.None;
+            bool noPile = mode == Mode.LinkedPiles && storageSync.OpenedLinkedStockpiles.Count == 0;
+            storeEmpty.text = noChest ? Loc.T("No linked chest: place a chest on the same claimed land, or a public chest within 8 blocks off claimed land.")
+                : noPile ? Loc.T("No linked stockpile: place a stockpile on the same claimed land, or a public stockpile within 8 blocks off claimed land.") : "";
+            storeEmpty.style.display = noChest || noPile ? DisplayStyle.Flex : DisplayStyle.None;
 
             string side;
             int members = storageSync.OpenedMembers;
@@ -323,6 +333,15 @@ namespace Voxel.Client
                     pool.ShowChests(storageSync.OpenedLinkedMembers, storageSync.OpenedLinkedContents, 0);
                     ShowWeight(storageSync.OpenedLinkedContents, Mathf.Max(1, chests));
                     side = chests > 1 ? Loc.T("Linked chests ({0})", chests) : Loc.T("Linked chest");
+                    break;
+                case Mode.LinkedPiles:
+                    System.Collections.Generic.IReadOnlyList<StorageMember> linkedPiles = storageSync.OpenedLinkedStockpiles;
+                    pool.ShowStockpiles(linkedPiles, 0);
+                    int piled = storageSync.OpenedPileTotal;
+                    int room = Mathf.Max(1, storageSync.OpenedPileCapacity);
+                    storeFill.text = $"{piled} / {room}";
+                    ShowShare(storeFill, (float)piled / room);
+                    side = linkedPiles.Count > 1 ? Loc.T("Linked stockpiles ({0})", linkedPiles.Count) : Loc.T("Linked stockpile");
                     break;
                 default:
                     pool.ShowSingle(storageSync.OpenedFuelContents);
@@ -368,7 +387,8 @@ namespace Voxel.Client
         {
             switch (mode)
             {
-                case Mode.Stockpiles: return StorageRules.AcceptsInStockpile(item);
+                case Mode.Stockpiles:
+                case Mode.LinkedPiles: return StorageRules.AcceptsInStockpile(item);
                 case Mode.Fuel: return Fuels.IsFuel(item);
                 default: return StorageRules.AcceptsInChest(item);
             }
@@ -468,6 +488,9 @@ namespace Voxel.Client
                     case Mode.Linked:
                         storageSync.RequestFireMove(true, itemOrPile, count, member);
                         break;
+                    case Mode.LinkedPiles:
+                        storageSync.RequestFireMove(true, itemOrPile, count, member, true);
+                        break;
                     case Mode.Fuel:
                         storageSync.RequestFuel(itemOrPile, count);
                         break;
@@ -490,6 +513,10 @@ namespace Voxel.Client
                     break;
                 case Mode.Linked:
                     storageSync.RequestFireMove(false, itemOrPile, all ? ContentsOf(storageSync.OpenedLinkedMembers, storageSync.OpenedLinkedContents, member).Count(itemOrPile) : 1, member);
+                    break;
+                case Mode.LinkedPiles:
+                    int piled = byItem ? StockpileCount(itemOrPile) : storageSync.OpenedPileCountAt(itemOrPile);
+                    storageSync.RequestFireMove(false, itemOrPile, all ? piled : 1, 0, true, byItem);
                     break;
                 case Mode.Fuel:
                     storageSync.RequestTakeFuel(itemOrPile, all ? storageSync.OpenedFuelContents.Count(itemOrPile) : 1);
@@ -526,7 +553,7 @@ namespace Voxel.Client
             if (!dragging && Vector2.Distance(e.position, pressedAt) >= DragThreshold)
             {
                 dragging = true;
-                bool pile = !fromBag && CurrentMode == Mode.Stockpiles && !pressedByItem;
+                bool pile = !fromBag && (CurrentMode == Mode.Stockpiles || CurrentMode == Mode.LinkedPiles) && !pressedByItem;
                 int item = pile ? storageSync.OpenedPileItem(pressedItemOrPile) : pressedItemOrPile;
                 ghost.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(item, ecosystemSync));
                 ghost.RemoveFromClassList("hidden");

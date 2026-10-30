@@ -225,6 +225,27 @@ namespace Voxel.Core
             return taken;
         }
 
+        // Whether the stockpiles have room for all of these together (what a station makes at once),
+        // each put in order as AddToStockpiles would: checked on copies, since kinds of blocks share
+        // the empty piles.
+        public static bool StockpileRoomFor(IReadOnlyList<Storage> stockpiles, IReadOnlyList<(int Item, int Count)> items)
+        {
+            var copies = new List<Storage>();
+            foreach (Storage stockpile in stockpiles)
+            {
+                var copy = new Storage(stockpile.Id, stockpile.Kind, stockpile.Position, stockpile.Facing, stockpile.OwnerId);
+                copy.Piles.CopyFrom(stockpile.Piles);
+                copies.Add(copy);
+            }
+
+            foreach ((int item, int count) in items)
+            {
+                if (AddToStockpiles(copies, item, count) < count) return false;
+            }
+
+            return true;
+        }
+
         // ---- Both ----
 
         // Moves everything a storage holds into the others of its pool, if all of it fits; else

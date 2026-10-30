@@ -86,6 +86,17 @@ namespace Voxel.Client
             new Box(Stuff.Iron, 0.002f, 0.44f, 0f, 0.035f, 0.05f, 0.011f)
         };
 
+        // A short handle with a grip, a head across its top: a square face toward +x, a claw toward -x.
+        private static readonly Box[] Hammer =
+        {
+            new Box(Stuff.Wood, 0f, 0.32f, 0f, 0.06f, 0.64f, 0.06f),
+            new Box(Stuff.Light, 0f, 0.2f, 0f, 0.075f, 0.22f, 0.075f),
+            new Box(Stuff.Iron, 0.04f, 0.66f, 0f, 0.2f, 0.09f, 0.09f),
+            new Box(Stuff.Iron, 0.165f, 0.66f, 0f, 0.05f, 0.12f, 0.12f),
+            new Box(Stuff.Iron, -0.1f, 0.68f, 0f, 0.1f, 0.06f, 0.05f),
+            new Box(Stuff.Iron, -0.17f, 0.64f, 0f, 0.06f, 0.06f, 0.05f)
+        };
+
         private static readonly Box[] Arrow =
         {
             new Box(Stuff.Wood, 0f, 0.55f, 0f, 0.04f, 1f, 0.04f),
@@ -106,6 +117,7 @@ namespace Voxel.Client
                 case Items.Hoe: return Hoe;
                 case Items.Bow: return Bow;
                 case Items.Knife: return Knife;
+                case Items.Hammer: return Hammer;
                 case Items.Arrow: return Arrow;
                 default: return Array.Empty<Box>();
             }

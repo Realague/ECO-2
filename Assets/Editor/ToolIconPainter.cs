@@ -639,6 +639,35 @@ internal static class ToolIconPainter
                     new Disc(Brass, 0f, -30f, 1.8f)
                 };
 
+            case Items.Hammer:
+            {
+                // A square striking face toward -x, a claw curving down toward +x, a wedge through the head.
+                var claw = new List<Vector2>();
+                for (int i = 0; i <= 10; i++)
+                {
+                    float s = i / 10f;
+                    claw.Add(V(8f + 34f * s, 62f - 18f * s * s));
+                }
+
+                for (int i = 10; i >= 0; i--)
+                {
+                    float s = i / 10f;
+                    float width = 11f * (1f - s) + 2f;
+                    claw.Add(V(8f + 34f * s, 62f - 18f * s * s - width));
+                }
+
+                return new List<Shape>
+                {
+                    new Rod(Wood, 0f, -62f, 0f, 58f, 5f),
+                    new Rod(Leather, 0f, -62f, 0f, -30f, 6.2f),
+                    new Plate(Steel, claw.ToArray()),
+                    new Plate(Steel, V(-36f, 46f), V(-12f, 48f), V(-12f, 66f), V(-36f, 68f)),
+                    new Plate(DarkSteel, V(-44f, 42f), V(-36f, 42f), V(-36f, 72f), V(-44f, 72f)),
+                    new Plate(DarkSteel, V(-10f, 44f), V(10f, 44f), V(10f, 68f), V(-10f, 68f)),
+                    new Disc(Brass, 0f, 56f, 2.2f)
+                };
+            }
+
             case Items.Arrow:
                 return new List<Shape>
                 {

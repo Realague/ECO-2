@@ -15,6 +15,10 @@
                 <ui:VisualElement class="icon icon--category-tools inventory-tab-icon" />
                 <ui:Label text="Crafting" class="inventory-tab-text" />
             </ui:Button>
+            <ui:Button name="tab-creative" class="inventory-tab">
+                <ui:VisualElement class="icon icon--plus inventory-tab-icon" />
+                <ui:Label text="Creative" class="inventory-tab-text" />
+            </ui:Button>
             <ui:VisualElement class="inventory-tabs-space" />
             <ui:VisualElement class="speciality">
                 <ui:VisualElement class="icon icon--plant" />
@@ -76,6 +80,37 @@
                     <ui:VisualElement class="item-well queue-well">
                         <ui:Label name="craft-queue-empty" text="Nothing queued: choose a recipe, then Add to the queue." class="items-empty" />
                         <ui:ScrollView name="craft-queue" class="queue-list" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- The creative tab (CreativePage): creative mode on or off, then every item of the game to take. -->
+                <ui:VisualElement name="creative-page" class="creative-page">
+                    <ui:VisualElement class="creative-head">
+                        <ui:Button name="creative-toggle" class="button creative-toggle">
+                            <ui:VisualElement name="creative-toggle-dot" class="creative-toggle-dot" />
+                            <ui:Label name="creative-toggle-text" class="button-text" />
+                        </ui:Button>
+                        <ui:Label name="creative-hint" class="creative-hint" />
+                    </ui:VisualElement>
+                    <ui:VisualElement class="creative-body">
+                        <ui:VisualElement class="categories">
+                            <ui:Label text="Categories" class="column-title" />
+                            <ui:ScrollView name="creative-category-list" class="category-list" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="items">
+                            <ui:VisualElement class="items-heading">
+                                <ui:Label text="Every item" class="column-title items-title" />
+                                <ui:VisualElement name="creative-search-box" class="item-search-box">
+                                    <ui:VisualElement class="icon icon--search item-search-icon" picking-mode="Ignore" />
+                                    <ui:TextField name="creative-search" max-length="32" class="item-search" />
+                                    <ui:Label name="creative-search-hint" text="Search" class="item-search-hint" picking-mode="Ignore" />
+                                </ui:VisualElement>
+                            </ui:VisualElement>
+                            <ui:VisualElement class="item-well">
+                                <ui:Label name="creative-empty" class="items-empty" />
+                                <ui:ScrollView name="creative-grid" class="item-grid" />
+                            </ui:VisualElement>
+                        </ui:VisualElement>
                     </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>

@@ -41,20 +41,27 @@ namespace Voxel.Core
         // Whether they were given a knife (format 9): once only, for players from before knives (new
         // players get it with their tools).
         public bool ReceivedKnife;
+
+        // Whether they were given a hammer (format 10): once only, for players from before hammers.
+        public bool ReceivedHammer;
+
+        // Whether they play in creative mode (format 11): items for free, flight, one hit breaks
+        // anything, no hunger nor carrying limits. Anyone may switch it on or off.
+        public bool Creative;
     }
 
     // The state of every player known to the server, by player id.
     public sealed class PlayerStore
     {
         private const uint Magic = 0x504F4345; // "ECOP"
-        private const int FormatVersion = 9;
+        private const int FormatVersion = 11;
 
         // Older formats still load. Without inventory, the player keeps their position; without
         // appearance, they choose one at their next connection; without a hotbar, theirs starts empty
         // (the server fills it with what they own); without a stomach, theirs starts half full;
         // without tools, they get them at their next connection; without a name or storage, they choose
-        // a name and get a chest and a stockpile at their next connection; without torches or a knife,
-        // they get them at their next connection.
+        // a name and get a chest and a stockpile at their next connection; without torches, a knife or a hammer,
+        // they get them at their next connection; without creative mode, they play in survival.
         private const int FormatWithoutInventory = 1;
         private const int FormatWithoutAppearance = 2;
         private const int FormatWithoutHotbar = 3;
@@ -63,6 +70,8 @@ namespace Voxel.Core
         private const int FormatWithoutName = 6;
         private const int FormatWithoutTorches = 7;
         private const int FormatWithoutKnife = 8;
+        private const int FormatWithoutHammer = 9;
+        private const int FormatWithoutCreative = 10;
 
         private readonly Dictionary<string, PlayerState> players = new Dictionary<string, PlayerState>();
 
@@ -136,6 +145,8 @@ namespace Voxel.Core
                     writer.Write(state.ReceivedStorage);
                     writer.Write(state.ReceivedTorches);
                     writer.Write(state.ReceivedKnife);
+                    writer.Write(state.ReceivedHammer);
+                    writer.Write(state.Creative);
                 }
             }
         }
@@ -212,7 +223,9 @@ namespace Voxel.Core
                     }
 
                     if (formatVersion >= FormatWithoutKnife) state.ReceivedTorches = reader.ReadBoolean();
-                    if (formatVersion >= FormatVersion) state.ReceivedKnife = reader.ReadBoolean();
+                    if (formatVersion >= FormatWithoutHammer) state.ReceivedKnife = reader.ReadBoolean();
+                    if (formatVersion >= FormatWithoutCreative) state.ReceivedHammer = reader.ReadBoolean();
+                    if (formatVersion >= FormatVersion) state.Creative = reader.ReadBoolean();
 
                     store.Set(playerId, state);
                 }

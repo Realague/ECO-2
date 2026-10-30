@@ -1062,3 +1062,70 @@
     margin-left: 6px;
     font-size: 18px;
 }
+
+/* ---- The creative tab (CreativePage) ---- */
+
+/* Creative mode on or off, a reminder of what it does, then the categories and every item. */
+.creative-page {
+    flex-grow: 1;
+    background-color: var(--inv-main);
+    border-width: 1px;
+    border-color: var(--panel-border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.creative-head {
+    flex-direction: row;
+    align-items: center;
+    padding: 14px 20px;
+    border-bottom-width: 1px;
+    border-color: var(--panel-border);
+    background-color: var(--inv-column);
+}
+
+.creative-toggle {
+    flex-direction: row;
+    align-items: center;
+    height: 42px;
+    padding: 0 18px;
+    font-size: 17px;
+    margin-right: 18px;
+}
+
+.creative-toggle-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 6px;
+    margin-right: 10px;
+    background-color: #6c6e6f;
+}
+
+.creative-toggle--on {
+    background-color: var(--action);
+}
+
+.creative-toggle--on > .creative-toggle-dot {
+    background-color: var(--accent);
+}
+
+.creative-hint {
+    flex-grow: 1;
+    flex-shrink: 1;
+    font-size: 16px;
+    color: var(--text-muted);
+    white-space: normal;
+    margin: 0;
+    padding: 0;
+}
+
+.creative-body {
+    flex-grow: 1;
+    flex-direction: row;
+}
+
+/* Out of creative mode the catalog is greyed and takes no clicks (ItemGrid). */
+.item-slot--dimmed,
+.item-slot--dimmed:hover {
+    opacity: 0.32;
+}

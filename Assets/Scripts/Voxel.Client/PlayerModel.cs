@@ -322,7 +322,7 @@ namespace Voxel.Client
         // (ToolShapes' +x) faces down and ahead, the bow's string (-x) faces the player.
         private static float TurnInHand(int tool)
         {
-            return tool == Items.Axe || tool == Items.Pickaxe || tool == Items.Bow ? -90f : 0f;
+            return tool == Items.Axe || tool == Items.Pickaxe || tool == Items.Hammer || tool == Items.Bow ? -90f : 0f;
         }
 
         private static Mesh ToolMesh(int tool)

@@ -616,7 +616,7 @@ namespace Voxel.Client
                 if (!claimSync.Check(clientId, cell.X, cell.Z)) return;
             }
 
-            if (!inventorySync.TryConsume(clientId, item)) return;
+            if (!inventorySync.TryConsumePlaced(clientId, item)) return;
 
             Storage storage = store.Add(kind, position, facing, playerId);
             details[storage.Id] = new Shown { OwnerName = registry.NameOf(playerId) };
@@ -833,8 +833,8 @@ namespace Voxel.Client
                 if (StorageRules.IsStockpile(member.Kind)) BroadcastState(member);
             }
 
-            // Stations open in a window show what their linked chests hold.
-            if (storage.Kind == StorageKind.Chest) RefreshStationsLinkedTo(pool);
+            // Stations open in a window show what their linked storage holds.
+            if (!StorageRules.IsStation(storage.Kind)) RefreshStationsLinkedTo(pool);
         }
 
         // Plots changed hands: the pools may have too (a zone grown, split or given up), and the

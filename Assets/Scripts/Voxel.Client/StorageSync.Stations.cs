@@ -39,7 +39,24 @@ namespace Voxel.Client
     public partial class StorageSync
     {
         // What a station of a kind makes.
-        public static IReadOnlyList<Recipe> RecipesOf(StorageKind kind) => kind == StorageKind.ButcherTable ? Recipes.Butchery : Recipes.Cooking;
+        public static IReadOnlyList<Recipe> RecipesOf(StorageKind kind)
+        {
+            switch (kind)
+            {
+                case StorageKind.ButcherTable: return Recipes.Butchery;
+                case StorageKind.CarpentryTable: return Recipes.Carpentry;
+                default: return Recipes.Cooking;
+            }
+        }
+
+        // The choices a queued order carries: one per ingredient, at most two (Fire.Queue's spare ints;
+        // no station's recipe has a group past its second ingredient).
+        public const int MaxChoices = 2;
+
+        // Fire.Move's flags.
+        private const int MoveDeposit = 1;
+        private const int MoveByItem = 2;
+        private const int MoveStockpiles = 4;
 
         private const string FuelMessage = "Fire.Fuel";
         private const string TakeFuelMessage = "Fire.TakeFuel";
@@ -49,7 +66,8 @@ namespace Voxel.Client
         private const string FireMoveMessage = "Fire.Move";
         private const string FireStateMessage = "Fire.State";
 
-        // How far from a station off claimed land the public chests it uses stand, in blocks.
+        // How far from a station off claimed land the public storage it uses stands, in blocks (to the
+        // nearest of its cells).
         public const float LinkRange = 8f;
 
         // The calories a click puts into an order (Shift: all it needs, as far as the player has them).
@@ -63,18 +81,30 @@ namespace Voxel.Client
         private readonly List<StationJobView> openedJobs = new List<StationJobView>();
         private readonly Inventory openedLinked = new Inventory();
         private readonly List<StorageMember> openedLinkedMembers = new List<StorageMember>();
+        private readonly Inventory openedLinkedPiled = new Inventory();
+        private readonly List<StorageMember> openedLinkedStockpiles = new List<StorageMember>();
+        private readonly Inventory openedLinkedAll = new Inventory();
         private readonly Inventory openedFuel = new Inventory();
         private double openedFireTime;
 
         public IReadOnlyList<StationJobView> OpenedJobs => openedJobs;
 
-        // What the linked chests of the open station hold together, for the ingredients it shows, and
-        // each of them.
+        // What the linked chests of the open station hold together, and each of them.
         public Inventory OpenedLinkedContents => openedLinked;
 
         public IReadOnlyList<StorageMember> OpenedLinkedMembers => openedLinkedMembers;
 
         public int OpenedLinkedChests => openedLinkedMembers.Count;
+
+        // Its linked stockpiles, and what they hold together.
+        public IReadOnlyList<StorageMember> OpenedLinkedStockpiles => openedLinkedStockpiles;
+
+        public Inventory OpenedLinkedPiled => openedLinkedPiled;
+
+        // What all its linked storage holds, for the ingredients it shows.
+        public Inventory OpenedLinkedAll => openedLinkedAll;
+
+        public int OpenedLinkedStorage => openedLinkedMembers.Count + openedLinkedStockpiles.Count;
 
         // The wood by the open campfire, by kind, and how many logs in all.
         public Inventory OpenedFuelContents => openedFuel;
@@ -155,15 +185,25 @@ namespace Voxel.Client
 
         public void RequestTakeFuel(int wood, int count) => SendFire(TakeFuelMessage, wood, count);
 
-        public void RequestQueue(int recipe, int count) => SendFire(QueueMessage, recipe, count);
+        // Queues an order, with what goes in for each ingredient of a group (Items.None: Auto).
+        public void RequestQueue(int recipe, int count, IReadOnlyList<int> choices = null)
+        {
+            int first = choices != null && choices.Count > 0 ? choices[0] : Items.None;
+            int second = choices != null && choices.Count > 1 ? choices[1] : Items.None;
+            SendFire(QueueMessage, recipe, count, first, second);
+        }
 
         public void RequestLabour(int jobId, bool all) => SendFire(LabourMessage, jobId, all ? 1 : 0);
 
         public void RequestCancelJob(int jobId) => SendFire(CancelJobMessage, jobId, 0);
 
-        // Moves items between the bag and the open station's linked chests (member: one of them, or 0
-        // for them all).
-        public void RequestFireMove(bool deposit, int item, int count, int member) => SendFire(FireMoveMessage, item, count, deposit ? 1 : 0, member);
+        // Moves items between the bag and the open station's linked chests, or its linked stockpiles
+        // (member: one of them, or 0 for them all; from stockpiles, itemOrPile is a pile unless byItem).
+        public void RequestFireMove(bool deposit, int itemOrPile, int count, int member, bool stockpiles = false, bool byItem = true)
+        {
+            int flags = (deposit ? MoveDeposit : 0) | (byItem ? MoveByItem : 0) | (stockpiles ? MoveStockpiles : 0);
+            SendFire(FireMoveMessage, itemOrPile, count, flags, member);
+        }
 
         private void SendFire(string message, int a, int b, int c = 0, int d = 0)
         {
@@ -205,6 +245,9 @@ namespace Voxel.Client
             openedJobs.Clear();
             openedLinked.Clear();
             openedLinkedMembers.Clear();
+            openedLinkedStockpiles.Clear();
+            openedLinkedPiled.Clear();
+            openedLinkedAll.Clear();
             openedFuel.Clear();
         }
 
@@ -235,7 +278,7 @@ namespace Voxel.Client
                     if (fire.Station.BurnsFuel) TakeFuel(clientId, fire, a, b);
                     break;
                 case QueueMessage:
-                    QueueOrder(clientId, playerId, state, fire, a, b);
+                    QueueOrder(clientId, playerId, state, fire, a, b, new[] { c, d });
                     break;
                 case LabourMessage:
                     AddLabour(clientId, state, fire, a, b != 0);
@@ -244,8 +287,12 @@ namespace Voxel.Client
                     CancelOrder(clientId, state, fire, a);
                     break;
                 case FireMoveMessage:
-                    List<Storage> linked = LinkedChests(fire);
-                    if (linked.Count > 0 && MoveWithin(clientId, linked, true, c != 0, a, b, d, false)) Changed(linked[0], linked);
+                    // Into or out of the linked chests, or the linked stockpiles.
+                    List<Storage> linked = LinkedStorage(fire);
+                    Split(linked, out List<Storage> chests, out List<Storage> piles);
+                    bool toPiles = (c & MoveStockpiles) != 0;
+                    List<Storage> side = toPiles ? piles : chests;
+                    if (side.Count > 0 && MoveWithin(clientId, side, !toPiles, (c & MoveDeposit) != 0, a, b, d, (c & MoveByItem) != 0)) Changed(side[0], linked);
                     break;
             }
 
@@ -285,9 +332,11 @@ namespace Voxel.Client
             if (moved > 0) inventorySync.Give(clientId, wood, moved);
         }
 
-        // The ingredients of as many of the order as can be had now, whole, from the bag first, then
-        // from the linked chests; the others are taken from the linked chests when their turn comes.
-        private void QueueOrder(ulong clientId, string playerId, PlayerState state, Storage fire, int recipeIndex, int count)
+        // The ingredients of as many of the order as can be had now, whole (Recipes.Pick over the bag
+        // and the linked storage together, with the player's choices for groups), from the bag first,
+        // then the linked chests, then the linked stockpiles; the others are taken from the linked
+        // storage when their turn comes.
+        private void QueueOrder(ulong clientId, string playerId, PlayerState state, Storage fire, int recipeIndex, int count, int[] choices)
         {
             if (recipeIndex < 0 || recipeIndex >= fire.Station.Recipes.Count || count < 1 || count > Station.MaxCount) return;
             if (fire.Station.Jobs.Count >= Station.MaxJobs)
@@ -297,32 +346,106 @@ namespace Voxel.Client
             }
 
             Recipe recipe = fire.Station.Recipes[recipeIndex];
-            List<Storage> linked = LinkedChests(fire);
-            int stocked = count;
-            foreach (Ingredient ingredient in recipe.Ingredients)
+            for (int i = 0; i < choices.Length; i++)
             {
-                int have = state.Inventory.Count(ingredient.Item) + StoragePool.Count(linked, ingredient.Item);
-                stocked = Math.Min(stocked, have / ingredient.Count);
+                if (choices[i] == Items.None) continue;
+                if (i >= recipe.Ingredients.Count || !recipe.Ingredients[i].IsGroup || !recipe.Ingredients[i].Matches(choices[i])) return;
             }
 
-            bool chestsChanged = false;
-            if (stocked > 0)
+            List<Storage> linked = LinkedStorage(fire);
+            Inventory available = Available(linked);
+            AddAll(available, state.Inventory);
+            int stocked = count;
+            List<(int Item, int Count)> taken = null;
+            while (stocked > 0 && (taken = Recipes.Pick(available, recipe, choices, stocked)) == null)
             {
-                foreach (Ingredient ingredient in recipe.Ingredients)
+                stocked--;
+            }
+
+            bool storageChanged = false;
+            if (taken != null)
+            {
+                foreach ((int item, int needed) in taken)
                 {
-                    int needed = ingredient.Count * stocked;
-                    int fromBag = Math.Min(needed, state.Inventory.Count(ingredient.Item));
-                    if (fromBag > 0) inventorySync.TryConsume(clientId, ingredient.Item, fromBag);
+                    int fromBag = Math.Min(needed, state.Inventory.Count(item));
+                    if (fromBag > 0) inventorySync.TryConsume(clientId, item, fromBag);
                     if (needed > fromBag)
                     {
-                        StoragePool.TakeFromChests(linked, ingredient.Item, needed - fromBag);
-                        chestsChanged = true;
+                        TakeFrom(linked, item, needed - fromBag);
+                        storageChanged = true;
                     }
                 }
             }
 
-            fire.Station.Queue(recipeIndex, count, playerId, stocked);
-            if (chestsChanged) Changed(linked[0], linked);
+            fire.Station.Queue(recipeIndex, count, playerId, choices, stocked, taken);
+            if (storageChanged) Changed(linked[0], linked);
+        }
+
+        // What linked storage holds together: the chests' items and the stockpiles' blocks.
+        private static Inventory Available(List<Storage> linked)
+        {
+            var available = new Inventory();
+            foreach (Storage storage in linked)
+            {
+                if (storage.Kind == StorageKind.Chest)
+                {
+                    AddAll(available, storage.Contents);
+                    continue;
+                }
+
+                for (int pile = 0; pile < storage.Piles.Count; pile++)
+                {
+                    int count = storage.Piles.CountAt(pile);
+                    if (count > 0) available.Add(storage.Piles.ItemAt(pile), count);
+                }
+            }
+
+            return available;
+        }
+
+        // Takes an item from linked storage: the chests first, then the stockpiles.
+        private static void TakeFrom(List<Storage> linked, int item, int count)
+        {
+            Split(linked, out List<Storage> chests, out List<Storage> piles);
+            int left = count - StoragePool.TakeFromChests(chests, item, count);
+            if (left > 0) StoragePool.TakeFromStockpiles(piles, item, left);
+        }
+
+        // Linked storage by kind: the chests, the stockpiles.
+        private static void Split(List<Storage> linked, out List<Storage> chests, out List<Storage> piles)
+        {
+            chests = new List<Storage>();
+            piles = new List<Storage>();
+            foreach (Storage storage in linked)
+            {
+                if (storage.Kind == StorageKind.Chest) chests.Add(storage);
+                else piles.Add(storage);
+            }
+        }
+
+        // Whether linked storage has room for all of these together, each where it goes (a chest's
+        // items in the chests, blocks and wood on the stockpiles).
+        private bool HasRoomFor(List<Storage> linked, IEnumerable<(int Item, int Count)> items)
+        {
+            Split(linked, out List<Storage> chests, out List<Storage> piles);
+            var forChests = new List<(int Item, int Count)>();
+            var forPiles = new List<(int Item, int Count)>();
+            foreach ((int item, int count) in items)
+            {
+                if (StorageRules.AcceptsInChest(item)) forChests.Add((item, count));
+                else forPiles.Add((item, count));
+            }
+
+            return (forChests.Count == 0 || (chests.Count > 0 && StoragePool.ChestRoomFor(chests, forChests, ecosystemSync.ItemWeights)))
+                && (forPiles.Count == 0 || (piles.Count > 0 && StoragePool.StockpileRoomFor(piles, forPiles)));
+        }
+
+        // Puts items into linked storage, each where it goes.
+        private void PutInto(List<Storage> linked, int item, int count)
+        {
+            Split(linked, out List<Storage> chests, out List<Storage> piles);
+            if (StorageRules.AcceptsInChest(item)) StoragePool.AddToChests(chests, item, count, ecosystemSync.ItemWeights);
+            else StoragePool.AddToStockpiles(piles, item, count);
         }
 
         private void AddLabour(ulong clientId, PlayerState state, Storage fire, int jobId, bool all)
@@ -334,20 +457,21 @@ namespace Voxel.Client
                 return;
             }
 
+            // A creative player's work costs them nothing.
             float wanted = all ? job.LabourLeft : Mathf.Min(LabourStep, job.LabourLeft);
-            float added = fire.Station.AddLabour(jobId, Mathf.Min(wanted, state.Stomach.Calories));
-            if (added > 0f) state.Stomach.Burn(added);
+            float added = fire.Station.AddLabour(jobId, state.Creative ? wanted : Mathf.Min(wanted, state.Stomach.Calories));
+            if (added > 0f && !state.Creative) state.Stomach.Burn(added);
         }
 
-        // What was taken and not cooked goes back to the bag, then to the linked chests; all of it, or
+        // What was taken and not made goes back to the bag, then to the linked storage; all of it, or
         // the order stays.
         private void CancelOrder(ulong clientId, PlayerState state, Storage fire, int jobId)
         {
             if (!fire.Station.TryGetJob(jobId, out StationJob job)) return;
 
-            List<Storage> linked = LinkedChests(fire);
+            List<Storage> linked = LinkedStorage(fire);
             var toBag = new List<KeyValuePair<int, int>>();
-            var toChests = new List<KeyValuePair<int, int>>();
+            var toStorage = new List<(int Item, int Count)>();
             var bag = new Inventory();
             bag.CopyFrom(state.Inventory);
             foreach (KeyValuePair<int, int> item in job.Held())
@@ -359,28 +483,14 @@ namespace Voxel.Client
                     toBag.Add(new KeyValuePair<int, int>(item.Key, fits));
                 }
 
-                if (item.Value > fits) toChests.Add(new KeyValuePair<int, int>(item.Key, item.Value - fits));
+                if (item.Value > fits) toStorage.Add((item.Key, item.Value - fits));
             }
 
-            // What the bag cannot take must fit in the linked chests, checked on copies.
-            if (toChests.Count > 0)
+            // What the bag cannot take must fit in the linked storage, checked on copies.
+            if (toStorage.Count > 0 && !HasRoomFor(linked, toStorage))
             {
-                var copies = new List<Storage>();
-                foreach (Storage chest in linked)
-                {
-                    var copy = new Storage(chest.Id, chest.Kind, chest.Position, chest.Facing, chest.OwnerId);
-                    copy.Contents.CopyFrom(chest.Contents);
-                    copies.Add(copy);
-                }
-
-                foreach (KeyValuePair<int, int> item in toChests)
-                {
-                    if (StoragePool.AddToChests(copies, item.Key, item.Value, ecosystemSync.ItemWeights) < item.Value)
-                    {
-                        Refuse(clientId, StorageRefusal.NoRoomToGiveBack);
-                        return;
-                    }
-                }
+                Refuse(clientId, StorageRefusal.NoRoomToGiveBack);
+                return;
             }
 
             fire.Station.Remove(jobId);
@@ -389,12 +499,12 @@ namespace Voxel.Client
                 inventorySync.Give(clientId, item.Key, item.Value);
             }
 
-            foreach (KeyValuePair<int, int> item in toChests)
+            foreach ((int item, int count) in toStorage)
             {
-                StoragePool.AddToChests(linked, item.Key, item.Value, ecosystemSync.ItemWeights);
+                PutInto(linked, item, count);
             }
 
-            if (toChests.Count > 0 && linked.Count > 0) Changed(linked[0], linked);
+            if (toStorage.Count > 0 && linked.Count > 0) Changed(linked[0], linked);
         }
 
         // A station picked up: nothing may be queued, and a campfire's wood goes back to the bag, all of it.
@@ -423,27 +533,25 @@ namespace Voxel.Client
             return true;
         }
 
-        // The chests a station takes ingredients from and puts what it makes into: those of its claimed zone;
-        // off claimed land, the public chests within LinkRange.
-        private List<Storage> LinkedChests(Storage fire)
+        // The storage a station takes ingredients from and puts what it makes into, chests and
+        // stockpiles: those of its claimed zone; off claimed land, the public ones within LinkRange (of
+        // their nearest cell). In id order.
+        private List<Storage> LinkedStorage(Storage fire)
         {
             var linked = new List<Storage>();
             bool claimed = TryLandOf(fire, out int x, out int z);
             int zone = claimed ? claimSync.ZoneAt(x, z) : -1;
             foreach (Storage other in store.All)
             {
-                if (other.Kind != StorageKind.Chest) continue;
+                if (StorageRules.IsStation(other.Kind)) continue;
 
                 if (claimed)
                 {
                     if (TryLandOf(other, out int ox, out int oz) && claimSync.ZoneAt(ox, oz) == zone) linked.Add(other);
                 }
-                else if (IsPublic(other))
+                else if (IsPublic(other) && IsWithinLinkRange(fire, other))
                 {
-                    float dx = other.Position.X - fire.Position.X;
-                    float dy = other.Position.Y - fire.Position.Y;
-                    float dz = other.Position.Z - fire.Position.Z;
-                    if (dx * dx + dy * dy + dz * dz <= LinkRange * LinkRange) linked.Add(other);
+                    linked.Add(other);
                 }
             }
 
@@ -451,23 +559,37 @@ namespace Voxel.Client
             return linked;
         }
 
-        // One's ingredients from the linked chests, all or nothing.
-        private static bool TakeIngredients(List<Storage> linked, Recipe recipe)
+        private static bool IsWithinLinkRange(Storage fire, Storage other)
         {
-            foreach (Ingredient ingredient in recipe.Ingredients)
+            for (int cell = 0; cell < other.CellCount; cell++)
             {
-                if (StoragePool.Count(linked, ingredient.Item) < ingredient.Count) return false;
+                BlockPos at = other.Cell(cell);
+                float dx = at.X - fire.Position.X;
+                float dy = at.Y - fire.Position.Y;
+                float dz = at.Z - fire.Position.Z;
+                if (dx * dx + dy * dy + dz * dz <= LinkRange * LinkRange) return true;
             }
 
-            foreach (Ingredient ingredient in recipe.Ingredients)
-            {
-                StoragePool.TakeFromChests(linked, ingredient.Item, ingredient.Count);
-            }
-
-            return true;
+            return false;
         }
 
-        // Every frame: each station with something queued works; what it made goes into the linked chests.
+        // One's ingredients from the linked storage, all or nothing (the order's choices pick them):
+        // what was taken, or null.
+        private static List<(int Item, int Count)> TakeIngredients(List<Storage> linked, StationJob job)
+        {
+            List<(int Item, int Count)> unit = Recipes.Pick(Available(linked), job.Made, job.Choices, 1);
+            if (unit == null) return null;
+
+            foreach ((int item, int count) in unit)
+            {
+                TakeFrom(linked, item, count);
+            }
+
+            return unit;
+        }
+
+        // Every frame: each station with something queued works; what it made goes into the linked
+        // storage, each thing where it goes.
         private void TickStations(float seconds)
         {
             fires.Clear();
@@ -478,37 +600,41 @@ namespace Voxel.Client
 
             foreach (Storage fire in fires)
             {
-                List<Storage> linked = LinkedChests(fire);
-                bool chestsChanged = false;
-                IReadOnlyList<Recipe> recipes = fire.Station.Recipes;
+                List<Storage> linked = LinkedStorage(fire);
+                bool storageChanged = false;
                 StationJob done = fire.Station.Tick(seconds,
-                    made => linked.Count > 0 && StoragePool.ChestRoomFor(linked, made.Outputs, ecosystemSync.ItemWeights),
-                    index => chestsChanged = TakeIngredients(linked, recipes[index]));
+                    made => HasRoomFor(linked, made.Outputs),
+                    job =>
+                    {
+                        List<(int Item, int Count)> taken = TakeIngredients(linked, job);
+                        storageChanged |= taken != null;
+                        return taken;
+                    });
                 if (done != null)
                 {
                     foreach ((int item, int count) in done.Made.Outputs)
                     {
-                        StoragePool.AddToChests(linked, item, count, ecosystemSync.ItemWeights);
+                        PutInto(linked, item, count);
                     }
 
-                    chestsChanged = true;
+                    storageChanged = true;
                 }
 
-                if (chestsChanged && linked.Count > 0) Changed(linked[0], linked);
+                if (storageChanged && linked.Count > 0) Changed(linked[0], linked);
                 SetOpen(fire, fire.Station.Status == StationStatus.Working);
                 SendFireToViewers(fire, false);
             }
         }
 
-        // Stations open in a window whose linked chests are among these: their viewers get them again.
-        private void RefreshStationsLinkedTo(List<Storage> chests)
+        // Stations open in a window whose linked storage is among these: their viewers get them again.
+        private void RefreshStationsLinkedTo(List<Storage> storage)
         {
             foreach (KeyValuePair<int, HashSet<ulong>> watched in viewers)
             {
                 if (watched.Value.Count == 0 || !store.TryGet(watched.Key, out Storage fire) || !StorageRules.IsStation(fire.Kind)) continue;
 
-                List<Storage> linked = LinkedChests(fire);
-                if (linked.Exists(chests.Contains)) SendFireToViewers(fire, true);
+                List<Storage> linked = LinkedStorage(fire);
+                if (linked.Exists(storage.Contains)) SendFireToViewers(fire, true);
             }
         }
 
@@ -540,7 +666,7 @@ namespace Voxel.Client
         {
             Station station = fire.Station;
             bool owner = registry.TryGetPlayerId(clientId, out string playerId) && playerId == OwnerOf(fire);
-            List<Storage> linked = LinkedChests(fire);
+            List<Storage> linked = LinkedStorage(fire);
             if (clientId == networkManager.LocalClientId)
             {
                 var jobs = new List<StationJobView>();
@@ -668,20 +794,39 @@ namespace Voxel.Client
 
             openedBurning = burning;
             OpenedLogSeconds = Mathf.Max(1f, logSeconds);
+            // The linked chests and stockpiles apart; the stockpiles also as the opened ones, which the
+            // pile slots read (PoolView).
             openedLinkedMembers.Clear();
-            openedLinkedMembers.AddRange(linked);
+            openedLinkedStockpiles.Clear();
             openedLinked.Clear();
-            foreach (StorageMember chest in linked)
+            openedLinkedPiled.Clear();
+            openedStockpiles.Clear();
+            foreach (StorageMember member in linked)
             {
-                AddAll(openedLinked, chest.Contents);
+                if (member.Piles == null)
+                {
+                    openedLinkedMembers.Add(member);
+                    AddAll(openedLinked, member.Contents);
+                    continue;
+                }
+
+                openedLinkedStockpiles.Add(member);
+                openedStockpiles.Add(member.Piles);
+                for (int pile = 0; pile < member.Piles.Count; pile++)
+                {
+                    int count = member.Piles.CountAt(pile);
+                    if (count > 0) openedLinkedPiled.Add(member.Piles.ItemAt(pile), count);
+                }
             }
+
+            openedLinkedAll.CopyFrom(openedLinked);
+            AddAll(openedLinkedAll, openedLinkedPiled);
 
             openedJobs.Clear();
             openedJobs.AddRange(jobs);
             openedFireTime = Time.unscaledTimeAsDouble;
             openedMembers.Clear();
             openedContents.Clear();
-            openedStockpiles.Clear();
             OpenedChanged?.Invoke();
         }
     }

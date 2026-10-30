@@ -43,6 +43,7 @@ namespace Voxel.Client
         [SerializeField] private InventoryScreen inventoryScreen;
         [SerializeField] private BowSync bowSync;
         [SerializeField] private ClaimSync claimSync;
+        [SerializeField] private InventorySync inventorySync;
 
         private VisualElement screen;
         private VisualElement hints;
@@ -50,6 +51,9 @@ namespace Voxel.Client
         private Label day;
         private Label time;
         private Label speed;
+
+        // "Creative mode", under the banner while the local player plays in it.
+        private VisualElement creativeTag;
         private Label place;
         private Label mapKey;
         private VisualElement draw;
@@ -81,6 +85,7 @@ namespace Voxel.Client
             draw = root.Q("draw");
             drawFill = root.Q("draw-fill");
             damageLayer = root.Q("damage-numbers");
+            creativeTag = root.Q("creative-tag");
             nameplates = new Nameplates(root.Q("nameplates"));
             screen.style.display = DisplayStyle.None;
         }
@@ -144,6 +149,9 @@ namespace Voxel.Client
             if (player == null) return;
 
             hints.style.display = inventoryScreen.IsOpen || StorageScreen.IsOpen ? DisplayStyle.None : DisplayStyle.Flex;
+            // Not over the inventory's or a storage's tab bar.
+            bool creativeShown = inventorySync != null && inventorySync.Creative && !inventoryScreen.IsOpen && !StorageScreen.IsOpen;
+            if (creativeTag != null) creativeTag.style.display = creativeShown ? DisplayStyle.Flex : DisplayStyle.None;
             ShowClock();
             ShowDraw();
 

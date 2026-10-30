@@ -145,6 +145,9 @@ namespace Voxel.Client
             int needed = MiningRules.HitsToBreak(aimed);
             if (needed <= 0) return;
 
+            // In creative mode one hit breaks anything.
+            if (inventorySync.Creative) needed = 1;
+
             bool last = shownBlocks.Hits(pos, Now) + 1 >= needed;
             SpawnChips(point, FaceNormal(face), BlockAtlas.ChipColour(aimed, face), last);
             if (isServer)
@@ -164,7 +167,8 @@ namespace Voxel.Client
         {
             if (!running || !ecosystemSync.TryGetView(plantId, out PlantView view)) return;
 
-            int needed = ecosystemSync.HitsNeeded(view);
+            int natural = ecosystemSync.HitsNeeded(view);
+            int needed = inventorySync.Creative ? 1 : natural;
             bool last = shownPlants.Hits(plantId, Now) + 1 >= needed;
             SpawnChips(point, PlantNormal(view, point), ecosystemSync.ChipColour(view.SpeciesIndex), last);
             plantHitPoints[plantId] = point;
@@ -178,7 +182,7 @@ namespace Voxel.Client
             pendingPlants[plantId] = pendingPlants.TryGetValue(plantId, out int pending) ? pending + 1 : 1;
 
             // A plant cut in one go goes at once; a tree falls only when the server says so.
-            if (last && needed == 1) ecosystemSync.PredictRemove(plantId);
+            if (last && natural == 1) ecosystemSync.PredictRemove(plantId);
             SendHit(PlantTarget, default, plantId, 0, point, NoFace);
         }
 
@@ -294,6 +298,9 @@ namespace Voxel.Client
                 valid = ecosystemSync.CheckPlantHit(clientId, plantId, out needed, out calories, out min, out max);
                 if (valid && ecosystemSync.TryGetView(plantId, out PlantView view)) type = (ushort)view.SpeciesIndex;
             }
+
+            // In creative mode one hit breaks anything.
+            if (valid && inventorySync.IsCreative(clientId)) needed = 1;
 
             // A starving player swings at nothing: what they predicted comes back.
             if (!paced || !valid || hungerSync.IsStarving(clientId))

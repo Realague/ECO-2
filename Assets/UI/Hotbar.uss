@@ -206,3 +206,184 @@
 .hotbar-carry-second {
     margin-top: 10px;
 }
+
+/* The hammer's panel, above the bar: the block to place, its shape and the mode, and the keys. */
+.build-panel {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 8px 14px 8px 10px;
+    background-color: var(--veil);
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: var(--panel-border);
+}
+
+.build-icon {
+    width: 52px;
+    height: 52px;
+    margin-right: 12px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.build-text {
+    width: 300px;
+    margin-right: 14px;
+}
+
+.build-block {
+    font-size: 19px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;
+    padding: 0;
+}
+
+.build-detail {
+    font-size: 15px;
+    color: var(--accent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 2px 0 0 0;
+    padding: 0;
+}
+
+.build-keys .key-label {
+    font-size: 16px;
+    margin-right: 12px;
+}
+
+/* The hammer's wheel, while R is held: shapes on the inner ring, the bag's construction blocks on
+   the outer one, around the middle of the screen. BuildingHud places the slots and sizes the discs. */
+.build-wheel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+}
+
+.wheel-anchor {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 0;
+    height: 0;
+}
+
+.wheel-disc {
+    position: absolute;
+    background-color: var(--veil);
+    border-width: 1px;
+    border-color: var(--panel-border);
+}
+
+.wheel-disc--outer {
+    background-color: rgba(30, 31, 30, 0.62);
+}
+
+.wheel-slot {
+    position: absolute;
+    translate: -50% -50%;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(33, 34, 34, 0.92);
+    border-width: 2px;
+    border-color: #4a4c4d;
+    transition-property: scale, border-color, background-color;
+    transition-duration: 0.08s;
+}
+
+.wheel-slot--shape {
+    width: 78px;
+    height: 78px;
+    border-radius: 14px;
+}
+
+.wheel-slot--block {
+    width: 64px;
+    height: 64px;
+    border-radius: 10px;
+}
+
+.wheel-slot--chosen {
+    border-width: 3px;
+    border-color: var(--accent);
+}
+
+.wheel-slot--hover {
+    scale: 1.14 1.14;
+    background-color: rgba(64, 66, 62, 0.97);
+    border-color: #ffffff;
+}
+
+/* A door has no shape: the shapes stay, faded. */
+.wheel-slot--faded > .shape-glyph {
+    opacity: 0.35;
+}
+
+.shape-glyph {
+    width: 60px;
+    height: 60px;
+    --shape-top: #dcb378;
+    --shape-left: #9e784a;
+    --shape-right: #bd915c;
+    --shape-line: #2b1f14;
+}
+
+.wheel-block-icon {
+    width: 46px;
+    height: 46px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.wheel-block-count {
+    position: absolute;
+    right: 4px;
+    bottom: 1px;
+    font-size: 13px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    color: var(--text);
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.7);
+    margin: 0;
+    padding: 0;
+}
+
+.wheel-centre {
+    position: absolute;
+    width: 200px;
+    translate: -50% -50%;
+    align-items: center;
+}
+
+.wheel-name {
+    font-size: 19px;
+    color: var(--text);
+    -unity-text-align: middle-center;
+    white-space: normal;
+    margin: 0;
+    padding: 0;
+}
+
+.wheel-hint {
+    font-size: 13px;
+    color: var(--text-muted);
+    -unity-text-align: middle-center;
+    white-space: normal;
+    margin: 6px 0 0 0;
+    padding: 0;
+}
+
+.wheel-pointer {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    translate: -50% -50%;
+    border-radius: 6px;
+    background-color: var(--accent);
+    border-width: 1px;
+    border-color: rgba(0, 0, 0, 0.6);
+}

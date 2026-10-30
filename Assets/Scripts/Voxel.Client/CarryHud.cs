@@ -27,6 +27,7 @@ namespace Voxel.Client
         private VisualElement weightFill;
         private int shownBlocks = -1;
         private float shownWeight = -1f;
+        private bool shownCreative;
 
         private void Start()
         {
@@ -57,19 +58,24 @@ namespace Voxel.Client
             Inventory inventory = inventorySync.Inventory;
             int blocks = CarryLimits.BlockCount(inventory);
             float weight = CarryLimits.Weight(inventory, ecosystemSync.ItemWeights);
-            if (blocks == shownBlocks && Mathf.Approximately(weight, shownWeight)) return;
+            bool creative = inventorySync.Creative;
+            if (blocks == shownBlocks && Mathf.Approximately(weight, shownWeight) && creative == shownCreative) return;
 
             shownBlocks = blocks;
             shownWeight = weight;
-            Show(blocks, weight, blocksText, blocksFill, weightText, weightFill);
+            shownCreative = creative;
+            Show(blocks, weight, blocksText, blocksFill, weightText, weightFill, creative);
         }
 
-        internal static void Show(int blocks, float weight, Label blocksText, VisualElement blocksFill, Label weightText, VisualElement weightFill)
+        // In creative mode there is no limit: "∞" in its place, the gauges empty.
+        internal static void Show(int blocks, float weight, Label blocksText, VisualElement blocksFill, Label weightText, VisualElement weightFill, bool creative = false)
         {
-            blocksText.text = Loc.T("Blocks {0} / {1}", blocks, CarryLimits.MaxBlocks);
-            weightText.text = Loc.T("Weight {0} / {1} kg", Loc.Number(weight, "0.0"), CarryLimits.MaxWeight.ToString("0"));
-            ShowGauge(blocksFill, (float)blocks / CarryLimits.MaxBlocks);
-            ShowGauge(weightFill, weight / CarryLimits.MaxWeight);
+            blocksText.text = creative ? Loc.T("Blocks {0} / {1}", blocks, "∞") : Loc.T("Blocks {0} / {1}", blocks, CarryLimits.MaxBlocks);
+            weightText.text = creative
+                ? Loc.T("Weight {0} kg / ∞", Loc.Number(weight, "0.0"))
+                : Loc.T("Weight {0} / {1} kg", Loc.Number(weight, "0.0"), CarryLimits.MaxWeight.ToString("0"));
+            ShowGauge(blocksFill, creative ? 0f : (float)blocks / CarryLimits.MaxBlocks);
+            ShowGauge(weightFill, creative ? 0f : weight / CarryLimits.MaxWeight);
         }
 
         private static void ShowGauge(VisualElement fill, float share)

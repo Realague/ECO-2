@@ -181,7 +181,7 @@ namespace Voxel.Client
 
         private bool TryFindItem(string normalisedName, out int found)
         {
-            foreach (int item in GivableItems())
+            foreach (int item in ItemCatalog.AllItems(ecosystemSync))
             {
                 if (Command.Normalise(EnglishNameOf(item)) == normalisedName || Command.Normalise(ItemCatalog.NameOf(item, ecosystemSync)) == normalisedName)
                 {
@@ -194,48 +194,6 @@ namespace Voxel.Client
             return false;
         }
 
-        // Every item a player may hold: blocks (not water), what is crafted, each species' seeds, wood
-        // and crop, each animal's carcass, the meats and what butchering gives, the dishes.
-        private IEnumerable<int> GivableItems()
-        {
-            for (int type = 1; type <= Blocks.LastType; type++)
-            {
-                if (type != Blocks.Water && Items.IsValid(type)) yield return type;
-            }
-
-            foreach (int item in new[] { Items.Straw, Items.Arrow, Items.Chest, Items.Stockpile, Items.SmallStockpile, Items.Campfire, Items.ButcherTable, Items.Hide, Items.Bones, Items.Fat })
-            {
-                yield return item;
-            }
-
-            foreach (int tool in Items.Tools)
-            {
-                yield return tool;
-            }
-
-            for (int kind = 0; kind < Butchery.MeatKindCount; kind++)
-            {
-                yield return Items.Meat((MeatKind)kind);
-            }
-
-            for (int species = 0; species < ecosystemSync.PlantSpeciesCount; species++)
-            {
-                yield return Items.Seed(species);
-                if (ecosystemSync.IsTree(species)) yield return Items.WoodOf(species);
-                if (ecosystemSync.IsCrop(species)) yield return Items.Produce(species);
-            }
-
-            for (int animal = 0; animal < ecosystemSync.AnimalSpeciesCount; animal++)
-            {
-                yield return Items.Carcass(animal);
-            }
-
-            for (int dish = 0; dish < Dishes.All.Count; dish++)
-            {
-                yield return Items.Dish(dish);
-            }
-        }
-
         // An item's name in English, which the server answers in.
         private string EnglishNameOf(int item)
         {
@@ -243,6 +201,12 @@ namespace Voxel.Client
             if (Items.IsWood(item)) return $"{ecosystemSync.SpeciesName(false, Items.WoodSpecies(item))} wood";
             if (Items.IsProduce(item)) return EcosystemSync.DisplayName(ecosystemSync.ProduceName(Items.ProduceSpecies(item)));
             if (Items.IsCarcass(item)) return $"{ecosystemSync.SpeciesName(true, Items.CarcassSpecies(item))} carcass";
+            if (item > 0 && item <= ushort.MaxValue && WoodBlocks.IsWoodBlock((ushort)item))
+            {
+                string wood = ecosystemSync.SpeciesName(false, WoodBlocks.SpeciesOf((ushort)item));
+                return WoodBlocks.IsLog((ushort)item) ? $"{wood} log" : $"{wood} planks";
+            }
+
             return Items.NameOf(item);
         }
 

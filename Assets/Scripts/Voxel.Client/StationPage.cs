@@ -6,15 +6,16 @@ using Voxel.Core;
 namespace Voxel.Client
 {
     // A station's work tab (Storage.uxml: cooking-page), run by StorageScreen and laid out as the
-    // inventory's crafting tab, for a campfire (dishes) or a butcher's table (carcasses): how many chests
-    // are linked, a campfire's wood and what is left of the log alight, and the player's calories; what
-    // it makes (what each takes, as the bag and the linked chests hold it, its time and work; a click
-    // chooses one; at a butcher's table the carcasses at hand first); under them the queue, each order
-    // with who queued it, how many are left, the calories put in and how far the one being made is, what
-    // it waits for, a button putting 100 kcal into it (Shift: all it needs) and one cancelling it; and
-    // the chosen recipe's sheet: its ingredients for as many as asked and where they are, its time and
-    // work, what one dish gives whoever eats it or what a carcass gives, how many to make and Add to the
-    // queue (taken without its ingredients: it waits for them).
+    // inventory's crafting tab, for a campfire (dishes), a butcher's table (carcasses) or a carpentry
+    // table (wood blocks, a door, stations): how much storage is linked, a campfire's wood and what is
+    // left of the log alight, and the player's calories; what it makes (what each takes, as the bag and
+    // the linked storage hold it, its time and work; a click chooses one; at a butcher's table the
+    // carcasses at hand first); under them the queue, each order with who queued it, how many are left,
+    // the calories put in and how far the one being made is, what it waits for, a button putting 100 kcal
+    // into it (Shift: all it needs) and one cancelling it; and the chosen recipe's sheet: its ingredients
+    // for as many as asked and where they are, with for a group (any wood, any planks) a row of choices
+    // as the crafting tab has, its time and work, what one dish gives whoever eats it or what the rest
+    // gives, how many to make and Add to the queue (taken without its ingredients: it waits for them).
     internal sealed class StationPage
     {
         private readonly StorageSync storageSync;
@@ -52,7 +53,11 @@ namespace Voxel.Client
         private readonly OrderRows queue;
 
         private readonly List<Row> rows = new List<Row>();
-        private readonly Dictionary<StorageKind, int> chosen = new Dictionary<StorageKind, int>();
+        private readonly Dictionary<StorageKind, int> selectedByKind = new Dictionary<StorageKind, int>();
+
+        // The item chosen for each group of ingredient (Items.None: Auto), kept for the session.
+        private readonly Dictionary<IngredientGroup, int> chosen = new Dictionary<IngredientGroup, int>();
+        private readonly Inventory available = new Inventory();
         private StorageKind kind = StorageKind.Campfire;
         private IReadOnlyList<Recipe> recipes = Recipes.Cooking;
         private int selected;
@@ -104,7 +109,7 @@ namespace Voxel.Client
             sheetReason = root.Q<Label>("fire-sheet-reason");
             queueButton = root.Q<Button>("fire-sheet-queue");
             queueButton.focusable = false;
-            queueButton.clicked += () => storageSync.RequestQueue(selected, quantity.Value);
+            queueButton.clicked += () => storageSync.RequestQueue(selected, quantity.Value, ChoicesFor(recipes[selected]));
 
             quantity = new QuantityStepper(root.Q("fire-sheet-quantity"), Station.MaxCount, () => Makeable(recipes[selected]));
             quantity.Changed += () => shownKey = long.MinValue;
@@ -114,6 +119,8 @@ namespace Voxel.Client
             recipeList.verticalScrollerVisibility = ScrollerVisibility.AlwaysVisible;
             BuildRows();
         }
+
+        private bool IsCooking => kind == StorageKind.Campfire;
 
         private bool IsButchery => kind == StorageKind.ButcherTable;
 
@@ -134,10 +141,10 @@ namespace Voxel.Client
         {
             if (shownKind == kind) return;
 
-            chosen[kind] = selected;
+            selectedByKind[kind] = selected;
             kind = shownKind;
             recipes = StorageSync.RecipesOf(kind);
-            selected = chosen.TryGetValue(kind, out int kept) && kept < recipes.Count ? kept : 0;
+            selected = selectedByKind.TryGetValue(kind, out int kept) && kept < recipes.Count ? kept : 0;
             BuildRows();
             shownKey = long.MinValue;
             queueKey = long.MinValue;
@@ -146,10 +153,9 @@ namespace Voxel.Client
         // Every frame while the tab is shown: the bars, and the rest when what it shows changed.
         public void Refresh()
         {
-            bool fire = !IsButchery;
-            fuelBox.style.display = fire ? DisplayStyle.Flex : DisplayStyle.None;
-            burn.style.display = fire ? DisplayStyle.Flex : DisplayStyle.None;
-            if (fire)
+            fuelBox.style.display = IsCooking ? DisplayStyle.Flex : DisplayStyle.None;
+            burn.style.display = IsCooking ? DisplayStyle.Flex : DisplayStyle.None;
+            if (IsCooking)
             {
                 fuel.text = $"{storageSync.OpenedFuel} / {Station.MaxFuel}";
                 burnFill.style.width = Length.Percent(Mathf.Clamp01(storageSync.OpenedBurning / storageSync.OpenedLogSeconds) * 100f);
@@ -162,12 +168,20 @@ namespace Voxel.Client
             if (key == shownKey) return;
 
             shownKey = key;
-            recipesTitle.text = IsButchery ? Loc.T("Carcasses") : Loc.T("Dishes");
-            queueEmpty.text = IsButchery ? Loc.T("Nothing queued: choose a carcass, then Add to the queue.") : Loc.T("Nothing queued: choose a dish, then Add to the queue.");
-            int linkedChests = storageSync.OpenedLinkedChests;
-            linked.text = linkedChests == 0 ? Loc.T("No linked chest")
-                : linkedChests == 1 ? Loc.T("1 linked chest") : Loc.T("{0} linked chests", linkedChests);
-            linked.EnableInClassList("fire-linked--none", linkedChests == 0);
+            available.CopyFrom(inventorySync.Inventory);
+            foreach (KeyValuePair<int, int> entry in storageSync.OpenedLinkedAll.Entries)
+            {
+                available.Add(entry.Key, entry.Value);
+            }
+
+            recipesTitle.text = IsCooking ? Loc.T("Dishes") : IsButchery ? Loc.T("Carcasses") : Loc.T("Recipes");
+            queueEmpty.text = IsCooking ? Loc.T("Nothing queued: choose a dish, then Add to the queue.")
+                : IsButchery ? Loc.T("Nothing queued: choose a carcass, then Add to the queue.")
+                : Loc.T("Nothing queued: choose a recipe, then Add to the queue.");
+            int linkedStorage = storageSync.OpenedLinkedStorage;
+            linked.text = linkedStorage == 0 ? Loc.T("No linked storage")
+                : linkedStorage == 1 ? Loc.T("1 linked storage") : Loc.T("{0} linked storages", linkedStorage);
+            linked.EnableInClassList("fire-linked--none", linkedStorage == 0);
             foreach (Row row in rows)
             {
                 ShowRow(row);
@@ -177,8 +191,14 @@ namespace Voxel.Client
             ShowSheet();
         }
 
-        // What the list shows: a dish (what it makes) or a carcass (what it takes).
+        // What the list shows: what it makes, or at a butcher's table the carcass it takes.
         private int ShownItem(Recipe recipe) => IsButchery ? recipe.Ingredients[0].Item : recipe.Output;
+
+        private string ShownName(Recipe recipe)
+        {
+            string name = ItemCatalog.NameOf(ShownItem(recipe), ecosystemSync);
+            return !IsButchery && recipe.OutputCount > 1 ? Loc.T("{0} ×{1}", name, recipe.OutputCount) : name;
+        }
 
         private void BuildRows()
         {
@@ -190,8 +210,8 @@ namespace Voxel.Client
             }
         }
 
-        // At a butcher's table, the carcasses at hand (bag and linked chests) first, then the others, each
-        // in species order.
+        // At a butcher's table, the carcasses at hand (bag and linked storage) first, then the others,
+        // each in species order.
         private void SortRows()
         {
             var order = new List<Row>(rows);
@@ -226,19 +246,19 @@ namespace Voxel.Client
             var costs = new VisualElement { pickingMode = PickingMode.Ignore };
             costs.AddToClassList("recipe-row-cost");
 
-            // A dish shows what it takes; a carcass what it gives (and how many are at hand, in its name).
+            // A carcass shows what it gives (and how many are at hand, in its name); the rest what they take.
             if (IsButchery)
             {
                 foreach ((int item, int count) in recipe.Outputs)
                 {
-                    costs.Add(Chip(item, $"×{count}", out _));
+                    costs.Add(Chip(ItemCatalog.IconOf(item, ecosystemSync), ItemCatalog.NameOf(item, ecosystemSync), $"×{count}", out _));
                 }
             }
             else
             {
                 foreach (Ingredient ingredient in recipe.Ingredients)
                 {
-                    costs.Add(Chip(ingredient.Item, "", out Label count));
+                    costs.Add(Chip(CraftingPage.IconOf(ingredient, ecosystemSync), CraftingPage.IngredientName(ingredient, Items.None, ecosystemSync), "", out Label count));
                     row.Counts.Add(count);
                 }
             }
@@ -257,13 +277,13 @@ namespace Voxel.Client
             return row.Root;
         }
 
-        private VisualElement Chip(int item, string text, out Label count)
+        private static VisualElement Chip(Texture2D icon, string name, string text, out Label count)
         {
-            var chip = new VisualElement { pickingMode = PickingMode.Ignore, tooltip = ItemCatalog.NameOf(item, ecosystemSync) };
+            var chip = new VisualElement { pickingMode = PickingMode.Ignore, tooltip = name };
             chip.AddToClassList("recipe-chip");
             var chipIcon = new VisualElement { pickingMode = PickingMode.Ignore };
             chipIcon.AddToClassList("recipe-chip-icon");
-            chipIcon.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(item, ecosystemSync));
+            chipIcon.style.backgroundImage = new StyleBackground(icon);
             count = new Label(text) { pickingMode = PickingMode.Ignore };
             count.AddToClassList("recipe-chip-text");
             chip.Add(chipIcon);
@@ -271,26 +291,25 @@ namespace Voxel.Client
             return chip;
         }
 
-        // What a dish takes, as the bag and the linked chests hold it; how many of a carcass are at hand.
+        // What a recipe takes, as the bag and the linked storage hold it; how many of a carcass are at hand.
         private void ShowRow(Row row)
         {
             Recipe recipe = recipes[row.Index];
-            string name = ItemCatalog.NameOf(ShownItem(recipe), ecosystemSync);
             if (IsButchery)
             {
-                int have = Have(recipe.Ingredients[0].Item);
-                row.Name.text = have > 0 ? Loc.T("{0} ({1})", name, have) : name;
+                int have = available.Count(recipe.Ingredients[0].Item);
+                row.Name.text = have > 0 ? Loc.T("{0} ({1})", ShownName(recipe), have) : ShownName(recipe);
             }
             else
             {
-                row.Name.text = name;
+                row.Name.text = ShownName(recipe);
+                int[] choices = ChoicesFor(recipe);
                 for (int i = 0; i < recipe.Ingredients.Count; i++)
                 {
                     Ingredient ingredient = recipe.Ingredients[i];
-                    int have = Have(ingredient.Item);
+                    int have = Recipes.Have(available, ingredient, choices[i]);
                     row.Counts[i].text = $"{Mathf.Min(have, 9999)} / {ingredient.Count}";
                     row.Counts[i].EnableInClassList("recipe-chip-text--missing", have < ingredient.Count);
-                    row.Counts[i].parent.tooltip = ItemCatalog.NameOf(ingredient.Item, ecosystemSync);
                 }
             }
 
@@ -303,10 +322,11 @@ namespace Voxel.Client
         private void ShowSheet()
         {
             Recipe recipe = recipes[selected];
+            int[] choices = ChoicesFor(recipe);
             int count = quantity.Value;
             int shown = ShownItem(recipe);
             sheetIcon.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(shown, ecosystemSync));
-            sheetName.text = ItemCatalog.NameOf(shown, ecosystemSync);
+            sheetName.text = ShownName(recipe);
             sheetKind.text = IsButchery ? Loc.T("Butchering") : ItemCatalog.KindName(shown);
             sheetDescription.text = IsButchery
                 ? Loc.T("Cut up on the butcher's table: its meat, hide, bones and fat go into the linked chests. A knife in the field takes only half its meat.")
@@ -314,18 +334,11 @@ namespace Voxel.Client
             sheetDuration.text = CraftingPage.Times(Loc.T("{0} s", Loc.Number(recipe.Seconds, "0.#")), Loc.T("{0} s", Loc.Number(recipe.Seconds * count, "0.#")), count);
             sheetWork.text = CraftingPage.Times($"{recipe.Calories:0} kcal", $"{recipe.Calories * count:0} kcal", count);
 
-            // What a carcass gives, for as many as asked; or what one dish gives whoever eats it.
-            sheetOutputsBox.style.display = IsButchery ? DisplayStyle.Flex : DisplayStyle.None;
-            sheetFood.style.display = IsButchery ? DisplayStyle.None : DisplayStyle.Flex;
+            // What one dish gives whoever eats it; or what the rest makes, for as many as asked.
+            sheetOutputsBox.style.display = IsCooking ? DisplayStyle.None : DisplayStyle.Flex;
+            sheetFood.style.display = IsCooking ? DisplayStyle.Flex : DisplayStyle.None;
             sheetOutputs.Clear();
-            if (IsButchery)
-            {
-                foreach ((int item, int each) in recipe.Outputs)
-                {
-                    sheetOutputs.Add(Line(item, $"{each * count}"));
-                }
-            }
-            else
+            if (IsCooking)
             {
                 Nutrition food = ecosystemSync.FoodOf(recipe.Output);
                 sheetWeight.text = Loc.T("{0} kg each", Loc.Number(ecosystemSync.ItemWeights.Of(recipe.Output), "0.###"));
@@ -337,42 +350,61 @@ namespace Voxel.Client
                     sheetNutrientBars[i].style.width = Length.Percent(Mathf.Clamp01(points / ItemCatalog.FullNutrient) * 100f);
                 }
             }
-
-            // Each ingredient for as many as asked, and where it is: the bag, the linked chests.
-            sheetIngredients.Clear();
-            foreach (Ingredient ingredient in recipe.Ingredients)
+            else
             {
-                int bag = inventorySync.Inventory.Count(ingredient.Item);
-                int chests = storageSync.OpenedLinkedContents.Count(ingredient.Item);
+                foreach ((int item, int each) in recipe.Outputs)
+                {
+                    sheetOutputs.Add(Line(ItemCatalog.IconOf(item, ecosystemSync), ItemCatalog.NameOf(item, ecosystemSync), $"{each * count}"));
+                }
+            }
+
+            // Each ingredient for as many as asked, and where it is: the bag, the linked storage; for a
+            // group, what goes in.
+            sheetIngredients.Clear();
+            for (int i = 0; i < recipe.Ingredients.Count; i++)
+            {
+                Ingredient ingredient = recipe.Ingredients[i];
+                int bag = Recipes.Have(inventorySync.Inventory, ingredient, choices[i]);
+                int linkedHave = Recipes.Have(storageSync.OpenedLinkedAll, ingredient, choices[i]);
                 int need = ingredient.Count * count;
-                VisualElement line = Line(ingredient.Item, $"{bag + chests} / {need}");
-                line.Q<Label>(className: "details-line-value").EnableInClassList("ingredient-value--missing", bag + chests < need);
+                Texture2D icon = choices[i] != Items.None ? ItemCatalog.IconOf(choices[i], ecosystemSync) : CraftingPage.IconOf(ingredient, ecosystemSync);
+                VisualElement line = Line(icon, CraftingPage.IngredientName(ingredient, choices[i], ecosystemSync), $"{bag + linkedHave} / {need}");
+                line.Q<Label>(className: "details-line-value").EnableInClassList("ingredient-value--missing", bag + linkedHave < need);
                 sheetIngredients.Add(line);
-                var source = new Label(Loc.T("bag {0} · linked chests {1}", bag, chests));
+                var source = new Label(Loc.T("bag {0} · linked storage {1}", bag, linkedHave));
                 source.AddToClassList("ingredient-source");
                 sheetIngredients.Add(source);
+                if (ingredient.IsGroup) sheetIngredients.Add(Choices(ingredient, choices[i]));
             }
 
             // Why it cannot be queued; in amber, what it will wait for.
             bool full = storageSync.OpenedJobs.Count >= Station.MaxJobs;
             queueButton.SetEnabled(!full);
-            string warning = storageSync.OpenedLinkedChests == 0
-                ? (IsButchery ? Loc.T("No linked chest: what it cuts up needs one to go into") : Loc.T("No linked chest: dishes need one to go into"))
-                : Makeable(recipe) < count ? Loc.T("Missing ingredients: the order will wait for them in the linked chests") : "";
+            bool needsChest = false;
+            bool needsStockpile = false;
+            foreach ((int Item, int Count) output in recipe.Outputs)
+            {
+                if (StorageRules.AcceptsInChest(output.Item)) needsChest = true;
+                else needsStockpile = true;
+            }
+
+            string warning = needsChest && storageSync.OpenedLinkedChests == 0 ? Loc.T("No linked chest: what it makes needs one to go into")
+                : needsStockpile && storageSync.OpenedLinkedStockpiles.Count == 0 ? Loc.T("No linked stockpile: what it makes needs one to go into")
+                : Makeable(recipe) < count ? Loc.T("Missing ingredients: the order will wait for them in the linked storage") : "";
             sheetReason.text = full ? Loc.T("The queue is full ({0})", Station.MaxJobs) : warning;
             sheetReason.EnableInClassList("recipe-reason--warning", !full);
             sheetReason.style.display = sheetReason.text.Length > 0 ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
-        // A line of the sheet: an item's icon, its name and a value.
-        private VisualElement Line(int item, string value)
+        // A line of the sheet: an icon, a name and a value.
+        private static VisualElement Line(Texture2D icon, string name, string value)
         {
             var line = new VisualElement();
             line.AddToClassList("details-line");
             var picture = new VisualElement();
             picture.AddToClassList("ingredient-icon");
-            picture.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(item, ecosystemSync));
-            var label = new Label(ItemCatalog.NameOf(item, ecosystemSync));
+            picture.style.backgroundImage = new StyleBackground(icon);
+            var label = new Label(name);
             label.AddToClassList("details-line-label");
             var text = new Label(value);
             text.AddToClassList("details-line-value");
@@ -382,19 +414,81 @@ namespace Voxel.Client
             return line;
         }
 
-        // How many of a recipe the bag and the linked chests hold the ingredients for.
+        // What goes in for an ingredient of a group: Auto, then each item the bag and the linked
+        // storage hold of it, with how many.
+        private VisualElement Choices(Ingredient ingredient, int choice)
+        {
+            var row = new VisualElement();
+            row.AddToClassList("choices");
+            row.Add(Choice(ingredient.Group, Items.None, Loc.T("Auto"), null, choice == Items.None, false));
+            foreach (int item in Recipes.Options(available, ingredient))
+            {
+                int count = available.Count(item);
+                VisualElement option = Choice(ingredient.Group, item, count.ToString(), ItemCatalog.IconOf(item, ecosystemSync), choice == item, count < ingredient.Count * quantity.Value);
+                option.tooltip = ItemCatalog.NameOf(item, ecosystemSync);
+                row.Add(option);
+            }
+
+            return row;
+        }
+
+        private VisualElement Choice(IngredientGroup group, int item, string text, Texture2D picture, bool isChosen, bool tooFew)
+        {
+            var option = new VisualElement();
+            option.AddToClassList("choice");
+            option.EnableInClassList("choice--selected", isChosen);
+            option.EnableInClassList("choice--short", tooFew);
+            if (picture != null)
+            {
+                var image = new VisualElement { pickingMode = PickingMode.Ignore };
+                image.AddToClassList("choice-icon");
+                image.style.backgroundImage = new StyleBackground(picture);
+                option.Add(image);
+            }
+
+            var label = new Label(text) { pickingMode = PickingMode.Ignore };
+            label.AddToClassList("choice-text");
+            option.Add(label);
+            option.RegisterCallback<PointerDownEvent>(e =>
+            {
+                if (e.button != 0) return;
+
+                chosen[group] = item;
+                shownKey = long.MinValue;
+            });
+            return option;
+        }
+
+        // The choice for each of a recipe's ingredients: the item chosen for its group, while the bag
+        // or the linked storage holds any of it.
+        private int[] ChoicesFor(Recipe recipe)
+        {
+            int[] choices = Recipes.AutoChoices(recipe);
+            for (int i = 0; i < choices.Length; i++)
+            {
+                Ingredient ingredient = recipe.Ingredients[i];
+                if (!ingredient.IsGroup || !chosen.TryGetValue(ingredient.Group, out int item)) continue;
+
+                if (available.Has(item) && ingredient.Matches(item)) choices[i] = item;
+                else chosen.Remove(ingredient.Group);
+            }
+
+            return choices;
+        }
+
+        // How many of a recipe the bag and the linked storage hold the ingredients for.
         private int Makeable(Recipe recipe)
         {
+            int[] choices = ChoicesFor(recipe);
             int count = Station.MaxCount;
-            foreach (Ingredient ingredient in recipe.Ingredients)
+            for (int i = 0; i < recipe.Ingredients.Count; i++)
             {
-                count = Mathf.Min(count, Have(ingredient.Item) / ingredient.Count);
+                Ingredient ingredient = recipe.Ingredients[i];
+                count = Mathf.Min(count, Recipes.Have(available, ingredient, choices[i]) / ingredient.Count);
             }
 
             return count;
         }
-
-        private int Have(int item) => inventorySync.Inventory.Count(item) + storageSync.OpenedLinkedContents.Count(item);
 
         // The queue's rows, laid out again when the orders change; their bars and states every frame.
         private void ShowQueue()
@@ -456,13 +550,14 @@ namespace Voxel.Client
             bool more = job.LabourLeft > 0f;
             if (!job.UnitPaid)
             {
-                queue.Set(job.Id, done, true, IsButchery ? Loc.T("Needs calories to butcher") : Loc.T("Needs calories to cook"), true, true, false);
+                string needs = IsCooking ? Loc.T("Needs calories to cook") : IsButchery ? Loc.T("Needs calories to butcher") : Loc.T("Needs calories to work");
+                queue.Set(job.Id, done, true, needs, true, true, false);
                 return;
             }
 
             if (job.Stocked == 0)
             {
-                queue.Set(job.Id, done, true, Loc.T("Missing ingredients: put them in a linked chest"), true, more, false);
+                queue.Set(job.Id, done, true, Loc.T("Missing ingredients: put them in the linked storage"), true, more, false);
                 return;
             }
 
@@ -478,17 +573,18 @@ namespace Voxel.Client
                     queue.Set(job.Id, done, true, Loc.T("Needs firewood"), true, more, false);
                     break;
                 case StationStatus.NoRoom:
-                    queue.Set(job.Id, done, true, Loc.T(storageSync.OpenedLinkedChests == 0 ? "No linked chest to put it in" : "No room in the linked chests"), true, more, false);
+                    queue.Set(job.Id, done, true, Loc.T(storageSync.OpenedLinkedStorage == 0 ? "No linked storage to put it in" : "No room in the linked storage"), true, more, false);
                     break;
                 default:
-                    string doing = IsButchery ? Loc.T("Butchering… {0} s", Mathf.CeilToInt(left)) : Loc.T("Cooking… {0} s", Mathf.CeilToInt(left));
+                    int seconds = Mathf.CeilToInt(left);
+                    string doing = IsCooking ? Loc.T("Cooking… {0} s", seconds) : IsButchery ? Loc.T("Butchering… {0} s", seconds) : Loc.T("Working… {0} s", seconds);
                     queue.Set(job.Id, done, true, doing, false, more, storageSync.OpenedStatus == StationStatus.Working);
                     break;
             }
         }
 
-        // What the list and sheet show depends on: the station, the bag, the linked chests, the queue's
-        // length, the recipe and quantity chosen.
+        // What the list and sheet show depends on: the station, the bag, the linked storage, the queue's
+        // length, the recipe, choices and quantity chosen.
         private long KeyOf()
         {
             long key = 17 + (long)kind;
@@ -497,15 +593,21 @@ namespace Voxel.Client
                 key += (entry.Key * 7919L + entry.Value) * 2654435761L;
             }
 
-            foreach (KeyValuePair<int, int> entry in storageSync.OpenedLinkedContents.Entries)
+            foreach (KeyValuePair<int, int> entry in storageSync.OpenedLinkedAll.Entries)
             {
                 key += (entry.Key * 6271L + entry.Value) * 40503L;
             }
 
             key = key * 31 + storageSync.OpenedLinkedChests;
+            key = key * 31 + storageSync.OpenedLinkedStockpiles.Count;
             key = key * 31 + storageSync.OpenedJobs.Count;
             key = key * 31 + selected;
             key = key * 31 + quantity.Value;
+            foreach (KeyValuePair<IngredientGroup, int> choice in chosen)
+            {
+                key = key * 31 + (int)choice.Key * 1000 + choice.Value;
+            }
+
             return key;
         }
     }

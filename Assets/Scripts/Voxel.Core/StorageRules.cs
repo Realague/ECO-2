@@ -9,10 +9,11 @@ namespace Voxel.Core
         Stockpile = 2,
         SmallStockpile = 3,
 
-        // Not storage but placed like it (one cell, like a chest): stations (Station), one that cooks
-        // and one where carcasses are cut up.
+        // Not storage but placed like it (one cell, like a chest): stations (Station), one that cooks,
+        // one where carcasses are cut up and one where wood is worked.
         Campfire = 4,
-        ButcherTable = 5
+        ButcherTable = 5,
+        CarpentryTable = 6
     }
 
     // What storage holds and where it may stand. A chest stands in one cell on top of a solid block
@@ -35,15 +36,15 @@ namespace Voxel.Core
         public const int SmallStockpileSide = 2;
         public const int SmallPileSize = 20;
 
-        public static bool IsKind(byte kind) => kind >= (byte)StorageKind.Chest && kind <= (byte)StorageKind.ButcherTable;
+        public static bool IsKind(byte kind) => kind >= (byte)StorageKind.Chest && kind <= (byte)StorageKind.CarpentryTable;
 
         // Whether it stands in one cell like a chest (a chest or a station), rather than on a patch.
         public static bool IsSingleCell(StorageKind kind) => !IsStockpile(kind);
 
         public static bool IsStockpile(StorageKind kind) => kind == StorageKind.Stockpile || kind == StorageKind.SmallStockpile;
 
-        // A campfire or a butcher's table: a queue of orders, not storage (Storage.Station).
-        public static bool IsStation(StorageKind kind) => kind == StorageKind.Campfire || kind == StorageKind.ButcherTable;
+        // A campfire, a butcher's table or a carpentry table: a queue of orders, not storage (Storage.Station).
+        public static bool IsStation(StorageKind kind) => kind == StorageKind.Campfire || kind == StorageKind.ButcherTable || kind == StorageKind.CarpentryTable;
 
         // A stockpile's side in cells, its number of piles, the blocks a pile holds and in all.
         public static int SideOf(StorageKind kind) => kind == StorageKind.SmallStockpile ? SmallStockpileSide : StockpileSide;
@@ -62,6 +63,7 @@ namespace Voxel.Core
                 case StorageKind.SmallStockpile: return Items.SmallStockpile;
                 case StorageKind.Campfire: return Items.Campfire;
                 case StorageKind.ButcherTable: return Items.ButcherTable;
+                case StorageKind.CarpentryTable: return Items.CarpentryTable;
                 default: return Items.Stockpile;
             }
         }
@@ -74,6 +76,7 @@ namespace Voxel.Core
                 case Items.SmallStockpile: kind = StorageKind.SmallStockpile; break;
                 case Items.Campfire: kind = StorageKind.Campfire; break;
                 case Items.ButcherTable: kind = StorageKind.ButcherTable; break;
+                case Items.CarpentryTable: kind = StorageKind.CarpentryTable; break;
                 default: kind = StorageKind.Stockpile; break;
             }
 
@@ -115,10 +118,11 @@ namespace Voxel.Core
             return ((quarter % 4) + 4) % 4;
         }
 
-        // The cell a chest goes into: on top of the solid block, free of blocks (air, not water).
+        // The cell a chest goes into: on top of the solid block (not a door), free of blocks (air, not water).
         public static bool CanPlaceChest(World world, BlockPos cell)
         {
-            return world.InBounds(cell.X, cell.Y, cell.Z) && world.GetBlock(cell) == Blocks.Air && world.IsSolid(cell.X, cell.Y - 1, cell.Z);
+            return world.InBounds(cell.X, cell.Y, cell.Z) && world.GetBlock(cell) == Blocks.Air && world.IsSolid(cell.X, cell.Y - 1, cell.Z)
+                && Shapes.IsFullCube(world.GetBlock(cell.X, cell.Y - 1, cell.Z)) && !Blocks.IsDoor(world.GetBlock(cell.X, cell.Y - 1, cell.Z));
         }
 
         // The corner (lowest x and z) of a stockpile of that side placed by a player facing that way
@@ -144,6 +148,8 @@ namespace Voxel.Core
                 BlockPos cell = PileCell(corner, pile, side);
                 if (!world.InBounds(cell.X, cell.Y, cell.Z) || world.GetBlock(cell) != Blocks.Air) return false;
                 if (!world.IsSolid(cell.X, cell.Y - 1, cell.Z) || world.IsWater(cell.X, cell.Y - 1, cell.Z)) return false;
+                ushort ground = world.GetBlock(cell.X, cell.Y - 1, cell.Z);
+                if (Blocks.IsDoor(ground) || !Shapes.IsFullCube(ground)) return false;
             }
 
             return true;

@@ -172,7 +172,7 @@ namespace Voxel.Client
                 chip.AddToClassList("recipe-chip");
                 var chipIcon = new VisualElement { pickingMode = PickingMode.Ignore };
                 chipIcon.AddToClassList("recipe-chip-icon");
-                chipIcon.style.backgroundImage = new StyleBackground(IconOf(ingredient));
+                chipIcon.style.backgroundImage = new StyleBackground(IconOf(ingredient, ecosystemSync));
                 var count = new Label { pickingMode = PickingMode.Ignore };
                 count.AddToClassList("recipe-chip-text");
                 chip.Add(chipIcon);
@@ -264,8 +264,8 @@ namespace Voxel.Client
                 line.AddToClassList("details-line");
                 var picture = new VisualElement();
                 picture.AddToClassList("ingredient-icon");
-                picture.style.backgroundImage = new StyleBackground(choices[i] != Items.None ? ItemCatalog.IconOf(choices[i], ecosystemSync) : IconOf(ingredient));
-                var label = new Label(IngredientName(ingredient, choices[i]));
+                picture.style.backgroundImage = new StyleBackground(choices[i] != Items.None ? ItemCatalog.IconOf(choices[i], ecosystemSync) : IconOf(ingredient, ecosystemSync));
+                var label = new Label(IngredientName(ingredient, choices[i], ecosystemSync));
                 label.AddToClassList("details-line-label");
                 var value = new Label($"{have} / {need}");
                 value.AddToClassList("details-line-value");
@@ -445,24 +445,26 @@ namespace Voxel.Client
             return recipe.OutputCount > 1 ? Loc.T("{0} ×{1}", output, recipe.OutputCount) : output;
         }
 
-        private string IngredientName(Ingredient ingredient, int choice)
+        internal static string IngredientName(Ingredient ingredient, int choice, EcosystemSync ecosystemSync)
         {
             if (choice != Items.None) return ItemCatalog.NameOf(choice, ecosystemSync);
             switch (ingredient.Group)
             {
                 case IngredientGroup.Wood: return Loc.T("Wood");
                 case IngredientGroup.Stone: return Loc.T("Stone");
+                case IngredientGroup.Planks: return Loc.T("Planks");
                 default: return ItemCatalog.NameOf(ingredient.Item, ecosystemSync);
             }
         }
 
-        // A group's picture: oak wood for wood, granite for stone.
-        private Texture2D IconOf(Ingredient ingredient)
+        // A group's picture: oak wood for wood, granite for stone, oak planks for planks.
+        internal static Texture2D IconOf(Ingredient ingredient, EcosystemSync ecosystemSync)
         {
             switch (ingredient.Group)
             {
                 case IngredientGroup.Wood: return ItemCatalog.IconOf(Items.WoodOf(Items.OakSpecies), ecosystemSync);
                 case IngredientGroup.Stone: return ItemCatalog.IconOf(Blocks.Granite, ecosystemSync);
+                case IngredientGroup.Planks: return ItemCatalog.IconOf(Blocks.FirstPlanks, ecosystemSync);
                 default: return ItemCatalog.IconOf(ingredient.Item, ecosystemSync);
             }
         }

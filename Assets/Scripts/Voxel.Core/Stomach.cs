@@ -81,6 +81,20 @@ namespace Voxel.Core
             }
         }
 
+        // A full stomach (a player entering creative mode): the balance kept, or even if it was empty.
+        public void Fill()
+        {
+            if (Calories <= 0f)
+            {
+                for (int i = 0; i < nutrients.Length; i++)
+                {
+                    nutrients[i] = StartingNutrient;
+                }
+            }
+
+            Calories = Capacity;
+        }
+
         public void CopyFrom(Stomach other)
         {
             Calories = other.Calories;

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using NUnit.Framework;
+using Voxel.Core;
 
 namespace Eco.Sim.Tests
 {
@@ -101,6 +102,28 @@ namespace Eco.Sim.Tests
             {
                 Assert.That(x, Is.GreaterThanOrEqualTo(0));
             }
+        }
+
+        // A fence, a wall or a post on top of a column stops animals, one block high as it is; a floor
+        // or a roof is ground like any block.
+        [Test]
+        public void TryGetGround_AFenceAWallOrAPostStopsAnimals_AFloorDoesNot()
+        {
+            World world = MeadowGenerator.CreateWorld(1);
+            int y = MeadowGenerator.Surface;
+            Assert.IsTrue(WoodBlocks.TryPlanksOf(0, out ushort planks));
+            world.SetBlock(3, y, 3, Shapes.Make(planks, Shape.Fence, 0));
+            world.SetBlock(4, y, 3, Shapes.Make(planks, Shape.Wall, 1));
+            world.SetBlock(5, y, 3, Shapes.Make(planks, Shape.Post, 0));
+            world.SetBlock(6, y, 3, Shapes.Make(planks, Shape.Floor, 0));
+
+            Assert.IsFalse(AnimalMoves.TryGetGround(world, AnimalHabitat.Land, 3, 3, out _));
+            Assert.IsFalse(AnimalMoves.TryGetGround(world, AnimalHabitat.Land, 4, 3, out _));
+            Assert.IsFalse(AnimalMoves.TryGetGround(world, AnimalHabitat.Land, 5, 3, out _));
+            Assert.IsTrue(AnimalMoves.TryGetGround(world, AnimalHabitat.Land, 6, 3, out int onFloor));
+            Assert.AreEqual(y + 1, onFloor);
+            Assert.IsTrue(AnimalMoves.TryGetGround(world, AnimalHabitat.Land, 7, 3, out int beside));
+            Assert.AreEqual(y, beside);
         }
 
         // Flat ground 20 x 20 at Floor, with raised columns and taken columns.

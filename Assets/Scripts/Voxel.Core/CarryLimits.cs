@@ -13,8 +13,8 @@ namespace Voxel.Core
         public const float MaxWeight = 30f;
 
         // What counts against the blocks' limit rather than the weight: blocks, and every wood. A torch
-        // is a block type but weighs, like a tool.
-        public static bool CountsAsBlock(int item) => (Items.IsBlock(item) && item != Blocks.Torch) || Items.IsWood(item);
+        // and a door are block types but weigh, like a tool.
+        public static bool CountsAsBlock(int item) => (Items.IsBlock(item) && item != Blocks.Torch && item != Blocks.Door) || Items.IsWood(item);
 
         public static int BlockCount(Inventory inventory)
         {

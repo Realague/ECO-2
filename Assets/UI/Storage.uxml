@@ -6,7 +6,8 @@
     <!-- StorageScreen fills both sides (the player's bag, the storage's items or piles, PoolView), the
          weight or fill of the storage, and moves the dragged item's ghost. A campfire has three tabs:
          its cooking (StationPage), the bag and its linked chests, the bag and its wood; a butcher's
-         table two: its butchering (the same page) and the bag and its linked chests. -->
+         table two: its butchering (the same page) and the bag and its linked chests; a carpentry table
+         three: its carpentry, the bag and its linked chests, the bag and its linked stockpiles. -->
     <ui:VisualElement name="screen" class="screen inventory-screen storage-screen">
         <ui:VisualElement class="inventory-tabs">
             <ui:Button name="tab-storage" class="inventory-tab inventory-tab--selected">
@@ -20,6 +21,10 @@
             <ui:Button name="tab-fire-inventory" class="inventory-tab">
                 <ui:VisualElement class="icon icon--backpack inventory-tab-icon" />
                 <ui:Label text="Inventories" class="inventory-tab-text" />
+            </ui:Button>
+            <ui:Button name="tab-fire-stockpiles" class="inventory-tab">
+                <ui:VisualElement class="icon icon--category-blocks inventory-tab-icon" />
+                <ui:Label text="Stockpiles" class="inventory-tab-text" />
             </ui:Button>
             <ui:Button name="tab-fuel" class="inventory-tab">
                 <ui:VisualElement class="icon icon--category-wood inventory-tab-icon" />
@@ -118,7 +123,7 @@
                 <ui:VisualElement class="crafting-page">
                     <ui:VisualElement class="items-heading">
                         <ui:Label name="fire-recipes-title" text="Dishes" class="column-title items-title" />
-                        <ui:Label name="fire-linked" class="fire-linked" tooltip="Ingredients are taken from your bag, then from the linked chests (those of the same claimed zone; off claimed land, the public chests within 8 blocks), and what is made goes into them." />
+                        <ui:Label name="fire-linked" class="fire-linked" tooltip="Ingredients are taken from your bag, then from the linked storage (the chests and stockpiles of the same claimed zone; off claimed land, the public ones within 8 blocks), and what is made goes into it." />
                         <ui:VisualElement name="fire-fuel-box" class="carry-count" tooltip="Wood by the fire (20 at most): it burns only while a dish cooks, 30 s a log">
                             <ui:VisualElement class="icon icon--category-wood carry-count-icon" />
                             <ui:Label name="fire-fuel" class="carry-count-text" />

@@ -46,9 +46,14 @@ namespace Voxel.Client
         private VisualElement screen;
         private Button inventoryTab;
         private Button craftingTab;
+        private Button creativeTab;
         private VisualElement inventoryMain;
         private CraftingPage crafting;
-        private bool craftingShown;
+        private CreativePage creative;
+
+        private enum Tab { Inventory, Crafting, Creative }
+
+        private Tab tab;
         private ScrollView grid;
         private Label carryBlocks;
         private Label carryWeight;
@@ -165,10 +170,13 @@ namespace Voxel.Client
             inventoryMain = root.Q(className: "inventory-main");
             inventoryTab = root.Q<Button>("tab-inventory");
             craftingTab = root.Q<Button>("tab-crafting");
+            creativeTab = root.Q<Button>("tab-creative");
             crafting = new CraftingPage(root, craftingSync, inventorySync, hungerSync, ecosystemSync);
-            Connect(inventoryTab, () => ShowTab(false));
-            Connect(craftingTab, () => ShowTab(true));
-            ShowTab(false);
+            creative = new CreativePage(root, inventorySync, ecosystemSync);
+            Connect(inventoryTab, () => ShowTab(Tab.Inventory));
+            Connect(craftingTab, () => ShowTab(Tab.Crafting));
+            Connect(creativeTab, () => ShowTab(Tab.Creative));
+            ShowTab(Tab.Inventory);
             Connect(specialityChoose, () => inventorySync.RequestSpeciality(Specialities.Choices[0]));
 
             search.RegisterValueChangedCallback(e =>
@@ -203,14 +211,15 @@ namespace Voxel.Client
             }
 
             Keyboard keyboard = Keyboard.current;
-            if (keyboard != null && IsOpen && (search.focusController?.focusedElement == search || crafting.IsTyping))
+            if (keyboard != null && IsOpen && (search.focusController?.focusedElement == search || crafting.IsTyping || creative.IsTyping))
             {
-                // Letters typed in the search, or a count typed on the crafting sheet, are not keys;
+                // Letters typed in a search, or a count typed on the crafting sheet, are not keys;
                 // Escape leaves the field first.
                 if (keyboard.escapeKey.wasPressedThisFrame)
                 {
                     search.Blur();
                     crafting.Blur();
+                    creative.Blur();
                 }
             }
             else if (keyboard != null && !CommandConsole.HoldsInput && !mapScreen.HoldsInput && !StorageScreen.HoldsInput)
@@ -224,19 +233,35 @@ namespace Voxel.Client
                 {
                     Close(true);
                 }
-                else if (IsOpen && !craftingShown)
+                else if (IsOpen && tab == Tab.Inventory)
                 {
                     int slot = HotbarHud.PressedSlot(keyboard);
                     int item = hoveredItem != Items.None ? hoveredItem : selectedItem;
                     if (slot >= 0 && item != Items.None) PutInHotbar(item, slot);
                 }
+                else if (IsOpen && tab == Tab.Creative && inventorySync.Creative)
+                {
+                    // A digit over a catalog item takes a stack of it into that hotbar slot.
+                    int slot = HotbarHud.PressedSlot(keyboard);
+                    int item = creative.HoveredItem;
+                    if (slot >= 0 && item != Items.None)
+                    {
+                        inventorySync.RequestCreativeGive(item, CreativeRules.StackOf(item));
+                        PutInHotbar(item, slot);
+                    }
+                }
             }
 
             if (!IsOpen) return;
 
-            if (craftingShown)
+            if (tab == Tab.Crafting)
             {
                 crafting.Refresh();
+            }
+            else if (tab == Tab.Creative)
+            {
+                creative.Refresh();
+                ShowDetails();
             }
             else
             {
@@ -247,15 +272,18 @@ namespace Voxel.Client
             ShowSpeciality();
         }
 
-        // The Inventory tab (the items and their details) or the Crafting tab (recipes and their sheet).
-        private void ShowTab(bool craftingTabShown)
+        // The Inventory tab (the items and their details), the Crafting tab (recipes and their sheet)
+        // or the Creative tab (every item, and the details of the one under the pointer).
+        private void ShowTab(Tab shown)
         {
-            craftingShown = craftingTabShown;
-            inventoryTab.EnableInClassList("inventory-tab--selected", !craftingShown);
-            craftingTab.EnableInClassList("inventory-tab--selected", craftingShown);
-            inventoryMain.style.display = craftingShown ? DisplayStyle.None : DisplayStyle.Flex;
-            details.style.display = craftingShown ? DisplayStyle.None : DisplayStyle.Flex;
-            crafting.Show(craftingShown);
+            tab = shown;
+            inventoryTab.EnableInClassList("inventory-tab--selected", tab == Tab.Inventory);
+            craftingTab.EnableInClassList("inventory-tab--selected", tab == Tab.Crafting);
+            creativeTab.EnableInClassList("inventory-tab--selected", tab == Tab.Creative);
+            inventoryMain.style.display = tab == Tab.Inventory ? DisplayStyle.Flex : DisplayStyle.None;
+            details.style.display = tab == Tab.Crafting ? DisplayStyle.None : DisplayStyle.Flex;
+            crafting.Show(tab == Tab.Crafting);
+            creative.Show(tab == Tab.Creative);
             EndDrag();
             shownSearch = null;
         }
@@ -307,7 +335,7 @@ namespace Voxel.Client
             categoryKinds.Add(kind);
         }
 
-        private static string CategoryTitle(ItemCategory? kind) => kind.HasValue ? ItemCatalog.CategoryName(kind.Value) : Loc.T("All");
+        internal static string CategoryTitle(ItemCategory? kind) => kind.HasValue ? ItemCatalog.CategoryName(kind.Value) : Loc.T("All");
 
         // Another language: the categories' names, and the items' grid and details shown again.
         private void OnLanguageChanged()
@@ -319,10 +347,11 @@ namespace Voxel.Client
 
             shownSearch = null;
             crafting.Retranslate();
+            creative.Retranslate();
         }
 
         // The icon class (Common.uss) of a category; null is "All".
-        private static string CategoryIcon(ItemCategory? kind)
+        internal static string CategoryIcon(ItemCategory? kind)
         {
             switch (kind)
             {
@@ -358,7 +387,8 @@ namespace Voxel.Client
         {
             Inventory inventory = inventorySync.Inventory;
             string text = (search.value ?? "").Trim();
-            bool changed = shownSearch != text + "|" + category || inventory.DistinctCount != shownEntries.Count;
+            string key = text + "|" + category + "|" + inventorySync.Creative;
+            bool changed = shownSearch != key || inventory.DistinctCount != shownEntries.Count;
             if (!changed)
             {
                 int i = 0;
@@ -374,7 +404,7 @@ namespace Voxel.Client
 
             if (!changed) return;
 
-            shownSearch = text + "|" + category;
+            shownSearch = key;
             shownEntries.Clear();
             shownEntries.AddRange(inventory.Entries);
 
@@ -432,12 +462,14 @@ namespace Voxel.Client
         // 30 kg, gold when nearly full and red when full (CarryHud draws the same as gauges in game).
         private void ShowCarry(Inventory inventory)
         {
+            // In creative mode there is no limit.
+            bool creativeMode = inventorySync.Creative;
             int blocks = CarryLimits.BlockCount(inventory);
             float weight = CarryLimits.Weight(inventory, ecosystemSync.ItemWeights);
-            carryBlocks.text = $"{blocks} / {CarryLimits.MaxBlocks}";
-            carryWeight.text = $"{Loc.Number(weight, "0.0")} / {CarryLimits.MaxWeight:0} kg";
-            ShowCarryShare(carryBlocks, (float)blocks / CarryLimits.MaxBlocks);
-            ShowCarryShare(carryWeight, weight / CarryLimits.MaxWeight);
+            carryBlocks.text = creativeMode ? $"{blocks} / ∞" : $"{blocks} / {CarryLimits.MaxBlocks}";
+            carryWeight.text = creativeMode ? $"{Loc.Number(weight, "0.0")} kg / ∞" : $"{Loc.Number(weight, "0.0")} / {CarryLimits.MaxWeight:0} kg";
+            ShowCarryShare(carryBlocks, creativeMode ? 0f : (float)blocks / CarryLimits.MaxBlocks);
+            ShowCarryShare(carryWeight, creativeMode ? 0f : weight / CarryLimits.MaxWeight);
         }
 
         private static void ShowCarryShare(Label label, float share)
@@ -570,10 +602,12 @@ namespace Voxel.Client
             hotbar.Select(slot);
         }
 
-        // The item under the pointer, else the chosen one (the slots show no names).
+        // The item under the pointer, else the chosen one (the slots show no names); on the Creative
+        // tab, the catalog item under the pointer.
         private void ShowDetails()
         {
-            int item = hoveredItem != Items.None && !dragging && inventorySync.Inventory.Has(hoveredItem) ? hoveredItem : selectedItem;
+            int item = tab == Tab.Creative ? creative.HoveredItem
+                : hoveredItem != Items.None && !dragging && inventorySync.Inventory.Has(hoveredItem) ? hoveredItem : selectedItem;
             details.style.visibility = item == Items.None ? Visibility.Hidden : Visibility.Visible;
             if (item == Items.None) return;
 

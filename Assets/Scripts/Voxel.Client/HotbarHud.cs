@@ -32,6 +32,7 @@ namespace Voxel.Client
 
         private VisualElement screen;
         private VisualElement bar;
+        private VisualElement buildPanel;
         private Label heldName;
         private readonly VisualElement[] slots = new VisualElement[Hotbar.SlotCount];
         private readonly VisualElement[] icons = new VisualElement[Hotbar.SlotCount];
@@ -75,7 +76,10 @@ namespace Voxel.Client
                 float panelHeight = screen.resolvedStyle.height;
                 if (float.IsNaN(panelHeight) || panelHeight <= 0f) return 0f;
 
-                return (panelHeight - bar.worldBound.yMin) * Screen.height / panelHeight;
+                // The hammer's panel stands above the bar while it shows.
+                float top = bar.worldBound.yMin;
+                if (buildPanel != null && !buildPanel.ClassListContains("hidden")) top = Mathf.Min(top, buildPanel.worldBound.yMin);
+                return (panelHeight - top) * Screen.height / panelHeight;
             }
         }
 
@@ -93,6 +97,7 @@ namespace Voxel.Client
             VisualElement root = document.rootVisualElement;
             screen = root.Q("screen");
             bar = root.Q("hotbar");
+            buildPanel = root.Q("build-panel");
             heldName = root.Q<Label>("held-name");
             for (int slot = 0; slot < Hotbar.SlotCount; slot++)
             {

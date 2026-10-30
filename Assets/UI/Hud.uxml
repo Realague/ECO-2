@@ -24,6 +24,12 @@
             </ui:VisualElement>
         </ui:VisualElement>
 
+        <!-- Under the banner while the local player plays in creative mode (HudBanner). -->
+        <ui:VisualElement name="creative-tag" class="hud-creative" picking-mode="Ignore">
+            <ui:VisualElement class="icon icon--plus hud-creative-icon" picking-mode="Ignore" />
+            <ui:Label text="Creative mode" class="hud-creative-text strong" picking-mode="Ignore" />
+        </ui:VisualElement>
+
         <!-- How far the bow is drawn, above the crosshair while the left button is held. -->
         <ui:VisualElement name="draw" class="hud-draw hidden" picking-mode="Ignore">
             <ui:VisualElement name="draw-fill" class="hud-draw-fill" picking-mode="Ignore" />

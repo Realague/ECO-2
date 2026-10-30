@@ -21,6 +21,9 @@ namespace Voxel.Core
         {
             if (!Blocks.IsBreakable(block)) return Items.None;
 
+            // What players build is taken back with a hammer: planks, logs and doors.
+            if (Blocks.IsConstruction(block)) return Items.Hammer;
+
             switch (Blocks.TypeOf(block))
             {
                 // Taken down by hand: whatever is in it does.

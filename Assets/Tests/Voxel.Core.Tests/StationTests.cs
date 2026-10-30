@@ -282,16 +282,16 @@ namespace Voxel.Core.Tests
             fire.AddLabour(job.Id, 1000f);
             int asked = 0;
 
-            Assert.IsNull(fire.Tick(5f, Room, recipe =>
+            Assert.IsNull(fire.Tick(5f, Room, order =>
             {
                 asked++;
-                return false;
+                return null;
             }));
             Assert.AreEqual(StationStatus.NoIngredients, fire.Status);
             Assert.AreEqual(1, asked);
             Assert.AreEqual(5, fire.FuelCount, "nothing burns while it waits");
 
-            Assert.IsNull(fire.Tick(5f, Room, recipe => true));
+            Assert.IsNull(fire.Tick(5f, Room, order => new List<(int, int)> { (Items.Produce(CropSpecies.Potato), 2) }));
             Assert.AreEqual(StationStatus.Working, fire.Status);
             Assert.AreEqual(1, job.Stocked);
             Assert.AreEqual(10f, job.SecondsLeft, 1e-3f);
@@ -309,8 +309,8 @@ namespace Voxel.Core.Tests
             fire.AddLabour(stocked.Id, 1000f);
 
             Assert.AreSame(stocked, fire.Next);
-            Assert.AreSame(stocked, fire.Tick(15f, Room, recipe => false));
-            Assert.IsNull(fire.Tick(1f, Room, recipe => false));
+            Assert.AreSame(stocked, fire.Tick(15f, Room, order => null));
+            Assert.IsNull(fire.Tick(1f, Room, order => null));
             Assert.AreEqual(StationStatus.NoIngredients, fire.Status);
         }
 
@@ -444,7 +444,8 @@ namespace Voxel.Core.Tests
             Assert.IsTrue(StorageRules.IsStation(kind));
             Assert.IsTrue(StorageRules.IsSingleCell(kind));
             Assert.IsFalse(StorageRules.IsStation(StorageKind.Chest));
-            Assert.IsTrue(Recipes.All.Any(recipe => recipe.Output == Items.ButcherTable));
+            Assert.IsFalse(Recipes.All.Any(recipe => recipe.Output == Items.ButcherTable), "made at a carpentry table");
+            Assert.IsTrue(Recipes.Carpentry.Any(recipe => recipe.Output == Items.ButcherTable));
             Assert.IsTrue(Recipes.All.Any(recipe => recipe.Output == Items.Knife));
         }
     }

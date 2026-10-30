@@ -164,7 +164,8 @@ namespace Voxel.Client
             var icon = new VisualElement { pickingMode = PickingMode.Ignore };
             icon.AddToClassList("item-icon");
             icon.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(item, ecosystemSync));
-            var amount = new Label(count.ToString()) { pickingMode = PickingMode.Ignore };
+            // None held (the creative catalog): no count.
+            var amount = new Label(count > 0 ? count.ToString() : "") { pickingMode = PickingMode.Ignore };
             amount.AddToClassList("item-count");
             slot.Add(icon);
             slot.Add(amount);

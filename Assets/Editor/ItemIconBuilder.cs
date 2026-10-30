@@ -40,7 +40,7 @@ public static class ItemIconBuilder
         for (int type = 1; type <= Blocks.LastType; type++)
         {
             // A torch is no cube: it is rendered below like the other objects.
-            if (!Items.IsBlock(type) || type == Blocks.Torch) continue;
+            if (!Items.IsBlock(type) || type == Blocks.Torch || type == Blocks.Door) continue;
 
             Texture2D block = BlockIcon((ushort)type);
             Write($"Block_{type}", block);
@@ -131,6 +131,16 @@ public static class ItemIconBuilder
             Texture2D table = renderer.Render(ButcherTableParts(), 26f, 0.95f);
             Write("ButcherTable", table);
             UnityEngine.Object.DestroyImmediate(table);
+            written++;
+
+            Texture2D bench = renderer.Render(StationParts(CarpentryTableShapes.Wood, CarpentryTableShapes.Iron), 26f, 0.95f);
+            Write("CarpentryTable", bench);
+            UnityEngine.Object.DestroyImmediate(bench);
+            written++;
+
+            Texture2D door = renderer.Render(DoorParts(), 12f, 0.9f, Quaternion.Euler(0f, 15f, 0f));
+            Write("Door", door);
+            UnityEngine.Object.DestroyImmediate(door);
             written++;
 
             for (int kind = 0; kind < Butchery.MeatKindCount; kind++)
@@ -565,13 +575,39 @@ public static class ItemIconBuilder
     private static Color ColourOf(uint rgb) => new Color(((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f);
 
     // A butcher's table as placed ones are drawn (ButcherTableShapes), with its cleaver.
-    private static IReadOnlyList<SpeciesAsset.Part> ButcherTableParts()
+    private static IReadOnlyList<SpeciesAsset.Part> ButcherTableParts() => StationParts(ButcherTableShapes.Wood, ButcherTableShapes.Iron);
+
+    // A station table's boxes in wood and iron, as placed ones are drawn.
+    private static IReadOnlyList<SpeciesAsset.Part> StationParts(IEnumerable<(Vector3 centre, Vector3 size)> woodBoxes, IEnumerable<(Vector3 centre, Vector3 size)> ironBoxes)
     {
         var wood = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/ArrowShaft.mat");
         var iron = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/ArrowHead.mat");
         var parts = new List<SpeciesAsset.Part>();
-        AddBoxes(parts, ButcherTableShapes.Wood, Vector3.zero, wood);
-        AddBoxes(parts, ButcherTableShapes.Iron, Vector3.zero, iron);
+        AddBoxes(parts, woodBoxes, Vector3.zero, wood);
+        AddBoxes(parts, ironBoxes, Vector3.zero, iron);
+        return parts;
+    }
+
+    // A closed door seen from its inner side: the panel, its rails, hinges and handle (as DoorViews).
+    private static IReadOnlyList<SpeciesAsset.Part> DoorParts()
+    {
+        Mesh cube = Resources.GetBuiltinResource<Mesh>("Cube.fbx");
+        var wood = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/ArrowShaft.mat");
+        var iron = AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/ArrowHead.mat");
+        float back = 1f - Doors.Thickness;
+        var parts = new List<SpeciesAsset.Part>
+        {
+            new SpeciesAsset.Part { mesh = cube, material = wood, offset = new Vector3(0.5f, 1f, 1f - Doors.Thickness * 0.5f), scale = new Vector3(0.96f, 1.96f, Doors.Thickness) }
+        };
+
+        foreach (float y in new[] { 0.35f, 1.02f, 1.65f })
+        {
+            parts.Add(new SpeciesAsset.Part { mesh = cube, material = wood, offset = new Vector3(0.5f, y, back - 0.02f), scale = new Vector3(0.86f, 0.12f, 0.042f) });
+        }
+
+        parts.Add(new SpeciesAsset.Part { mesh = cube, material = iron, offset = new Vector3(0.17f, 0.35f, back - 0.045f), scale = new Vector3(0.26f, 0.06f, 0.03f) });
+        parts.Add(new SpeciesAsset.Part { mesh = cube, material = iron, offset = new Vector3(0.17f, 1.65f, back - 0.045f), scale = new Vector3(0.26f, 0.06f, 0.03f) });
+        parts.Add(new SpeciesAsset.Part { mesh = cube, material = iron, offset = new Vector3(0.84f, 0.8f, back - 0.07f), scale = new Vector3(0.05f, 0.13f, 0.05f) });
         return parts;
     }
 

@@ -5,6 +5,36 @@
     <!-- HotbarHud fills each slot with its item's icon and count and marks the chosen one. StomachHud
          fills the stomach box, which hangs at the bar's left without moving it. -->
     <ui:VisualElement name="screen" class="screen hotbar-screen" picking-mode="Ignore">
+        <!-- BuildingHud's wheel, while R is held with the hammer: the shapes on the inner ring, the
+             construction blocks of the bag on the outer one, placed by code around the anchor. -->
+        <ui:VisualElement name="build-wheel" class="build-wheel hidden" picking-mode="Ignore">
+            <ui:VisualElement name="wheel-anchor" class="wheel-anchor" picking-mode="Ignore">
+                <ui:VisualElement name="wheel-outer-disc" class="wheel-disc wheel-disc--outer" picking-mode="Ignore" />
+                <ui:VisualElement name="wheel-inner-disc" class="wheel-disc" picking-mode="Ignore" />
+                <ui:VisualElement name="wheel-slots" picking-mode="Ignore" />
+                <ui:VisualElement class="wheel-centre" picking-mode="Ignore">
+                    <ui:Label name="wheel-name" class="wheel-name strong" picking-mode="Ignore" />
+                    <ui:Label text="Point at one, then release R or click" class="wheel-hint" picking-mode="Ignore" />
+                </ui:VisualElement>
+                <ui:VisualElement name="wheel-pointer" class="wheel-pointer" picking-mode="Ignore" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <!-- BuildingHud shows it while the hammer is in hand: the block to place, its shape, the mode. -->
+        <ui:VisualElement name="build-panel" class="build-panel hidden" picking-mode="Ignore">
+            <ui:VisualElement name="build-icon" class="build-icon" picking-mode="Ignore" />
+            <ui:VisualElement class="build-text" picking-mode="Ignore">
+                <ui:Label name="build-block" class="build-block strong" picking-mode="Ignore" />
+                <ui:Label name="build-detail" class="build-detail" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement class="keys build-keys" picking-mode="Ignore">
+                <ui:VisualElement class="key"><ui:Label name="build-shape-key" text="R" class="key-text" /></ui:VisualElement>
+                <ui:Label text="Shape (hold: menu)" class="key-label" />
+                <ui:VisualElement class="key"><ui:Label name="build-mode-key" text="V" class="key-text" /></ui:VisualElement>
+                <ui:Label text="Mode" class="key-label" />
+                <ui:VisualElement class="key"><ui:Label name="build-block-key" text="B" class="key-text" /></ui:VisualElement>
+                <ui:Label text="Block" class="key-label" />
+            </ui:VisualElement>
+        </ui:VisualElement>
         <ui:Label name="held-name" class="hotbar-held strong" picking-mode="Ignore" />
         <ui:VisualElement name="hotbar" class="hotbar">
             <ui:VisualElement name="stomach" class="stomach" picking-mode="Ignore">

@@ -199,3 +199,31 @@
     white-space: nowrap;
     translate: -50% -100%;
 }
+
+/* Under the banner while the local player plays in creative mode. */
+.hud-creative {
+    position: absolute;
+    left: 24px;
+    top: 118px;
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 14px 6px 10px;
+    background-color: var(--veil);
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: var(--accent);
+}
+
+.hud-creative-icon {
+    width: 18px;
+    height: 18px;
+    margin-right: 8px;
+    -unity-background-image-tint-color: var(--accent);
+}
+
+.hud-creative-text {
+    font-size: 16px;
+    color: var(--accent);
+    margin: 0;
+    padding: 0;
+}

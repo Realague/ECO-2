@@ -66,6 +66,14 @@ namespace Eco.Sim
         public static bool TryGetGround(World world, AnimalHabitat habitat, int x, int z, out int y)
         {
             int top = world.GetTopHeight(x, z);
+
+            // A wall, a post or a fence on top of the column stops animals (Shapes.StopsAnimals).
+            if (top > 0 && Shapes.StopsAnimals(world.GetBlock(x, top - 1, z)))
+            {
+                y = 0;
+                return false;
+            }
+
             bool wet = top > 0 && world.IsWater(x, top - 1, z);
             int bed = wet ? world.GetSurfaceHeight(x, z) : top;
             return GroundFor(habitat, top, wet, bed, out y);

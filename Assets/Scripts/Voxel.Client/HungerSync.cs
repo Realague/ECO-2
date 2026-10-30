@@ -128,8 +128,9 @@ namespace Voxel.Client
                     }
                 }
 
+                // A creative player burns nothing.
                 lastPositions[client.ClientId] = position;
-                state.Stomach.Burn(spent);
+                if (!state.Creative) state.Stomach.Burn(spent);
                 PublishIfChanged(client.ClientId, state.Stomach);
             }
 
@@ -148,24 +149,24 @@ namespace Voxel.Client
             }
         }
 
-        // Placing and tilling cost calories here; breaking costs nothing more than the hits it took
-        // (BurnEffort, from MiningSync).
+        // Placing, taking back with a hammer and tilling cost calories here; breaking costs nothing more
+        // than the hits it took (BurnEffort, from MiningSync).
         private void OnEditApplied(ulong clientId, EditKind kind)
         {
-            if (kind == EditKind.Placed) BurnEffort(clientId, HungerRules.PerBlockPlaced);
+            if (kind == EditKind.Placed || kind == EditKind.TakenBack) BurnEffort(clientId, HungerRules.PerBlockPlaced);
             else if (kind == EditKind.Tilled) BurnEffort(clientId, HungerRules.PerTill);
         }
 
         // Server side: a player's effort (a hit with a tool) burns calories.
         internal void BurnEffort(ulong clientId, float calories)
         {
-            if (registry != null && registry.TryGetState(clientId, out PlayerState state)) state.Stomach.Burn(calories);
+            if (registry != null && registry.TryGetState(clientId, out PlayerState state) && !state.Creative) state.Stomach.Burn(calories);
         }
 
         // Server side: whether a player's stomach is empty (they then swing at half pace).
         internal bool IsStarving(ulong clientId)
         {
-            return registry != null && registry.TryGetState(clientId, out PlayerState state) && state.Stomach.IsStarving;
+            return registry != null && registry.TryGetState(clientId, out PlayerState state) && state.Stomach.IsStarving && !state.Creative;
         }
 
         private void Eat(ulong clientId, int item)

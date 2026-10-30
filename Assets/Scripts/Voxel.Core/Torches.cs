@@ -53,7 +53,11 @@ namespace Voxel.Core
         public static bool HasSupport(World world, BlockPos pos, ushort torch)
         {
             BlockPos support = SupportOf(pos, torch);
-            return world.InBounds(support.X, support.Y, support.Z) && Blocks.IsSolid(world.GetBlock(support));
+            if (!world.InBounds(support.X, support.Y, support.Z)) return false;
+
+            // Not on a door (opening it would leave the torch in the air) nor on a shaped block.
+            ushort block = world.GetBlock(support);
+            return Blocks.IsSolid(block) && !Blocks.IsDoor(block) && Shapes.IsFullCube(block);
         }
 
         // The torches held by the block at support (to drop when it goes), added to into.

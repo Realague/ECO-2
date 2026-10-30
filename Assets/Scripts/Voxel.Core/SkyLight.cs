@@ -176,7 +176,7 @@ namespace Voxel.Core
                     if (!world.InBounds(nx, ny, nz)) continue;
 
                     ushort block = world.GetBlock(nx, ny, nz);
-                    if (Blocks.IsOpaque(block)) continue;
+                    if (Blocks.BlocksLight(block)) continue;
 
                     bool straightDown = direction == Down && level == Max && Blocks.TypeOf(block) == Blocks.Air;
                     int lit = straightDown ? Max : level - 1;
@@ -190,7 +190,7 @@ namespace Voxel.Core
 
         private static int FromAboveTheWorld(ushort block)
         {
-            if (Blocks.IsOpaque(block)) return 0;
+            if (Blocks.BlocksLight(block)) return 0;
             return Blocks.TypeOf(block) == Blocks.Air ? Max : Max - 1;
         }
 
@@ -266,7 +266,7 @@ namespace Voxel.Core
                                     ushort block = chunk.Get(lx, ly, lz);
                                     int y = cy * Chunk.Size + ly;
                                     if (sky < 0 && Blocks.TypeOf(block) != Blocks.Air) sky = y + 1;
-                                    if (Blocks.IsOpaque(block))
+                                    if (Blocks.BlocksLight(block))
                                     {
                                         solid = y;
                                         break;
