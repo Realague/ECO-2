@@ -81,6 +81,11 @@ namespace Voxel.Client
         // When the last click not yet struck came, or -1.
         private float queuedStrike = -1f;
 
+        // The left button has been held since a press made while playing (not the click that captured
+        // the mouse, nor one held through a window), and the frame Interact last ran.
+        private bool strikeHeld;
+        private int lastInteractFrame = -1;
+
         // The last move was stopped by a block on the side.
         private bool againstWall;
 
@@ -361,8 +366,16 @@ namespace Voxel.Client
                 bowSync.CancelDraw();
             }
 
-            // A left click is one hit with the held tool, struck as soon as the last swing is over.
+            // A left click is one hit with the held tool, struck as soon as the last swing is over; held
+            // down, it strikes again at every swing (each still a hit, with its swing and calories). Not
+            // the hammer, whose blows take blocks back at once and lay out lines.
+            if (lastInteractFrame != Time.frameCount - 1) strikeHeld = false;
+            lastInteractFrame = Time.frameCount;
+            if (mouse.leftButton.wasPressedThisFrame) strikeHeld = true;
+            else if (!mouse.leftButton.isPressed) strikeHeld = false;
+
             if (mouse.leftButton.wasPressedThisFrame && held != Items.Bow) queuedStrike = Time.time;
+            else if (strikeHeld && held != Items.Bow && held != Items.Hammer && miningSync.CanSwing) queuedStrike = Time.time;
             if (queuedStrike >= 0f && Time.time - queuedStrike > StrikeQueueSeconds) queuedStrike = -1f;
 
             bool strike = queuedStrike >= 0f && miningSync.CanSwing;
@@ -381,6 +394,10 @@ namespace Voxel.Client
                 queuedStrike = -1f;
                 bool struckHit = VoxelRaycast.Cast(world, origin, direction, PlayerRules.Reach, true, out VoxelHit struck);
                 Strike(held, origin, direction, struckHit, struck, struckHit ? struck.Distance : PlayerRules.Reach);
+
+                // A strike refused without a swing (a missing tool, someone's land, too hungry) is not
+                // repeated while the button stays down: it would say so every frame.
+                if (miningSync.CanSwing) strikeHeld = false;
                 return;
             }
 
