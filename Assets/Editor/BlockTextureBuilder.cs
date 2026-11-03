@@ -30,6 +30,25 @@ namespace Voxel.EditorTools
         private static readonly Color Sand = new Color(0.88f, 0.80f, 0.56f);
         private static readonly Color Clay = new Color(0.62f, 0.59f, 0.57f);
 
+        // The natural blocks' tiles painted with variants (TileVariants: Name_2.png, Name_3.png), the same
+        // rules drawn from another seed, and their weights: the base file twice as often as each variant.
+        // Ice (its cracks are fixed), tilled soil (its furrows) and wood are left as they are.
+        private const int PaintedVariants = 3;
+        private const string VariantWeights = "2 1 1";
+
+        private static readonly int[] VariedTiles =
+        {
+            GraniteTile, DirtTile, GrassTopTile, GrassSideTile, BasaltTile, LimestoneTile, MarbleTile, SandstoneTile,
+            SlateTile, SandTile, SnowTile, GravelTile, ClayTile, CoalTile, IronTile, CopperTile, TinTile, GoldTile,
+            SaltTile, FlintTile, BedrockTile, MudTile
+        };
+
+        // The tiles whose top and bottom turn at random: soils and snow, whose grain has no way up.
+        private static readonly int[] RotatedTiles = { GrassTopTile, DirtTile, SandTile, SnowTile, GravelTile, ClayTile, MudTile };
+
+        // Added to every noise's seed while a variant is painted (0 for the base files, so they stay the same).
+        private static int variantSeed;
+
         [MenuItem("Eco/Write missing block textures")]
         private static void WriteMissing()
         {
@@ -37,26 +56,62 @@ namespace Voxel.EditorTools
             var written = new List<string>();
             for (int tile = 0; tile < TileCount; tile++)
             {
-                string name = TileNames[tile];
-                string path = $"{Folder}/{name}.png";
-                if (!File.Exists(path))
+                for (int number = 1; number <= (System.Array.IndexOf(VariedTiles, tile) >= 0 ? PaintedVariants : 1); number++)
                 {
-                    WritePng(path, (x, y) => TileColour(tile, x, y));
-                    written.Add(name);
-                }
+                    variantSeed = number == 1 ? 0 : number * 7919;
+                    string name = number == 1 ? TileNames[tile] : TileVariants.VariantName(TileNames[tile], number);
+                    string path = $"{Folder}/{name}.png";
+                    if (!File.Exists(path))
+                    {
+                        WritePng(path, (x, y) => TileColour(tile, x, y));
+                        written.Add(name);
+                    }
 
-                string maskPath = $"{Folder}/{name}{TintSuffix}.png";
-                if (HasTint(tile) && !File.Exists(maskPath))
-                {
-                    WritePng(maskPath, (x, y) => IsTinted(tile, x, y) ? Color.white : Color.black);
-                    written.Add(name + TintSuffix);
+                    string maskPath = $"{Folder}/{name}{TintSuffix}.png";
+                    if (HasTint(tile) && !File.Exists(maskPath))
+                    {
+                        WritePng(maskPath, (x, y) => IsTinted(tile, x, y) ? Color.white : Color.black);
+                        written.Add(name + TintSuffix);
+                    }
                 }
+            }
+
+            variantSeed = 0;
+            string weightsPath = $"{Folder}/{TileVariants.WeightsFile}.txt";
+            if (!File.Exists(weightsPath))
+            {
+                File.WriteAllText(weightsPath, DefaultWeights());
+                written.Add(TileVariants.WeightsFile + ".txt");
             }
 
             AssetDatabase.Refresh();
             Debug.Log(written.Count == 0
                 ? $"Every block texture is already in {Folder}."
                 : $"Wrote {written.Count} block textures to {Folder}: {string.Join(", ", written)}.");
+        }
+
+        // The weights file written with the painted variants, explained for whoever edits it.
+        private static string DefaultWeights()
+        {
+            var text = new System.Text.StringBuilder();
+            text.AppendLine("# Weighted random block textures (TileVariants), as OptiFine's random textures.");
+            text.AppendLine("# A tile's variants are its files numbered from 2: Granite.png, Granite_2.png, Granite_3.png...");
+            text.AppendLine("# \"Name: w1 w2 w3\" gives each file's weight, the base file first (0 never shows it);");
+            text.AppendLine("# a tile without a line shows its files equally often.");
+            text.AppendLine("# \"rotate:\" lists the tiles whose top and bottom turn and mirror at random.");
+            foreach (int tile in VariedTiles)
+            {
+                text.AppendLine($"{TileNames[tile]}: {VariantWeights}");
+            }
+
+            text.Append("rotate:");
+            foreach (int tile in RotatedTiles)
+            {
+                text.Append(' ').Append(TileNames[tile]);
+            }
+
+            text.AppendLine();
+            return text.ToString();
         }
 
         private delegate Color Pixel(int x, int y);
@@ -166,7 +221,7 @@ namespace Voxel.EditorTools
 
         private static float Noise(int tile, int x, int y)
         {
-            int hash = (x * 73856093) ^ (y * 19349663) ^ (tile * 83492791);
+            int hash = (x * 73856093) ^ (y * 19349663) ^ ((tile + variantSeed) * 83492791);
             hash ^= hash >> 13;
             hash *= 1274126177;
             return ((hash >> 8) & 0xFF) / 255f;

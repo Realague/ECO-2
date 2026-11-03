@@ -315,7 +315,7 @@ namespace Voxel.Client
                     {
                         float u = Mathf.Lerp(ChunkMesher.UvInset, 1f - ChunkMesher.UvInset, corner.x);
                         float v = Mathf.Lerp(ChunkMesher.UvInset, 1f - ChunkMesher.UvInset, corner.y);
-                        uvs.Add(new Vector2((tile + u) / BlockAtlas.TileCount, v));
+                        uvs.Add(new Vector2((tile + u) / BlockAtlas.SlotCount, v));
                     }
                 }
 

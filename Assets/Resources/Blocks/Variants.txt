@@ -1,0 +1,28 @@
+# Weighted random block textures (TileVariants), as OptiFine's random textures.
+# A tile's variants are its files numbered from 2: Granite.png, Granite_2.png, Granite_3.png...
+# "Name: w1 w2 w3" gives each file's weight, the base file first (0 never shows it);
+# a tile without a line shows its files equally often.
+# "rotate:" lists the tiles whose top and bottom turn and mirror at random.
+Granite: 2 1 1
+Dirt: 2 1 1
+GrassTop: 2 1 1
+GrassSide: 2 1 1
+Basalt: 2 1 1
+Limestone: 2 1 1
+Marble: 2 1 1
+Sandstone: 2 1 1
+Slate: 2 1 1
+Sand: 2 1 1
+Snow: 2 1 1
+Gravel: 2 1 1
+Clay: 2 1 1
+CoalOre: 2 1 1
+IronOre: 2 1 1
+CopperOre: 2 1 1
+TinOre: 2 1 1
+GoldOre: 2 1 1
+RockSalt: 2 1 1
+Flint: 2 1 1
+Bedrock: 2 1 1
+Mud: 2 1 1
+rotate: GrassTop Dirt Sand Snow Gravel Clay Mud

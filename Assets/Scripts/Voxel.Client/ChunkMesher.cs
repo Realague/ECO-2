@@ -99,12 +99,16 @@ namespace Voxel.Client
         // The light of torches for the chunk being built; null for none.
         private BlockLight glow;
 
+        // The tiles' variants for the chunk being built (BlockAtlas.Variants, read once per chunk).
+        private TileVariants variants = TileVariants.None;
+
         // True when the last chunk built has no face to draw.
         public bool IsEmpty => vertices.Count == 0;
 
         public void Build(World world, SkyLight light, Chunk chunk, BlockLight blockLight = null)
         {
             glow = blockLight;
+            variants = BlockAtlas.Variants;
             vertices.Clear();
             normals.Clear();
             uvs.Clear();
@@ -149,7 +153,7 @@ namespace Voxel.Client
 
                             SampleFront(world, light, worldX + normal.x, worldY + normal.y, worldZ + normal.z, face);
                             AddFace(new Vector3(x, y, z), face, 1f, solidTriangles, true);
-                            AddTileUvs(BlockAtlas.TileFor(block, face));
+                            AddTileUvs(BlockAtlas.TileFor(block, face), worldX, worldY, worldZ, face);
                         }
                     }
                 }
@@ -453,7 +457,7 @@ namespace Voxel.Client
             }
 
             AddQuad(origin, corners, normal, false);
-            AddLocalUvs(BlockAtlas.TileFor(block, turned), turned, corners);
+            AddLocalUvs(BlockAtlas.TileFor(block, turned), turned, corners, cell);
         }
 
         // A post a little thinner than a wall, and two rails toward each fence beside it.
@@ -492,7 +496,7 @@ namespace Voxel.Client
                 }
 
                 AddQuad(origin, corners, normal, true);
-                AddLocalUvs(BlockAtlas.TileFor(block, face), face, corners);
+                AddLocalUvs(BlockAtlas.TileFor(block, face), face, corners, cell);
             }
         }
 
@@ -529,7 +533,7 @@ namespace Voxel.Client
 
             Vector3 normal = face < 0 ? TurnPoint(new Vector3(0.5f, 0.5f + 0.70710678f, 0.5f - 0.70710678f), facing) - new Vector3(0.5f, 0.5f, 0.5f) : (Vector3)toward;
             AddQuad(origin, corners, normal, false);
-            AddLocalUvs(BlockAtlas.TileFor(block, turned), turned, corners);
+            AddLocalUvs(BlockAtlas.TileFor(block, turned), turned, corners, cell);
         }
 
         // A point of the cell turned about its middle by quarter turns: (x, z) -> (z, 1 - x).
@@ -577,9 +581,11 @@ namespace Voxel.Client
         }
 
         // The part of a tile under each corner, as the face's axes run through the cell (the same as a
-        // full face's corners, AddTileUvs, at the cell's corners).
-        private void AddLocalUvs(int tile, int face, Vector3[] quad)
+        // full face's corners, AddTileUvs, at the cell's corners), from the variant of the tile the cell
+        // shows on that face (never turned: a shape's boxes line up with the world).
+        private void AddLocalUvs(int tile, int face, Vector3[] quad, Vector3Int cell)
         {
+            int slot = variants.Pick(tile, cell.x, cell.y, cell.z, face, out _, out _);
             for (int i = 0; i < 4; i++)
             {
                 Vector3 p = quad[i];
@@ -596,17 +602,21 @@ namespace Voxel.Client
 
                 u = Mathf.Lerp(ChunkMesher.UvInset, 1f - ChunkMesher.UvInset, Mathf.Clamp01(u));
                 v = Mathf.Lerp(ChunkMesher.UvInset, 1f - ChunkMesher.UvInset, Mathf.Clamp01(v));
-                uvs.Add(new Vector2((tile + u) / BlockAtlas.TileCount, v));
+                uvs.Add(new Vector2((slot + u) / variants.SlotCount, v));
             }
         }
 
-        private void AddTileUvs(int tile)
+        // A whole face of the block at (x, y, z): the variant of its tile picked for that face
+        // (TileVariants), turned by quarter turns and mirrored when the tile rotates there.
+        private void AddTileUvs(int tile, int x, int y, int z, int face)
         {
+            int slot = variants.Pick(tile, x, y, z, face, out int turn, out bool mirror);
             for (int i = 0; i < 4; i++)
             {
-                float u = Mathf.Lerp(ChunkMesher.UvInset, 1f - ChunkMesher.UvInset, ChunkMesher.CornerUvs[i].x);
-                float v = Mathf.Lerp(ChunkMesher.UvInset, 1f - ChunkMesher.UvInset, ChunkMesher.CornerUvs[i].y);
-                uvs.Add(new Vector2((tile + u) / BlockAtlas.TileCount, v));
+                Vector2 corner = ChunkMesher.CornerUvs[(i + turn) & 3];
+                float u = Mathf.Lerp(ChunkMesher.UvInset, 1f - ChunkMesher.UvInset, mirror ? 1f - corner.x : corner.x);
+                float v = Mathf.Lerp(ChunkMesher.UvInset, 1f - ChunkMesher.UvInset, corner.y);
+                uvs.Add(new Vector2((slot + u) / variants.SlotCount, v));
             }
         }
     }

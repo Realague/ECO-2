@@ -92,6 +92,19 @@ namespace Voxel.Client
         // The mean colour of each tile's pixels, set by CreateTexture.
         private static Color[] meanColours;
 
+        // The tiles' variants (weighted random textures) the meshes pick from, found by CreateTexture;
+        // base tiles alone until then.
+        private static TileVariants variants;
+
+        internal static TileVariants Variants
+        {
+            get => variants ?? TileVariants.None;
+            set => variants = value;
+        }
+
+        // How many places the atlas has (base tiles and variants): texture coordinates are divided by it.
+        public static int SlotCount => Variants.SlotCount;
+
         public static int TileFor(ushort block, int face)
         {
             ushort type = Blocks.TypeOf(block);
@@ -155,36 +168,46 @@ namespace Voxel.Client
         // within its own tile), down to tiles of MipTileSize: blocks stay sharp up close (point
         // filtering), do not shimmer far away, and no colour ever bleeds from one tile into the next.
         // Tiles are as large as the largest file (rounded up to a power of two); smaller files are
-        // scaled up pixel by pixel.
+        // scaled up pixel by pixel. The variants (TileVariants) follow the base tiles; a variant without
+        // its own tint mask takes its base tile's.
         public static Texture2D CreateTexture()
         {
-            var colours = new Texture2D[TileCount];
-            var masks = new Texture2D[TileCount];
+            Variants = TileVariants.FromResources();
+            int slotCount = Variants.SlotCount;
+            var colours = new Texture2D[slotCount];
+            var masks = new Texture2D[slotCount];
             int tileSize = MipTileSize;
-            for (int tile = 0; tile < TileCount; tile++)
+            for (int slot = 0; slot < slotCount; slot++)
             {
-                string path = $"{ResourceFolder}/{TileNames[tile]}";
-                colours[tile] = Load(path, true);
-                masks[tile] = Load(path + TintSuffix, false);
-                if (colours[tile] != null) tileSize = Mathf.Max(tileSize, colours[tile].width, colours[tile].height);
+                string path = $"{ResourceFolder}/{Variants.SlotName(slot)}";
+                colours[slot] = Load(path, true);
+                masks[slot] = Load(path + TintSuffix, false);
+                if (colours[slot] != null) tileSize = Mathf.Max(tileSize, colours[slot].width, colours[slot].height);
             }
 
             tileSize = Mathf.NextPowerOfTwo(tileSize);
             int mipCount = 1;
             for (int size = tileSize; size > MipTileSize; size /= 2) mipCount++;
 
-            var texture = new Texture2D(TileCount * tileSize, tileSize, TextureFormat.RGBA32, mipCount, false)
+            // The atlas is one row of tiles: too many for the graphics card, and it would not be made.
+            if (slotCount * tileSize > SystemInfo.maxTextureSize)
+            {
+                Debug.LogError($"The block atlas would be {slotCount * tileSize} pixels wide, more than this machine's {SystemInfo.maxTextureSize}: remove texture variants or use smaller tiles.");
+            }
+
+            var texture = new Texture2D(slotCount * tileSize, tileSize, TextureFormat.RGBA32, mipCount, false)
             {
                 name = "BlockAtlas",
                 filterMode = FilterMode.Point,
                 wrapMode = TextureWrapMode.Clamp
             };
 
-            int width = TileCount * tileSize;
+            int width = slotCount * tileSize;
             var level = new Color[width * tileSize];
-            meanColours = new Color[TileCount];
-            for (int tile = 0; tile < TileCount; tile++)
+            meanColours = new Color[slotCount];
+            for (int tile = 0; tile < slotCount; tile++)
             {
+                Texture2D mask = masks[tile] != null ? masks[tile] : masks[Variants.BaseOf(tile)];
                 Color sum = Color.clear;
                 for (int y = 0; y < tileSize; y++)
                 {
@@ -196,7 +219,7 @@ namespace Voxel.Client
 
                         // Alpha is not transparency but the tint mask read by the blocks' shader:
                         // below 1, the pixel takes the colour of the climate where the block stands.
-                        colour.a = masks[tile] != null && Sample(masks[tile], x, y, tileSize).r >= 0.5f ? 0f : 1f;
+                        colour.a = mask != null && Sample(mask, x, y, tileSize).r >= 0.5f ? 0f : 1f;
                         level[y * width + tile * tileSize + x] = colour;
                         sum += colour;
                     }
@@ -207,7 +230,7 @@ namespace Voxel.Client
                 meanColours[tile] = mean;
             }
 
-            for (int tile = 0; tile < TileCount; tile++)
+            for (int tile = 0; tile < slotCount; tile++)
             {
                 if (colours[tile] != null) Resources.UnloadAsset(colours[tile]);
                 if (masks[tile] != null) Resources.UnloadAsset(masks[tile]);
@@ -216,7 +239,7 @@ namespace Voxel.Client
             texture.SetPixels(level, 0);
             for (int mip = 1; mip < mipCount; mip++)
             {
-                level = HalveTiles(level, tileSize);
+                level = HalveTiles(level, tileSize, slotCount);
                 tileSize /= 2;
                 texture.SetPixels(level, mip);
             }
@@ -252,11 +275,11 @@ namespace Voxel.Client
         }
 
         // The next mipmap level of a row of tiles of this size: each pixel the mean of the four under it.
-        private static Color[] HalveTiles(Color[] pixels, int tileSize)
+        private static Color[] HalveTiles(Color[] pixels, int tileSize, int slotCount)
         {
-            int width = TileCount * tileSize;
+            int width = slotCount * tileSize;
             int half = tileSize / 2;
-            int halfWidth = TileCount * half;
+            int halfWidth = slotCount * half;
             var result = new Color[halfWidth * half];
             for (int y = 0; y < half; y++)
             {

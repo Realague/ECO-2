@@ -17,6 +17,14 @@ namespace Voxel.Client.Tests
         // made the atlas 81 tiles wide (every texture coordinate moved).
         private const ulong ExpectedWorldMeshes = 0xA5A60C27902AE740UL;
 
+        // The meshes without texture variants (TileVariants): the pinned hash must not depend on which
+        // variant files are in Resources/Blocks, nor on whether the atlas was made in this session.
+        [SetUp]
+        public void WithoutVariants()
+        {
+            BlockAtlas.Variants = TileVariants.None;
+        }
+
         [Test]
         public void TheReferenceWorld_GivesTheRecordedMeshes()
         {
