@@ -47,6 +47,7 @@ namespace Voxel.Client
 
         private VisualElement screen;
         private VisualElement hints;
+        private VisualElement banner;
         private HudGlyph sky;
         private Label day;
         private Label time;
@@ -76,6 +77,7 @@ namespace Voxel.Client
             VisualElement root = document.rootVisualElement;
             screen = root.Q("screen");
             hints = root.Q("hints");
+            banner = root.Q("banner");
             sky = root.Q<HudGlyph>("sky");
             day = root.Q<Label>("day");
             time = root.Q<Label>("time");
@@ -148,9 +150,13 @@ namespace Voxel.Client
             screen.style.display = player != null ? DisplayStyle.Flex : DisplayStyle.None;
             if (player == null) return;
 
-            hints.style.display = inventoryScreen.IsOpen || StorageScreen.IsOpen ? DisplayStyle.None : DisplayStyle.Flex;
+            // The inventory and the storage window take the whole screen: the hour, the place and the
+            // key hints make room for them.
+            bool windowOpen = inventoryScreen.IsOpen || StorageScreen.IsOpen;
+            hints.style.display = windowOpen ? DisplayStyle.None : DisplayStyle.Flex;
+            banner.style.display = windowOpen ? DisplayStyle.None : DisplayStyle.Flex;
             // Not over the inventory's or a storage's tab bar.
-            bool creativeShown = inventorySync != null && inventorySync.Creative && !inventoryScreen.IsOpen && !StorageScreen.IsOpen;
+            bool creativeShown = inventorySync != null && inventorySync.Creative && !windowOpen;
             if (creativeTag != null) creativeTag.style.display = creativeShown ? DisplayStyle.Flex : DisplayStyle.None;
             ShowClock();
             ShowDraw();
