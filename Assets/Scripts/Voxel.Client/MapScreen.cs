@@ -200,14 +200,14 @@ namespace Voxel.Client
                 return;
             }
 
-            // An M typed in the command line, or in the species search, does not toggle the map;
-            // Escape then leaves the search first.
+            // An M typed in the command line, in the species search or in a field of the inventory (its
+            // searches, a count) does not toggle the map; Escape then leaves the search first.
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null && IsOpen && speciesPanel.HasFocus)
             {
                 if (keyboard.escapeKey.wasPressedThisFrame) speciesPanel.Blur();
             }
-            else if (keyboard != null && !CommandConsole.HoldsInput && !StorageScreen.HoldsInput)
+            else if (keyboard != null && !CommandConsole.HoldsInput && !StorageScreen.HoldsInput && !inventoryScreen.IsTyping)
             {
                 if (MapKey(keyboard).wasPressedThisFrame)
                 {

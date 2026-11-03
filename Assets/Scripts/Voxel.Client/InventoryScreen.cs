@@ -107,6 +107,10 @@ namespace Voxel.Client
         // Also true on the frame it closes, so that its key does nothing else.
         public bool HoldsInput => IsOpen || Time.frameCount == closedFrame;
 
+        // Whether a text field of the inventory has the keyboard (a search, a count being typed): its
+        // letters are not keys, so M does not open the map then.
+        public bool IsTyping => IsOpen && (search.focusController?.focusedElement == search || crafting.IsTyping || creative.IsTyping);
+
         private void Start()
         {
             VisualElement root = document.rootVisualElement;
@@ -211,7 +215,7 @@ namespace Voxel.Client
             }
 
             Keyboard keyboard = Keyboard.current;
-            if (keyboard != null && IsOpen && (search.focusController?.focusedElement == search || crafting.IsTyping || creative.IsTyping))
+            if (keyboard != null && IsTyping)
             {
                 // Letters typed in a search, or a count typed on the crafting sheet, are not keys;
                 // Escape leaves the field first.
