@@ -23,7 +23,7 @@ namespace Voxel.Client
         private const string ChosenClass = "wheel-slot--chosen";
 
         // Holding R longer than this opens the wheel; a shorter press cycles the shape.
-        private const float HoldSeconds = 0.2f;
+        private const float HoldSeconds = 0.35f;
 
         // The wheel's rings (panel units): shapes, then blocks, at least this far out and far enough for
         // their slots not to touch; within DeadZone of the middle the pointer points at nothing.
@@ -59,6 +59,9 @@ namespace Voxel.Client
         // When R went down (-1 while it is up), and where the wheel's pointer is, from its middle.
         private float rPressedAt = -1f;
         private Vector2 pointer;
+
+        // Whether the pointer has pointed at something since the wheel opened.
+        private bool wheelPointed;
         private float outerRadius;
 
         // Whether the hammer is in hand: the panel shows and right and left clicks build and take back.
@@ -209,10 +212,13 @@ namespace Voxel.Client
             if (WheelOpen)
             {
                 MovePointer(mouse);
+                if (TryHovered(out _, out _)) wheelPointed = true;
                 if (mouse.leftButton.wasPressedThisFrame) ChooseHovered();
                 if (!shapeKey.isPressed)
                 {
-                    ChooseHovered();
+                    // Released without ever pointing at anything (a slow press): it was meant as a press.
+                    if (TryHovered(out _, out _)) ChooseHovered();
+                    else if (!wheelPointed) NextShape(step);
                     CloseWheel();
                     rPressedAt = -1f;
                 }
@@ -224,7 +230,7 @@ namespace Voxel.Client
             if (shapeKey.wasReleasedThisFrame && rPressedAt >= 0f)
             {
                 rPressedAt = -1f;
-                if (block != Blocks.Door) shapeIndex = Wrap(shapeIndex + step, Shapes.All.Length);
+                NextShape(step);
             }
 
             if (KeyFor(keyboard, "b", keyboard.bKey).wasPressedThisFrame && held.Count > 0)
@@ -238,6 +244,12 @@ namespace Voxel.Client
                 LineMode = !LineMode;
                 ClearLine();
             }
+        }
+
+        // The next shape (or the one before, step -1); a door has none.
+        private void NextShape(int step)
+        {
+            if (block != Blocks.Door) shapeIndex = Wrap(shapeIndex + step, Shapes.All.Length);
         }
 
         private static int Wrap(int value, int count) => ((value % count) + count) % count;
@@ -255,6 +267,7 @@ namespace Voxel.Client
             if (wheel == null) return;
 
             WheelOpen = true;
+            wheelPointed = false;
             pointer = Vector2.zero;
             BuildWheel();
             wheel.RemoveFromClassList(HiddenClass);
