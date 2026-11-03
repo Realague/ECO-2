@@ -656,3 +656,6 @@ Every item	Tous les objets
 Double Space: fly · one hit breaks anything · no hunger, no carrying limit. Click: a stack, right click: one.	Double Espace : voler · un coup casse tout · ni faim ni limite de port. Clic : une pile, clic droit : un seul.
 Switch creative mode on to take any item for free, fly and break anything in one hit.	Activez le mode créatif pour prendre n'importe quel objet gratuitement, voler et tout casser en un coup.
 Weight {0} kg / ∞	Poids {0} kg / ∞
+Flight on: you are flying. Space goes up, Shift down; double Space lands or takes off again.	Vol activé : vous volez. Espace monte, Maj descend ; double Espace pour atterrir ou redécoller.
+Flight off.	Vol désactivé.
+Usage: /fly, /fly on or /fly off	Usage : /fly, /fly on ou /fly off

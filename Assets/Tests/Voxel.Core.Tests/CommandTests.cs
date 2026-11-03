@@ -67,9 +67,24 @@ namespace Voxel.Core.Tests
             Assert.IsTrue(Command.TryParse("players", out Command players, out _));
             Assert.AreEqual(CommandKind.Players, players.Kind);
 
-            Assert.IsFalse(Command.TryParse("/fly", out _, out string unknown));
+            Assert.IsFalse(Command.TryParse("/jump", out _, out string unknown));
             StringAssert.Contains("Unknown command", unknown);
             Assert.IsFalse(Command.TryParse("   ", out _, out _));
+        }
+
+        // /fly switches flight, /fly on and /fly off set it.
+        [Test]
+        public void Fly_SwitchesOrSetsFlight()
+        {
+            Assert.IsTrue(Command.TryParse("/fly", out Command toggle, out _));
+            Assert.AreEqual(CommandKind.Fly, toggle.Kind);
+            Assert.IsNull(toggle.On);
+            Assert.IsTrue(Command.TryParse("/FLY on", out Command on, out _));
+            Assert.AreEqual(true, on.On);
+            Assert.IsTrue(Command.TryParse("fly off", out Command off, out _));
+            Assert.AreEqual(false, off.On);
+            Assert.IsFalse(Command.TryParse("/fly up", out _, out _));
+            Assert.IsFalse(Command.TryParse("/fly on now", out _, out _));
         }
 
         [Test]

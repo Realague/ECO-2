@@ -88,8 +88,21 @@ namespace Voxel.Client
         private bool flying;
         private float lastSpacePress = -1f;
 
-        // Whether the local player flies (creative mode, a double press on Space).
+        // Flight allowed outside creative mode (/fly, for tests): this machine's own, not saved.
+        private bool flightAllowed;
+
+        // Whether the local player flies (creative mode or /fly, a double press on Space).
         public bool IsFlying => flying;
+
+        // /fly: allows flight (true), forbids it (false) or switches it (null), and returns whether it
+        // is allowed now. Allowed, the player takes off at once; forbidden, they fall (unless creative).
+        public bool AllowFlight(bool? allow)
+        {
+            flightAllowed = allow ?? !flightAllowed;
+            flying = flightAllowed || (flying && inventorySync.Creative);
+            if (flying) velocity.y = 0f;
+            return flightAllowed;
+        }
         private readonly List<BlockPos> heldTorches = new List<BlockPos>();
         private (bool enabled, Color colour, FogMode mode, float density) airFog;
 
@@ -898,8 +911,8 @@ namespace Voxel.Client
             bool swimming = IsWaterAt(transform.position + Vector3.up * SwimDepth);
             bool spacePressed = hasControl && keyboard.spaceKey.isPressed;
 
-            // In creative mode a double press on Space switches flight on or off.
-            if (!inventorySync.Creative) flying = false;
+            // In creative mode, or with flight allowed by /fly, a double press on Space switches flight on or off.
+            if (!inventorySync.Creative && !flightAllowed) flying = false;
             else if (hasControl && keyboard.spaceKey.wasPressedThisFrame)
             {
                 if (lastSpacePress >= 0f && Time.unscaledTime - lastSpacePress < DoubleTapSeconds)

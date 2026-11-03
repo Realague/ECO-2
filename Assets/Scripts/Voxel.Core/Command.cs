@@ -12,7 +12,8 @@ namespace Voxel.Core
         TeleportTo,
         TeleportToPlayer,
         Spawn,
-        Give
+        Give,
+        Fly
     }
 
     // A command typed by a player, as the server runs it (CommandSync). The text may start with "/";
@@ -24,6 +25,7 @@ namespace Voxel.Core
     //   tp <player number>      to that player
     //   spawn <name> [count]    animals or plants of a species, where the player aims
     //   give <item> [count] [#player]   items into the player's bag, or that player's
+    //   fly [on|off]            flight allowed or not (switched when neither is given), for tests
     // A species or item name may be written in several words ("snow hare" is SnowHare), with or
     // without accents.
     public sealed class Command
@@ -33,7 +35,7 @@ namespace Voxel.Core
         public const int MaxGiveCount = 999;
 
         public const string HelpText =
-            "Commands: /give <item> [count] [#player], /spawn <animal or plant> [count], /tp <x> <z>, /tp <x> <y> <z>, /tp <player number>, /players, /help";
+            "Commands: /give <item> [count] [#player], /spawn <animal or plant> [count], /tp <x> <z>, /tp <x> <y> <z>, /tp <player number>, /fly [on|off], /players, /help";
 
         public CommandKind Kind { get; private set; }
 
@@ -48,6 +50,9 @@ namespace Voxel.Core
         // Spawn and Give: the species or item, letters and digits only, lower case ("snowhare"), and how many.
         public string Name { get; private set; }
         public int Count { get; private set; } = 1;
+
+        // Fly: on (true), off (false), or switched (null).
+        public bool? On { get; private set; }
 
         public static bool TryParse(string text, out Command command, out string error)
         {
@@ -91,6 +96,16 @@ namespace Voxel.Core
 
                 case "give":
                     return TryParseGive(words, out command, out error);
+
+                case "fly":
+                    if (words.Length > 2 || (words.Length == 2 && words[1].ToLowerInvariant() != "on" && words[1].ToLowerInvariant() != "off"))
+                    {
+                        error = "Usage: /fly, /fly on or /fly off";
+                        return false;
+                    }
+
+                    command = new Command { Kind = CommandKind.Fly, On = words.Length == 2 ? words[1].ToLowerInvariant() == "on" : (bool?)null };
+                    return true;
 
                 default:
                     error = $"Unknown command '{words[0]}'. {HelpText}";

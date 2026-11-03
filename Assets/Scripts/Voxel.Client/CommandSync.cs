@@ -21,6 +21,9 @@ namespace Voxel.Client
         private const string ReplyMessage = "Cmd.Reply";
         private const string TeleportMessage = "Cmd.Teleport";
 
+        // /fly: the player's machine allows flight or not (1 on, 0 off, -1 switched), and says so.
+        private const string FlyMessage = "Cmd.Fly";
+
         // How far ahead of the player a spawn takes place when the crosshair is on nothing.
         private const float SpawnDistance = 3f;
 
@@ -51,6 +54,7 @@ namespace Voxel.Client
             clientRunning = true;
             Messaging.RegisterNamedMessageHandler(ReplyMessage, OnReply);
             Messaging.RegisterNamedMessageHandler(TeleportMessage, OnTeleport);
+            Messaging.RegisterNamedMessageHandler(FlyMessage, OnFly);
         }
 
         public void Stop()
@@ -126,6 +130,9 @@ namespace Voxel.Client
 
             switch (command.Kind)
             {
+                case CommandKind.Fly:
+                    SendFly(clientId, command.On.HasValue ? (command.On.Value ? 1 : 0) : -1);
+                    break;
                 case CommandKind.Help:
                     Reply(clientId, Command.HelpText);
                     break;
@@ -332,6 +339,41 @@ namespace Voxel.Client
                 writer.WriteValueSafe(position);
                 Messaging.SendNamedMessage(TeleportMessage, clientId, writer, NetworkDelivery.ReliableSequenced);
             }
+        }
+
+        // Flight is the player's own machine's (it moves its body): the server only passes /fly on.
+        private void SendFly(ulong clientId, int mode)
+        {
+            if (networkManager.IsClient && clientId == networkManager.LocalClientId)
+            {
+                ApplyFly(mode);
+                return;
+            }
+
+            using (var writer = new FastBufferWriter(sizeof(int), Allocator.Temp))
+            {
+                writer.WriteValueSafe(mode);
+                Messaging.SendNamedMessage(FlyMessage, clientId, writer, NetworkDelivery.ReliableSequenced);
+            }
+        }
+
+        private void OnFly(ulong senderId, FastBufferReader reader)
+        {
+            if (!clientRunning || senderId != NetworkManager.ServerClientId) return;
+
+            reader.ReadValueSafe(out int mode);
+            ApplyFly(mode);
+        }
+
+        private void ApplyFly(int mode)
+        {
+            NetworkObject player = networkManager.SpawnManager?.GetLocalPlayerObject();
+            if (player == null || !player.TryGetComponent(out PlayerController controller)) return;
+
+            bool allowed = controller.AllowFlight(mode < 0 ? (bool?)null : mode == 1);
+            Replied?.Invoke(allowed
+                ? "Flight on: you are flying. Space goes up, Shift down; double Space lands or takes off again."
+                : "Flight off.");
         }
 
         private void OnReply(ulong senderId, FastBufferReader reader)
