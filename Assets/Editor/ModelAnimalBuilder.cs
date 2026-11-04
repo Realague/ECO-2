@@ -217,11 +217,48 @@ namespace Voxel.EditorTools
             Tones = 6
         };
 
+        // ---- The bear (a low-poly model, coloured from its texture) ----
+
+        // The legs below the belly: the hind ones behind the middle, the front ones ahead of it (the
+        // head never comes down that low). Ears and tail are too small to move.
+        private static int BearRegion(Vector3 c)
+        {
+            int side = c.x < 0f ? 0 : 1;
+            if (c.y < 0.40f && c.z < -0.1f) return 3 + side;
+            if (c.y < 0.40f && c.z > 0.1f) return 1 + side;
+            return 0;
+        }
+
+        private static readonly Spec Bear = new Spec
+        {
+            Species = "Bear",
+            Model = "Assets/Models/Bear/Bear.fbx",
+
+            // 2 blocks long and about 1.2 at the shoulder hump: a brown bear. The model has 528
+            // triangles, so nothing is simplified away.
+            Length = 2f,
+            LegsCentre = new Vector2(0f, 0.81f),
+            Triangles = 528,
+            Cuts = new[] { new Vector4(0f, 1f, 0f, 0.40f) },
+            Regions = new[]
+            {
+                new Region { Name = "Body", Motion = AnimalPart.Body },
+                new Region { Name = "FrontLegLeft", Motion = AnimalPart.FrontLeg },
+                new Region { Name = "FrontLegRight", Motion = AnimalPart.FrontLeg },
+                new Region { Name = "HindLegLeft", Motion = AnimalPart.HindLeg },
+                new Region { Name = "HindLegRight", Motion = AnimalPart.HindLeg }
+            },
+            RegionOf = BearRegion,
+            Texture = "Assets/Models/Bear/Bear_Diffuse.png",
+            Tones = 5
+        };
+
         [MenuItem("Eco/Rebuild animals from models")]
         public static void BuildAll()
         {
             Build(Fox);
             Build(Deer);
+            Build(Bear);
             AssetDatabase.SaveAssets();
         }
 
@@ -459,13 +496,15 @@ namespace Voxel.EditorTools
         }
 
         // The colours of a model's texture over its surface: each original triangle's colour (the
-        // texture sampled at a few points of it), found again by position, from the nearest triangle
-        // centre, once the triangles and their texture coordinates are gone.
+        // texture sampled at a few points of it), found again by position, from the nearest original
+        // triangle, once the triangles and their texture coordinates are gone. Each triangle is filed
+        // in every cell its bounds cover, so a low-poly model's large triangles are found from any
+        // point of them, not only near their centre.
         private sealed class ColourField
         {
             private const float CellSize = 0.03f;
             private readonly Dictionary<(int, int, int), List<int>> cells = new Dictionary<(int, int, int), List<int>>();
-            private readonly List<Vector3> centres = new List<Vector3>();
+            private readonly List<Vector3> corners = new List<Vector3>();
             private readonly List<Color> colours = new List<Color>();
 
             public ColourField(string texturePath, List<Vector3> positions, List<Vector2> uvs, List<int> indices)
@@ -483,12 +522,23 @@ namespace Voxel.EditorTools
                         colour += texture.GetPixelBilinear(uv.x, uv.y);
                     }
 
-                    Vector3 centre = (positions[a] + positions[b] + positions[c]) / 3f;
-                    (int, int, int) cell = CellOf(centre);
-                    if (!cells.TryGetValue(cell, out List<int> list)) cells[cell] = list = new List<int>();
-                    list.Add(centres.Count);
-                    centres.Add(centre);
+                    int triangle = colours.Count;
                     colours.Add(colour / 5f);
+                    corners.Add(positions[a]);
+                    corners.Add(positions[b]);
+                    corners.Add(positions[c]);
+
+                    Vector3 min = Vector3.Min(Vector3.Min(positions[a], positions[b]), positions[c]);
+                    Vector3 max = Vector3.Max(Vector3.Max(positions[a], positions[b]), positions[c]);
+                    (int x0, int y0, int z0) = CellOf(min);
+                    (int x1, int y1, int z1) = CellOf(max);
+                    for (int x = x0; x <= x1; x++)
+                    for (int y = y0; y <= y1; y++)
+                    for (int z = z0; z <= z1; z++)
+                    {
+                        if (!cells.TryGetValue((x, y, z), out List<int> list)) cells[(x, y, z)] = list = new List<int>();
+                        list.Add(triangle);
+                    }
                 }
 
                 UnityEngine.Object.DestroyImmediate(texture);
@@ -497,7 +547,7 @@ namespace Voxel.EditorTools
             public Color At(Vector3 point)
             {
                 (int x, int y, int z) = CellOf(point);
-                for (int reach = 1; reach <= 4; reach++)
+                for (int reach = 0; reach <= 4; reach++)
                 {
                     int nearest = -1;
                     float best = float.MaxValue;
@@ -509,7 +559,8 @@ namespace Voxel.EditorTools
 
                         foreach (int i in list)
                         {
-                            float distance = (centres[i] - point).sqrMagnitude;
+                            Vector3 closest = ClosestOnTriangle(point, corners[i * 3], corners[i * 3 + 1], corners[i * 3 + 2]);
+                            float distance = (closest - point).sqrMagnitude;
                             if (distance < best)
                             {
                                 best = distance;
@@ -522,6 +573,34 @@ namespace Voxel.EditorTools
                 }
 
                 return Color.grey;
+            }
+
+            // The point of triangle abc nearest to p (Ericson, Real-Time Collision Detection, 5.1.5).
+            private static Vector3 ClosestOnTriangle(Vector3 p, Vector3 a, Vector3 b, Vector3 c)
+            {
+                Vector3 ab = b - a, ac = c - a, ap = p - a;
+                float d1 = Vector3.Dot(ab, ap), d2 = Vector3.Dot(ac, ap);
+                if (d1 <= 0f && d2 <= 0f) return a;
+
+                Vector3 bp = p - b;
+                float d3 = Vector3.Dot(ab, bp), d4 = Vector3.Dot(ac, bp);
+                if (d3 >= 0f && d4 <= d3) return b;
+
+                float vc = d1 * d4 - d3 * d2;
+                if (vc <= 0f && d1 >= 0f && d3 <= 0f) return a + ab * (d1 / (d1 - d3));
+
+                Vector3 cp = p - c;
+                float d5 = Vector3.Dot(ab, cp), d6 = Vector3.Dot(ac, cp);
+                if (d6 >= 0f && d5 <= d6) return c;
+
+                float vb = d5 * d2 - d1 * d6;
+                if (vb <= 0f && d2 >= 0f && d6 <= 0f) return a + ac * (d2 / (d2 - d6));
+
+                float va = d3 * d6 - d5 * d4;
+                if (va <= 0f && d4 - d3 >= 0f && d5 - d6 >= 0f) return b + (c - b) * ((d4 - d3) / (d4 - d3 + (d5 - d6)));
+
+                float denominator = 1f / (va + vb + vc);
+                return a + ab * (vb * denominator) + ac * (vc * denominator);
             }
 
             private static (int, int, int) CellOf(Vector3 p) =>
