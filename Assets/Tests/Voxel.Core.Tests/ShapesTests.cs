@@ -38,13 +38,15 @@ namespace Voxel.Core.Tests
             Assert.IsFalse(Blocks.IsValid(Blocks.WithOrientation(Blocks.Stone, 1)), "natural blocks have no shapes");
             Assert.AreEqual(Shape.Cube, Shapes.ShapeOf(Blocks.WithOrientation(Blocks.Torch, 1)), "a torch's orientation is not a shape");
 
-            // The variant bits: only wood blocks use them, and only variant 1; the type reads past them.
+            // The variant bits: wood blocks use only variant 1 (rocks hold their ore there, Ores, and
+            // other blocks none); the type reads past them.
             ushort stairs = Shapes.Make(planks, Shape.Stairs, 2);
             Assert.AreEqual(planks, Blocks.TypeOf(stairs));
             Assert.AreEqual(1, Blocks.VariantOf(stairs));
             Assert.IsTrue(WoodBlocks.IsPlanks(stairs));
             Assert.IsFalse(Blocks.IsValid(Blocks.WithVariant(planks, 2, 0)));
-            Assert.IsFalse(Blocks.IsValid(Blocks.WithVariant(Blocks.Stone, 1, 0)));
+            Assert.IsFalse(Blocks.IsValid(Blocks.WithVariant(Blocks.Dirt, 1, 0)));
+            Assert.IsFalse(Blocks.IsValid(Blocks.WithVariant(Blocks.Stone, Ores.Count + 1, 0)), "past the last ore");
             Assert.IsFalse(Blocks.IsValid(Blocks.WithVariant(Blocks.Torch, 1, Torches.Standing)));
         }
 

@@ -11,6 +11,13 @@ namespace Voxel.Core.Tests
             {
                 if (Blocks.IsRetired(type)) continue;
 
+                // The former ore blocks are read as their rock holding the ore (Ores.UpgradeBlock).
+                if (Ores.IsFormerBlock(type))
+                {
+                    Assert.IsFalse(Items.IsBlock(type), $"former ore block {type}");
+                    continue;
+                }
+
                 int item = Items.OfBlock(type);
 
                 Assert.IsTrue(Items.IsBlock(item));

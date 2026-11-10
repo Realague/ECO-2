@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: db2faee3e3549c843ad2cb1c3f730f4d
+guid: 476892fb7f464214996864033c7ba69d
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 8266357822075452196
-    second: Block_23_0
+      213: 7411244718258792501
+    second: Ore_RockSalt_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -102,7 +102,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Block_23_0
+      name: Ore_RockSalt_0
       rect:
         serializedVersion: 2
         x: 0
@@ -117,8 +117,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 42b341364a008b270800000000000000
-      internalID: 8266357822075452196
+      spriteID: 5382e470ec70ad660800000000000000
+      internalID: 7411244718258792501
       vertices: []
       indices: 
       edges: []
@@ -137,7 +137,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Block_23_0: 8266357822075452196
+      Ore_RockSalt_0: 7411244718258792501
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

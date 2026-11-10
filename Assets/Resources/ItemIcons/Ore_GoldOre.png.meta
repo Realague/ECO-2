@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: a937a8d1ecefe644998e50f548df5115
+guid: 01a8375b05a6cb34baea3eede920d962
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -6777147301469938247
-    second: Block_21_0
+      213: 8675919900895422820
+    second: Ore_GoldOre_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -102,7 +102,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Block_21_0
+      name: Ore_GoldOre_0
       rect:
         serializedVersion: 2
         x: 0
@@ -117,8 +117,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 9bd1369af6cb2f1a0800000000000000
-      internalID: -6777147301469938247
+      spriteID: 4692d90de2f076870800000000000000
+      internalID: 8675919900895422820
       vertices: []
       indices: 
       edges: []
@@ -137,7 +137,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Block_21_0: -6777147301469938247
+      Ore_GoldOre_0: 8675919900895422820
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
