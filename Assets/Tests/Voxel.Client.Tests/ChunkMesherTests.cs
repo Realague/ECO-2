@@ -135,6 +135,135 @@ namespace Voxel.Client.Tests
             }
         }
 
+        // Smoothed ground is meshed on worker threads as on the main thread, has its own submesh, and
+        // shows the ground in it rather than in blocks.
+        [Test]
+        public void SmoothMeshing_OnWorkerThreads_GivesTheSameMeshesAsOnTheMainThread()
+        {
+            World world = Generate();
+            var light = new SkyLight(world);
+            var mesh = new Mesh();
+            try
+            {
+                var serial = new Dictionary<Chunk, ulong>();
+                var builder = new ChunkMeshBuilder();
+                int smoothTriangles = 0;
+                foreach (Chunk chunk in world.Chunks)
+                {
+                    builder.Build(world, light, chunk, null, true);
+                    builder.ApplyTo(mesh);
+                    serial[chunk] = HashOf(mesh);
+                    Assert.AreEqual(3, mesh.subMeshCount, $"Chunk {chunk.Coord}");
+                    smoothTriangles += (int)mesh.GetIndexCount(ChunkMesher.SmoothSubmesh);
+                }
+
+                Assert.Greater(smoothTriangles, 0, "the ground is smoothed");
+                ChunkMeshing.BuildAll(world, light, world.Chunks, (chunk, built) =>
+                {
+                    built.ApplyTo(mesh);
+                    Assert.AreEqual(serial[chunk], HashOf(mesh), $"Chunk {chunk.Coord}");
+                }, null, true);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(mesh);
+            }
+        }
+
+        // The smoothed ground has no hole, within chunks or between them, nor where it meets the ground
+        // kept in blocks under planks laid on flat grass: every edge of the triangles of the ground and
+        // the blocks is walked once each way (two faces meeting there, or four where two blocks only touch
+        // by an edge), but along the world's sides, where the ground is cut off.
+        [Test]
+        public void SmoothGround_IsWatertight()
+        {
+            World world = Generate();
+            int laid = 0;
+            for (int z = 8; z < world.SizeZ - 8; z += 5)
+            {
+                for (int x = 8; x < world.SizeX - 8; x += 5)
+                {
+                    int top = world.GetTopHeight(x, z);
+                    if (Blocks.TypeOf(world.GetBlock(x, top - 1, z)) != Blocks.Grass) continue;
+
+                    bool flat = true;
+                    for (int dz = -1; dz <= 1; dz++)
+                    {
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            flat &= world.GetTopHeight(x + dx, z + dz) == top && world.GetSurfaceHeight(x + dx, z + dz) == top;
+                        }
+                    }
+
+                    if (!flat) continue;
+
+                    world.SetBlock(x, top, z, Blocks.FirstPlanks);
+                    laid++;
+                }
+            }
+
+            Assert.Greater(laid, 5, "planks laid on flat grass");
+            var light = new SkyLight(world);
+            var builder = new ChunkMeshBuilder();
+            var mesh = new Mesh();
+            var edges = new Dictionary<(long, long), int>();
+            try
+            {
+                foreach (Chunk chunk in world.Chunks)
+                {
+                    builder.Build(world, light, chunk, null, true);
+                    builder.ApplyTo(mesh);
+                    mesh.GetVertices(Vectors);
+                    var origin = new Vector3(chunk.Coord.X, chunk.Coord.Y, chunk.Coord.Z) * Chunk.Size;
+                    foreach (int submesh in new[] { ChunkMesher.SolidSubmesh, ChunkMesher.SmoothSubmesh })
+                    {
+                        mesh.GetTriangles(Triangles, submesh);
+                        for (int t = 0; t < Triangles.Count; t += 3)
+                        {
+                            for (int corner = 0; corner < 3; corner++)
+                            {
+                                long from = KeyOf(Vectors[Triangles[t + corner]] + origin);
+                                long to = KeyOf(Vectors[Triangles[t + (corner + 1) % 3]] + origin);
+                                edges.TryGetValue((from, to), out int count);
+                                edges[(from, to)] = count + 1;
+                            }
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(mesh);
+            }
+
+            Assert.Greater(edges.Count, 1000);
+            int open = 0;
+            foreach (KeyValuePair<(long, long), int> edge in edges)
+            {
+                edges.TryGetValue((edge.Key.Item2, edge.Key.Item1), out int back);
+                if (back == edge.Value) continue;
+                if (OnTheSides(edge.Key.Item1, world) && OnTheSides(edge.Key.Item2, world)) continue;
+
+                open++;
+            }
+
+            Assert.AreEqual(0, open, "edges walked one way more than the other");
+        }
+
+        // A position to a thousandth of a block, as one number.
+        private static long KeyOf(Vector3 p)
+        {
+            long x = Mathf.RoundToInt(p.x * 1000f), y = Mathf.RoundToInt(p.y * 1000f), z = Mathf.RoundToInt(p.z * 1000f);
+            return (x + 1000) * 4_000_000_000_000L + (y + 1000) * 2_000_000L + (z + 1000);
+        }
+
+        private static bool OnTheSides(long key, World world)
+        {
+            long x = key / 4_000_000_000_000L - 1000;
+            long z = key % 2_000_000L - 1000;
+            return x <= 0 || z <= 0 || x >= world.SizeX * 1000L || z >= world.SizeZ * 1000L;
+        }
+
         private static World Generate()
         {
             var world = new World(8, 4, 8);

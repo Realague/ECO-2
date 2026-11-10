@@ -21,6 +21,12 @@ namespace Voxel.Client
     // the fourth texture coordinates, flagged by the blue of their vertex colour, which the shader
     // lays over the rock.
     //
+    // With smooth terrain (TerrainSettings), natural ground (SmoothTerrain.IsSmooth) goes on a third
+    // submesh: each face of such a block that meets anything but smooth ground is a quad through the
+    // smoothed vertices of its four corners, lit, coloured and textured at those corners (no texture
+    // coordinates: the terrain material textures it from its position); faces of water and
+    // construction blocks are then drawn against it, since it may lie half a block from them.
+    //
     // The work is done by a ChunkMeshBuilder, which only reads the world and the light: builders run
     // on worker threads (ChunkMeshing), each with its own buffers, and only ApplyTo touches the Mesh.
     internal static class ChunkMesher
@@ -30,6 +36,16 @@ namespace Voxel.Client
 
         public const int SolidSubmesh = 0;
         public const int WaterSubmesh = 1;
+
+        // The smoothed ground (SmoothTerrain), drawn with the terrain material (the blocks' shader with
+        // _ECO_SMOOTH): only meshes built with smooth terrain have it.
+        public const int SmoothSubmesh = 2;
+
+        // On the smoothed ground's vertices: the materials (SmoothTerrain.MaterialOf) of the quad's four
+        // corners, the same on all four, and which corner the vertex is (one weight of 1), so that each
+        // corner's share runs smoothly across the quad and into the next one.
+        public const int SmoothMaterialChannel = 1;
+        public const int SmoothWeightChannel = 2;
 
         public const int FaceCount = 6;
         public const float UvInset = 0.01f;
@@ -101,6 +117,29 @@ namespace Voxel.Client
         private readonly List<int> solidTriangles = new List<int>();
         private readonly List<int> waterTriangles = new List<int>();
 
+        // The smoothed ground (SmoothTerrain): its triangles and, from its first vertex on, the corners'
+        // materials and weights (zeros under the other vertices, added as needed and in ApplyTo).
+        private readonly List<int> smoothTriangles = new List<int>();
+        private readonly List<Vector4> smoothMaterials = new List<Vector4>();
+        private readonly List<Vector4> smoothWeights = new List<Vector4>();
+
+        // Whether the chunk being built shows natural ground smoothed.
+        private bool smooth;
+
+        // The smoothed vertices of the chunk's block corners (0 to Chunk.Size along each axis), worked
+        // out once each while the chunk is built.
+        private const int CornerSide = Chunk.Size + 1;
+        private readonly bool[] cornerKnown = new bool[CornerSide * CornerSide * CornerSide];
+        private readonly Vector3[] cornerPositions = new Vector3[CornerSide * CornerSide * CornerSide];
+        private readonly Vector3[] cornerNormals = new Vector3[CornerSide * CornerSide * CornerSide];
+        private readonly float[] cornerSky = new float[CornerSide * CornerSide * CornerSide];
+        private readonly float[] cornerTorch = new float[CornerSide * CornerSide * CornerSide];
+        private readonly int[] cornerMaterials = new int[CornerSide * CornerSide * CornerSide];
+        private readonly int[] quadCorners = new int[4];
+        private int originX;
+        private int originY;
+        private int originZ;
+
         // The cells in front of a face, 3 × 3 around the one it touches, indexed (a + 1) + 3 * (b + 1)
         // along the face's two axes.
         private readonly bool[] frontOpaque = new bool[9];
@@ -120,9 +159,12 @@ namespace Voxel.Client
         // True when the last chunk built has no face to draw.
         public bool IsEmpty => vertices.Count == 0;
 
-        public void Build(World world, SkyLight light, Chunk chunk, BlockLight blockLight = null)
+        // smoothTerrain: natural ground drawn smoothed (SmoothTerrain) on its own submesh; otherwise in
+        // blocks, as it always was.
+        public void Build(World world, SkyLight light, Chunk chunk, BlockLight blockLight = null, bool smoothTerrain = false)
         {
             glow = blockLight;
+            smooth = smoothTerrain;
             variants = BlockAtlas.Variants;
             overlays = BlockAtlas.Overlays;
             vertices.Clear();
@@ -132,11 +174,15 @@ namespace Voxel.Client
             colours.Clear();
             solidTriangles.Clear();
             waterTriangles.Clear();
+            smoothTriangles.Clear();
+            smoothMaterials.Clear();
+            smoothWeights.Clear();
             if (chunk.IsEmpty) return;
 
-            int originX = chunk.Coord.X * Chunk.Size;
-            int originY = chunk.Coord.Y * Chunk.Size;
-            int originZ = chunk.Coord.Z * Chunk.Size;
+            originX = chunk.Coord.X * Chunk.Size;
+            originY = chunk.Coord.Y * Chunk.Size;
+            originZ = chunk.Coord.Z * Chunk.Size;
+            if (smooth) System.Array.Clear(cornerKnown, 0, cornerKnown.Length);
 
             for (int y = 0; y < Chunk.Size; y++)
             {
@@ -163,12 +209,22 @@ namespace Voxel.Client
                             continue;
                         }
 
+                        // Ground under a player's block stays a block (SmoothTerrain.IsPinned), its faces
+                        // hidden by the ground beside it as any block's are.
+                        bool pinned = smooth && SmoothTerrain.IsSmooth(block) && SmoothTerrain.IsPinned(world, worldX, worldY, worldZ);
+                        if (smooth && SmoothTerrain.IsSmooth(block) && !pinned)
+                        {
+                            AddSmoothBlock(world, light, block, x, y, z);
+                            continue;
+                        }
+
                         // A rock holding an ore shows the ore's overlay over its own tile.
                         OreKind ore = Ores.OreOf(block);
                         for (int face = 0; face < ChunkMesher.FaceCount; face++)
                         {
                             Vector3Int normal = ChunkMesher.FaceNormals[face];
-                            if (world.IsOpaque(worldX + normal.x, worldY + normal.y, worldZ + normal.z)) continue;
+                            int nx = worldX + normal.x, ny = worldY + normal.y, nz = worldZ + normal.z;
+                            if (pinned ? world.IsOpaque(nx, ny, nz) : HidesFace(world, nx, ny, nz)) continue;
 
                             SampleFront(world, light, worldX + normal.x, worldY + normal.y, worldZ + normal.z, face);
                             AddFace(new Vector3(x, y, z), face, 1f, solidTriangles, true);
@@ -195,9 +251,135 @@ namespace Voxel.Client
             }
 
             mesh.SetColors(colours);
-            mesh.subMeshCount = 2;
+            if (smooth)
+            {
+                while (smoothMaterials.Count < vertices.Count) smoothMaterials.Add(Vector4.zero);
+                while (smoothWeights.Count < vertices.Count) smoothWeights.Add(Vector4.zero);
+                mesh.SetUVs(ChunkMesher.SmoothMaterialChannel, smoothMaterials);
+                mesh.SetUVs(ChunkMesher.SmoothWeightChannel, smoothWeights);
+            }
+
+            mesh.subMeshCount = smooth ? 3 : 2;
             mesh.SetTriangles(solidTriangles, ChunkMesher.SolidSubmesh);
             mesh.SetTriangles(waterTriangles, ChunkMesher.WaterSubmesh);
+            if (smooth) mesh.SetTriangles(smoothTriangles, ChunkMesher.SmoothSubmesh);
+        }
+
+        // Whether a block's face against this cell is hidden by it: an opaque block hides it, except,
+        // with smooth terrain, smooth ground, which may lie up to half a block away from the face (the
+        // faces of water and construction blocks against it are drawn, so no gap shows between them);
+        // ground kept in blocks under a player's block hides it as a block does.
+        private bool HidesFace(World world, int x, int y, int z)
+        {
+            if (!world.IsOpaque(x, y, z)) return false;
+            if (!smooth || !world.InBounds(x, y, z) || !SmoothTerrain.IsSmooth(world.GetBlock(x, y, z))) return true;
+            return SmoothTerrain.IsPinned(world, x, y, z);
+        }
+
+        // A smooth block at (x, y, z) in the chunk: each face that does not meet other smooth ground, as a
+        // quad through the smoothed vertices of its four corners (SmoothTerrain), lit at those corners.
+        // The blue of its vertex colour is the ore its block holds (OreKind, 0 for none): an ore shows on
+        // its own block's faces, whatever the rock around.
+        private void AddSmoothBlock(World world, SkyLight light, ushort block, int x, int y, int z)
+        {
+            byte ore = (byte)Ores.OreOf(block);
+            for (int face = 0; face < ChunkMesher.FaceCount; face++)
+            {
+                Vector3Int n = ChunkMesher.FaceNormals[face];
+                if (SmoothTerrain.IsSmoothAt(world, originX + x + n.x, originY + y + n.y, originZ + z + n.z)) continue;
+
+                Vector3[] unit = ChunkMesher.FaceCorners[face];
+                for (int i = 0; i < 4; i++)
+                {
+                    quadCorners[i] = Corner(world, light, x + (int)unit[i].x, y + (int)unit[i].y, z + (int)unit[i].z);
+                    cornerLight[i] = cornerSky[quadCorners[i]];
+                }
+
+                var materials = new Vector4(
+                    cornerMaterials[quadCorners[0]], cornerMaterials[quadCorners[1]],
+                    cornerMaterials[quadCorners[2]], cornerMaterials[quadCorners[3]]);
+                while (smoothMaterials.Count < vertices.Count) smoothMaterials.Add(Vector4.zero);
+                while (smoothWeights.Count < vertices.Count) smoothWeights.Add(Vector4.zero);
+
+                int first = vertices.Count;
+                for (int i = 0; i < 4; i++)
+                {
+                    int corner = quadCorners[i];
+                    vertices.Add(cornerPositions[corner]);
+                    normals.Add(cornerNormals[corner] == Vector3.zero ? (Vector3)n : cornerNormals[corner]);
+                    uvs.Add(Vector2.zero);
+                    colours.Add(new Color32((byte)Mathf.RoundToInt(cornerSky[corner] * 255f), (byte)Mathf.RoundToInt(cornerTorch[corner] * 255f), ore, 255));
+                    smoothMaterials.Add(materials);
+                    smoothWeights.Add(new Vector4(i == 0 ? 1f : 0f, i == 1 ? 1f : 0f, i == 2 ? 1f : 0f, i == 3 ? 1f : 0f));
+                }
+
+                // Split along the diagonal that keeps both triangles facing out (a quad bent across a
+                // thin ledge folds over along the other); where both do, along the brighter one, as for
+                // a block's face.
+                Vector3 p0 = cornerPositions[quadCorners[0]], p1 = cornerPositions[quadCorners[1]];
+                Vector3 p2 = cornerPositions[quadCorners[2]], p3 = cornerPositions[quadCorners[3]];
+                float firstSplit = Mathf.Min(Facing(p0, p1, p2, n), Facing(p0, p2, p3, n));
+                float otherSplit = Mathf.Min(Facing(p1, p2, p3, n), Facing(p1, p3, p0, n));
+                bool brighterOther = cornerLight[0] + cornerLight[2] < cornerLight[1] + cornerLight[3];
+                bool useOther = firstSplit > FoldLimit && otherSplit > FoldLimit ? brighterOther : otherSplit > firstSplit;
+                int[] order = useOther ? OtherDiagonal : FirstDiagonal;
+                foreach (int index in order)
+                {
+                    smoothTriangles.Add(first + index);
+                }
+            }
+        }
+
+        // A triangle facing out less than this (the cosine between it and its block's face) is taken as folded.
+        private const float FoldLimit = 0.2f;
+
+        // How much the triangle a, b, c (clockwise seen from outside) faces the way of its block's face:
+        // the cosine between them, 0 for a degenerate one.
+        private static float Facing(Vector3 a, Vector3 b, Vector3 c, Vector3Int face)
+        {
+            Vector3 normal = Vector3.Cross(b - a, c - a);
+            float length = normal.magnitude;
+            return length > 1e-6f ? Vector3.Dot(normal, face) / length : 0f;
+        }
+
+        private static readonly int[] FirstDiagonal = { 0, 1, 2, 0, 2, 3 };
+        private static readonly int[] OtherDiagonal = { 1, 2, 3, 1, 3, 0 };
+
+        // The index of a corner of the chunk (0 to Chunk.Size along each axis) in the corner arrays, worked
+        // out the first time: its smoothed position in the chunk, its normal, its material, and its light,
+        // the mean of the sky light and torch light of the cells around it that are not opaque (smooth
+        // across faces and chunks; a shaped block that stops light borrows its neighbours', as for faces).
+        private int Corner(World world, SkyLight light, int x, int y, int z)
+        {
+            int index = x + CornerSide * (y + CornerSide * z);
+            if (cornerKnown[index]) return index;
+
+            int cx = originX + x, cy = originY + y, cz = originZ + z;
+            SmoothTerrain.CornerVertex(world, cx, cy, cz, out System.Numerics.Vector3 position, out System.Numerics.Vector3 normal);
+            cornerPositions[index] = new Vector3(position.X - originX, position.Y - originY, position.Z - originZ);
+            cornerNormals[index] = normal.ToUnity();
+            int material = SmoothTerrain.MaterialAt(world, cx, cy, cz);
+            cornerMaterials[index] = material >= 0 ? material : SmoothTerrain.MaterialOf(Blocks.Stone);
+
+            int sum = 0, glowSum = 0, count = 0;
+            for (int bit = 0; bit < 8; bit++)
+            {
+                int bx = cx - 1 + (bit & 1), by = cy - 1 + ((bit >> 1) & 1), bz = cz - 1 + ((bit >> 2) & 1);
+                if (world.IsOpaque(bx, by, bz)) continue;
+
+                int level = light.Get(bx, by, bz);
+                int torch = glow != null ? glow.Get(bx, by, bz) : 0;
+                if (level == 0 && Blocks.BlocksLight(world.GetBlock(bx, by, bz))) BorrowLight(world, light, bx, by, bz, out level, out torch);
+
+                sum += level;
+                glowSum += torch;
+                count++;
+            }
+
+            cornerSky[index] = count > 0 ? sum / (count * (float)SkyLight.Max) : 0f;
+            cornerTorch[index] = count > 0 ? glowSum / (count * (float)Blocks.TorchLight) : 0f;
+            cornerKnown[index] = true;
+            return index;
         }
 
         private void AddWater(World world, SkyLight light, int x, int y, int z, Vector3 blockOrigin)
@@ -211,7 +393,7 @@ namespace Voxel.Client
                 int nx = x + normal.x;
                 int ny = y + normal.y;
                 int nz = z + normal.z;
-                if (world.IsOpaque(nx, ny, nz) || world.IsWater(nx, ny, nz)) continue;
+                if (HidesFace(world, nx, ny, nz) || world.IsWater(nx, ny, nz)) continue;
 
                 // A water face is lit by the air in front of it: open sky over a lake, darkness in a cave.
                 float level = light.Get(nx, ny, nz) / (float)SkyLight.Max;
@@ -451,7 +633,7 @@ namespace Voxel.Client
         {
             int turned = face < 0 ? ChunkMesher.TopFace : TurnFace(face, facing);
             Vector3Int toward = ChunkMesher.FaceNormals[turned];
-            if (face >= 0 && world.IsOpaque(cell.x + toward.x, cell.y + toward.y, cell.z + toward.z)) return;
+            if (face >= 0 && HidesFace(world, cell.x + toward.x, cell.y + toward.y, cell.z + toward.z)) return;
 
             SampleFront(world, light, cell.x + toward.x, cell.y + toward.y, cell.z + toward.z, turned);
             float level = frontLevel[4] / (float)SkyLight.Max;
@@ -513,7 +695,7 @@ namespace Voxel.Client
             {
                 Vector3Int normal = ChunkMesher.FaceNormals[face];
                 bool onSide = face == 0 ? max.x >= 1f : face == 1 ? min.x <= 0f : face == 2 ? max.y >= 1f : face == 3 ? min.y <= 0f : face == 4 ? max.z >= 1f : min.z <= 0f;
-                if (onSide && world.IsOpaque(cell.x + normal.x, cell.y + normal.y, cell.z + normal.z)) continue;
+                if (onSide && HidesFace(world, cell.x + normal.x, cell.y + normal.y, cell.z + normal.z)) continue;
 
                 SampleFront(world, light, cell.x + normal.x, cell.y + normal.y, cell.z + normal.z, face);
                 Vector3[] unit = ChunkMesher.FaceCorners[face];
@@ -546,7 +728,7 @@ namespace Voxel.Client
         {
             int turned = face < 0 ? ChunkMesher.TopFace : TurnFace(face, facing);
             Vector3Int toward = ChunkMesher.FaceNormals[turned];
-            if (face >= 0 && world.IsOpaque(cell.x + toward.x, cell.y + toward.y, cell.z + toward.z)) return;
+            if (face >= 0 && HidesFace(world, cell.x + toward.x, cell.y + toward.y, cell.z + toward.z)) return;
 
             SampleFront(world, light, cell.x + toward.x, cell.y + toward.y, cell.z + toward.z, turned);
             float level = frontLevel[4] / (float)SkyLight.Max;

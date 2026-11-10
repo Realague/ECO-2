@@ -329,6 +329,74 @@ namespace Voxel.Client
             return texture;
         }
 
+        // The tile a smoothed block shows where its ground faces up, sideways or down (SmoothTerrain, the
+        // terrain material): its block's own, except that grass and tilled soil show earth on their sides
+        // (the green band of GrassSide would make stripes along a slope).
+        public static int SmoothTileFor(ushort block, int face)
+        {
+            ushort type = Blocks.TypeOf(block);
+            if (face != ChunkMesher.TopFace && (type == Blocks.Grass || type == Blocks.TilledSoil)) return DirtTile;
+            return TileFor(block, face);
+        }
+
+        // The tables the terrain material reads (BlocksForwardPass.hlsl, _ECO_SMOOTH), for the atlas and
+        // overlays made last (Variants, Overlays), set as the shader's globals:
+        // _SmoothMaterials, one texel per material (SmoothTerrain.MaterialOf, a block type): the tiles
+        // its ground shows facing up, sideways and down; _SmoothVariants, one row per tile then per ore
+        // overlay: (variant count, total weight, whether it turns) then, per variant, (its slot, the weights
+        // up to it); _SmoothAtlas: the atlas's slots, the overlays' slots, and the row of the first overlay.
+        // Half floats hold these small whole numbers exactly. The caller destroys the two textures.
+        public static void SetSmoothTables(out Texture2D materials, out Texture2D variantTable)
+        {
+            materials = new Texture2D(SmoothTerrain.MaterialCount, 1, TextureFormat.RGBAHalf, false, true)
+            {
+                name = "SmoothMaterials",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp
+            };
+
+            var texels = new Color[SmoothTerrain.MaterialCount];
+            for (int type = 0; type < texels.Length; type++)
+            {
+                var block = (ushort)type;
+                texels[type] = new Color(SmoothTileFor(block, ChunkMesher.TopFace), SmoothTileFor(block, 0), SmoothTileFor(block, ChunkMesher.BottomFace), 0f);
+            }
+
+            materials.SetPixels(texels);
+            materials.Apply(false, true);
+
+            TileVariants tiles = Variants;
+            TileVariants ores = Overlays;
+            int width = TileVariants.MaxVariants + 1;
+            int height = TileCount + OverlayNames.Length;
+            variantTable = new Texture2D(width, height, TextureFormat.RGBAHalf, false, true)
+            {
+                name = "SmoothVariants",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp
+            };
+
+            var rows = new Color[width * height];
+            for (int row = 0; row < height; row++)
+            {
+                TileVariants of = row < TileCount ? tiles : ores;
+                int tile = row < TileCount ? row : row - TileCount;
+                int count = of.VariantCount(tile);
+                rows[row * width] = new Color(count, of.CumulativeWeight(tile, count - 1), of.Rotates(tile) ? 1f : 0f, 0f);
+                for (int v = 0; v < count && v < TileVariants.MaxVariants; v++)
+                {
+                    rows[row * width + 1 + v] = new Color(of.VariantSlot(tile, v), of.CumulativeWeight(tile, v), 0f, 0f);
+                }
+            }
+
+            variantTable.SetPixels(rows);
+            variantTable.Apply(false, true);
+
+            Shader.SetGlobalTexture("_SmoothMaterials", materials);
+            Shader.SetGlobalTexture("_SmoothVariants", variantTable);
+            Shader.SetGlobalVector("_SmoothAtlas", new Vector4(tiles.SlotCount, ores.SlotCount, TileCount, 0f));
+        }
+
         // A texture from Resources whose pixels can be read; a missing colour file is reported (a missing mask is not).
         private static Texture2D Load(string path, bool required)
         {

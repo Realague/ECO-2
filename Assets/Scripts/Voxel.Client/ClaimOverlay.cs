@@ -41,6 +41,9 @@ namespace Voxel.Client
         private World world;
         private RenderParams renderParams;
 
+        // Whether the ground is drawn smoothed (TerrainSettings): the tint then lies on its vertices.
+        private bool smooth;
+
         public static bool Shown { get; private set; }
 
         public static void SetShown(bool shown)
@@ -80,6 +83,12 @@ namespace Voxel.Client
         private void LateUpdate()
         {
             Watch(worldSync.World);
+            if (smooth != TerrainSettings.Smooth)
+            {
+                smooth = TerrainSettings.Smooth;
+                dirty.UnionWith(meshes.Keys);
+            }
+
             Camera eye = Camera.main;
             if (!Shown || world == null || eye == null || material == null || claimSync.PlotsX == 0) return;
 
@@ -113,9 +122,18 @@ namespace Voxel.Client
         {
             if (shown == world) return;
 
-            if (world != null) world.BlockChanged -= OnBlockChanged;
+            if (world != null)
+            {
+                world.BlockChanged -= OnBlockChanged;
+                world.Pins.Changed -= OnPinChanged;
+            }
+
             world = shown;
-            if (world != null) world.BlockChanged += OnBlockChanged;
+            if (world != null)
+            {
+                world.BlockChanged += OnBlockChanged;
+                world.Pins.Changed += OnPinChanged;
+            }
             foreach (Mesh mesh in meshes.Values)
             {
                 Destroy(mesh);
@@ -124,6 +142,9 @@ namespace Voxel.Client
             meshes.Clear();
             dirty.Clear();
         }
+
+        // Storage placed or taken (World.Pins) moves the smoothed ground around it as a block would.
+        private void OnPinChanged(BlockPos cell) => OnBlockChanged(cell, 0, 0);
 
         private void OnBlockChanged(BlockPos position, ushort before, ushort after)
         {
@@ -176,7 +197,7 @@ namespace Voxel.Client
                 for (int x = plotX * size; x < (plotX + 1) * size; x++)
                 {
                     float h = SurfaceOf(x, z);
-                    Quad(new Vector3(x, h, z), new Vector3(x, h, z + 1), new Vector3(x + 1, h, z + 1), new Vector3(x + 1, h, z), fill);
+                    Quad(Corner(x, h, z), Corner(x, h, z + 1), Corner(x + 1, h, z + 1), Corner(x + 1, h, z), fill);
 
                     // The sides of a step down to a neighbour, and the edges of the owner's land.
                     Side(x, z, h, 1, 0, owner, fill, edge);
@@ -211,7 +232,18 @@ namespace Voxel.Client
             Vector3 b = dx != 0 ? new Vector3(fx, 0f, z + 1) : new Vector3(x + 1, 0f, fz);
             if (nh < h - 0.01f)
             {
-                Quad(new Vector3(a.x, nh, a.z), new Vector3(a.x, h, a.z), new Vector3(b.x, h, b.z), new Vector3(b.x, nh, b.z), fill);
+                // On smoothed ground, a block at a time, through the vertices of each level.
+                if (smooth && IsWhole(nh) && IsWhole(h))
+                {
+                    for (float y = nh; y < h - 0.5f; y += 1f)
+                    {
+                        Quad(Corner(a.x, y, a.z), Corner(a.x, y + 1f, a.z), Corner(b.x, y + 1f, b.z), Corner(b.x, y, b.z), fill);
+                    }
+                }
+                else
+                {
+                    Quad(Corner(a.x, nh, a.z), Corner(a.x, h, a.z), Corner(b.x, h, b.z), Corner(b.x, nh, b.z), fill);
+                }
             }
 
             int neighbourOwner = inside ? claimSync.ShownOwnerIndex(ClaimRules.PlotOf(nx), ClaimRules.PlotOf(nz)) : -1;
@@ -219,8 +251,30 @@ namespace Voxel.Client
 
             // A strip along that edge, on this column's top.
             Vector3 inward = new Vector3(-dx, 0f, -dz) * EdgeWidth;
-            Vector3 up = Vector3.up * (h + 0.005f);
-            Quad(a + up, b + up, b + up + inward, a + up + inward, edge);
+            Vector3 lift = Vector3.up * 0.005f;
+            Vector3 from = Corner(a.x, h, a.z) + lift;
+            Vector3 to = Corner(b.x, h, b.z) + lift;
+            Quad(from, to, to + inward, from + inward, edge);
+        }
+
+        // Whether a drawn height is a block's top (not a water surface).
+        private static bool IsWhole(float h) => Mathf.Abs(h - Lift - Mathf.Round(h - Lift)) < 0.001f;
+
+        // A point of the ground at a block corner (x, h, z), h as drawn (Lift included): on smoothed
+        // ground (TerrainSettings), the vertex the ground shows there (SmoothTerrain), lifted along its
+        // normal; otherwise, and on water, as given.
+        private Vector3 Corner(float x, float h, float z)
+        {
+            var given = new Vector3(x, h, z);
+            if (!smooth || !IsWhole(h)) return given;
+
+            int ix = Mathf.RoundToInt(x), iy = Mathf.RoundToInt(h - Lift), iz = Mathf.RoundToInt(z);
+            int mask = SmoothTerrain.CornerMask(world, ix, iy, iz);
+            if (mask == 0 || mask == 0xFF) return given;
+
+            SmoothTerrain.CornerVertex(world, ix, iy, iz, out System.Numerics.Vector3 position, out System.Numerics.Vector3 normal);
+            Vector3 outward = normal == System.Numerics.Vector3.Zero ? Vector3.up : normal.ToUnity();
+            return position.ToUnity() + outward * Lift;
         }
 
         // Where a column's top is drawn: its solid top, or the surface of the water on it.

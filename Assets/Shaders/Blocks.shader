@@ -116,7 +116,8 @@ Shader "ECO/Blocks"
             AlphaToMask[_AlphaToMask]
 
             HLSLPROGRAM
-            #pragma target 2.0
+            // ECO: 3.5 (was 2.0) for the smoothed ground's integer hashes and texel loads.
+            #pragma target 3.5
 
             // -------------------------------------
             // Shader Stages
@@ -125,6 +126,8 @@ Shader "ECO/Blocks"
 
             // -------------------------------------
             // Material Keywords
+            // ECO: the smoothed ground (Assets/Materials/Terrain.mat has it on, so builds keep its variant).
+            #pragma shader_feature_local _ECO_SMOOTH
             #pragma shader_feature_local _NORMALMAP
             #pragma shader_feature_local _PARALLAXMAP
             #pragma shader_feature_local _RECEIVE_SHADOWS_OFF

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Eco.Sim;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Voxel.Core;
 
 namespace Voxel.Client
 {
@@ -78,6 +79,10 @@ namespace Voxel.Client
         private readonly float[] lookTops;
         private readonly RenderParams[][] renderParams;
         private readonly Dictionary<long, Region> regions = new Dictionary<long, Region>();
+
+        // The world shown and whether its ground is smoothed (ShowOn).
+        private World ground;
+        private bool smoothShown;
 
         public PlantRenderer(SpeciesAsset[] species)
         {
@@ -183,6 +188,66 @@ namespace Voxel.Client
             falls.Clear();
         }
 
+        // To call every frame before Render: the world the plants stand on and whether its ground is
+        // drawn smoothed (TerrainSettings), for the height the ground shows under each plant
+        // (SmoothTerrain.HeightAt). Every plant is placed again when either changes, and those near a
+        // block that changes.
+        public void ShowOn(World world, bool smoothTerrain)
+        {
+            if (world == ground && smoothTerrain == smoothShown) return;
+
+            if (ground != null)
+            {
+                ground.BlockChanged -= OnBlockChanged;
+                ground.Pins.Changed -= OnPinChanged;
+            }
+
+            ground = world;
+            smoothShown = smoothTerrain;
+            if (ground != null)
+            {
+                ground.BlockChanged += OnBlockChanged;
+                ground.Pins.Changed += OnPinChanged;
+            }
+            foreach (Region region in regions.Values) region.Dirty = true;
+        }
+
+        // A block changed, or storage was placed or taken (World.Pins): the smoothed ground moves under
+        // the plants of the columns around it.
+        private void OnPinChanged(BlockPos cell) => OnBlockChanged(cell, 0, 0);
+
+        private void OnBlockChanged(BlockPos pos, ushort previous, ushort current)
+        {
+            if (!smoothShown) return;
+
+            for (int dz = -1; dz <= 1; dz++)
+            {
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    int x = pos.X + dx, z = pos.Z + dz;
+                    if (x < 0 || z < 0) continue;
+                    if (regions.TryGetValue(KeyOf(x / RegionSize, z / RegionSize), out Region region)) region.Dirty = true;
+                }
+            }
+        }
+
+        // Where a plant stands: the middle of its column on its ground, on smoothed ground the height
+        // the ground shows there; a floating plant at the water's surface.
+        private Vector3 FootOf(PlantView plant)
+        {
+            var foot = new Vector3(plant.X + 0.5f, plant.Y, plant.Z + 0.5f);
+            if (species[plant.SpeciesIndex].FloatsOnWater)
+            {
+                foot.y += ChunkMesher.WaterSurface;
+            }
+            else if (smoothShown && ground != null && !ground.IsWater(plant.X, plant.Y, plant.Z))
+            {
+                foot.y = SmoothTerrain.HeightAt(ground, plant.X, plant.Z, plant.Y, 0.5f, 0.5f);
+            }
+
+            return foot;
+        }
+
         // A felled tree falls the way yaw points (radians about the vertical, 0 toward +z), about its
         // foot just above where its stump stays.
         public void StartFall(PlantView plant, float yaw)
@@ -197,7 +262,7 @@ namespace Voxel.Client
             {
                 Look = look,
                 FruitLook = FruitLookOf(look, plant),
-                Foot = new Vector3(plant.X + 0.5f, plant.Y, plant.Z + 0.5f),
+                Foot = FootOf(plant),
                 Turn = TurnOf(plant.X, plant.Z),
                 Size = size,
                 Axis = Vector3.Cross(Vector3.up, direction),
@@ -226,7 +291,7 @@ namespace Voxel.Client
 
             float size = PlantShape.Scale(plant.Stage);
             Quaternion turn = TurnOf(plant.X, plant.Z);
-            var foot = new Vector3(plant.X + 0.5f, plant.Y, plant.Z + 0.5f);
+            Vector3 foot = FootOf(plant);
             centre = foot + turn * new Vector3(middle.x, 0f, middle.z) * size + Vector3.up * (PlantShape.StumpHeight * size);
             Vector3 turned = turn * extents;
             halfSize = new Vector2(Mathf.Abs(turned.x), Mathf.Abs(turned.z)) * size;
@@ -445,8 +510,7 @@ namespace Voxel.Client
                     if (look < 0) continue;
 
                     float size = PlantShape.Scale(plant.Stage);
-                    var foot = new Vector3(plant.X + 0.5f, plant.Y, plant.Z + 0.5f);
-                    if (renderer.species[plant.SpeciesIndex].FloatsOnWater) foot.y += ChunkMesher.WaterSurface;
+                    Vector3 foot = renderer.FootOf(plant);
                     Quaternion turn = TurnOf(plant.X, plant.Z);
                     Place(renderer, look, foot, turn, size);
                     bottom = Mathf.Min(bottom, foot.y + renderer.lookBottoms[look] * size);

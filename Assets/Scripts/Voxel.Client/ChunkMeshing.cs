@@ -19,18 +19,18 @@ namespace Voxel.Client
         // BuildAll): one batch is applied from one set while the next is built into the other.
         private static readonly ChunkMeshBuilder[][] Builders = { NewBuilders(), NewBuilders() };
 
-        public static void BuildAll(World world, SkyLight light, IReadOnlyList<Chunk> chunks, Action<Chunk, ChunkMeshBuilder> apply, BlockLight blockLight = null)
+        public static void BuildAll(World world, SkyLight light, IReadOnlyList<Chunk> chunks, Action<Chunk, ChunkMeshBuilder> apply, BlockLight blockLight = null, bool smoothTerrain = false)
         {
             if (chunks.Count == 0) return;
 
-            Task building = BuildBatch(world, light, blockLight, chunks, 0, Builders[0]);
+            Task building = BuildBatch(world, light, blockLight, smoothTerrain, chunks, 0, Builders[0]);
             try
             {
                 for (int start = 0, set = 0; start < chunks.Count; start += BatchSize, set ^= 1)
                 {
                     building.Wait();
                     int next = start + BatchSize;
-                    building = next < chunks.Count ? BuildBatch(world, light, blockLight, chunks, next, Builders[set ^ 1]) : null;
+                    building = next < chunks.Count ? BuildBatch(world, light, blockLight, smoothTerrain, chunks, next, Builders[set ^ 1]) : null;
 
                     ChunkMeshBuilder[] built = Builders[set];
                     int count = Math.Min(BatchSize, chunks.Count - start);
@@ -48,10 +48,10 @@ namespace Voxel.Client
             }
         }
 
-        private static Task BuildBatch(World world, SkyLight light, BlockLight blockLight, IReadOnlyList<Chunk> chunks, int start, ChunkMeshBuilder[] builders)
+        private static Task BuildBatch(World world, SkyLight light, BlockLight blockLight, bool smoothTerrain, IReadOnlyList<Chunk> chunks, int start, ChunkMeshBuilder[] builders)
         {
             int count = Math.Min(BatchSize, chunks.Count - start);
-            return Task.Run(() => Parallel.For(0, count, i => builders[i].Build(world, light, chunks[start + i], blockLight)));
+            return Task.Run(() => Parallel.For(0, count, i => builders[i].Build(world, light, chunks[start + i], blockLight, smoothTerrain)));
         }
 
         private static ChunkMeshBuilder[] NewBuilders()

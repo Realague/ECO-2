@@ -36,6 +36,10 @@ namespace Voxel.Core
         // Arguments: position, old block, new block.
         public event Action<BlockPos, ushort, ushort> BlockChanged;
 
+        // Ground cells under storage and stations, kept in blocks by the smoothed ground (display
+        // only: neither saved nor sent; each machine's StorageSync sets them from the storage it knows).
+        public GroundPins Pins { get; } = new GroundPins();
+
         public int ChunksX { get; }
         public int ChunksY { get; }
         public int ChunksZ { get; }

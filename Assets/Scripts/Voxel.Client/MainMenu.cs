@@ -40,6 +40,7 @@ namespace Voxel.Client
         private VisualElement languageList;
         private Slider minimapSize;
         private Label minimapSizeValue;
+        private VisualElement terrainList;
         private Label hostHint;
         private ScrollView worldList;
         private VisualElement worldEmpty;
@@ -119,6 +120,7 @@ namespace Voxel.Client
             minimapSize.highValue = MinimapSettings.MaxScale * 100f;
             minimapSize.SetValueWithoutNotify(MinimapSettings.Scale * 100f);
             minimapSize.RegisterValueChangedCallback(OnMinimapSizeChanged);
+            terrainList = root.Q("terrain-list");
             hostHint = root.Q<Label>("host-hint");
 
             root.Q<Label>("game-title").text = Application.productName;
@@ -152,6 +154,28 @@ namespace Voxel.Client
             hostHint.text = Loc.T("Players who join need it. Leave it empty for an open game. Players connect on UDP port {0}.", session.Port);
             ShowLanguages();
             ShowMinimapSize();
+            ShowTerrain();
+        }
+
+        // Two buttons, smooth or in blocks (TerrainSettings); the one in use is the primary one.
+        private void ShowTerrain()
+        {
+            terrainList.Clear();
+            foreach ((bool smooth, string name) in new[] { (true, "Smooth"), (false, "Blocks") })
+            {
+                var button = new Button { focusable = false };
+                button.AddToClassList("button");
+                button.AddToClassList(smooth == TerrainSettings.Smooth ? "button--primary" : "button--secondary");
+                var text = new Label(Loc.T(name));
+                text.AddToClassList("button-text");
+                button.Add(text);
+                button.clicked += () =>
+                {
+                    TerrainSettings.SetSmooth(smooth);
+                    ShowTerrain();
+                };
+                terrainList.Add(button);
+            }
         }
 
         // In steps of 5 %.

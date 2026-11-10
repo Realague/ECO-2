@@ -24,6 +24,10 @@ namespace Voxel.Client
 
         // Transparent, drawn on each chunk's second submesh (ChunkMesher.WaterSubmesh).
         [SerializeField] private Material waterMaterial;
+
+        // The smoothed ground, drawn on the third submesh (ChunkMesher.SmoothSubmesh): Terrain.mat, the
+        // blocks' shader with _ECO_SMOOTH on. Without it, the ground is drawn in blocks.
+        [SerializeField] private Material terrainMaterial;
         [SerializeField] private string saveFileName = "world.dat";
 
         [Tooltip("Brightness kept where no sky light reaches, deep underground (1 is open sky).")]
@@ -52,6 +56,18 @@ namespace Voxel.Client
 
         // The ores' overlays (BlockAtlas.CreateOverlayTexture), the global texture _OreOverlay of the blocks' shader.
         private Texture2D oreOverlays;
+
+        // The smoothed ground (SmoothTerrain): its material (the blocks' shader with _ECO_SMOOTH, with the
+        // atlas), the tables it reads (BlockAtlas.SetSmoothTables), whether the meshes now show it, and the
+        // chunks' materials with and without it.
+        private Material terrainInstance;
+        private Texture2D smoothMaterialTable;
+        private Texture2D smoothVariantTable;
+        private bool smoothShown;
+
+        // Not kept by the Editor's reloads (it would give them back empty, not null).
+        [NonSerialized] private Material[] blockMaterials;
+        [NonSerialized] private Material[] smoothMaterials;
         private SkyLight skyLight;
         private BlockLight blockLight;
         private TorchViews torchViews;
@@ -60,6 +76,12 @@ namespace Voxel.Client
         private bool rendering;
 
         public World World { get; private set; }
+
+        // Whether natural ground is drawn smoothed now (SmoothTerrain): as TerrainSettings asks, if the
+        // terrain material is set.
+        public bool SmoothTerrainShown => smoothShown;
+
+        private bool WantsSmoothTerrain => TerrainSettings.Smooth && terrainInstance != null;
 
         // The blocks' material with the atlas, for what is drawn in block tiles (stockpiles); null on a
         // server without a display.
@@ -76,6 +98,14 @@ namespace Voxel.Client
             oreOverlays = BlockAtlas.CreateOverlayTexture();
             Shader.SetGlobalTexture("_OreOverlay", oreOverlays);
             Shader.SetGlobalFloat("_DarkestSkyLight", darkestSkyLight);
+            BlockAtlas.SetSmoothTables(out smoothMaterialTable, out smoothVariantTable);
+            if (terrainMaterial != null)
+            {
+                terrainInstance = new Material(terrainMaterial) { mainTexture = atlas };
+                terrainInstance.EnableKeyword("_ECO_SMOOTH");
+            }
+
+            TerrainSettings.Changed += OnTerrainSettingsChanged;
             if (torchWoodMaterial != null && torchHeadMaterial != null && torchFlameMaterial != null)
             {
                 torchViews = new TorchViews(torchWoodMaterial, torchHeadMaterial, torchFlameMaterial);
@@ -116,7 +146,7 @@ namespace Voxel.Client
             {
                 remeshing.Clear();
                 remeshing.AddRange(dirtyChunks);
-                ChunkMeshing.BuildAll(World, skyLight, remeshing, ShowMesh, blockLight);
+                ChunkMeshing.BuildAll(World, skyLight, remeshing, ShowMesh, blockLight, smoothShown);
                 remeshing.Clear();
             }
             else
@@ -124,7 +154,7 @@ namespace Voxel.Client
                 builder ??= new ChunkMeshBuilder();
                 foreach (Chunk chunk in dirtyChunks)
                 {
-                    builder.Build(World, skyLight, chunk, blockLight);
+                    builder.Build(World, skyLight, chunk, blockLight, smoothShown);
                     ShowMesh(chunk, builder);
                 }
             }
@@ -134,10 +164,14 @@ namespace Voxel.Client
 
         private void OnDestroy()
         {
+            TerrainSettings.Changed -= OnTerrainSettingsChanged;
             Unload();
             Destroy(materialInstance);
+            Destroy(terrainInstance);
             Destroy(atlas);
             Destroy(oreOverlays);
+            Destroy(smoothMaterialTable);
+            Destroy(smoothVariantTable);
         }
 
         // Server world: read from the save in the given folder, with its own seed and size, or
@@ -192,12 +226,21 @@ namespace Voxel.Client
             blockLight.UpdateChunk(chunk, dirtyChunks);
             doorViews?.RefreshChunk(chunk);
 
-            // The faces of neighbouring chunks turned toward this one change too.
-            foreach (BlockPos offset in NeighbourOffsets)
+            // The faces of neighbouring chunks turned toward this one change too; on smoothed ground,
+            // those of the chunks touching it by an edge or a corner as well (they share its corners' vertices).
+            for (int dz = -1; dz <= 1; dz++)
             {
-                var coord = new ChunkCoord(chunk.Coord.X + offset.X, chunk.Coord.Y + offset.Y, chunk.Coord.Z + offset.Z);
-                Chunk neighbour = World.GetChunk(coord);
-                if (neighbour != null) dirtyChunks.Add(neighbour);
+                for (int dy = -1; dy <= 1; dy++)
+                {
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int sides = (dx != 0 ? 1 : 0) + (dy != 0 ? 1 : 0) + (dz != 0 ? 1 : 0);
+                        if (sides == 0 || (sides > 1 && !smoothShown)) continue;
+
+                        Chunk neighbour = World.GetChunk(new ChunkCoord(chunk.Coord.X + dx, chunk.Coord.Y + dy, chunk.Coord.Z + dz));
+                        if (neighbour != null) dirtyChunks.Add(neighbour);
+                    }
+                }
             }
         }
 
@@ -206,6 +249,7 @@ namespace Voxel.Client
             if (World == null) return;
 
             World.BlockChanged -= OnBlockChanged;
+            World.Pins.Changed -= OnPinChanged;
             Save();
 
             foreach (MeshFilter filter in chunkMeshes.Values)
@@ -239,7 +283,9 @@ namespace Voxel.Client
             double lightSeconds = timer.Elapsed.TotalSeconds;
 
             World.BlockChanged += OnBlockChanged;
-            ChunkMeshing.BuildAll(World, skyLight, World.Chunks, ShowMesh, blockLight);
+            World.Pins.Changed += OnPinChanged;
+            smoothShown = WantsSmoothTerrain;
+            ChunkMeshing.BuildAll(World, skyLight, World.Chunks, ShowMesh, blockLight, smoothShown);
 
             Debug.Log(
                 $"Sky light worked out in {lightSeconds * 1000:0} ms, chunks meshed in {(timer.Elapsed.TotalSeconds - lightSeconds) * 1000:0} ms "
@@ -285,8 +331,10 @@ namespace Voxel.Client
 
             if (hasObject)
             {
+                int submeshes = filter.sharedMesh != null ? filter.sharedMesh.subMeshCount : 0;
                 Destroy(filter.sharedMesh);
                 filter.sharedMesh = mesh;
+                if (submeshes != mesh.subMeshCount) filter.GetComponent<MeshRenderer>().sharedMaterials = MaterialsFor(mesh);
                 return;
             }
 
@@ -295,7 +343,7 @@ namespace Voxel.Client
             chunkObject.transform.localPosition = new Vector3(chunk.Coord.X, chunk.Coord.Y, chunk.Coord.Z) * Chunk.Size;
             filter = chunkObject.AddComponent<MeshFilter>();
             filter.sharedMesh = mesh;
-            chunkObject.AddComponent<MeshRenderer>().sharedMaterials = new[] { materialInstance, waterMaterial };
+            chunkObject.AddComponent<MeshRenderer>().sharedMaterials = MaterialsFor(mesh);
             chunkMeshes.Add(chunk, filter);
         }
 
@@ -306,11 +354,70 @@ namespace Voxel.Client
             blockLight.Update(pos, dirtyChunks);
             doorViews?.Changed(pos, current);
 
-            // A block on a chunk edge also changes the visible faces of the neighbouring chunk.
+            // A block on a chunk edge also changes the visible faces of the neighbouring chunk; on
+            // smoothed ground, it moves the vertices of its eight corners, which the faces of every
+            // block around it share, diagonals included, and a player's block placed or taken also
+            // pins or frees the ground under it (SmoothTerrain.IsPinned), so one more layer below.
+            if (smoothShown)
+            {
+                for (int dz = -1; dz <= 1; dz++)
+                {
+                    for (int dy = -2; dy <= 1; dy++)
+                    {
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            MarkDirty(new BlockPos(pos.X + dx, pos.Y + dy, pos.Z + dz));
+                        }
+                    }
+                }
+
+                return;
+            }
+
             foreach (BlockPos offset in NeighbourOffsets)
             {
                 MarkDirty(pos + offset);
             }
+        }
+
+        // Storage was placed on this ground cell or taken from it (World.Pins): it is kept in blocks or
+        // smoothed again, and so move the vertices of its corners, shared by every block around it.
+        private void OnPinChanged(BlockPos cell)
+        {
+            if (!smoothShown) return;
+
+            for (int dz = -1; dz <= 1; dz++)
+            {
+                for (int dy = -1; dy <= 1; dy++)
+                {
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        MarkDirty(new BlockPos(cell.X + dx, cell.Y + dy, cell.Z + dz));
+                    }
+                }
+            }
+        }
+
+        // The ground is drawn smoothed or in blocks from now on: every chunk is meshed again.
+        private void OnTerrainSettingsChanged()
+        {
+            if (!rendering || World == null) return;
+
+            bool wanted = WantsSmoothTerrain;
+            if (wanted == smoothShown) return;
+
+            smoothShown = wanted;
+            dirtyChunks.Clear();
+            ChunkMeshing.BuildAll(World, skyLight, World.Chunks, ShowMesh, blockLight, smoothShown);
+        }
+
+        // The materials of a chunk's object for its mesh's submeshes: the blocks and the water, then the
+        // smoothed ground if it has one (a renderer with more materials than submeshes would draw the
+        // last one again with each extra material).
+        private Material[] MaterialsFor(Mesh mesh)
+        {
+            if (mesh.subMeshCount > 2) return smoothMaterials ??= new[] { materialInstance, waterMaterial, terrainInstance };
+            return blockMaterials ??= new[] { materialInstance, waterMaterial };
         }
 
         private void MarkDirty(BlockPos pos)

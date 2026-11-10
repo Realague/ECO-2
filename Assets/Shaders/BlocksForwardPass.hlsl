@@ -52,6 +52,77 @@ static const half3 TorchColour = half3(0.95h, 0.6h, 0.3h);
 TEXTURE2D(_OreOverlay);
 SAMPLER(sampler_OreOverlay);
 
+#if defined(_ECO_SMOOTH)
+// ECO: the smoothed ground (SmoothTerrain, ChunkMesher.SmoothSubmesh, the terrain material). Its faces
+// have no texture coordinates: each pixel is textured from the side its normal faces most (x, y or z,
+// one tile per block as the blocks), the choice dithered texel by texel where two sides are close, so
+// that it stays pixel art instead of blurring two pictures together. Each vertex carries the
+// materials (block types) of its quad's four corners and which corner it is: each pixel shows one of
+// them, picked by their shares there, dithered too. A material's tile depends on how much its ground
+// faces up (BlockAtlas.SetSmoothTables), its variant on the block cell the pixel lies in, as
+// TileVariants weighs them. The blue of the vertex colour is the ore of the quad's own block.
+TEXTURE2D(_SmoothMaterials);
+TEXTURE2D(_SmoothVariants);
+float4 _SmoothAtlas; // x: the atlas's slots, y: the overlays' slots, z: the row of the first overlay
+
+static const float SmoothUvInset = 0.01; // ChunkMesher.UvInset
+
+uint EcoHash(int3 cell, uint salt)
+{
+    uint h = (uint)cell.x * 0x8DA6B343u ^ (uint)cell.y * 0xD8163841u ^ (uint)cell.z * 0xCB1AB31Fu ^ (salt + 1u) * 0x165667B1u;
+    h ^= h >> 15;
+    h *= 0x2C1B3C6Du;
+    h ^= h >> 12;
+    h *= 0x297A2D39u;
+    h ^= h >> 15;
+    return h;
+}
+
+float EcoRandom(int3 cell, uint salt)
+{
+    return (EcoHash(cell, salt) & 0xFFFFFFu) / 16777216.0;
+}
+
+// The slot of one of a tile's variants (a row of _SmoothVariants) picked by the hash, and whether and
+// how it turns (only when mayTurn and the tile turns).
+float EcoPickSlot(int row, uint hash, bool mayTurn, out uint turn, out bool mirror)
+{
+    float4 head = LOAD_TEXTURE2D(_SmoothVariants, int2(0, row));
+    turn = 0u;
+    mirror = false;
+    if (mayTurn && head.z > 0.5)
+    {
+        turn = (hash >> 24) & 3u;
+        mirror = ((hash >> 26) & 1u) != 0u;
+    }
+
+    uint count = (uint)round(head.x);
+    uint total = (uint)max(round(head.y), 1.0);
+    float roll = (float)((hash & 0xFFFFFFu) % total);
+    for (uint v = 0u; v < count; v++)
+    {
+        float4 entry = LOAD_TEXTURE2D(_SmoothVariants, int2(1 + v, row));
+        if (roll < entry.y) return entry.x;
+    }
+
+    return LOAD_TEXTURE2D(_SmoothVariants, int2(1, row)).x;
+}
+
+float2 EcoTurn(float2 f, uint turn, bool mirror)
+{
+    if ((turn & 1u) != 0u) f = float2(f.y, 1.0 - f.x);
+    if ((turn & 2u) != 0u) f = 1.0 - f;
+    if (mirror) f.x = 1.0 - f.x;
+    return f;
+}
+
+// Within a slot of a row of tiles, as ChunkMesher places a tile: inset a little from its edges.
+float2 EcoSlotUv(float slot, float slots, float2 f)
+{
+    return float2((slot + lerp(SmoothUvInset, 1.0 - SmoothUvInset, f.x)) / slots, lerp(SmoothUvInset, 1.0 - SmoothUvInset, f.y));
+}
+#endif
+
 #if defined(LOD_FADE_CROSSFADE)
     #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/LODCrossFade.hlsl"
 #endif
@@ -72,10 +143,15 @@ struct Attributes
     float3 normalOS     : NORMAL;
     float4 tangentOS    : TANGENT;
     float2 texcoord     : TEXCOORD0;
+#if defined(_ECO_SMOOTH)
+    float4 smoothMaterials    : TEXCOORD1; // ECO: the materials of the quad's four corners
+    float4 smoothWeights      : TEXCOORD2; // ECO: which corner this vertex is
+#else
     float2 staticLightmapUV   : TEXCOORD1;
     float2 dynamicLightmapUV  : TEXCOORD2;
+#endif
     float2 overlayUV          : TEXCOORD3; // ECO: an ore's overlay, its place (only where color.b is full)
-    half4 color               : COLOR; // ECO: r is the sky light, g the torches', b full on an ore's faces
+    half4 color               : COLOR; // ECO: r is the sky light, g the torches', b full on an ore's faces (on smoothed ground, the ore)
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
@@ -115,6 +191,11 @@ struct Varyings
 
 #ifdef USE_APV_PROBE_OCCLUSION
     float4 probeOcclusion : TEXCOORD10;
+#endif
+
+#if defined(_ECO_SMOOTH)
+    float4 smoothMaterials          : TEXCOORD11; // ECO
+    float4 smoothWeights            : TEXCOORD12; // ECO
 #endif
 
     float4 positionCS               : SV_POSITION;
@@ -232,8 +313,15 @@ Varyings LitPassVertex(Attributes input)
     #endif
 
     output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
+#if defined(_ECO_SMOOTH)
+    // ECO: on smoothed ground, the quad's materials and corner weights, and its ore in z.
+    output.voxelLight = float4(input.color.rg, round(input.color.b * 255.0), 0.0);
+    output.smoothMaterials = input.smoothMaterials;
+    output.smoothWeights = input.smoothWeights;
+#else
     // ECO: the overlay's place on an ore's faces, below zero (none) everywhere else.
     output.voxelLight = float4(input.color.rg, input.color.b > 0.5h ? input.overlayUV : float2(-1.0, -1.0));
+#endif
 
     // already normalized from normal transform to WS.
     output.normalWS = normalInput.normalWS;
@@ -251,9 +339,11 @@ Varyings LitPassVertex(Attributes input)
     output.viewDirTS = viewDirTS;
 #endif
 
+#if !defined(_ECO_SMOOTH) // ECO: the smoothed ground's chunks are never lightmapped, and use these channels
     OUTPUT_LIGHTMAP_UV(input.staticLightmapUV, unity_LightmapST, output.staticLightmapUV);
 #ifdef DYNAMICLIGHTMAP_ON
     output.dynamicLightmapUV = input.dynamicLightmapUV.xy * unity_DynamicLightmapST.xy + unity_DynamicLightmapST.zw;
+#endif
 #endif
     OUTPUT_SH4(vertexInput.positionWS, output.normalWS.xyz, GetWorldSpaceNormalizeViewDir(vertexInput.positionWS), output.vertexSH, output.probeOcclusion);
 #ifdef _ADDITIONAL_LIGHTS_VERTEX
@@ -274,6 +364,96 @@ Varyings LitPassVertex(Attributes input)
 
     return output;
 }
+
+#if defined(_ECO_SMOOTH)
+// ECO: the colour of the smoothed ground at this pixel: its side, material, tile, variant, the climate's
+// tint and its block's ore (see _SmoothMaterials above).
+half3 EcoSmoothAlbedo(Varyings input)
+{
+    float3 p = input.positionWS;
+    float3 n = normalize(input.normalWS);
+    float3 dpdx = ddx(p);
+    float3 dpdy = ddy(p);
+
+    // The texel the pixel lies in, a little inside the ground so that flat ground does not flicker
+    // between two cells: the dithering's cell.
+    float texels = _BaseMap_TexelSize.w;
+    int3 texel = (int3)floor((p - n * (0.5 / texels)) * texels);
+
+    // The side it is textured from, by how much the surface itself faces each: the triangle's own
+    // normal (from the position's derivatives), not the smoothed one, which leans toward the
+    // neighbouring faces near an edge and would pick a side the face runs along, stretching the
+    // texture into streaks.
+    float3 faceNormal = cross(dpdy, dpdx);
+    float faceLength = length(faceNormal);
+    faceNormal = faceLength > 1e-8 ? faceNormal / faceLength : n;
+    if (dot(faceNormal, n) < 0.0) faceNormal = -faceNormal;
+    float3 share = pow(abs(faceNormal), 8.0);
+    share /= share.x + share.y + share.z;
+    float pickSide = EcoRandom(texel, 0u);
+    uint axis = pickSide < share.x ? 0u : (pickSide < share.x + share.y ? 1u : 2u);
+
+    // The material, by its corner's share (squared, so that each keeps to its corner more).
+    float4 w = input.smoothWeights * input.smoothWeights;
+    float pickMaterial = EcoRandom(texel, 1u) * (w.x + w.y + w.z + w.w);
+    float4 ids = input.smoothMaterials;
+    float id = pickMaterial < w.x ? ids.x : (pickMaterial < w.x + w.y ? ids.y : (pickMaterial < w.x + w.y + w.z ? ids.z : ids.w));
+    float4 tiles = LOAD_TEXTURE2D(_SmoothMaterials, int2((int)round(id), 0));
+
+    // Its top where the ground faces up enough (the threshold dithered), its bottom facing down, else its side.
+    float threshold = 0.5 + (EcoRandom(texel, 2u) - 0.5) * 0.3;
+    float tile = n.y > threshold ? tiles.x : (n.y < -0.7 ? tiles.z : tiles.y);
+
+    // As the blocks' faces lay their tiles: +x along z, -x and +z mirrored, the top along x and z.
+    float2 uv, du, dv;
+    if (axis == 0u)
+    {
+        float s = faceNormal.x >= 0.0 ? 1.0 : -1.0;
+        uv = float2(s * p.z, p.y);
+        du = float2(s * dpdx.z, dpdx.y);
+        dv = float2(s * dpdy.z, dpdy.y);
+    }
+    else if (axis == 1u)
+    {
+        uv = p.xz;
+        du = dpdx.xz;
+        dv = dpdy.xz;
+    }
+    else
+    {
+        float s = faceNormal.z >= 0.0 ? -1.0 : 1.0;
+        uv = float2(s * p.x, p.y);
+        du = float2(s * dpdx.x, dpdx.y);
+        dv = float2(s * dpdy.x, dpdy.y);
+    }
+
+    int3 cell = int3((int2)floor(uv), (int)axis);
+    float2 f = frac(uv);
+    uint turn;
+    bool mirror;
+    float slot = EcoPickSlot((int)round(tile), EcoHash(cell, 3u), axis == 1u, turn, mirror);
+    float slots = _SmoothAtlas.x;
+    half4 colour = SAMPLE_TEXTURE2D_GRAD(_BaseMap, sampler_BaseMap, EcoSlotUv(slot, slots, EcoTurn(f, turn, mirror)),
+        float2(du.x / slots, du.y), float2(dv.x / slots, dv.y));
+
+    // Tinted pixels take the climate's colour, as on the blocks.
+    half3 albedo = colour.rgb * _BaseColor.rgb;
+    albedo *= lerp(half3(1.0h, 1.0h, 1.0h), ClimateTintAt(p), 1.0h - colour.a);
+
+    // The ore of the quad's own block, over the rock.
+    int ore = (int)round(input.voxelLight.z);
+    if (ore > 0)
+    {
+        float oreSlots = _SmoothAtlas.y;
+        float oreSlot = EcoPickSlot((int)_SmoothAtlas.z + ore - 1, EcoHash(cell, 4u), true, turn, mirror);
+        half4 crystals = SAMPLE_TEXTURE2D_GRAD(_OreOverlay, sampler_OreOverlay, EcoSlotUv(oreSlot, oreSlots, EcoTurn(f, turn, mirror)),
+            float2(du.x / oreSlots, du.y), float2(dv.x / oreSlots, dv.y));
+        albedo = lerp(albedo, crystals.rgb * _BaseColor.rgb, crystals.a);
+    }
+
+    return albedo;
+}
+#endif
 
 // Used in Standard (Physically Based) shader
 void LitPassFragment(
@@ -300,6 +480,9 @@ void LitPassFragment(
     SurfaceData surfaceData;
     InitializeStandardLitSurfaceData(input.uv, surfaceData);
 
+#if defined(_ECO_SMOOTH)
+    surfaceData.albedo = EcoSmoothAlbedo(input); // ECO
+#else
     // ECO: tinted pixels take the climate's colour; the others keep the atlas's.
     half tinted = 1.0h - SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap)).a;
     surfaceData.albedo *= lerp(half3(1.0h, 1.0h, 1.0h), ClimateTintAt(input.positionWS), tinted);
@@ -309,6 +492,7 @@ void LitPassFragment(
     half4 ore = SAMPLE_TEXTURE2D(_OreOverlay, sampler_OreOverlay, input.voxelLight.zw);
     ore.a *= step(0.0, input.voxelLight.z);
     surfaceData.albedo = lerp(surfaceData.albedo, ore.rgb * _BaseColor.rgb, ore.a);
+#endif
 #if !defined(_SURFACE_TYPE_TRANSPARENT)
     // The atlas's alpha is the tint mask, not transparency. Transparent materials (the water, which
     // has no atlas) keep their own alpha.

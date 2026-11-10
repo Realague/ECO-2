@@ -428,7 +428,7 @@ namespace Voxel.Client
             foreach (KeyValuePair<int, View> entry in views)
             {
                 AnimalSpecies kind = species[entry.Value.SpeciesIndex];
-                Vector3 position = entry.Value.PositionAt(Time.time);
+                Vector3 position = OnSmoothGround(entry.Value.SpeciesIndex, entry.Value.PositionAt(Time.time));
                 if (assets != null) position.y += entry.Value.LiftAt(Time.time, assets[entry.Value.SpeciesIndex]);
                 float half = kind.Width * 0.5f;
                 var min = new System.Numerics.Vector3(position.x - half, position.y, position.z - half);
@@ -464,7 +464,7 @@ namespace Voxel.Client
             {
                 View view = entry.Value;
                 AnimalSpecies kind = species[view.SpeciesIndex];
-                Vector3 position = view.PositionAt(now);
+                Vector3 position = OnSmoothGround(view.SpeciesIndex, view.PositionAt(now));
                 if (!canHunt(Mathf.FloorToInt(position.x), Mathf.FloorToInt(position.z))) continue;
                 if (assets != null) position.y += view.LiftAt(now, assets[view.SpeciesIndex]);
 
@@ -532,7 +532,7 @@ namespace Voxel.Client
             foreach (View view in views.Values)
             {
                 int s = view.SpeciesIndex;
-                Vector3 position = Afloat(s, view.PositionAt(now));
+                Vector3 position = Afloat(s, OnSmoothGround(s, view.PositionAt(now)));
                 Quaternion rotation = Quaternion.Euler(0f, view.FacingAt(now), 0f);
                 AnimalSpeciesAsset asset = assets[s];
                 IReadOnlyList<SpeciesAsset.Part> parts = asset.Parts;
@@ -608,6 +608,21 @@ namespace Voxel.Client
         {
             lowest[speciesIndex] = Vector3.Min(lowest[speciesIndex], position);
             highest[speciesIndex] = Vector3.Max(highest[speciesIndex], position);
+        }
+
+        // On smoothed ground (TerrainSettings, SmoothTerrain), an animal standing on it follows the height
+        // the ground shows where it is, not the top of its column's block. Fish keep to their water.
+        private Vector3 OnSmoothGround(int speciesIndex, Vector3 position)
+        {
+            if (world == null || !TerrainSettings.Smooth || species[speciesIndex].Habitat == AnimalHabitat.Water) return position;
+
+            int x = Mathf.FloorToInt(position.x);
+            int y = Mathf.RoundToInt(position.y);
+            int z = Mathf.FloorToInt(position.z);
+            if (!world.InBounds(x, y - 1, z) || !SmoothTerrain.IsSmooth(world.GetBlock(x, y - 1, z)) || world.IsSolid(x, y, z)) return position;
+
+            position.y = SmoothTerrain.HeightAt(world, x, z, y, position.x - x, position.z - z);
+            return position;
         }
 
         // A shore animal above water floats in it, a little below the top of the block under it.

@@ -1569,6 +1569,7 @@ MonoBehaviour:
   seed: 1
   blockMaterial: {fileID: 2100000, guid: 94b05fea58d6f8246bd6ef44fd341669, type: 2}
   waterMaterial: {fileID: 2100000, guid: 5bd02ebd5f8fc8d44a82e5211d374a64, type: 2}
+  terrainMaterial: {fileID: 2100000, guid: 5e476673d6366634a924fb17b6b877f2, type: 2}
   saveFileName: world.dat
   darkestSkyLight: 0.02
   torchWoodMaterial: {fileID: 2100000, guid: d6c58eacd8d934e44917e6d85ca61461, type: 2}

@@ -84,6 +84,9 @@ namespace Voxel.Core
 
         public int Count => storages.Count;
 
+        // Counts every storage added or removed: what follows the storage placed knows when to look again.
+        public int Version { get; private set; }
+
         public IEnumerable<Storage> All => storages.Values;
 
         public bool TryGet(int id, out Storage storage) => storages.TryGetValue(id, out storage);
@@ -119,6 +122,7 @@ namespace Voxel.Core
         {
             if (!storages.TryGetValue(id, out Storage storage)) return false;
 
+            Version++;
             storages.Remove(id);
             for (int i = 0; i < storage.CellCount; i++)
             {
@@ -277,6 +281,7 @@ namespace Voxel.Core
 
         private void Insert(Storage storage)
         {
+            Version++;
             storages[storage.Id] = storage;
             for (int i = 0; i < storage.CellCount; i++)
             {

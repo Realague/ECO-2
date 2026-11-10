@@ -40,7 +40,7 @@
                     <ui:VisualElement class="icon icon--gear" />
                     <ui:VisualElement class="menu-button-texts">
                         <ui:Label text="Options" class="menu-button-title" />
-                        <ui:Label text="Language." class="menu-button-text" />
+                        <ui:Label text="Language, minimap and terrain." class="menu-button-text" />
                     </ui:VisualElement>
                 </ui:Button>
                 <ui:Button name="quit-button" class="link-button">
@@ -128,6 +128,10 @@
                     <ui:Label name="minimap-size-value" class="option-slider-value" />
                 </ui:VisualElement>
                 <ui:Label text="The round map at the top right of the screen. It shows the same area at any size." class="field-hint" />
+                <!-- The ground's look (TerrainSettings): MainMenu fills it with two buttons, smooth and blocks. -->
+                <ui:Label text="Terrain" class="field-label" />
+                <ui:VisualElement name="terrain-list" class="language-list" />
+                <ui:Label text="The natural ground's look: rounded, or in cubes. Only the look changes: you walk and dig by blocks either way." class="field-hint" />
                 <ui:VisualElement class="view-buttons">
                     <ui:Button name="options-back" class="button button--secondary">
                         <ui:VisualElement class="icon icon--arrow-left" />

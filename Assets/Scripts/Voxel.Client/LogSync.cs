@@ -218,12 +218,26 @@ namespace Voxel.Client
             if (views == null) views = new LogViews(ecosystemSync.PlantAssets, cutMaterial);
 
             float now = Time.time;
+            World world = TerrainSettings.Smooth ? worldSync.World : null;
             foreach (Shown entry in shown.Values)
             {
-                if (entry.VisibleAt <= now) views.Add(entry.Log.Position.ToUnity(), entry.Log.Yaw, entry.Log.Species);
+                if (entry.VisibleAt <= now) views.Add(OnShownGround(world, entry.Log.Position.ToUnity()), entry.Log.Yaw, entry.Log.Species);
             }
 
             views.Render();
+        }
+
+        // On smoothed ground (a world given), a log lying on a block's top rests at the height the ground
+        // shows there (SmoothTerrain.HeightAt); afloat or on anything else, where it is.
+        private static Vector3 OnShownGround(World world, Vector3 position)
+        {
+            if (world == null) return position;
+
+            int x = Mathf.FloorToInt(position.x), y = Mathf.RoundToInt(position.y), z = Mathf.FloorToInt(position.z);
+            if (Mathf.Abs(position.y - y) > 0.01f || !world.InBounds(x, y - 1, z) || !SmoothTerrain.IsSmooth(world.GetBlock(x, y - 1, z))) return position;
+
+            position.y = SmoothTerrain.HeightAt(world, x, z, y, position.x - x, position.z - z);
+            return position;
         }
 
         // Server side: logs a block changed under or into are moved to rest on what is there now.

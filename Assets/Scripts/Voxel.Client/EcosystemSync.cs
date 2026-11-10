@@ -283,6 +283,7 @@ namespace Voxel.Client
             if (plantRenderer == null) return;
 
             Camera viewer = Camera.main;
+            plantRenderer.ShowOn(worldSync.World, TerrainSettings.Smooth);
             if (viewer != null) plantRenderer.Render(viewer.transform.position, plantViewDistance);
             animalViews.Render();
         }

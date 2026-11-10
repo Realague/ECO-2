@@ -83,6 +83,12 @@ namespace Voxel.Client
 
         public bool Rotates(int tile) => rotates[tile];
 
+        // The slot of a tile's variant (0 is the base tile itself) and the weights of its variants up to
+        // that one, added up (what Pick rolls against).
+        public int VariantSlot(int tile, int variant) => slots[tile][variant];
+
+        public int CumulativeWeight(int tile, int variant) => cumulative[tile][variant];
+
         public static string VariantName(string tileName, int number) => $"{tileName}_{number}";
 
         // The slot a face of the block at (x, y, z) shows for this base tile, and how its texture turns:

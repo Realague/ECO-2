@@ -105,6 +105,15 @@ namespace Voxel.Client
         private Storages shown = new Storages();
         private readonly Dictionary<int, Shown> details = new Dictionary<int, Shown>();
 
+        // The ground cells under the storage shown, pinned in the world drawn (World.Pins: the smoothed
+        // ground keeps them in blocks), and what they were worked out from (SyncGroundPins).
+        private readonly HashSet<BlockPos> pinnedCells = new HashSet<BlockPos>();
+        private readonly HashSet<BlockPos> wantedCells = new HashSet<BlockPos>();
+        private readonly List<BlockPos> unpinning = new List<BlockPos>();
+        private World pinnedWorld;
+        private Storages pinnedFrom;
+        private int pinnedVersion = -1;
+
         // Server side.
         private Storages store;
         private PlayerRegistry registry;
@@ -542,8 +551,65 @@ namespace Voxel.Client
             else SendInt(PickupMessage, OpenedId);
         }
 
+        // Pins the ground under every storage shown (a chest's or station's cell, each of a stockpile's)
+        // in the world drawn, and frees what nothing stands on any more: worked out again only when the
+        // storage placed or the world changes.
+        private void SyncGroundPins()
+        {
+            World world = voxelWorld != null ? voxelWorld.World : null;
+            Storages from = running ? shown : null;
+            int version = from != null ? from.Version : -1;
+            if (world == pinnedWorld && from == pinnedFrom && version == pinnedVersion) return;
+
+            pinnedFrom = from;
+            pinnedVersion = version;
+            if (world != pinnedWorld)
+            {
+                if (pinnedWorld != null)
+                {
+                    foreach (BlockPos cell in pinnedCells) pinnedWorld.Pins.Unpin(cell);
+                }
+
+                pinnedCells.Clear();
+                pinnedWorld = world;
+            }
+
+            if (world == null) return;
+
+            wantedCells.Clear();
+            if (from != null)
+            {
+                foreach (Storage storage in from.All)
+                {
+                    for (int i = 0; i < storage.CellCount; i++)
+                    {
+                        BlockPos cell = storage.Cell(i);
+                        wantedCells.Add(new BlockPos(cell.X, cell.Y - 1, cell.Z));
+                    }
+                }
+            }
+
+            unpinning.Clear();
+            foreach (BlockPos cell in pinnedCells)
+            {
+                if (!wantedCells.Contains(cell)) unpinning.Add(cell);
+            }
+
+            foreach (BlockPos cell in unpinning)
+            {
+                pinnedCells.Remove(cell);
+                world.Pins.Unpin(cell);
+            }
+
+            foreach (BlockPos cell in wantedCells)
+            {
+                if (pinnedCells.Add(cell)) world.Pins.Pin(cell);
+            }
+        }
+
         private void LateUpdate()
         {
+            if (!Application.isBatchMode) SyncGroundPins();
             if (!running) return;
 
             if (IsServer && Time.unscaledTime >= nextReachCheck)
