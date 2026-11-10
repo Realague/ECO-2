@@ -284,6 +284,7 @@ namespace Voxel.Client
 
             World.BlockChanged += OnBlockChanged;
             World.Pins.Changed += OnPinChanged;
+            TerrainSettings.Apply();
             smoothShown = WantsSmoothTerrain;
             ChunkMeshing.BuildAll(World, skyLight, World.Chunks, ShowMesh, blockLight, smoothShown);
 
@@ -404,8 +405,9 @@ namespace Voxel.Client
             if (!rendering || World == null) return;
 
             bool wanted = WantsSmoothTerrain;
-            if (wanted == smoothShown) return;
+            if (wanted == smoothShown && (!wanted || SmoothTerrain.Strength == TerrainSettings.Smoothing)) return;
 
+            TerrainSettings.Apply();
             smoothShown = wanted;
             dirtyChunks.Clear();
             ChunkMeshing.BuildAll(World, skyLight, World.Chunks, ShowMesh, blockLight, smoothShown);

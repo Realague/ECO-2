@@ -132,6 +132,13 @@
                 <ui:Label text="Terrain" class="field-label" />
                 <ui:VisualElement name="terrain-list" class="language-list" />
                 <ui:Label text="The natural ground's look: rounded, or in cubes. Only the look changes: you walk and dig by blocks either way." class="field-hint" />
+                <!-- How smooth the rounded ground is (TerrainSettings.Smoothing), in percent; MainMenu writes the value beside it. -->
+                <ui:Label text="Terrain smoothing" class="field-label" />
+                <ui:VisualElement class="option-slider-row">
+                    <ui:Slider name="terrain-smoothing" low-value="10" high-value="100" class="option-slider" />
+                    <ui:Label name="terrain-smoothing-value" class="option-slider-value" />
+                </ui:VisualElement>
+                <ui:Label text="Lower keeps steeper slopes and sharper edges; higher rounds them off." class="field-hint" />
                 <ui:VisualElement class="view-buttons">
                     <ui:Button name="options-back" class="button button--secondary">
                         <ui:VisualElement class="icon icon--arrow-left" />

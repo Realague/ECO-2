@@ -7,6 +7,13 @@ namespace Voxel.Core.Tests
     {
         private const int Ground = FlatGenerator.GroundHeight;
 
+        // The full Surface Nets, whatever a game in this Editor last set.
+        [SetUp]
+        public void AtFullStrength()
+        {
+            SmoothTerrain.Strength = 1f;
+        }
+
         // Flat ground keeps its exact height, its normals point straight up, and the vertices sit on
         // the block grid's corners, up to the world's sides (beyond which the edge column is repeated).
         [Test]
@@ -169,6 +176,34 @@ namespace Voxel.Core.Tests
             // A pin on air pins nothing.
             world.Pins.Pin(new BlockPos(4, Ground + 3, 4));
             Assert.IsFalse(SmoothTerrain.IsPinned(world, 4, Ground + 3, 4));
+        }
+
+        // A lower strength keeps the vertices nearer the block corners: a step's edge is pulled half as
+        // far, flat ground stays where it is.
+        [Test]
+        public void ALowerStrength_KeepsSteeperSlopes()
+        {
+            World world = FlatGenerator.CreateWorld();
+            for (int z = 0; z < world.SizeZ; z++)
+            {
+                for (int x = 8; x < world.SizeX; x++)
+                {
+                    world.SetBlock(x, Ground, z, Blocks.Stone);
+                }
+            }
+
+            try
+            {
+                SmoothTerrain.Strength = 0.5f;
+                SmoothTerrain.CornerVertex(world, 8, Ground + 1, 5, out Vector3 upper, out _);
+                SmoothTerrain.CornerVertex(world, 4, Ground, 5, out Vector3 flat, out _);
+                Assert.AreEqual(new Vector3(8.125f, Ground + 0.875f, 5f), upper);
+                Assert.AreEqual(new Vector3(4f, Ground, 5f), flat);
+            }
+            finally
+            {
+                SmoothTerrain.Strength = 1f;
+            }
         }
 
         // Construction blocks, water, torches and doors stay out of the smoothing: over a plank floor

@@ -83,6 +83,7 @@ namespace Voxel.Client
         // The world shown and whether its ground is smoothed (ShowOn).
         private World ground;
         private bool smoothShown;
+        private float strengthShown = float.NaN;
 
         public PlantRenderer(SpeciesAsset[] species)
         {
@@ -194,7 +195,9 @@ namespace Voxel.Client
         // block that changes.
         public void ShowOn(World world, bool smoothTerrain)
         {
-            if (world == ground && smoothTerrain == smoothShown) return;
+            if (world == ground && smoothTerrain == smoothShown && SmoothTerrain.Strength == strengthShown) return;
+
+            strengthShown = SmoothTerrain.Strength;
 
             if (ground != null)
             {

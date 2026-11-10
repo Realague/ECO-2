@@ -41,6 +41,8 @@ namespace Voxel.Client
         private Slider minimapSize;
         private Label minimapSizeValue;
         private VisualElement terrainList;
+        private Slider terrainSmoothing;
+        private Label terrainSmoothingValue;
         private Label hostHint;
         private ScrollView worldList;
         private VisualElement worldEmpty;
@@ -121,6 +123,13 @@ namespace Voxel.Client
             minimapSize.SetValueWithoutNotify(MinimapSettings.Scale * 100f);
             minimapSize.RegisterValueChangedCallback(OnMinimapSizeChanged);
             terrainList = root.Q("terrain-list");
+            terrainSmoothing = root.Q<Slider>("terrain-smoothing");
+            terrainSmoothingValue = root.Q<Label>("terrain-smoothing-value");
+            terrainSmoothing.focusable = false;
+            terrainSmoothing.lowValue = TerrainSettings.MinSmoothing * 100f;
+            terrainSmoothing.highValue = TerrainSettings.MaxSmoothing * 100f;
+            terrainSmoothing.SetValueWithoutNotify(TerrainSettings.Smoothing * 100f);
+            terrainSmoothing.RegisterValueChangedCallback(OnTerrainSmoothingChanged);
             hostHint = root.Q<Label>("host-hint");
 
             root.Q<Label>("game-title").text = Application.productName;
@@ -155,6 +164,21 @@ namespace Voxel.Client
             ShowLanguages();
             ShowMinimapSize();
             ShowTerrain();
+            ShowTerrainSmoothing();
+        }
+
+        // In steps of 5 %.
+        private void OnTerrainSmoothingChanged(ChangeEvent<float> change)
+        {
+            float percent = Mathf.Round(change.newValue / 5f) * 5f;
+            terrainSmoothing.SetValueWithoutNotify(percent);
+            TerrainSettings.SetSmoothing(percent / 100f);
+            ShowTerrainSmoothing();
+        }
+
+        private void ShowTerrainSmoothing()
+        {
+            terrainSmoothingValue.text = Loc.T("{0} %", Mathf.RoundToInt(TerrainSettings.Smoothing * 100f));
         }
 
         // Two buttons, smooth or in blocks (TerrainSettings); the one in use is the primary one.

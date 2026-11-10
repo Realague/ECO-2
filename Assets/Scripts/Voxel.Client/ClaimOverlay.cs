@@ -43,6 +43,7 @@ namespace Voxel.Client
 
         // Whether the ground is drawn smoothed (TerrainSettings): the tint then lies on its vertices.
         private bool smooth;
+        private float strength = float.NaN;
 
         public static bool Shown { get; private set; }
 
@@ -83,9 +84,10 @@ namespace Voxel.Client
         private void LateUpdate()
         {
             Watch(worldSync.World);
-            if (smooth != TerrainSettings.Smooth)
+            if (smooth != TerrainSettings.Smooth || strength != SmoothTerrain.Strength)
             {
                 smooth = TerrainSettings.Smooth;
+                strength = SmoothTerrain.Strength;
                 dirty.UnionWith(meshes.Keys);
             }
 

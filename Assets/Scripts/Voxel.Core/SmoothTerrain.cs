@@ -102,6 +102,12 @@ namespace Voxel.Core
             return false;
         }
 
+        // How far the vertices go from the block corners toward the Surface Nets position, 0 to 1: at 1
+        // the smoothest, lower values keep steeper slopes and sharper edges (flat ground and vertical
+        // cliffs are the same at any value). Display only, set by the client (TerrainSettings) on the
+        // main thread while nothing is meshed; 1 unless set.
+        public static float Strength = 1f;
+
         public static void CornerVertex(int mask, int cx, int cy, int cz, out Vector3 position, out Vector3 normal)
         {
             float sumX = 0f, sumY = 0f, sumZ = 0f;
@@ -139,7 +145,8 @@ namespace Voxel.Core
                 }
             }
 
-            position = count > 0 ? new Vector3(sumX / count, sumY / count, sumZ / count) : new Vector3(cx, cy, cz);
+            var corner = new Vector3(cx, cy, cz);
+            position = count > 0 ? corner + (new Vector3(sumX / count, sumY / count, sumZ / count) - corner) * Strength : corner;
 
             float gx = 0f, gy = 0f, gz = 0f;
             for (int bit = 0; bit < 8; bit++)

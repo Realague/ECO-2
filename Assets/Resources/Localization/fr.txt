@@ -34,6 +34,8 @@ The round map at the top right of the screen. It shows the same area at any size
 Smooth	Lisse
 The natural ground's look: rounded, or in cubes. Only the look changes: you walk and dig by blocks either way.	L'aspect du sol naturel : arrondi, ou en cubes. Seul l'aspect change : on marche et on creuse par blocs dans les deux cas.
 Language, minimap and terrain.	Langue, minimap et terrain.
+Terrain smoothing	Lissage du terrain
+Lower keeps steeper slopes and sharper edges; higher rounds them off.	Plus bas, les pentes restent raides et les arêtes vives ; plus haut, elles s'arrondissent.
 Players who join need it. Leave it empty for an open game. Players connect on UDP port {0}.	Les joueurs qui vous rejoignent en ont besoin. Laissez vide pour une partie ouverte. Les joueurs se connectent sur le port UDP {0}.
 Never saved: playing it makes a new world.	Jamais sauvegardé : y jouer crée un nouveau monde.
 Made by an older version: playing it makes a new world.	Créé par une version plus ancienne : y jouer crée un nouveau monde.
