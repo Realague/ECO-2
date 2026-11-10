@@ -334,3 +334,54 @@
     margin: 0 10px 8px 0;
     min-width: 160px;
 }
+
+/* Options: a slider with its value beside it (the minimap's size). */
+.option-slider-row {
+    flex-direction: row;
+    align-items: center;
+    max-width: 520px;
+}
+
+.option-slider {
+    flex-grow: 1;
+    margin: 0;
+    padding: 0;
+}
+
+.option-slider .unity-base-slider__drag-container {
+    height: 32px;
+}
+
+.option-slider .unity-base-slider__tracker {
+    height: 8px;
+    margin-top: -4px;
+    background-color: var(--control);
+    border-width: 1px;
+    border-color: var(--control-border);
+    border-radius: 4px;
+}
+
+.option-slider .unity-base-slider__dragger {
+    width: 22px;
+    height: 22px;
+    margin-top: -11px;
+    margin-left: -11px;
+    background-color: var(--accent);
+    border-width: 2px;
+    border-color: var(--control-border);
+    border-radius: 11px;
+}
+
+.option-slider .unity-base-slider__dragger-border {
+    display: none;
+}
+
+.option-slider-value {
+    width: 80px;
+    margin: 0 0 0 16px;
+    padding: 0;
+    font-size: 19px;
+    -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
+    -unity-text-align: middle-right;
+    color: var(--text);
+}

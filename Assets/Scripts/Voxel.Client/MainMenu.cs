@@ -38,6 +38,8 @@ namespace Voxel.Client
         private VisualElement joinView;
         private VisualElement optionsView;
         private VisualElement languageList;
+        private Slider minimapSize;
+        private Label minimapSizeValue;
         private Label hostHint;
         private ScrollView worldList;
         private VisualElement worldEmpty;
@@ -110,6 +112,13 @@ namespace Voxel.Client
 
             optionsView = root.Q("view-options");
             languageList = root.Q("language-list");
+            minimapSize = root.Q<Slider>("minimap-size");
+            minimapSizeValue = root.Q<Label>("minimap-size-value");
+            minimapSize.focusable = false;
+            minimapSize.lowValue = MinimapSettings.MinScale * 100f;
+            minimapSize.highValue = MinimapSettings.MaxScale * 100f;
+            minimapSize.SetValueWithoutNotify(MinimapSettings.Scale * 100f);
+            minimapSize.RegisterValueChangedCallback(OnMinimapSizeChanged);
             hostHint = root.Q<Label>("host-hint");
 
             root.Q<Label>("game-title").text = Application.productName;
@@ -142,6 +151,21 @@ namespace Voxel.Client
         {
             hostHint.text = Loc.T("Players who join need it. Leave it empty for an open game. Players connect on UDP port {0}.", session.Port);
             ShowLanguages();
+            ShowMinimapSize();
+        }
+
+        // In steps of 5 %.
+        private void OnMinimapSizeChanged(ChangeEvent<float> change)
+        {
+            float percent = Mathf.Round(change.newValue / 5f) * 5f;
+            minimapSize.SetValueWithoutNotify(percent);
+            MinimapSettings.SetScale(percent / 100f);
+            ShowMinimapSize();
+        }
+
+        private void ShowMinimapSize()
+        {
+            minimapSizeValue.text = Loc.T("{0} %", Mathf.RoundToInt(MinimapSettings.Scale * 100f));
         }
 
         private void OnLanguageChanged()

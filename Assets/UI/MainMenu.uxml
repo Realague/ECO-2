@@ -121,6 +121,13 @@
                 <ui:Label text="Language" class="field-label" />
                 <ui:VisualElement name="language-list" class="language-list" />
                 <ui:Label text="The game's texts change at once. Your choice is kept on this computer." class="field-hint" />
+                <!-- The minimap's size (MinimapSettings), in percent; MainMenu writes the value beside it. -->
+                <ui:Label text="Minimap size" class="field-label" />
+                <ui:VisualElement class="option-slider-row">
+                    <ui:Slider name="minimap-size" low-value="50" high-value="200" class="option-slider" />
+                    <ui:Label name="minimap-size-value" class="option-slider-value" />
+                </ui:VisualElement>
+                <ui:Label text="The round map at the top right of the screen. It shows the same area at any size." class="field-hint" />
                 <ui:VisualElement class="view-buttons">
                     <ui:Button name="options-back" class="button button--secondary">
                         <ui:VisualElement class="icon icon--arrow-left" />

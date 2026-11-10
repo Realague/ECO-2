@@ -13,6 +13,11 @@ namespace Voxel.Client
         // Blocks from the centre of the map to its rim.
         private const float Radius = 64f;
 
+        // The frame's width and border radius at scale 1 (Minimap.uss), and the north label's
+        // width; MinimapSettings.Scale multiplies the first two.
+        private const float FrameSize = 300f;
+        private const float NorthSize = 30f;
+
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private WorldMap worldMap;
@@ -23,7 +28,10 @@ namespace Voxel.Client
         [SerializeField] private UIDocument document;
 
         private VisualElement screen;
+        private VisualElement minimap;
         private VisualElement frame;
+        private VisualElement north;
+        private float shownScale = float.NaN;
         private VisualElement image;
         private VisualElement claims;
         private Texture2D shownClaims;
@@ -42,7 +50,9 @@ namespace Voxel.Client
         {
             VisualElement root = document.rootVisualElement;
             screen = root.Q("screen");
+            minimap = root.Q("minimap");
             frame = root.Q("map-frame");
+            north = root.Q("map-north");
             image = root.Q("map-image");
             claims = root.Q("map-claims");
             position = root.Q<Label>("map-position");
@@ -63,6 +73,7 @@ namespace Voxel.Client
             screen.style.display = player != null ? DisplayStyle.Flex : DisplayStyle.None;
             if (player == null) return;
 
+            Resize();
             if (texture != shownTexture)
             {
                 shownTexture = texture;
@@ -71,6 +82,26 @@ namespace Voxel.Client
 
             texture.filterMode = FilterMode.Point;
             Place(texture, player.transform);
+        }
+
+        // The size chosen in the options: the frame grows or shrinks, still round and showing the
+        // same blocks; the rim, the north label and the coordinates keep their size.
+        private void Resize()
+        {
+            float scale = MinimapSettings.Scale;
+            if (scale == shownScale) return;
+
+            shownScale = scale;
+            float size = Mathf.Round(FrameSize * scale);
+            minimap.style.width = size;
+            frame.style.width = size;
+            frame.style.height = size;
+            var radius = new Length(size * 0.5f);
+            frame.style.borderTopLeftRadius = radius;
+            frame.style.borderTopRightRadius = radius;
+            frame.style.borderBottomLeftRadius = radius;
+            frame.style.borderBottomRightRadius = radius;
+            north.style.left = (size - NorthSize) * 0.5f;
         }
 
         private void Place(Texture2D texture, Transform player)

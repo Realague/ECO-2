@@ -5,7 +5,7 @@
 
     <!-- Minimap places the picture, the dots and the arrow, and fills in the position. -->
     <ui:VisualElement name="screen" class="screen minimap-screen" picking-mode="Ignore">
-        <ui:VisualElement class="minimap" picking-mode="Ignore">
+        <ui:VisualElement name="minimap" class="minimap" picking-mode="Ignore">
             <ui:VisualElement name="map-frame" class="minimap-frame" picking-mode="Ignore">
                 <ui:VisualElement name="map-image" class="map-image" picking-mode="Ignore" />
                 <ui:VisualElement name="map-claims" class="map-image" picking-mode="Ignore" />
@@ -13,7 +13,7 @@
                 <ui:VisualElement name="map-players" class="map-layer" picking-mode="Ignore" />
                 <vc:MapArrow name="map-arrow" class="map-arrow" />
             </ui:VisualElement>
-            <ui:Label text="N" class="minimap-north" picking-mode="Ignore" />
+            <ui:Label name="map-north" text="N" class="minimap-north" picking-mode="Ignore" />
             <ui:Label name="map-position" class="minimap-position" picking-mode="Ignore" />
         </ui:VisualElement>
     </ui:VisualElement>
