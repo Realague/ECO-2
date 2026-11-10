@@ -127,7 +127,7 @@ namespace Voxel.Core.Tests
         private static bool IsRock(ushort block)
         {
             ushort type = Blocks.TypeOf(block);
-            return type == Blocks.Granite || (type >= Blocks.Basalt && type <= Blocks.Slate) || (type >= Blocks.CoalOre && type <= Blocks.Flint);
+            return type == Blocks.Granite || (type >= Blocks.Basalt && type <= Blocks.Slate);
         }
 
         [Test]

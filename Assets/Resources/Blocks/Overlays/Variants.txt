@@ -1,0 +1,4 @@
+# The ores' overlays (BlockAtlas.Overlays), laid over the rock an ore lies in.
+# Variants as for the blocks' tiles: CoalOre.png, CoalOre_2.png...; "Name: w1 w2 w3" weighs them.
+# "rotate:" lists the overlays that turn and mirror at random, here on every face.
+rotate: CoalOre IronOre CopperOre TinOre GoldOre RockSalt Flint

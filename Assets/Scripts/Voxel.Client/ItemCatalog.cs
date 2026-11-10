@@ -60,6 +60,11 @@ namespace Voxel.Client
                 yield return tool;
             }
 
+            for (int ore = 1; ore <= Ores.Count; ore++)
+            {
+                yield return Items.Ore((OreKind)ore);
+            }
+
             for (int kind = 0; kind < Butchery.MeatKindCount; kind++)
             {
                 yield return Items.Meat((MeatKind)kind);
@@ -89,7 +94,7 @@ namespace Voxel.Client
             if (Items.IsSeed(item)) return ItemCategory.Seeds;
             if (Items.IsProduce(item) || Items.IsDish(item) || Items.IsMeat(item)) return ItemCategory.Food;
             if (Items.IsWood(item)) return ItemCategory.Wood;
-            return Items.IsCarcass(item) || item == Items.Straw || item == Items.Hide || item == Items.Bones || item == Items.Fat
+            return Items.IsCarcass(item) || item == Items.Straw || item == Items.Hide || item == Items.Bones || item == Items.Fat || Items.IsOre(item)
                 ? ItemCategory.Materials
                 : ItemCategory.Blocks;
         }
@@ -114,7 +119,7 @@ namespace Voxel.Client
             {
                 case ItemCategory.Seeds: return Loc.T("Seed");
                 case ItemCategory.Food: return Loc.T(Items.IsDish(item) ? "Dish" : Items.IsMeat(item) ? "Raw meat" : "Food");
-                case ItemCategory.Materials: return Loc.T(Items.IsCarcass(item) ? "Carcass" : "Material");
+                case ItemCategory.Materials: return Loc.T(Items.IsCarcass(item) ? "Carcass" : Items.IsOre(item) ? "Ore" : "Material");
                 case ItemCategory.Tools:
                     if (item == Items.Campfire || item == Items.ButcherTable || item == Items.CarpentryTable) return Loc.T("Station");
                     return Loc.T(item == Items.Arrow ? "Ammunition" : Items.IsStorage(item) ? "Storage" : item == Blocks.Torch ? "Light" : "Tool");
@@ -161,7 +166,7 @@ namespace Voxel.Client
             switch (item)
             {
                 case Items.Shovel: return Loc.T("Digs soft ground: dirt, grass, sand, gravel, clay, snow and mud, and digs up roots: beets, carrots and potatoes (right click on a ripe one). Hold it and left click.");
-                case Items.Pickaxe: return Loc.T("Breaks hard blocks: rock, ores and ice. Hold it and left click.");
+                case Items.Pickaxe: return Loc.T("Breaks hard blocks: rock and ice; a rock holding ore gives the ore too. Hold it and left click.");
                 case Items.Axe: return Loc.T("Fells trees and every plant that gives wood. Hold it and left click.");
                 case Items.Scythe: return Loc.T("Cuts grass, reeds and ferns, and harvests oats, wheat, maize, sunflowers and rice (right click on a ripe one). Other crops are picked by hand.");
                 case Items.Hoe: return Loc.T("Tills grass, dirt, mud or clay (right click): seeds only grow on tilled soil.");
@@ -185,6 +190,7 @@ namespace Voxel.Client
             if (Items.IsWood(item)) return WithPlant("From {2} once felled: each log on the ground gives three. Counted with the blocks, and kept on a stockpile.", Items.WoodSpecies(item), ecosystemSync);
             if (Items.IsCarcass(item)) return WithAnimal("The body of {2}, taken from the ground while at least half of it was left. Butcher it with a knife (right click it here) for half its meat, or on a butcher's table for all of it, with the hide, bones and fat.", Items.CarcassSpecies(item), ecosystemSync);
             if (Items.IsMeat(item)) return Loc.T("Raw: it is not eaten as it is. Cook it on a campfire.");
+            if (Items.IsOre(item)) return Loc.T("Found in rock: a block of rock holding it gives it, besides itself, when broken with a pickaxe. Kept in a chest.");
             if (item == Items.Straw) return Loc.T("Left over when wheat is harvested.");
             if (IsWoodBlock(item))
             {
@@ -239,6 +245,7 @@ namespace Voxel.Client
             if (item == Items.Bones) return "Bones";
             if (item == Items.Fat) return "Fat";
             if (Items.IsMeat(item)) return $"Meat_{Items.MeatKindOf(item)}";
+            if (Items.IsOre(item)) return $"Ore_{BlockAtlas.OverlayNames[(int)Items.OreKindOf(item) - 1]}";
             if (Dishes.TryGet(item, out Dish dish)) return $"Dish_{dish.Name.Replace(" ", "").Replace("'", "")}";
             if (item == Blocks.Torch) return "Torch";
             if (Items.IsTool(item)) return $"Tool_{Items.NameOf(item)}";

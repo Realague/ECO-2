@@ -357,10 +357,10 @@ namespace Voxel.Client
             int tool = ToolRules.ToBreak(type);
             if (tool != Items.None && !inventorySync.Owns(clientId, tool)) return false;
 
-            int drop = Items.DropOf(type);
-            if (inventorySync.RoomFor(clientId, drop) > 0) return true;
+            int unfitting = inventorySync.UnfittingDrop(clientId, type);
+            if (unfitting == Items.None) return true;
 
-            inventorySync.TellFull(clientId, InventorySync.ReasonFor(drop));
+            inventorySync.TellFull(clientId, InventorySync.ReasonFor(unfitting));
             return false;
         }
 

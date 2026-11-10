@@ -114,7 +114,7 @@ namespace Voxel.Core.Tests
         [TestCase(Blocks.Stone)]
         [TestCase(Blocks.Dirt)]
         [TestCase(Blocks.Sand)]
-        [TestCase(Blocks.IronOre)]
+        [TestCase(Blocks.Basalt)]
         public void DropOf_OtherBlocks_IsTheBlockItself(ushort block)
         {
             Assert.AreEqual((int)block, Items.DropOf(block));

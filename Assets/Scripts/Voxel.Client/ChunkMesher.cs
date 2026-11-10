@@ -17,6 +17,9 @@ namespace Voxel.Client
     // faces both are smooth: each corner takes the mean level of the four cells in front of the face
     // around that corner, leaving out opaque ones; the blocks' shader darkens by the first and adds
     // a warm glow by the second. Torches and doors are not meshed (TorchViews and DoorViews draw them).
+    // A rock holding an ore (Ores.OreOf) shows its own tile and carries the ore overlay's coordinates on
+    // the fourth texture coordinates, flagged by the blue of their vertex colour, which the shader
+    // lays over the rock.
     //
     // The work is done by a ChunkMeshBuilder, which only reads the world and the light: builders run
     // on worker threads (ChunkMeshing), each with its own buffers, and only ApplyTo touches the Mesh.
@@ -30,6 +33,9 @@ namespace Voxel.Client
 
         public const int FaceCount = 6;
         public const float UvInset = 0.01f;
+
+        // The texture coordinates of the ores' overlays (TEXCOORD3 in the blocks' shader).
+        public const int OverlayUvChannel = 3;
         // Height of a water surface open to the air, above the bottom of its block.
         public const float WaterSurface = 0.875f;
 
@@ -84,6 +90,13 @@ namespace Voxel.Client
         private readonly List<Vector3> vertices = new List<Vector3>();
         private readonly List<Vector3> normals = new List<Vector3>();
         private readonly List<Vector2> uvs = new List<Vector2>();
+
+        // The ores' overlays (BlockAtlas.Overlays) on the fourth texture coordinates: the place in the
+        // overlays' row on an ore's faces, which also have the blue of their vertex colour full (the
+        // flag the shader reads: a mesh without these coordinates may hand the shader anything for
+        // them, so they are never trusted alone). Filled up to the ore's faces only; the rest is zeros,
+        // added in ApplyTo; empty when the chunk shows no ore, and then the mesh has no such coordinates.
+        private readonly List<Vector2> overlayUvs = new List<Vector2>();
         private readonly List<Color32> colours = new List<Color32>();
         private readonly List<int> solidTriangles = new List<int>();
         private readonly List<int> waterTriangles = new List<int>();
@@ -99,8 +112,10 @@ namespace Voxel.Client
         // The light of torches for the chunk being built; null for none.
         private BlockLight glow;
 
-        // The tiles' variants for the chunk being built (BlockAtlas.Variants, read once per chunk).
+        // The tiles' variants and the ores' overlays for the chunk being built (BlockAtlas.Variants and
+        // Overlays, read once per chunk).
         private TileVariants variants = TileVariants.None;
+        private TileVariants overlays;
 
         // True when the last chunk built has no face to draw.
         public bool IsEmpty => vertices.Count == 0;
@@ -109,9 +124,11 @@ namespace Voxel.Client
         {
             glow = blockLight;
             variants = BlockAtlas.Variants;
+            overlays = BlockAtlas.Overlays;
             vertices.Clear();
             normals.Clear();
             uvs.Clear();
+            overlayUvs.Clear();
             colours.Clear();
             solidTriangles.Clear();
             waterTriangles.Clear();
@@ -146,6 +163,8 @@ namespace Voxel.Client
                             continue;
                         }
 
+                        // A rock holding an ore shows the ore's overlay over its own tile.
+                        OreKind ore = Ores.OreOf(block);
                         for (int face = 0; face < ChunkMesher.FaceCount; face++)
                         {
                             Vector3Int normal = ChunkMesher.FaceNormals[face];
@@ -154,6 +173,7 @@ namespace Voxel.Client
                             SampleFront(world, light, worldX + normal.x, worldY + normal.y, worldZ + normal.z, face);
                             AddFace(new Vector3(x, y, z), face, 1f, solidTriangles, true);
                             AddTileUvs(BlockAtlas.TileFor(block, face), worldX, worldY, worldZ, face);
+                            if (ore != OreKind.None) AddOverlayUvs((int)ore - 1, worldX, worldY, worldZ, face);
                         }
                     }
                 }
@@ -162,11 +182,18 @@ namespace Voxel.Client
 
         public void ApplyTo(Mesh mesh)
         {
-            mesh.Clear();
+            // The vertex layout too: a mesh that had overlay coordinates must lose them if this chunk has none.
+            mesh.Clear(false);
             mesh.indexFormat = vertices.Count > ushort.MaxValue ? IndexFormat.UInt32 : IndexFormat.UInt16;
             mesh.SetVertices(vertices);
             mesh.SetNormals(normals);
             mesh.SetUVs(0, uvs);
+            if (overlayUvs.Count > 0)
+            {
+                while (overlayUvs.Count < vertices.Count) overlayUvs.Add(Vector2.zero);
+                mesh.SetUVs(ChunkMesher.OverlayUvChannel, overlayUvs);
+            }
+
             mesh.SetColors(colours);
             mesh.subMeshCount = 2;
             mesh.SetTriangles(solidTriangles, ChunkMesher.SolidSubmesh);
@@ -603,6 +630,28 @@ namespace Voxel.Client
                 u = Mathf.Lerp(ChunkMesher.UvInset, 1f - ChunkMesher.UvInset, Mathf.Clamp01(u));
                 v = Mathf.Lerp(ChunkMesher.UvInset, 1f - ChunkMesher.UvInset, Mathf.Clamp01(v));
                 uvs.Add(new Vector2((slot + u) / variants.SlotCount, v));
+            }
+        }
+
+        // The overlay of this ore (its OreKind less one) on the face just added: a variant picked for that face,
+        // turned and mirrored on every face if the overlay rotates. Its hash is told apart from the
+        // rock's (the face counted past the six), so the two do not pick and turn alike.
+        private void AddOverlayUvs(int ore, int x, int y, int z, int face)
+        {
+            while (overlayUvs.Count < vertices.Count - 4) overlayUvs.Add(Vector2.zero);
+
+            int slot = overlays.Pick(ore, x, y, z, face + ChunkMesher.FaceCount, out int turn, out bool mirror, true);
+            for (int i = 0; i < 4; i++)
+            {
+                Vector2 corner = ChunkMesher.CornerUvs[(i + turn) & 3];
+                float u = Mathf.Lerp(ChunkMesher.UvInset, 1f - ChunkMesher.UvInset, mirror ? 1f - corner.x : corner.x);
+                float v = Mathf.Lerp(ChunkMesher.UvInset, 1f - ChunkMesher.UvInset, corner.y);
+                overlayUvs.Add(new Vector2((slot + u) / overlays.SlotCount, v));
+
+                int vertex = vertices.Count - 4 + i;
+                Color32 colour = colours[vertex];
+                colour.b = 255;
+                colours[vertex] = colour;
             }
         }
 

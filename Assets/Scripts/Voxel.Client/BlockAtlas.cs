@@ -105,6 +105,32 @@ namespace Voxel.Client
         // How many places the atlas has (base tiles and variants): texture coordinates are divided by it.
         public static int SlotCount => Variants.SlotCount;
 
+        // The ores' overlays (Ores): what a rock holding an ore shows over its own tile, one file per ore
+        // in Resources/Blocks/Overlays named as its tile (CoalOre.png…), transparent but for the ore,
+        // with variants as the tiles have (CoalOre_2.png…, weights and "rotate:" in a Variants.txt
+        // there; a rotating overlay turns on every face). Gathered by CreateOverlayTexture into a second
+        // row of tiles, which the blocks' shader lays over the rock (_OreOverlay, the meshes' fourth
+        // texture coordinates). The ore's own tile (CoalOre.png, the ore on grey stone) only paints the
+        // ore item's icon (ItemIconBuilder).
+        public const string OverlayFolder = ResourceFolder + "/Overlays";
+
+        public static readonly string[] OverlayNames = BuildOverlayNames();
+
+        private static TileVariants overlays;
+
+        internal static TileVariants Overlays
+        {
+            get => overlays ?? (overlays = TileVariants.Single(OverlayNames));
+            set => overlays = value;
+        }
+
+        private static string[] BuildOverlayNames()
+        {
+            var names = new string[Ores.Count];
+            for (int ore = 0; ore < Ores.Count; ore++) names[ore] = TileNames[CoalTile + ore];
+            return names;
+        }
+
         public static int TileFor(ushort block, int face)
         {
             ushort type = Blocks.TypeOf(block);
@@ -248,6 +274,61 @@ namespace Voxel.Client
             return texture;
         }
 
+        // The ores' overlays (Overlays), a row of tiles like the atlas with real transparency: its
+        // mipmaps average each pixel's four by their opacity, so a crystal's edge never darkens toward
+        // the colour of the transparent pixels around it. A missing file shows as a checkerboard.
+        public static Texture2D CreateOverlayTexture()
+        {
+            Overlays = TileVariants.FromResources(OverlayFolder, OverlayNames);
+            int slotCount = Overlays.SlotCount;
+            var colours = new Texture2D[slotCount];
+            int tileSize = MipTileSize;
+            for (int slot = 0; slot < slotCount; slot++)
+            {
+                colours[slot] = Load($"{OverlayFolder}/{Overlays.SlotName(slot)}", true);
+                if (colours[slot] != null) tileSize = Mathf.Max(tileSize, colours[slot].width, colours[slot].height);
+            }
+
+            tileSize = Mathf.NextPowerOfTwo(tileSize);
+            int mipCount = 1;
+            for (int size = tileSize; size > MipTileSize; size /= 2) mipCount++;
+
+            var texture = new Texture2D(slotCount * tileSize, tileSize, TextureFormat.RGBA32, mipCount, false)
+            {
+                name = "OreOverlays",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp
+            };
+
+            int width = slotCount * tileSize;
+            var level = new Color[width * tileSize];
+            for (int tile = 0; tile < slotCount; tile++)
+            {
+                for (int y = 0; y < tileSize; y++)
+                {
+                    for (int x = 0; x < tileSize; x++)
+                    {
+                        level[y * width + tile * tileSize + x] = colours[tile] != null
+                            ? Sample(colours[tile], x, y, tileSize)
+                            : ((x * 8 / tileSize + y * 8 / tileSize) % 2 == 0 ? MissingA : MissingB);
+                    }
+                }
+
+                if (colours[tile] != null) Resources.UnloadAsset(colours[tile]);
+            }
+
+            texture.SetPixels(level, 0);
+            for (int mip = 1; mip < mipCount; mip++)
+            {
+                level = HalveTiles(level, tileSize, slotCount, true);
+                tileSize /= 2;
+                texture.SetPixels(level, mip);
+            }
+
+            texture.Apply(false, true);
+            return texture;
+        }
+
         // A texture from Resources whose pixels can be read; a missing colour file is reported (a missing mask is not).
         private static Texture2D Load(string path, bool required)
         {
@@ -274,8 +355,9 @@ namespace Voxel.Client
             return texture.GetPixel(x * texture.width / tileSize, y * texture.height / tileSize);
         }
 
-        // The next mipmap level of a row of tiles of this size: each pixel the mean of the four under it.
-        private static Color[] HalveTiles(Color[] pixels, int tileSize, int slotCount)
+        // The next mipmap level of a row of tiles of this size: each pixel the mean of the four under it
+        // (their colours weighted by their opacity when byOpacity, for a texture with transparency).
+        private static Color[] HalveTiles(Color[] pixels, int tileSize, int slotCount, bool byOpacity = false)
         {
             int width = slotCount * tileSize;
             int half = tileSize / 2;
@@ -287,8 +369,18 @@ namespace Voxel.Client
                 {
                     int sourceX = x * 2;
                     int sourceY = y * 2;
-                    result[y * halfWidth + x] = (pixels[sourceY * width + sourceX] + pixels[sourceY * width + sourceX + 1]
-                        + pixels[(sourceY + 1) * width + sourceX] + pixels[(sourceY + 1) * width + sourceX + 1]) * 0.25f;
+                    Color a = pixels[sourceY * width + sourceX], b = pixels[sourceY * width + sourceX + 1];
+                    Color c = pixels[(sourceY + 1) * width + sourceX], d = pixels[(sourceY + 1) * width + sourceX + 1];
+                    if (!byOpacity)
+                    {
+                        result[y * halfWidth + x] = (a + b + c + d) * 0.25f;
+                        continue;
+                    }
+
+                    float opacity = a.a + b.a + c.a + d.a;
+                    Color colour = opacity > 0f ? (a * a.a + b * b.a + c * c.a + d * d.a) / opacity : Color.clear;
+                    colour.a = opacity * 0.25f;
+                    result[y * halfWidth + x] = colour;
                 }
             }
 
@@ -310,13 +402,6 @@ namespace Voxel.Client
             tiles[Blocks.Snow] = SnowTile;
             tiles[Blocks.Gravel] = GravelTile;
             tiles[Blocks.Clay] = ClayTile;
-            tiles[Blocks.CoalOre] = CoalTile;
-            tiles[Blocks.IronOre] = IronTile;
-            tiles[Blocks.CopperOre] = CopperTile;
-            tiles[Blocks.TinOre] = TinTile;
-            tiles[Blocks.GoldOre] = GoldTile;
-            tiles[Blocks.RockSalt] = SaltTile;
-            tiles[Blocks.Flint] = FlintTile;
             tiles[Blocks.Bedrock] = BedrockTile;
             tiles[Blocks.Mud] = MudTile;
             tiles[Blocks.TilledSoil] = DirtTile;

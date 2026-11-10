@@ -14,15 +14,64 @@ namespace Voxel.Client.Tests
         // It changes with what the terrain generator produces (TerrainGenerator.Version, like the
         // terrain fingerprints) or with the mesher's output (faces, light, atlas tiles): then copy the
         // new value from the failure message, saying why. Last changed when the wood blocks' 57 tiles
-        // made the atlas 81 tiles wide (every texture coordinate moved).
-        private const ulong ExpectedWorldMeshes = 0xA5A60C27902AE740UL;
+        // made the atlas 81 tiles wide (every texture coordinate moved), then when ores kept their host
+        // rock (Ores): their faces show the rock's tile, with their overlay's coordinates, now hashed too.
+        private const ulong ExpectedWorldMeshes = 0x8891A072371C7069UL;
 
-        // The meshes without texture variants (TileVariants): the pinned hash must not depend on which
-        // variant files are in Resources/Blocks, nor on whether the atlas was made in this session.
+        // The meshes without texture variants (TileVariants), for the tiles and the ores' overlays: the
+        // pinned hash must not depend on which variant files are in Resources/Blocks, nor on whether the
+        // atlas was made in this session.
         [SetUp]
         public void WithoutVariants()
         {
             BlockAtlas.Variants = TileVariants.None;
+            BlockAtlas.Overlays = TileVariants.Single(BlockAtlas.OverlayNames);
+        }
+
+        // A rock holding an ore shows its own tile, the ore's overlay on the fourth texture coordinates
+        // (its place in the overlays' row) and the blue of its vertex colour full (the shader's flag);
+        // the other blocks have neither.
+        [Test]
+        public void AnOre_ShowsItsRock_WithItsOverlay()
+        {
+            var world = new World(1, 1, 1);
+            world.SetBlock(4, 4, 4, Ores.Make(Blocks.Sandstone, OreKind.Iron));
+            world.SetBlock(10, 4, 4, Blocks.Granite);
+            var builder = new ChunkMeshBuilder();
+            var mesh = new Mesh();
+            try
+            {
+                builder.Build(world, new SkyLight(world), world.Chunks[0]);
+                builder.ApplyTo(mesh);
+                var uvs = new List<Vector2>();
+                var overlay = new List<Vector2>();
+                mesh.GetVertices(Vectors);
+                mesh.GetUVs(0, uvs);
+                mesh.GetUVs(ChunkMesher.OverlayUvChannel, overlay);
+                mesh.GetColors(Colours);
+                Assert.AreEqual(Vectors.Count, overlay.Count, "a coordinate for every vertex");
+
+                int ironPlace = (int)OreKind.Iron - 1;
+                int slots = BlockAtlas.Overlays.SlotCount;
+                for (int i = 0; i < Vectors.Count; i++)
+                {
+                    bool ore = Vectors[i].x < 7f;
+                    int tile = Mathf.FloorToInt(uvs[i].x * BlockAtlas.SlotCount);
+                    Assert.AreEqual(ore ? BlockAtlas.SandstoneTile : BlockAtlas.GraniteTile, tile, $"vertex {i}");
+                    Assert.AreEqual(ore ? 255 : 0, Colours[i].b, $"vertex {i}: the overlay's flag");
+                    if (!ore)
+                    {
+                        Assert.AreEqual(Vector2.zero, overlay[i], $"vertex {i}");
+                        continue;
+                    }
+
+                    Assert.That(overlay[i].x, Is.InRange((float)ironPlace / slots, (ironPlace + 1f) / slots), $"vertex {i}");
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(mesh);
+            }
         }
 
         [Test]
@@ -112,6 +161,8 @@ namespace Voxel.Client.Tests
             mesh.GetNormals(Vectors);
             foreach (Vector3 v in Vectors) hash = Mix(Mix(Mix(hash, Bits(v.x)), Bits(v.y)), Bits(v.z));
             mesh.GetUVs(0, Uvs);
+            foreach (Vector2 v in Uvs) hash = Mix(Mix(hash, Bits(v.x)), Bits(v.y));
+            mesh.GetUVs(ChunkMesher.OverlayUvChannel, Uvs);
             foreach (Vector2 v in Uvs) hash = Mix(Mix(hash, Bits(v.x)), Bits(v.y));
             mesh.GetColors(Colours);
             foreach (Color32 c in Colours) hash = Mix(hash, (ulong)(c.r | c.g << 8 | c.b << 16 | c.a << 24));

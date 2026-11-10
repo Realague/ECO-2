@@ -149,7 +149,8 @@ namespace Voxel.Core
             else if (geology.Marble && y < geology.CoverBottom + MarbleThickness) return Blocks.Marble;
             else host = geology.Cover;
 
-            return OreAt(column.X, y, column.Z, column.Ground - y, host, geology.Cold, column.Seed);
+            // The rock may hold an ore (Ores).
+            return Ores.Make(host, OreAt(column.X, y, column.Z, column.Ground - y, host, geology.Cold, column.Seed));
         }
 
         // Ores lie in clumps: the rock is cut into cells of 4 × 4 × 4 blocks, and a cell holds ore
@@ -157,10 +158,10 @@ namespace Voxel.Core
         // cell are ore. Sedimentary rocks hold coal, limestone flint near the surface, sandstone
         // rock salt; granite copper, tin in cold regions and gold deep down; basalt iron; and iron
         // is found a little everywhere. Chances are in 1/1024 per cell.
-        private static ushort OreAt(int x, int y, int z, int depth, ushort host, bool cold, uint seed)
+        private static OreKind OreAt(int x, int y, int z, int depth, ushort host, bool cold, uint seed)
         {
             uint cell = Hash(x >> 2, y >> 2, z >> 2, seed ^ OreSeedMask);
-            if ((Hash(x, y, z, seed ^ OreBlockSeedMask) & 3) == 0) return host;
+            if ((Hash(x, y, z, seed ^ OreBlockSeedMask) & 3) == 0) return OreKind.None;
 
             int roll = (int)(cell & 1023);
             int kindRoll = (int)((cell >> 10) & 1023);
@@ -169,21 +170,21 @@ namespace Voxel.Core
                 case Blocks.Limestone:
                 case Blocks.Sandstone:
                 case Blocks.Slate:
-                    if (host == Blocks.Limestone && depth < 10 && roll < 20) return Blocks.Flint;
-                    if (host == Blocks.Sandstone && depth >= 6 && roll < 18) return Blocks.RockSalt;
-                    if (depth >= 5 && roll >= 20 && roll < 50) return Blocks.CoalOre;
-                    if (roll >= 50 && roll < 60) return Blocks.IronOre;
-                    return host;
+                    if (host == Blocks.Limestone && depth < 10 && roll < 20) return OreKind.Flint;
+                    if (host == Blocks.Sandstone && depth >= 6 && roll < 18) return OreKind.RockSalt;
+                    if (depth >= 5 && roll >= 20 && roll < 50) return OreKind.Coal;
+                    if (roll >= 50 && roll < 60) return OreKind.Iron;
+                    return OreKind.None;
                 case Blocks.Granite:
-                    if (depth >= 25 && roll < 5) return Blocks.GoldOre;
-                    if (cold && roll >= 5 && roll < 17) return Blocks.TinOre;
-                    if (depth < 40 && roll >= 17 && roll < 37) return Blocks.CopperOre;
-                    if (roll >= 37 && roll < 47 + (kindRoll & 3)) return Blocks.IronOre;
-                    return host;
+                    if (depth >= 25 && roll < 5) return OreKind.Gold;
+                    if (cold && roll >= 5 && roll < 17) return OreKind.Tin;
+                    if (depth < 40 && roll >= 17 && roll < 37) return OreKind.Copper;
+                    if (roll >= 37 && roll < 47 + (kindRoll & 3)) return OreKind.Iron;
+                    return OreKind.None;
                 case Blocks.Basalt:
-                    return roll < 40 ? Blocks.IronOre : host;
+                    return roll < 40 ? OreKind.Iron : OreKind.None;
                 default:
-                    return host;
+                    return OreKind.None;
             }
         }
 

@@ -29,6 +29,8 @@ Leave it empty if the game has none.	Laissez vide si la partie n'en a pas.
 Join	Rejoindre
 Cancel	Annuler
 The game's texts change at once. Your choice is kept on this computer.	Les textes du jeu changent aussitôt. Votre choix est gardé sur cet ordinateur.
+Minimap size	Taille de la minimap
+The round map at the top right of the screen. It shows the same area at any size.	La carte ronde en haut à droite de l'écran. Elle montre la même zone à toutes les tailles.
 Players who join need it. Leave it empty for an open game. Players connect on UDP port {0}.	Les joueurs qui vous rejoignent en ont besoin. Laissez vide pour une partie ouverte. Les joueurs se connectent sur le port UDP {0}.
 Never saved: playing it makes a new world.	Jamais sauvegardé : y jouer crée un nouveau monde.
 Made by an older version: playing it makes a new world.	Créé par une version plus ancienne : y jouer crée un nouveau monde.
@@ -287,7 +289,7 @@ Sand	Sable
 Snow	Neige
 Gravel	Gravier
 Clay	Argile
-Coal ore	Minerai de charbon
+Coal	Charbon
 Iron ore	Minerai de fer
 Copper ore	Minerai de cuivre
 Tin ore	Minerai d'étain
@@ -311,7 +313,7 @@ Bow	Arc
 
 # Items: descriptions
 Digs soft ground: dirt, grass, sand, gravel, clay, snow and mud, and digs up roots: beets, carrots and potatoes (right click on a ripe one). Hold it and left click.	Creuse les sols meubles : terre, herbe, sable, gravier, argile, neige et boue, et déterre les racines : betteraves, carottes et pommes de terre (clic droit sur une culture mûre). En main, clic gauche.
-Breaks hard blocks: rock, ores and ice. Hold it and left click.	Casse les blocs durs : roche, minerais et glace. En main, clic gauche.
+Breaks hard blocks: rock and ice; a rock holding ore gives the ore too. Hold it and left click.	Casse les blocs durs : roche et glace ; une roche qui contient un minerai le donne aussi. En main, clic gauche.
 Fells trees and every plant that gives wood. Hold it and left click.	Abat les arbres et toutes les plantes qui donnent du bois. En main, clic gauche.
 Cuts grass, reeds and ferns, and harvests oats, wheat, maize, sunflowers and rice (right click on a ripe one). Other crops are picked by hand.	Coupe l'herbe, les roseaux et les fougères, et récolte l'avoine, le blé, le maïs, les tournesols et le riz (clic droit sur une culture mûre). Les autres cultures se cueillent à la main.
 Tills grass, dirt, mud or clay (right click): seeds only grow on tilled soil.	Laboure l'herbe, la terre, la boue ou l'argile (clic droit) : les graines ne poussent que sur la terre labourée.
@@ -659,3 +661,10 @@ Weight {0} kg / ∞	Poids {0} kg / ∞
 Flight on: you are flying. Space goes up, Shift down; double Space lands or takes off again.	Vol activé : vous volez. Espace monte, Maj descend ; double Espace pour atterrir ou redécoller.
 Flight off.	Vol désactivé.
 Usage: /fly, /fly on or /fly off	Usage : /fly, /fly on ou /fly off
+Players online	Joueurs en ligne
+{0} online	{0} en ligne
+(choosing a name)	(choisit son nom)
+Host	Hôte
+{0} ms	{0} ms
+Ore	Minerai
+Found in rock: a block of rock holding it gives it, besides itself, when broken with a pickaxe. Kept in a chest.	Se trouve dans la roche : un bloc de roche qui en contient le donne, en plus de lui-même, quand on le casse à la pioche. Se range dans un coffre.

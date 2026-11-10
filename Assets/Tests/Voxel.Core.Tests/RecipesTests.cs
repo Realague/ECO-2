@@ -33,7 +33,7 @@ namespace Voxel.Core.Tests
             Assert.IsTrue(stone.Matches(Blocks.Granite));
             Assert.IsTrue(stone.Matches(Blocks.Limestone));
             Assert.IsFalse(stone.Matches(Blocks.Dirt));
-            Assert.IsFalse(stone.Matches(Blocks.CoalOre), "ores are not stone");
+            Assert.IsFalse(stone.Matches(Items.Ore(OreKind.Coal)), "ores are not stone");
             Assert.IsFalse(stone.Matches(Items.None));
         }
 

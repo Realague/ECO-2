@@ -54,6 +54,10 @@ namespace Voxel.Core
         public const int Bones = 121;
         public const int Fat = 122;
 
+        // One item per ore (OreKind), what a rock holding it gives besides itself: FirstOre - 1 + the
+        // kind (coal 130 … flint 136). They were blocks 18 to 24 before (Upgrade).
+        private const int FirstOre = 130;
+
         // One seed per plant species: FirstSeed + index of the species.
         public const int MaxSeedSpecies = 100;
         private const int FirstSeed = 200;
@@ -83,7 +87,13 @@ namespace Voxel.Core
 
         public static int OfBlock(ushort block) => Blocks.TypeOf(block);
 
-        public static bool IsBlock(int item) => item > Blocks.Air && item <= Blocks.LastType && !Blocks.IsRetired((ushort)item);
+        public static bool IsBlock(int item) => item > Blocks.Air && item <= Blocks.LastType && !Blocks.IsRetired((ushort)item) && !Ores.IsFormerBlock(item);
+
+        public static int Ore(OreKind ore) => FirstOre - 1 + (int)ore;
+
+        public static bool IsOre(int item) => item >= FirstOre && item < FirstOre + Ores.Count;
+
+        public static OreKind OreKindOf(int item) => IsOre(item) ? (OreKind)(item - FirstOre + 1) : OreKind.None;
 
         // An item of an earlier version that no longer exists (the crafted blocks): saved
         // inventories lose it instead of being refused.
@@ -127,16 +137,22 @@ namespace Voxel.Core
 
         public static MeatKind MeatKindOf(int item) => (MeatKind)(item - FirstMeat);
 
-        // What an item read from a save of an earlier version is now (the one wood became oak wood).
-        public static int Upgrade(int item) => item == LegacyWood ? WoodOf(OakSpecies) : item;
+        // What an item read from a save of an earlier version is now (the one wood became oak wood, the
+        // ore blocks ores).
+        public static int Upgrade(int item)
+        {
+            if (item == LegacyWood) return WoodOf(OakSpecies);
+            return Ores.IsFormerBlock(item) ? Ore((OreKind)(item - Ores.FirstFormerBlock + 1)) : item;
+        }
 
         public static bool IsTool(int item) => item >= FirstTool && item <= LastTool;
 
         public static bool IsValid(int item) =>
             IsBlock(item) || IsWood(item) || item == Straw || item == Arrow || IsStorage(item) || IsTool(item) || IsSeed(item) || IsProduce(item) || IsCarcass(item)
-            || (IsDish(item) && DishIndex(item) < Dishes.All.Count) || IsMeat(item) || item == Hide || item == Bones || item == Fat;
+            || (IsDish(item) && DishIndex(item) < Dishes.All.Count) || IsMeat(item) || item == Hide || item == Bones || item == Fat || IsOre(item);
 
-        // What a broken block yields. Grass and tilled soil cannot be picked up: they give dirt.
+        // What a broken block yields (besides the ore a rock holds, Ores). Grass and tilled soil
+        // cannot be picked up: they give dirt.
         public static int DropOf(ushort block)
         {
             ushort type = Blocks.TypeOf(block);
@@ -162,13 +178,6 @@ namespace Voxel.Core
                 case Blocks.Snow: return "Snow";
                 case Blocks.Gravel: return "Gravel";
                 case Blocks.Clay: return "Clay";
-                case Blocks.CoalOre: return "Coal ore";
-                case Blocks.IronOre: return "Iron ore";
-                case Blocks.CopperOre: return "Copper ore";
-                case Blocks.TinOre: return "Tin ore";
-                case Blocks.GoldOre: return "Gold ore";
-                case Blocks.RockSalt: return "Rock salt";
-                case Blocks.Flint: return "Flint";
                 case Blocks.Bedrock: return "Bedrock";
                 case Blocks.Mud: return "Mud";
                 case Blocks.TilledSoil: return "Tilled soil";
@@ -196,6 +205,7 @@ namespace Voxel.Core
                 default:
                     if (Dishes.TryGet(item, out Dish dish)) return dish.Name;
                     if (IsMeat(item)) return Butchery.MeatName(MeatKindOf(item));
+                    if (IsOre(item)) return Ores.NameOf(OreKindOf(item));
                     if (item > 0 && item <= ushort.MaxValue && WoodBlocks.IsPlanks((ushort)item)) return "Planks";
                     if (item > 0 && item <= ushort.MaxValue && WoodBlocks.IsLog((ushort)item)) return "Log";
                     return IsSeed(item) ? "Seed" : IsProduce(item) ? "Crop" : IsWood(item) ? "Wood" : IsCarcass(item) ? "Carcass" : "Unknown item";

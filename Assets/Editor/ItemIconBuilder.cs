@@ -48,6 +48,15 @@ public static class ItemIconBuilder
             written++;
         }
 
+        // The ores (items, not blocks): a lump of each.
+        for (int ore = 1; ore <= Ores.Count; ore++)
+        {
+            Texture2D lump = OreIcon((OreKind)ore);
+            Write($"Ore_{BlockAtlas.OverlayNames[ore - 1]}", lump);
+            UnityEngine.Object.DestroyImmediate(lump);
+            written++;
+        }
+
         var renderer = new PreviewRenderer();
         try
         {
@@ -242,6 +251,104 @@ public static class ItemIconBuilder
         icon.SetPixels32(pixels);
         icon.Apply();
         return icon;
+    }
+
+    // An ore: a lump of rock cut from its own tile (the ore's crystals in their stone), in facets
+    // from a peak toward the upper left, each lit by how it faces the light there, outlined in dark
+    // brown over a soft shadow. Its outline is the same every time (seeded by the ore).
+    private static Texture2D OreIcon(OreKind ore)
+    {
+        Color32[] tile = Tile(BlockAtlas.CoalTile + (int)ore - 1, out int size, false);
+        var random = new System.Random(7919 * (int)ore);
+        var centre = new Vector2(IconSize * 0.5f, IconSize * 0.48f);
+        const int corners = 9;
+        var outline = new Vector2[corners];
+        for (int i = 0; i < corners; i++)
+        {
+            float angle = (i + (float)random.NextDouble() * 0.5f - 0.25f) * Mathf.PI * 2f / corners;
+            float reach = 0.82f + 0.18f * (float)random.NextDouble();
+            outline[i] = centre + new Vector2(Mathf.Cos(angle) * 48f, Mathf.Sin(angle) * 38f) * reach;
+        }
+
+        Vector2 peak = centre + new Vector2(-9f, 8f);
+        var light = new Vector2(-1f, 1f).normalized;
+        var shadowColour = new Color32(0, 0, 0, 60);
+        var edgeColour = new Color32(46, 34, 26, 255);
+        var pixels = new Color32[IconSize * IconSize];
+        var inside = new bool[IconSize * IconSize];
+        for (int y = 0; y < IconSize; y++)
+        {
+            for (int x = 0; x < IconSize; x++)
+            {
+                var point = new Vector2(x + 0.5f, y + 0.5f);
+                for (int i = 0; i < corners; i++)
+                {
+                    Vector2 a = outline[i], b = outline[(i + 1) % corners];
+                    if (!InTriangle(point, peak, a, b)) continue;
+
+                    // The facet's slope runs from the peak to its edge: lit where it faces the light.
+                    Vector2 slope = ((a + b) * 0.5f - peak).normalized;
+                    float shade = Mathf.Clamp(0.78f + 0.32f * Vector2.Dot(slope, light), 0.5f, 1.12f);
+                    Color32 colour = Sample(tile, size, (x % size) / (float)size, (y % size) / (float)size, Mathf.Min(shade, 1f));
+                    if (shade > 1f)
+                    {
+                        float lift = shade - 1f;
+                        colour = Color32.Lerp(colour, new Color32(255, 255, 255, 255), lift);
+                    }
+
+                    colour.a = 255;
+                    pixels[x + IconSize * y] = colour;
+                    inside[x + IconSize * y] = true;
+                    break;
+                }
+            }
+        }
+
+        // The outline, two pixels wide, then the shadow under the lump where nothing is drawn.
+        var result = (Color32[])pixels.Clone();
+        for (int y = 0; y < IconSize; y++)
+        {
+            for (int x = 0; x < IconSize; x++)
+            {
+                int index = x + IconSize * y;
+                bool edge = false;
+                for (int dy = -2; dy <= 2 && !edge; dy++)
+                {
+                    for (int dx = -2; dx <= 2 && !edge; dx++)
+                    {
+                        int nx = x + dx, ny = y + dy;
+                        bool neighbourInside = nx >= 0 && ny >= 0 && nx < IconSize && ny < IconSize && inside[nx + IconSize * ny];
+                        if (inside[index] != neighbourInside && dx * dx + dy * dy <= 4) edge = true;
+                    }
+                }
+
+                if (edge && inside[index]) result[index] = edgeColour;
+                else if (!inside[index])
+                {
+                    if (edge) result[index] = edgeColour;
+                    else
+                    {
+                        Vector2 below = new Vector2(x + 0.5f, y + 0.5f) - (centre + new Vector2(4f, -30f));
+                        if ((below.x * below.x) / (52f * 52f) + (below.y * below.y) / (14f * 14f) < 1f) result[index] = shadowColour;
+                    }
+                }
+            }
+        }
+
+        var icon = new Texture2D(IconSize, IconSize, TextureFormat.RGBA32, false);
+        icon.SetPixels32(result);
+        icon.Apply();
+        return icon;
+    }
+
+    private static bool InTriangle(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
+    {
+        float d1 = (p.x - b.x) * (a.y - b.y) - (a.x - b.x) * (p.y - b.y);
+        float d2 = (p.x - c.x) * (b.y - c.y) - (b.x - c.x) * (p.y - c.y);
+        float d3 = (p.x - a.x) * (c.y - a.y) - (c.x - a.x) * (p.y - a.y);
+        bool negative = d1 < 0f || d2 < 0f || d3 < 0f;
+        bool positive = d1 > 0f || d2 > 0f || d3 > 0f;
+        return !(negative && positive);
     }
 
     // Whether point lies in the parallelogram origin + u * a + v * b (u, v in 0..1).

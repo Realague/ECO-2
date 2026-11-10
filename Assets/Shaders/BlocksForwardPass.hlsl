@@ -1,7 +1,7 @@
 // The forward pass of the blocks: URP's LitForwardPass.hlsl (render-pipelines.universal 17,
-// Unity 6000.6) with two changes: the pixels the block atlas marks as tinted (alpha below 1:
-// grass) take the colour of the climate where they stand, and the vertices' sky light darkens
-// what is out of the sky's reach. To update for another
+// Unity 6000.6) with these changes: the pixels the block atlas marks as tinted (alpha below 1:
+// grass) take the colour of the climate where they stand, an ore's overlay is laid over its rock,
+// and the vertices' sky light darkens what is out of the sky's reach. To update for another
 // URP version, copy LitForwardPass.hlsl again and reapply the parts marked "ECO".
 #ifndef ECO_BLOCKS_FORWARD_PASS_INCLUDED
 #define ECO_BLOCKS_FORWARD_PASS_INCLUDED
@@ -44,6 +44,14 @@ half TorchGlow(half torchLight)
 
 static const half3 TorchColour = half3(0.95h, 0.6h, 0.3h);
 
+// ECO: the ores' overlays (BlockAtlas.CreateOverlayTexture, set by VoxelWorld), a row of tiles with
+// real transparency laid over the rock an ore lies in. An ore's faces carry their place in it on the
+// fourth texture coordinates and a full blue in their vertex colour (ChunkMesher); only that blue is
+// trusted, since a mesh without those coordinates may hand the shader anything for them (the
+// atlas's own coordinates were seen there, which laid overlays on grass).
+TEXTURE2D(_OreOverlay);
+SAMPLER(sampler_OreOverlay);
+
 #if defined(LOD_FADE_CROSSFADE)
     #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/LODCrossFade.hlsl"
 #endif
@@ -66,7 +74,8 @@ struct Attributes
     float2 texcoord     : TEXCOORD0;
     float2 staticLightmapUV   : TEXCOORD1;
     float2 dynamicLightmapUV  : TEXCOORD2;
-    half4 color               : COLOR; // ECO: r is the sky light, g the torches'
+    float2 overlayUV          : TEXCOORD3; // ECO: an ore's overlay, its place (only where color.b is full)
+    half4 color               : COLOR; // ECO: r is the sky light, g the torches', b full on an ore's faces
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
@@ -83,7 +92,7 @@ struct Varyings
     half4 tangentWS                : TEXCOORD3;    // xyz: tangent, w: sign
 #endif
 
-    half2 voxelLight                : TEXCOORD4; // ECO: x the sky light, y the torches'
+    float4 voxelLight               : TEXCOORD4; // ECO: x the sky light, y the torches', zw an ore's overlay
 
 #ifdef _ADDITIONAL_LIGHTS_VERTEX
     half4 fogFactorAndVertexLight   : TEXCOORD5; // x: fogFactor, yzw: vertex light
@@ -223,7 +232,8 @@ Varyings LitPassVertex(Attributes input)
     #endif
 
     output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
-    output.voxelLight = input.color.rg; // ECO
+    // ECO: the overlay's place on an ore's faces, below zero (none) everywhere else.
+    output.voxelLight = float4(input.color.rg, input.color.b > 0.5h ? input.overlayUV : float2(-1.0, -1.0));
 
     // already normalized from normal transform to WS.
     output.normalWS = normalInput.normalWS;
@@ -293,6 +303,12 @@ void LitPassFragment(
     // ECO: tinted pixels take the climate's colour; the others keep the atlas's.
     half tinted = 1.0h - SampleAlbedoAlpha(input.uv, TEXTURE2D_ARGS(_BaseMap, sampler_BaseMap)).a;
     surfaceData.albedo *= lerp(half3(1.0h, 1.0h, 1.0h), ClimateTintAt(input.positionWS), tinted);
+
+    // ECO: an ore's crystals over the rock it lies in (sampled everywhere, outside any branch, so its
+    // mipmap level comes from the pixels' neighbours; nothing shows where there is no overlay).
+    half4 ore = SAMPLE_TEXTURE2D(_OreOverlay, sampler_OreOverlay, input.voxelLight.zw);
+    ore.a *= step(0.0, input.voxelLight.z);
+    surfaceData.albedo = lerp(surfaceData.albedo, ore.rgb * _BaseColor.rgb, ore.a);
 #if !defined(_SURFACE_TYPE_TRANSPARENT)
     // The atlas's alpha is the tint mask, not transparency. Transparent materials (the water, which
     // has no atlas) keep their own alpha.

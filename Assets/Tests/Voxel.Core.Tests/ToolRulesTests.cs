@@ -12,7 +12,7 @@ namespace Voxel.Core.Tests
                 Assert.AreEqual(Items.Shovel, ToolRules.ToBreak(soft), Items.NameOf(soft));
             }
 
-            foreach (ushort hard in new[] { Blocks.Granite, Blocks.Basalt, Blocks.Limestone, Blocks.Marble, Blocks.CoalOre, Blocks.GoldOre, Blocks.Ice })
+            foreach (ushort hard in new[] { Blocks.Granite, Blocks.Basalt, Blocks.Limestone, Blocks.Marble, Ores.Make(Blocks.Slate, OreKind.Coal), Ores.Make(Blocks.Granite, OreKind.Gold), Blocks.Ice })
             {
                 Assert.AreEqual(Items.Pickaxe, ToolRules.ToBreak(hard), Items.NameOf(hard));
             }

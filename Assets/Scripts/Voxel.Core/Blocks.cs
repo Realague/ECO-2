@@ -1,8 +1,8 @@
 namespace Voxel.Core
 {
     // A block fits in two bytes: 8 bits of type (low bits; types stay below 100, where the item
-    // ranges begin), 4 bits of variant (only a wood block's shape uses it, Shapes), 4 bits of
-    // orientation. The variant bits were part of the type before; no type ever reached them, so every
+    // ranges begin), 4 bits of variant (a wood block's shape, Shapes; the ore a rock holds, Ores), 4
+    // bits of orientation. The variant bits were part of the type before; no type ever reached them, so every
     // saved block reads the same.
     public static class Blocks
     {
@@ -37,14 +37,9 @@ namespace Voxel.Core
         public const ushort Gravel = 16;
         public const ushort Clay = 17;
 
-        // Ores and other resources found in the rock.
-        public const ushort CoalOre = 18;
-        public const ushort IronOre = 19;
-        public const ushort CopperOre = 20;
-        public const ushort TinOre = 21;
-        public const ushort GoldOre = 22;
-        public const ushort RockSalt = 23;
-        public const ushort Flint = 24;
+        // Types 18 to 24 were the ores (coal, iron, copper, tin, gold, rock salt, flint): they are now
+        // held by rock blocks and given as items (Ores), and a save's block of those types is read as
+        // its rock holding the ore (Ores.UpgradeBlock). They are no longer valid blocks.
 
         // The bottom of the world: it cannot be broken.
         public const ushort Bedrock = 25;
@@ -147,11 +142,12 @@ namespace Voxel.Core
 
         // A block received from the network is only accepted if its type exists. Only torches
         // (Torches.Standing, or the side they hang on), doors (any of the 16) and wood blocks (their
-        // shape, Shapes, with its variant) are oriented.
+        // shape, Shapes, with its variant) are oriented; a rock keeps the ore it holds in its variant.
         public static bool IsValid(ushort block)
         {
-            if (TypeOf(block) > LastType || IsRetired(block)) return false;
+            if (TypeOf(block) > LastType || IsRetired(block) || Ores.IsFormerBlock(TypeOf(block))) return false;
             if (Shapes.HasShapes(block)) return Shapes.IsValidCode(block);
+            if (Ores.CanHold(block)) return Ores.IsValidCode(block);
 
             return VariantOf(block) == 0 && OrientationOf(block) <= LastOrientationOf(block);
         }

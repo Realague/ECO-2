@@ -26,7 +26,11 @@ namespace Voxel.Client
         private readonly bool[] rotates;
 
         // Every base tile alone, none turned: what the meshes show before the atlas is made (and in tests).
-        public static readonly TileVariants None = new TileVariants(BlockAtlas.TileNames, new Dictionary<int, int>(), new Dictionary<string, int[]>(), new HashSet<string>());
+        public static readonly TileVariants None = Single(BlockAtlas.TileNames);
+
+        // These tiles alone, none turned.
+        public static TileVariants Single(string[] tileNames) =>
+            new TileVariants(tileNames, new Dictionary<int, int>(), new Dictionary<string, int[]>(), new HashSet<string>());
 
         private TileVariants(string[] tileNames, Dictionary<int, int> variantCounts, Dictionary<string, int[]> weights, HashSet<string> rotated)
         {
@@ -82,13 +86,14 @@ namespace Voxel.Client
         public static string VariantName(string tileName, int number) => $"{tileName}_{number}";
 
         // The slot a face of the block at (x, y, z) shows for this base tile, and how its texture turns:
-        // quarter turns and a mirror, only on the top and bottom of a tile that rotates.
-        public int Pick(int tile, int x, int y, int z, int face, out int turn, out bool mirror)
+        // quarter turns and a mirror, only on the top and bottom of a tile that rotates, or on every
+        // face (everyFace: an ore's crystals, which have no way up).
+        public int Pick(int tile, int x, int y, int z, int face, out int turn, out bool mirror, bool everyFace = false)
         {
             uint hash = Hash(x, y, z, face);
             turn = 0;
             mirror = false;
-            if (rotates[tile] && (face == ChunkMesher.TopFace || face == ChunkMesher.BottomFace))
+            if (rotates[tile] && (everyFace || face == ChunkMesher.TopFace || face == ChunkMesher.BottomFace))
             {
                 turn = (int)(hash >> 24) & 3;
                 mirror = ((hash >> 26) & 1) != 0;
@@ -120,16 +125,19 @@ namespace Voxel.Client
         }
 
         // The variants found in Resources/Blocks and their weights (main thread: Resources).
-        public static TileVariants FromResources()
+        public static TileVariants FromResources() => FromResources(BlockAtlas.ResourceFolder, BlockAtlas.TileNames);
+
+        // The variants of these tiles found in a folder under Resources, with the weights file there if any.
+        public static TileVariants FromResources(string folder, string[] tileNames)
         {
-            var weightsAsset = Resources.Load<TextAsset>($"{BlockAtlas.ResourceFolder}/{WeightsFile}");
+            var weightsAsset = Resources.Load<TextAsset>($"{folder}/{WeightsFile}");
             string text = weightsAsset != null ? weightsAsset.text : "";
             if (weightsAsset != null) Resources.UnloadAsset(weightsAsset);
 
             var problems = new List<string>();
-            TileVariants variants = Parse(BlockAtlas.TileNames, name =>
+            TileVariants variants = Parse(tileNames, name =>
             {
-                var texture = Resources.Load<Texture2D>($"{BlockAtlas.ResourceFolder}/{name}");
+                var texture = Resources.Load<Texture2D>($"{folder}/{name}");
                 if (texture == null) return false;
 
                 Resources.UnloadAsset(texture);
@@ -138,7 +146,7 @@ namespace Voxel.Client
 
             foreach (string problem in problems)
             {
-                Debug.LogWarning($"Block texture variants (Resources/{BlockAtlas.ResourceFolder}/{WeightsFile}.txt): {problem}");
+                Debug.LogWarning($"Block texture variants (Resources/{folder}/{WeightsFile}.txt): {problem}");
             }
 
             return variants;

@@ -49,6 +49,9 @@ namespace Voxel.Client
         private ChunkMeshBuilder builder;
         private Material materialInstance;
         private Texture2D atlas;
+
+        // The ores' overlays (BlockAtlas.CreateOverlayTexture), the global texture _OreOverlay of the blocks' shader.
+        private Texture2D oreOverlays;
         private SkyLight skyLight;
         private BlockLight blockLight;
         private TorchViews torchViews;
@@ -70,6 +73,8 @@ namespace Voxel.Client
 
             atlas = BlockAtlas.CreateTexture();
             materialInstance = new Material(blockMaterial) { mainTexture = atlas };
+            oreOverlays = BlockAtlas.CreateOverlayTexture();
+            Shader.SetGlobalTexture("_OreOverlay", oreOverlays);
             Shader.SetGlobalFloat("_DarkestSkyLight", darkestSkyLight);
             if (torchWoodMaterial != null && torchHeadMaterial != null && torchFlameMaterial != null)
             {
@@ -132,6 +137,7 @@ namespace Voxel.Client
             Unload();
             Destroy(materialInstance);
             Destroy(atlas);
+            Destroy(oreOverlays);
         }
 
         // Server world: read from the save in the given folder, with its own seed and size, or

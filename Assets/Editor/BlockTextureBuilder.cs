@@ -32,16 +32,23 @@ namespace Voxel.EditorTools
 
         // The natural blocks' tiles painted with variants (TileVariants: Name_2.png, Name_3.png), the same
         // rules drawn from another seed, and their weights: the base file twice as often as each variant.
-        // Ice (its cracks are fixed), tilled soil (its furrows) and wood are left as they are.
+        // Ice (its cracks are fixed), tilled soil (its furrows) and wood are left as they are. Ores are
+        // drawn as their rock with an overlay (Ores), whose variants are painted apart (Overlays): their
+        // own tiles are only their items' icons, and need none.
         private const int PaintedVariants = 3;
         private const string VariantWeights = "2 1 1";
 
         private static readonly int[] VariedTiles =
         {
             GraniteTile, DirtTile, GrassTopTile, GrassSideTile, BasaltTile, LimestoneTile, MarbleTile, SandstoneTile,
-            SlateTile, SandTile, SnowTile, GravelTile, ClayTile, CoalTile, IronTile, CopperTile, TinTile, GoldTile,
-            SaltTile, FlintTile, BedrockTile, MudTile
+            SlateTile, SandTile, SnowTile, GravelTile, ClayTile, BedrockTile, MudTile
         };
+
+        private const string OverlayFolder = "Assets/Resources/" + BlockAtlas.OverlayFolder;
+
+        // The shadow an ore's crystal casts on the rock below and to the right of it (the light comes
+        // from the upper left), so it sits in any rock: this dark, at this opacity.
+        private static readonly Color CrystalShadow = new Color(0.05f, 0.04f, 0.04f, 0.45f);
 
         // The tiles whose top and bottom turn at random: soils and snow, whose grain has no way up.
         private static readonly int[] RotatedTiles = { GrassTopTile, DirtTile, SandTile, SnowTile, GravelTile, ClayTile, MudTile };
@@ -76,12 +83,36 @@ namespace Voxel.EditorTools
                 }
             }
 
+            // The ores' overlays: the crystals of each ore's own tile alone, and two variants.
+            Directory.CreateDirectory(OverlayFolder);
+            for (int ore = 0; ore < Voxel.Core.Ores.Count; ore++)
+            {
+                int tile = CoalTile + ore;
+                for (int number = 1; number <= PaintedVariants; number++)
+                {
+                    variantSeed = number == 1 ? 0 : number * 7919;
+                    string name = number == 1 ? OverlayNames[ore] : TileVariants.VariantName(OverlayNames[ore], number);
+                    string path = $"{OverlayFolder}/{name}.png";
+                    if (File.Exists(path)) continue;
+
+                    WritePng(path, (x, y) => OverlayColour(tile, x, y), true);
+                    written.Add("Overlays/" + name);
+                }
+            }
+
             variantSeed = 0;
             string weightsPath = $"{Folder}/{TileVariants.WeightsFile}.txt";
             if (!File.Exists(weightsPath))
             {
                 File.WriteAllText(weightsPath, DefaultWeights());
                 written.Add(TileVariants.WeightsFile + ".txt");
+            }
+
+            string overlayWeightsPath = $"{OverlayFolder}/{TileVariants.WeightsFile}.txt";
+            if (!File.Exists(overlayWeightsPath))
+            {
+                File.WriteAllText(overlayWeightsPath, DefaultOverlayWeights());
+                written.Add("Overlays/" + TileVariants.WeightsFile + ".txt");
             }
 
             AssetDatabase.Refresh();
@@ -114,9 +145,27 @@ namespace Voxel.EditorTools
             return text.ToString();
         }
 
+        // The ores' overlays' weights file: the variants as often as the base file, every overlay
+        // turning and mirroring at random (on every face of an ore).
+        private static string DefaultOverlayWeights()
+        {
+            var text = new System.Text.StringBuilder();
+            text.AppendLine("# The ores' overlays (BlockAtlas.Overlays), laid over the rock an ore lies in.");
+            text.AppendLine("# Variants as for the blocks' tiles: CoalOre.png, CoalOre_2.png...; \"Name: w1 w2 w3\" weighs them.");
+            text.AppendLine("# \"rotate:\" lists the overlays that turn and mirror at random, here on every face.");
+            text.Append("rotate:");
+            foreach (string name in OverlayNames)
+            {
+                text.Append(' ').Append(name);
+            }
+
+            text.AppendLine();
+            return text.ToString();
+        }
+
         private delegate Color Pixel(int x, int y);
 
-        private static void WritePng(string path, Pixel pixel)
+        private static void WritePng(string path, Pixel pixel, bool transparent = false)
         {
             var texture = new Texture2D(TileSize, TileSize, TextureFormat.RGBA32, false);
             for (int y = 0; y < TileSize; y++)
@@ -124,7 +173,7 @@ namespace Voxel.EditorTools
                 for (int x = 0; x < TileSize; x++)
                 {
                     Color colour = pixel(x, y);
-                    colour.a = 1f;
+                    if (!transparent) colour.a = 1f;
                     texture.SetPixel(x, y, colour);
                 }
             }

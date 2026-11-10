@@ -286,6 +286,27 @@ namespace Voxel.EditorTools
             return 0.15f + 0.85f * Clamp01((cell.F2 - cell.F1) / 3.5f);
         }
 
+        // An ore's overlay pixel: its crystals as its own tile paints them, transparent elsewhere but
+        // for the shadow a crystal casts on the rock below and to the right of it.
+        private static Color OverlayColour(int tile, int x, int y)
+        {
+            if (IsCrystal(tile, x, y)) return PaintedColour(tile, x, y);
+            return IsCrystal(tile, x - 1, y + 1) ? CrystalShadow : Color.clear;
+        }
+
+        // Whether this pixel of an ore's tile is the ore, not the rock around it (wrapping around the tile).
+        private static bool IsCrystal(int tile, int x, int y)
+        {
+            x = Wrap(x);
+            y = Wrap(y);
+            switch (tile)
+            {
+                case SaltTile: return CrystalDome(tile, x, y, out _) > 0f;
+                case FlintTile: return NoduleDome(tile, x, y) > 0f;
+                default: return OreCrystal(tile, x, y, out _) > 0f;
+            }
+        }
+
         // Rock salt: rosy rock with white cubic crystals in it.
         private static Color SaltColour(int tile, int x, int y, float light)
         {

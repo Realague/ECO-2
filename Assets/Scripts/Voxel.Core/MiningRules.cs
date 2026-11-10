@@ -30,13 +30,19 @@ namespace Voxel.Core
         // The wood a log lying on the ground gives when picked up.
         public const int WoodPerLog = 3;
 
-        // Hits a block takes to break, by hardness; 0 for one that cannot be broken.
+        // Hits a block takes to break, by hardness; 0 for one that cannot be broken. A rock holding an
+        // ore takes the more of its own and the ore's (Ores.Hardness).
         public static int HitsToBreak(ushort block)
         {
             if (!Blocks.IsBreakable(block)) return 0;
             // A hammer takes what was built back at once.
             if (Blocks.IsConstruction(block)) return 1;
 
+            return Math.Max(RockHits(block), Ores.Hardness(Ores.OreOf(block)));
+        }
+
+        private static int RockHits(ushort block)
+        {
             switch (Blocks.TypeOf(block))
             {
                 case Blocks.Dirt:
@@ -54,17 +60,9 @@ namespace Voxel.Core
                 case Blocks.Limestone:
                 case Blocks.Sandstone:
                 case Blocks.Slate:
-                case Blocks.RockSalt:
                     return 3;
-                case Blocks.CoalOre:
-                case Blocks.IronOre:
-                case Blocks.CopperOre:
-                case Blocks.TinOre:
-                    return 5;
-                case Blocks.GoldOre:
-                    return 6;
                 default:
-                    // Granite, marble, basalt, flint.
+                    // Granite, marble, basalt.
                     return 4;
             }
         }

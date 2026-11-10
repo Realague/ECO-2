@@ -73,6 +73,10 @@ namespace Voxel.Client
             ushort block = world.GetBlock(hit.Block);
             string blockName = ItemCatalog.NameOf(Blocks.TypeOf(block), ecosystemSync);
             if (Shapes.IsShaped(block)) blockName += " · " + BuildingHud.NameOf(Shapes.ShapeOf(block));
+
+            // A rock holding an ore names it: "Granite · Iron ore".
+            OreKind ore = Ores.OreOf(block);
+            if (ore != OreKind.None) blockName += " · " + ItemCatalog.NameOf(Items.Ore(ore), ecosystemSync);
             return OnLand(WithTool(blockName, ToolRules.ToBreak(block)), hit.Block.X, hit.Block.Z);
         }
 

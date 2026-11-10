@@ -181,15 +181,18 @@ namespace Voxel.Client
             int tool = ToolRules.ToBreak(previous);
             if (tool != Items.None && !inventorySync.Owns(clientId, tool)) return false;
 
-            int drop = Items.DropOf(previous);
-            if (inventorySync.RoomFor(clientId, drop) <= 0)
+            // The block and the ore a rock holds, together: both must fit.
+            int unfitting = inventorySync.UnfittingDrop(clientId, previous);
+            if (unfitting != Items.None)
             {
-                inventorySync.TellFull(clientId, InventorySync.ReasonFor(drop));
+                inventorySync.TellFull(clientId, InventorySync.ReasonFor(unfitting));
                 return false;
             }
 
             serverWorld.SetBlock(pos, Blocks.Air);
-            inventorySync.Give(clientId, drop, 1);
+            inventorySync.Give(clientId, Items.DropOf(previous), 1);
+            OreKind ore = Ores.OreOf(previous);
+            if (ore != OreKind.None) inventorySync.Give(clientId, Items.Ore(ore), Ores.Yield(ore));
 
             // A door goes whole, both halves for one door.
             if (Blocks.IsDoor(previous)) RemoveDoorHalf(Doors.OtherHalf(pos, previous));

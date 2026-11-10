@@ -21,6 +21,18 @@ namespace Voxel.Core
         public const float Bones = 0.2f;
         public const float Fat = 0.2f;
 
+        // A lump of ore (Items.Ore): coal and salt are lighter, flint a nodule.
+        public static float OreWeight(OreKind ore)
+        {
+            switch (ore)
+            {
+                case OreKind.Coal: return 0.5f;
+                case OreKind.RockSalt: return 0.5f;
+                case OreKind.Flint: return 0.3f;
+                default: return 1f;
+            }
+        }
+
         private readonly float[] produce;
         private readonly float[] carcasses;
 
@@ -56,6 +68,7 @@ namespace Voxel.Core
             if (item == Items.Hide) return Hide;
             if (item == Items.Bones) return Bones;
             if (item == Items.Fat) return Fat;
+            if (Items.IsOre(item)) return OreWeight(Items.OreKindOf(item));
             if (Dishes.TryGet(item, out Dish dish)) return dish.Weight;
             if (item == Blocks.Torch) return Torch;
             if (item == Blocks.Door) return Door;

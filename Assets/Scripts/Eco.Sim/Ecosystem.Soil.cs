@@ -358,7 +358,7 @@ namespace Eco.Sim
                 case Blocks.Bedrock:
                     return true;
                 default:
-                    return type >= Blocks.CoalOre && type <= Blocks.Flint;
+                    return false;
             }
         }
 

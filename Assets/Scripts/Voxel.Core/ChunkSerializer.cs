@@ -43,6 +43,9 @@ namespace Voxel.Core
                 // Blocks of earlier versions that no longer exist (crafted blocks) are gone.
                 if (Blocks.IsRetired(block)) block = Blocks.Air;
 
+                // The ores, blocks of their own before, are held by their rock now.
+                block = Ores.UpgradeBlock(block);
+
                 Array.Fill(blocks, block, index, run);
                 index += run;
             }

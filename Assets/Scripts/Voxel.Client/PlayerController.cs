@@ -733,11 +733,12 @@ namespace Voxel.Client
 
                     if (!CanBreakOnClaims(hit.Block)) return;
 
-                    // A block the player cannot carry stays in place, and the server would refuse it anyway.
-                    int drop = Items.DropOf(aimed);
-                    if (inventorySync.LocalRoomFor(drop) <= 0)
+                    // A block the player cannot carry (or the ore it holds) stays in place, and the
+                    // server would refuse it anyway.
+                    int unfitting = inventorySync.LocalUnfittingDrop(aimed);
+                    if (unfitting != Items.None)
                     {
-                        inventorySync.TellLocalFull(InventorySync.ReasonFor(drop));
+                        inventorySync.TellLocalFull(InventorySync.ReasonFor(unfitting));
                         return;
                     }
 

@@ -16,13 +16,6 @@ Sand: 2 1 1
 Snow: 2 1 1
 Gravel: 2 1 1
 Clay: 2 1 1
-CoalOre: 2 1 1
-IronOre: 2 1 1
-CopperOre: 2 1 1
-TinOre: 2 1 1
-GoldOre: 2 1 1
-RockSalt: 2 1 1
-Flint: 2 1 1
 Bedrock: 2 1 1
 Mud: 2 1 1
 rotate: GrassTop Dirt Sand Snow Gravel Clay Mud

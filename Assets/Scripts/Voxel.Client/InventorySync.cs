@@ -76,6 +76,23 @@ namespace Voxel.Client
         // Which limit an item runs into: blocks are counted, everything else weighed.
         public static FullReason ReasonFor(int item) => CarryLimits.CountsAsBlock(item) ? FullReason.Blocks : FullReason.Weight;
 
+        // What breaking this block gives that the local player could not carry: the block, or the ore
+        // a rock holds (all of its Ores.Yield); Items.None when both fit.
+        public int LocalUnfittingDrop(ushort block) => UnfittingDrop(block, LocalRoomFor);
+
+        // The same for a player, on the server.
+        public int UnfittingDrop(ulong clientId, ushort block) => UnfittingDrop(block, item => RoomFor(clientId, item));
+
+        private static int UnfittingDrop(ushort block, Func<int, int> roomFor)
+        {
+            int drop = Items.DropOf(block);
+            if (roomFor(drop) <= 0) return drop;
+
+            OreKind ore = Ores.OreOf(block);
+            if (ore != OreKind.None && roomFor(Items.Ore(ore)) < Ores.Yield(ore)) return Items.Ore(ore);
+            return Items.None;
+        }
+
         // Tells the local player at once, without asking the server (an action checked beforehand).
         public void TellLocalFull(FullReason reason) => Refused?.Invoke(reason);
 

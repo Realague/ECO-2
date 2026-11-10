@@ -14,9 +14,11 @@ namespace Voxel.Core.Tests
             Assert.AreEqual(2, MiningRules.HitsToBreak(Blocks.Ice));
             Assert.AreEqual(3, MiningRules.HitsToBreak(Blocks.Limestone));
             Assert.AreEqual(4, MiningRules.HitsToBreak(Blocks.Granite));
-            Assert.AreEqual(4, MiningRules.HitsToBreak(Blocks.Flint));
-            Assert.AreEqual(5, MiningRules.HitsToBreak(Blocks.IronOre));
-            Assert.AreEqual(6, MiningRules.HitsToBreak(Blocks.GoldOre));
+            // A rock holding an ore: the harder of the two.
+            Assert.AreEqual(4, MiningRules.HitsToBreak(Ores.Make(Blocks.Limestone, OreKind.Flint)));
+            Assert.AreEqual(3, MiningRules.HitsToBreak(Ores.Make(Blocks.Sandstone, OreKind.RockSalt)));
+            Assert.AreEqual(5, MiningRules.HitsToBreak(Ores.Make(Blocks.Granite, OreKind.Iron)));
+            Assert.AreEqual(6, MiningRules.HitsToBreak(Ores.Make(Blocks.Granite, OreKind.Gold)));
         }
 
         [Test]
@@ -101,7 +103,7 @@ namespace Voxel.Core.Tests
         public void HitCalories_RiseWithHardness()
         {
             Assert.Less(HungerRules.PerHit(MiningRules.HitsToBreak(Blocks.Dirt)), HungerRules.PerHit(MiningRules.HitsToBreak(Blocks.Granite)));
-            Assert.Less(HungerRules.PerHit(MiningRules.HitsToBreak(Blocks.Granite)), HungerRules.PerHit(MiningRules.HitsToBreak(Blocks.GoldOre)));
+            Assert.Less(HungerRules.PerHit(MiningRules.HitsToBreak(Blocks.Granite)), HungerRules.PerHit(MiningRules.HitsToBreak(Ores.Make(Blocks.Granite, OreKind.Gold))));
         }
 
         [Test]
