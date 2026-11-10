@@ -227,3 +227,112 @@
     margin: 0;
     padding: 0;
 }
+
+/* The players online, while P is held (PlayerListView): at the top, in the middle, a row per player
+   with their name and their ping as bars and milliseconds. */
+.player-list {
+    position: absolute;
+    top: 22px;
+    left: 50%;
+    translate: -50% 0;
+    width: 520px;
+    padding: 12px 16px 10px 16px;
+    background-color: var(--veil);
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: var(--panel-border);
+}
+
+.player-list-heading {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+    border-bottom-width: 1px;
+    border-color: var(--line);
+}
+
+.player-list-title {
+    font-size: 20px;
+    color: var(--text);
+    margin: 0;
+    padding: 0;
+}
+
+.player-list-count {
+    font-size: 17px;
+    color: var(--text-muted);
+    margin: 0;
+    padding: 0;
+}
+
+.player-row {
+    flex-direction: row;
+    align-items: center;
+    height: 34px;
+    padding: 0 6px;
+    border-radius: 6px;
+}
+
+.player-row--you {
+    background-color: var(--hover);
+}
+
+.player-name {
+    flex-grow: 1;
+    flex-shrink: 1;
+    font-size: 18px;
+    color: var(--text-body);
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.player-row--you .player-name {
+    color: var(--accent);
+}
+
+.player-name--unnamed {
+    color: var(--text-muted);
+    -unity-font-style: italic;
+}
+
+.player-ping {
+    width: 84px;
+    flex-shrink: 0;
+    font-size: 16px;
+    color: var(--text-muted);
+    -unity-text-align: middle-right;
+    margin: 0 10px 0 0;
+    padding: 0;
+}
+
+/* Five bars rising from left to right, as many lit as the connection is good. */
+.ping-bars {
+    flex-direction: row;
+    align-items: flex-end;
+    width: 30px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.ping-bar {
+    width: 4px;
+    margin-left: 2px;
+    background-color: rgba(255, 255, 255, 0.14);
+}
+
+.ping-bars--good .ping-bar--lit {
+    background-color: #84b65a;
+}
+
+.ping-bars--fair .ping-bar--lit {
+    background-color: #e8cc5a;
+}
+
+.ping-bars--poor .ping-bar--lit {
+    background-color: var(--danger);
+}

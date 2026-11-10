@@ -44,8 +44,13 @@ namespace Voxel.Client
         [SerializeField] private BowSync bowSync;
         [SerializeField] private ClaimSync claimSync;
         [SerializeField] private InventorySync inventorySync;
+        [SerializeField] private PlayerListSync playerListSync;
 
         private VisualElement screen;
+
+        // The players online, while P is held.
+        private PlayerListView playerList;
+        private Label playersKey;
         private VisualElement hints;
         private VisualElement banner;
         private HudGlyph sky;
@@ -89,6 +94,8 @@ namespace Voxel.Client
             damageLayer = root.Q("damage-numbers");
             creativeTag = root.Q("creative-tag");
             nameplates = new Nameplates(root.Q("nameplates"));
+            playerList = new PlayerListView(root.Q("player-list"));
+            playersKey = root.Q<Label>("players-key");
             screen.style.display = DisplayStyle.None;
         }
 
@@ -160,6 +167,7 @@ namespace Voxel.Client
             if (creativeTag != null) creativeTag.style.display = creativeShown ? DisplayStyle.Flex : DisplayStyle.None;
             ShowClock();
             ShowDraw();
+            ShowPlayers(windowOpen);
 
             if (Time.unscaledTime >= nextPlace)
             {
@@ -173,6 +181,18 @@ namespace Voxel.Client
         {
             if (damageNumbers.Count > 0) PlaceDamageNumbers();
             nameplates?.Place(networkManager, worldSync.World, Camera.main);
+        }
+
+        // The players online while P is held in game (the key the letter P is on, whatever the layout),
+        // not while a window or the command line has the keyboard.
+        private void ShowPlayers(bool windowOpen)
+        {
+            Keyboard keyboard = Keyboard.current;
+            KeyControl key = keyboard?.FindKeyOnCurrentKeyboardLayout("p");
+            if (key != null) playersKey.text = key.displayName.ToUpperInvariant();
+
+            bool held = key != null && key.isPressed && !windowOpen && !CommandConsole.HoldsInput && playerListSync != null;
+            playerList.Show(held, held ? playerListSync.Players : null, networkManager.LocalClientId);
         }
 
         // The bow's draw, while the left button is held with it (BowSync.DrawPower).

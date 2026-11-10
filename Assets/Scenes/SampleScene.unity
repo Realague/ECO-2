@@ -645,6 +645,7 @@ GameObject:
   - component: {fileID: 490447458}
   - component: {fileID: 490447459}
   - component: {fileID: 490447460}
+  - component: {fileID: 490447461}
   m_Layer: 0
   m_Name: GameSession
   m_TagString: Untagged
@@ -678,6 +679,7 @@ MonoBehaviour:
   craftingSync: {fileID: 490447460}
   appearanceSync: {fileID: 490447452}
   commandSync: {fileID: 490447453}
+  playerListSync: {fileID: 490447461}
   appearanceMenu: {fileID: 490447451}
   mapScreen: {fileID: 822296572}
   inventoryScreen: {fileID: 1141440427}
@@ -989,6 +991,19 @@ MonoBehaviour:
   inventorySync: {fileID: 490447450}
   hungerSync: {fileID: 490447454}
   ecosystemSync: {fileID: 490447448}
+--- !u!114 &490447461
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 490447444}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0957d0c4a2476046baecc28327be89c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.PlayerListSync
+  networkManager: {fileID: 947039382}
 --- !u!1 &593756662
 GameObject:
   m_ObjectHideFlags: 0
@@ -1804,6 +1819,7 @@ MonoBehaviour:
   bowSync: {fileID: 490447455}
   claimSync: {fileID: 490447459}
   inventorySync: {fileID: 490447450}
+  playerListSync: {fileID: 490447461}
 --- !u!114 &1863226320
 MonoBehaviour:
   m_ObjectHideFlags: 0

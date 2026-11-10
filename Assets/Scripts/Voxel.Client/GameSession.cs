@@ -56,6 +56,7 @@ namespace Voxel.Client
         [SerializeField] private CraftingSync craftingSync;
         [SerializeField] private AppearanceSync appearanceSync;
         [SerializeField] private CommandSync commandSync;
+        [SerializeField] private PlayerListSync playerListSync;
         [SerializeField] private AppearanceMenu appearanceMenu;
         [SerializeField] private MapScreen mapScreen;
         [SerializeField] private InventoryScreen inventoryScreen;
@@ -314,6 +315,7 @@ namespace Voxel.Client
             craftingSync.StartClient();
             appearanceSync.StartClient();
             commandSync.StartClient();
+            playerListSync.StartClient();
             sessionActive = true;
         }
 
@@ -363,6 +365,7 @@ namespace Voxel.Client
             miningSync.StartServer();
             appearanceSync.StartServer(registry);
             commandSync.StartServer();
+            playerListSync.StartServer();
             sessionActive = true;
             nextAutosave = Time.unscaledTime + autosaveInterval;
             Debug.Log($"Server started on port {port}. Saves in {worldDirectory}, every {autosaveInterval} s.");
@@ -481,6 +484,7 @@ namespace Voxel.Client
             craftingSync.Stop();
             appearanceSync.Stop();
             commandSync.Stop();
+            playerListSync.Stop();
             worldSync.Stop();
             if (registry != null)
             {

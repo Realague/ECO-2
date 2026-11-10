@@ -30,6 +30,15 @@
             <ui:Label text="Creative mode" class="hud-creative-text strong" picking-mode="Ignore" />
         </ui:VisualElement>
 
+        <!-- The players online and their ping, while P is held (PlayerListView fills the rows). -->
+        <ui:VisualElement name="player-list" class="player-list hidden" picking-mode="Ignore">
+            <ui:VisualElement class="player-list-heading" picking-mode="Ignore">
+                <ui:Label text="Players online" class="player-list-title strong" picking-mode="Ignore" />
+                <ui:Label name="player-count" class="player-list-count" picking-mode="Ignore" />
+            </ui:VisualElement>
+            <ui:VisualElement name="player-rows" class="player-rows" picking-mode="Ignore" />
+        </ui:VisualElement>
+
         <!-- How far the bow is drawn, above the crosshair while the left button is held. -->
         <ui:VisualElement name="draw" class="hud-draw hidden" picking-mode="Ignore">
             <ui:VisualElement name="draw-fill" class="hud-draw-fill" picking-mode="Ignore" />
@@ -51,6 +60,10 @@
             <ui:VisualElement class="hud-hint" picking-mode="Ignore">
                 <ui:VisualElement class="key"><ui:Label text="C" class="key-text" /></ui:VisualElement>
                 <ui:Label text="Claimed land" class="hud-hint-text" />
+            </ui:VisualElement>
+            <ui:VisualElement class="hud-hint" picking-mode="Ignore">
+                <ui:VisualElement class="key"><ui:Label name="players-key" text="P" class="key-text" /></ui:VisualElement>
+                <ui:Label text="Players" class="hud-hint-text" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>
