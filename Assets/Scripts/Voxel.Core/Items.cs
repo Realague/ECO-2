@@ -119,6 +119,10 @@ namespace Voxel.Core
 
         public static int WoodSpecies(int item) => item - FirstWood;
 
+        // What is kept on a stockpile rather than in a chest: blocks (but torches and doors, which are
+        // kept like tools) and every wood.
+        public static bool GoesOnStockpile(int item) => (IsBlock(item) && item != Blocks.Torch && item != Blocks.Door) || IsWood(item);
+
         public static int Carcass(int animalSpecies) => FirstCarcass + animalSpecies;
 
         public static bool IsCarcass(int item) => item >= FirstCarcass && item < FirstCarcass + MaxCarcassSpecies;

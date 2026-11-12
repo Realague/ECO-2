@@ -93,7 +93,7 @@ namespace Voxel.Client
             quantity = new QuantityStepper(root.Q("recipe-quantity"), CraftQueue.MaxCount, () =>
             {
                 Recipe recipe = Recipes.All[selected];
-                return Recipes.MaxCraftable(inventorySync.Inventory, recipe, ChoicesFor(recipe), ecosystemSync.ItemWeights, CraftQueue.MaxCount);
+                return Recipes.MaxCraftable(inventorySync.Inventory, recipe, ChoicesFor(recipe), inventorySync.LocalCarriedWeights, CraftQueue.MaxCount);
             });
             quantity.Changed += () => shownKey = long.MinValue;
             queue = new OrderRows(root.Q<ScrollView>("craft-queue"), root.Q<Label>("craft-queue-empty"), craftingSync.RequestCancel, null);
@@ -239,7 +239,7 @@ namespace Voxel.Client
             row.Seconds.text = Loc.T("{0} s", Loc.Number(recipe.Seconds, "0.#"));
             row.Calories.text = $"{recipe.Calories:0} kcal";
             row.Root.EnableInClassList(SelectedRowClass, index == selected);
-            row.Root.EnableInClassList("recipe-row--unavailable", Recipes.Check(bag, recipe, choices, ecosystemSync.ItemWeights) != CraftRefusal.None);
+            row.Root.EnableInClassList("recipe-row--unavailable", Recipes.Check(bag, recipe, choices, inventorySync.LocalCarriedWeights) != CraftRefusal.None);
         }
 
         private void ShowSheet(Inventory bag)
@@ -281,7 +281,7 @@ namespace Voxel.Client
             // Why it cannot be queued, or, in amber, that it will wait for its ingredients.
             CraftRefusal refusal = craftingSync.LocalCheck(selected, choices, count);
             craft.SetEnabled(refusal == CraftRefusal.None);
-            bool waits = refusal == CraftRefusal.None && Recipes.MaxCraftable(bag, recipe, choices, ecosystemSync.ItemWeights, count) < count;
+            bool waits = refusal == CraftRefusal.None && Recipes.MaxCraftable(bag, recipe, choices, inventorySync.LocalCarriedWeights, count) < count;
             reason.text = refusal != CraftRefusal.None ? Loc.T(CraftingSync.TextOf(refusal))
                 : waits ? Loc.T("Missing ingredients: the order will wait until they are in your bag") : "";
             reason.EnableInClassList("recipe-reason--warning", refusal == CraftRefusal.None);

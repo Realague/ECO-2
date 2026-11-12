@@ -12,10 +12,10 @@ namespace Voxel.Client
     // The inventory (Assets/UI/Inventory.uxml), opened and closed with Tab, closed with Escape:
     // categories, a grid of slots holding the items the player owns (searchable, sorted by kind then
     // name, empty slots after them), the details of the item under the pointer or else the chosen one
-    // (what it is, how many, its hotbar slot, a food's nutrition) and the speciality (chosen once, here). Items go into the hotbar, which stays shown below, by dragging
+    // (what it is, how many, its hotbar slot, a food's nutrition) and the skill points to spend. Items go into the hotbar, which stays shown below, by dragging
     // them onto a slot, by clicking a slot with an item chosen, or with the digits 1-0; a right click
     // empties a slot. A right click on a food in the grid eats one. M goes to the full-screen map.
-    // The Crafting tab (CraftingPage) takes the place of the items and their details, and stays chosen
+    // The Crafting tab (CraftingPage) and the Skills tab (SkillsPage) take the place of the items and their details; the tab stays chosen
     // from one opening to the next. While it is open the mouse is free and the player stands still (HoldsInput).
     public class InventoryScreen : MonoBehaviour
     {
@@ -42,16 +42,19 @@ namespace Voxel.Client
         [SerializeField] private MapScreen mapScreen;
         [SerializeField] private HotbarHud hotbar;
         [SerializeField] private CraftingSync craftingSync;
+        [SerializeField] private SkillSync skillSync;
 
         private VisualElement screen;
         private Button inventoryTab;
         private Button craftingTab;
         private Button creativeTab;
+        private Button skillsTab;
         private VisualElement inventoryMain;
         private CraftingPage crafting;
         private CreativePage creative;
+        private SkillsPage skills;
 
-        private enum Tab { Inventory, Crafting, Creative }
+        private enum Tab { Inventory, Crafting, Creative, Skills }
 
         private Tab tab;
         private ScrollView grid;
@@ -78,8 +81,8 @@ namespace Voxel.Client
         private Label detailsCalories;
         private readonly Label[] detailsNutrients = new Label[Nutrition.NutrientCount];
         private readonly VisualElement[] detailsNutrientBars = new VisualElement[Nutrition.NutrientCount];
-        private Label specialityName;
-        private Button specialityChoose;
+        private VisualElement skillPointsBox;
+        private Label skillPoints;
         private VisualElement ghost;
 
         // Categories down the left: null is "All".
@@ -109,7 +112,7 @@ namespace Voxel.Client
 
         // Whether a text field of the inventory has the keyboard (a search, a count being typed): its
         // letters are not keys, so M does not open the map then.
-        public bool IsTyping => IsOpen && (search.focusController?.focusedElement == search || crafting.IsTyping || creative.IsTyping);
+        public bool IsTyping => IsOpen && (search.focusController?.focusedElement == search || crafting.IsTyping || creative.IsTyping || skills.IsTyping);
 
         private void Start()
         {
@@ -152,8 +155,8 @@ namespace Voxel.Client
                 detailsNutrients[i] = root.Q<Label>($"details-nutrient-{i}");
                 detailsNutrientBars[i] = root.Q($"details-nutrient-bar-{i}");
             }
-            specialityName = root.Q<Label>("speciality-name");
-            specialityChoose = root.Q<Button>("speciality-choose");
+            skillPointsBox = root.Q("skill-points-box");
+            skillPoints = root.Q<Label>("skill-points");
             ghost = root.Q("drag-ghost");
 
             // The ghost moves to the hotbar's layer while dragging (drawn above this screen and the
@@ -175,13 +178,15 @@ namespace Voxel.Client
             inventoryTab = root.Q<Button>("tab-inventory");
             craftingTab = root.Q<Button>("tab-crafting");
             creativeTab = root.Q<Button>("tab-creative");
+            skillsTab = root.Q<Button>("tab-skills");
             crafting = new CraftingPage(root, craftingSync, inventorySync, hungerSync, ecosystemSync);
             creative = new CreativePage(root, inventorySync, ecosystemSync);
+            skills = new SkillsPage(root, skillSync);
             Connect(inventoryTab, () => ShowTab(Tab.Inventory));
             Connect(craftingTab, () => ShowTab(Tab.Crafting));
             Connect(creativeTab, () => ShowTab(Tab.Creative));
+            Connect(skillsTab, () => ShowTab(Tab.Skills));
             ShowTab(Tab.Inventory);
-            Connect(specialityChoose, () => inventorySync.RequestSpeciality(Specialities.Choices[0]));
 
             search.RegisterValueChangedCallback(e =>
             {
@@ -224,6 +229,7 @@ namespace Voxel.Client
                     search.Blur();
                     crafting.Blur();
                     creative.Blur();
+                    skills.Blur();
                 }
             }
             else if (keyboard != null && !CommandConsole.HoldsInput && !mapScreen.HoldsInput && !StorageScreen.HoldsInput)
@@ -262,6 +268,10 @@ namespace Voxel.Client
             {
                 crafting.Refresh();
             }
+            else if (tab == Tab.Skills)
+            {
+                skills.Refresh();
+            }
             else if (tab == Tab.Creative)
             {
                 creative.Refresh();
@@ -273,7 +283,7 @@ namespace Voxel.Client
                 ShowDetails();
             }
 
-            ShowSpeciality();
+            ShowSkillPoints();
         }
 
         // The Inventory tab (the items and their details), the Crafting tab (recipes and their sheet)
@@ -284,10 +294,13 @@ namespace Voxel.Client
             inventoryTab.EnableInClassList("inventory-tab--selected", tab == Tab.Inventory);
             craftingTab.EnableInClassList("inventory-tab--selected", tab == Tab.Crafting);
             creativeTab.EnableInClassList("inventory-tab--selected", tab == Tab.Creative);
+            skillsTab.EnableInClassList("inventory-tab--selected", tab == Tab.Skills);
+            screen.EnableInClassList("inventory-screen--skills", tab == Tab.Skills);
             inventoryMain.style.display = tab == Tab.Inventory ? DisplayStyle.Flex : DisplayStyle.None;
-            details.style.display = tab == Tab.Crafting ? DisplayStyle.None : DisplayStyle.Flex;
+            details.style.display = tab == Tab.Crafting || tab == Tab.Skills ? DisplayStyle.None : DisplayStyle.Flex;
             crafting.Show(tab == Tab.Crafting);
             creative.Show(tab == Tab.Creative);
+            skills.Show(tab == Tab.Skills);
             EndDrag();
             shownSearch = null;
         }
@@ -352,6 +365,7 @@ namespace Voxel.Client
             shownSearch = null;
             crafting.Retranslate();
             creative.Retranslate();
+            skills.Retranslate();
         }
 
         // The icon class (Common.uss) of a category; null is "All".
@@ -469,7 +483,7 @@ namespace Voxel.Client
             // In creative mode there is no limit.
             bool creativeMode = inventorySync.Creative;
             int blocks = CarryLimits.BlockCount(inventory);
-            float weight = CarryLimits.Weight(inventory, ecosystemSync.ItemWeights);
+            float weight = CarryLimits.Weight(inventory, inventorySync.LocalCarriedWeights);
             carryBlocks.text = creativeMode ? $"{blocks} / ∞" : $"{blocks} / {CarryLimits.MaxBlocks}";
             carryWeight.text = creativeMode ? $"{Loc.Number(weight, "0.0")} kg / ∞" : $"{Loc.Number(weight, "0.0")} / {CarryLimits.MaxWeight:0} kg";
             ShowCarryShare(carryBlocks, creativeMode ? 0f : (float)blocks / CarryLimits.MaxBlocks);
@@ -624,7 +638,7 @@ namespace Voxel.Client
             detailsSlot.text = slot >= 0 ? Loc.T("Hotbar slot {0}", SlotLabel(slot)) : "";
             detailsSlot.style.display = slot >= 0 ? DisplayStyle.Flex : DisplayStyle.None;
 
-            float weight = CarryLimits.CountsAsBlock(item) ? 0f : ecosystemSync.ItemWeights.Of(item);
+            float weight = CarryLimits.CountsAsBlock(item) ? 0f : inventorySync.LocalCarriedWeights.Of(item);
             detailsWeightLine.style.display = weight > 0f ? DisplayStyle.Flex : DisplayStyle.None;
             detailsWeight.text = Loc.T("{0} kg each", Loc.Number(weight, "0.###"));
             float burns = Fuels.SecondsOf(item);
@@ -646,12 +660,12 @@ namespace Voxel.Client
 
         private static string SlotLabel(int slot) => ((slot + 1) % Hotbar.SlotCount).ToString();
 
-        private void ShowSpeciality()
+        // The skill points to spend, all skills together, at the tab bar's end when there are any.
+        private void ShowSkillPoints()
         {
-            Speciality speciality = inventorySync.Speciality;
-            bool chosen = speciality != Speciality.None;
-            specialityName.text = chosen ? Loc.Name(Specialities.NameOf(speciality)) : Loc.T("No speciality yet");
-            specialityChoose.style.display = chosen ? DisplayStyle.None : DisplayStyle.Flex;
+            int points = skills.PointsToSpend();
+            skillPointsBox.style.display = points > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            if (points > 0) skillPoints.text = Loc.T("{0} skill points to spend", points);
         }
     }
 }

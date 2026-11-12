@@ -9,7 +9,7 @@ namespace Voxel.Core.Tests
         private static readonly ItemWeights Weights = new ItemWeights(new float[0]);
 
         [Test]
-        public void EachSpecies_HasItsOwnWood_CountedWithTheBlocks()
+        public void EachSpecies_HasItsOwnWood_WeighedNotCounted()
         {
             int oak = Items.WoodOf(Items.OakSpecies);
             int birch = Items.WoodOf(2);
@@ -20,7 +20,7 @@ namespace Voxel.Core.Tests
             Assert.AreEqual(2, Items.WoodSpecies(birch));
             Assert.IsFalse(Items.IsBlock(birch), "wood is not placed");
             Assert.IsFalse(Items.IsSeed(birch) || Items.IsProduce(birch));
-            Assert.IsTrue(CarryLimits.CountsAsBlock(birch));
+            Assert.IsFalse(CarryLimits.CountsAsBlock(birch), "wood is weighed (CarryLimitsTests)");
             Assert.IsTrue(StorageRules.AcceptsInStockpile(birch));
             Assert.IsFalse(StorageRules.AcceptsInChest(birch));
             Assert.IsFalse(Items.IsValid(Items.LegacyWood), "the one wood of before is only read, then upgraded");
@@ -28,8 +28,9 @@ namespace Voxel.Core.Tests
             var inventory = new Inventory();
             inventory.Add(oak, 20);
             inventory.Add(birch, 15);
-            Assert.AreEqual(35, CarryLimits.BlockCount(inventory));
-            Assert.AreEqual(5, CarryLimits.Room(inventory, Blocks.Dirt, Weights));
+            Assert.AreEqual(0, CarryLimits.BlockCount(inventory));
+            Assert.AreEqual(35 * ItemWeights.DefaultWood, CarryLimits.Weight(inventory, Weights), 1e-4f);
+            Assert.AreEqual(CarryLimits.MaxBlocks, CarryLimits.Room(inventory, Blocks.Dirt, Weights));
         }
 
         [Test]

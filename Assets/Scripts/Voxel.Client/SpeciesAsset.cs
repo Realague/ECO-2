@@ -85,6 +85,8 @@ namespace Voxel.Client
         [SerializeField] private int woodYield;
         [Tooltip("The colour of its wood (its item's icon, and its wood on stockpiles): its bark's grain tinted so.")]
         [SerializeField] private Color woodColour = new Color(0.66f, 0.49f, 0.31f);
+        [Tooltip("The weight of one of its wood, in kg (it counts in the carrying limit's kilos).")]
+        [SerializeField] private float woodWeight = 0.5f;
         [Tooltip("A crop: none, an annual (pulled up when harvested) or a perennial (picked again and again). " +
                  "Once adult it ripens through 3 stages, giving a third, two thirds and all of its harvest.")]
         [SerializeField] private HarvestKind harvest;
@@ -185,6 +187,8 @@ namespace Voxel.Client
         public int WoodYield => woodYield;
 
         public Color WoodColour => woodColour;
+
+        public float WoodWeight => woodWeight;
 
         // Its wood as stacked or carried: the bark's material (and grain) in the wood's colour, made
         // once. Null for a species without models.

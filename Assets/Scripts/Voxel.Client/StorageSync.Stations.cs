@@ -476,7 +476,7 @@ namespace Voxel.Client
             bag.CopyFrom(state.Inventory);
             foreach (KeyValuePair<int, int> item in job.Held())
             {
-                int fits = Math.Min(item.Value, CarryLimits.Room(bag, item.Key, ecosystemSync.ItemWeights));
+                int fits = Math.Min(item.Value, CarryLimits.Room(bag, item.Key, inventorySync.CarriedWeights(clientId)));
                 if (fits > 0)
                 {
                     bag.Add(item.Key, fits);
@@ -518,7 +518,7 @@ namespace Voxel.Client
             bag.Add(StorageRules.ItemOf(fire.Kind), 1);
             foreach (KeyValuePair<int, int> wood in station.Fuel.Entries)
             {
-                if (CarryLimits.Room(bag, wood.Key, ecosystemSync.ItemWeights) < wood.Value) return false;
+                if (CarryLimits.Room(bag, wood.Key, inventorySync.CarriedWeights(clientId)) < wood.Value) return false;
 
                 bag.Add(wood.Key, wood.Value);
             }

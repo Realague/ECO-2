@@ -3,9 +3,9 @@
     <Style src="Inventory.uss" />
 
     <!-- InventoryScreen fills the categories, the grid of items (with empty slots after them), the
-         details of the chosen or hovered one and the speciality, and moves the dragged item's ghost. -->
+         details of the chosen or hovered one and the skill points, and moves the dragged item's ghost. -->
     <ui:VisualElement name="screen" class="screen inventory-screen">
-        <!-- The tab bar, a bar of its own above both panels as in the mockup, the speciality at its end. -->
+        <!-- The tab bar, a bar of its own above both panels as in the mockup, the skill points at its end. -->
         <ui:VisualElement class="inventory-tabs">
             <ui:Button name="tab-inventory" class="inventory-tab inventory-tab--selected">
                 <ui:VisualElement class="icon icon--tab-inventory inventory-tab-icon" />
@@ -15,17 +15,19 @@
                 <ui:VisualElement class="icon icon--category-tools inventory-tab-icon" />
                 <ui:Label text="Crafting" class="inventory-tab-text" />
             </ui:Button>
+            <ui:Button name="tab-skills" class="inventory-tab">
+                <ui:VisualElement class="icon icon--plant inventory-tab-icon" />
+                <ui:Label text="Skills" class="inventory-tab-text" />
+            </ui:Button>
             <ui:Button name="tab-creative" class="inventory-tab">
                 <ui:VisualElement class="icon icon--plus inventory-tab-icon" />
                 <ui:Label text="Creative" class="inventory-tab-text" />
             </ui:Button>
             <ui:VisualElement class="inventory-tabs-space" />
-            <ui:VisualElement class="speciality">
+            <!-- The skill points to spend, all skills together, when there are any. -->
+            <ui:VisualElement name="skill-points-box" class="speciality" tooltip="Skill points to spend (Skills tab)">
                 <ui:VisualElement class="icon icon--plant" />
-                <ui:Label name="speciality-name" class="speciality-name" />
-                <ui:Button name="speciality-choose" class="button button--primary speciality-choose">
-                    <ui:Label text="Become a gardener" class="button-text" />
-                </ui:Button>
+                <ui:Label name="skill-points" class="speciality-name" />
             </ui:VisualElement>
         </ui:VisualElement>
 
@@ -80,6 +82,61 @@
                     <ui:VisualElement class="item-well queue-well">
                         <ui:Label name="craft-queue-empty" text="Nothing queued: choose a recipe, then Add to the queue." class="items-empty" />
                         <ui:ScrollView name="craft-queue" class="queue-list" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- The skills tab (SkillsPage): the skills, then the chosen one's tiers and upgrades. -->
+                <ui:VisualElement name="skills-page" class="skills-page">
+                    <ui:VisualElement class="categories skills-column">
+                        <ui:Label text="Skills" class="column-title" />
+                        <ui:VisualElement name="skill-search-box" class="item-search-box skill-search-box">
+                            <ui:VisualElement class="icon icon--search item-search-icon" picking-mode="Ignore" />
+                            <ui:TextField name="skill-search" max-length="32" class="item-search" />
+                            <ui:Label name="skill-search-hint" text="Search" class="item-search-hint" picking-mode="Ignore" />
+                        </ui:VisualElement>
+                        <ui:ScrollView name="skill-list" class="category-list skill-list" />
+                        <!-- The points left in every skill, and the chosen skill's experience. -->
+                        <ui:VisualElement class="skill-summary">
+                            <ui:VisualElement class="skill-summary-line">
+                                <ui:Label text="Skill points" class="skill-summary-label" />
+                                <ui:Label name="skill-summary-points" class="skill-summary-value" />
+                            </ui:VisualElement>
+                            <ui:VisualElement class="skill-summary-line">
+                                <ui:Label text="Total experience" class="skill-summary-label" />
+                                <ui:Label name="skill-summary-xp" class="skill-summary-value" />
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="skill-main">
+                        <!-- The chosen skill: its icon, name and description, its open tier and points. -->
+                        <ui:VisualElement class="skill-header">
+                            <ui:VisualElement name="skill-header-icon" class="skill-header-icon" />
+                            <ui:VisualElement class="skill-header-text">
+                                <ui:Label name="skill-title" class="skill-title" />
+                                <ui:Label name="skill-description" class="skill-subtitle" />
+                            </ui:VisualElement>
+                            <ui:VisualElement class="skill-header-side">
+                                <ui:VisualElement class="skill-header-points" tooltip="Skill points to spend">
+                                    <ui:VisualElement class="icon icon--plant skill-header-points-icon" />
+                                    <ui:Label name="skill-page-points" class="skill-header-points-text" />
+                                </ui:VisualElement>
+                                <ui:Label name="skill-header-tier" class="skill-header-tier" />
+                                <ui:VisualElement class="skill-header-bar">
+                                    <ui:VisualElement name="skill-header-bar-fill" class="skill-header-bar-fill" />
+                                </ui:VisualElement>
+                                <ui:Label name="skill-header-xp" class="skill-header-xp" />
+                            </ui:VisualElement>
+                        </ui:VisualElement>
+                        <ui:VisualElement class="skill-tiers-box">
+                            <ui:Label name="skill-empty" class="items-empty" />
+                            <ui:ScrollView name="skill-tiers" class="skill-tiers" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="skill-footer">
+                            <ui:VisualElement class="key"><ui:Label text="Esc" class="key-text" /></ui:VisualElement>
+                            <ui:Label text="Back" class="key-label" />
+                            <ui:VisualElement class="key"><ui:Label text="Click" class="key-text" /></ui:VisualElement>
+                            <ui:Label text="Select" class="key-label" />
+                        </ui:VisualElement>
                     </ui:VisualElement>
                 </ui:VisualElement>
 
@@ -246,6 +303,31 @@
                             </ui:Button>
                         </ui:VisualElement>
                     </ui:VisualElement>
+                </ui:VisualElement>
+
+                <!-- The chosen upgrade (SkillsPage), on a dark sheet: what it does, its bonus now and
+                     next, its cost and requirements, its options, and Upgrade. -->
+                <ui:VisualElement name="skill-sheet" class="skill-sheet">
+                    <ui:VisualElement class="skill-sheet-head">
+                        <ui:VisualElement class="skill-sheet-icon-frame">
+                            <ui:VisualElement name="skill-sheet-icon" class="skill-sheet-icon" />
+                        </ui:VisualElement>
+                        <ui:VisualElement class="skill-sheet-titles">
+                            <ui:Label name="skill-sheet-name" class="skill-sheet-name" />
+                            <ui:Label name="skill-sheet-kind" class="skill-sheet-kind" />
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:ScrollView class="skill-sheet-body">
+                        <ui:Label name="skill-sheet-description" class="skill-sheet-description" />
+                        <ui:VisualElement name="skill-sheet-choices" class="skill-choices" />
+                        <ui:VisualElement name="skill-sheet-effects" />
+                        <ui:Label name="skill-sheet-technical" class="skill-technical" />
+                    </ui:ScrollView>
+                    <ui:Label name="skill-sheet-reason" class="skill-sheet-reason" />
+                    <ui:Button name="skill-sheet-buy" class="button button--primary skill-sheet-buy">
+                        <ui:VisualElement class="icon icon--plus" />
+                        <ui:Label name="skill-sheet-buy-text" class="button-text" />
+                    </ui:Button>
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>

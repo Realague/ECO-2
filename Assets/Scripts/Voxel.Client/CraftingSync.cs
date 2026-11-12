@@ -40,6 +40,7 @@ namespace Voxel.Client
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private HungerSync hungerSync;
         [SerializeField] private EcosystemSync ecosystemSync;
+        [SerializeField] private SkillSync skillSync;
 
         // Server side: each player's queue, and what they were last sent of it.
         private sealed class Player
@@ -230,7 +231,7 @@ namespace Voxel.Client
                 return;
             }
 
-            CraftOrder made = queue.Update(seconds, order => CheckOrder(state, order), order => Make(clientId, state, order));
+            CraftOrder made = queue.Update(seconds, order => CheckOrder(clientId, state, order), order => Make(clientId, state, order));
             if (made != null)
             {
                 if (clientId == networkManager.LocalClientId) Crafted?.Invoke(made.Recipe);
@@ -243,11 +244,11 @@ namespace Voxel.Client
             SendState(clientId, queue);
         }
 
-        private CraftRefusal CheckOrder(PlayerState state, CraftOrder order)
+        private CraftRefusal CheckOrder(ulong clientId, PlayerState state, CraftOrder order)
         {
             if (state.Stomach.IsStarving) return CraftRefusal.TooHungry;
 
-            return Recipes.Check(state.Inventory, Recipes.All[order.Recipe], order.Choices, ecosystemSync.ItemWeights);
+            return Recipes.Check(state.Inventory, Recipes.All[order.Recipe], order.Choices, inventorySync.CarriedWeights(clientId));
         }
 
         // An item's time is up: made now, if everything is still there.
@@ -255,12 +256,13 @@ namespace Voxel.Client
         {
             Recipe recipe = Recipes.All[order.Recipe];
             bool had = state.Inventory.Has(recipe.Output);
-            CraftRefusal refusal = state.Stomach.IsStarving ? CraftRefusal.TooHungry : Recipes.TryCraft(state.Inventory, recipe, order.Choices, ecosystemSync.ItemWeights);
+            CraftRefusal refusal = state.Stomach.IsStarving ? CraftRefusal.TooHungry : Recipes.TryCraft(state.Inventory, recipe, order.Choices, inventorySync.CarriedWeights(clientId));
             if (refusal != CraftRefusal.None) return refusal;
 
             // Something new goes into the hotbar's first empty slot, as anything received.
             if (!had) state.Hotbar.Place(recipe.Output);
             hungerSync.BurnEffort(clientId, recipe.Calories);
+            skillSync?.Practise(clientId, SkillContext.Of(SkillContext.Craft, Items.NameOf(recipe.Output)), recipe.Calories, Items.None);
             inventorySync.Publish(clientId);
             return CraftRefusal.None;
         }

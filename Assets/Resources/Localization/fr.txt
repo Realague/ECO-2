@@ -334,7 +334,7 @@ Plant it to grow {2}: hold it and right click on the ground where it grows. It n
 Plant it to grow {2}. Only gardeners plant crops, on tilled soil.	À planter pour faire pousser un plant de {1}. Seuls les jardiniers plantent les cultures, sur la terre labourée.
 Harvested from {1} plants when they are ripe. Right click it here, or hold it and right click, to eat it.	Récolté sur les plants de {1} quand ils sont mûrs. Clic droit ici, ou en main clic droit, pour le manger.
 Harvested from {1} plants when they are ripe. It cannot be eaten.	Récolté sur les plants de {1} quand ils sont mûrs. Ne se mange pas.
-From {2} once felled: each log on the ground gives three. Counted with the blocks, and kept on a stockpile.	Tiré d'un arbre abattu ({1}) : chaque rondin au sol en donne trois. Compte avec les blocs et se range sur une réserve.
+From {2} once felled, pruned and bucked: each log on the ground gives three. It weighs in your bag, and is kept on a stockpile.	Tiré d'un arbre abattu, élagué et débité ({1}) : chaque rondin au sol en donne trois. Il pèse dans votre sac et se range sur une réserve.
 The body of {2}, taken from the ground while at least half of it was left. Butcher it with a knife (right click it here) for half its meat, or on a butcher's table for all of it, with the hide, bones and fat.	Le corps d'un animal ({1}), ramassé alors qu'il en restait au moins la moitié. Découpez-le au couteau (clic droit dessus ici) pour la moitié de sa viande, ou sur un établi de boucher pour toute sa viande, avec la peau, les os et la graisse.
 
 # Plants
@@ -673,3 +673,153 @@ Host	Hôte
 {0} ms	{0} ms
 Ore	Minerai
 Found in rock: a block of rock holding it gives it, besides itself, when broken with a pickaxe. Kept in a chest.	Se trouve dans la roche : un bloc de roche qui en contient le donne, en plus de lui-même, quand on le casse à la pioche. Se range dans un coffre.
+
+# Skills (SkillSync, SkillsPage, Assets/Skills), felling in steps
+Fallen {1}	{0} abattu
+{0} · {1} branches	{0} · {1} branches
+{0} · {1} logs	{0} · {1} rondins
+Skill unlocked: {0}	Compétence débloquée : {0}
+{0}: tier {1} reached	{0} : palier {1} atteint
+{0}: +{1} skill points	{0} : +{1} points de compétence
+{0}: tier {1} reached · +{2} skill points	{0} : palier {1} atteint · +{2} points de compétence
+This skill is not unlocked yet	Cette compétence n'est pas encore débloquée
+Reach this tier first	Atteignez d'abord ce palier
+Complete the required upgrades first	Terminez d'abord les améliorations requises
+Buy the upgrade it improves first	Achetez d'abord l'amélioration qu'elle améliore
+Already complete	Déjà terminée
+Already chosen	Déjà choisie
+Choose an option	Choisissez une option
+Not enough skill points	Pas assez de points de compétence
+You can't buy that	Impossible d'acheter cela
+Skills	Compétences
+Skill points to spend	Points de compétence à dépenser
+Skill points to spend (Skills tab)	Points de compétence à dépenser (onglet Compétences)
+{0} skill points to spend	{0} points de compétence à dépenser
+Tier {0}	Palier {0}
+Locked	Verrouillée
+No skill yet: skills unlock as you work (fell a tree with an axe…).	Aucune compétence pour l'instant : elles se débloquent en travaillant (abattez un arbre à la hache…).
+{0} points	{0} points
+Tier {0} · {1}	Palier {0} · {1}
+Complete	Terminée
+{0} pt	{0} pt
+Tier {0} · {1} points to spend	Palier {0} · {1} points à dépenser
+Choose an upgrade to see what it does.	Choisissez une amélioration pour voir ce qu'elle fait.
+Next: step {0} (tier {1})	Suivante : étape {0} (palier {1})
+Now	Actuellement
+Requires: {0}	Requiert : {0}
+Improves: {0}	Améliore : {0}
+Buy ({0} pt)	Acheter ({0} pt)
+{0} (chosen)	{0} (choisie)
+Tier {0} · {1} / {2} options	Palier {0} · {1} / {2} options
+Tier {0} · unique	Palier {0} · unique
+Tier {0} · step {1} / {2}	Palier {0} · étape {1} / {2}
++{0} % yield	+{0} % de rendement
++{0} yield	+{0} de rendement
+{0} % faster	{0} % plus rapide
+{0} s faster	{0} s plus rapide
+{0} % fewer calories	{0} % de calories en moins
+{0} % lighter	{0} % plus léger
+A new recipe	Une nouvelle recette
+cost {0}	coût {0}
+Step {0}, tier {1}:	Étape {0}, palier {1} :
+{0} with {1}	{0} (outil : {1})
+tier {0} of another skill	palier {0} d'une autre compétence
+Unlocked by: {0}	Se débloque en : {0}
+felling a tree	abattant un arbre
+digging	creusant
+mining	minant
+cutting plants	coupant des plantes
+crafting	fabriquant
+placing blocks	posant des blocs
+tilling	labourant
+Felling	Abattage
+Felling trees, pruning their branches and bucking their trunks into logs, with an axe. Every calorie spent on it teaches you.	Abattre les arbres, couper leurs branches et débiter leurs troncs en rondins, à la hache. Chaque calorie qui y est dépensée vous apprend.
+felling	abattage
+Automatic bucking	Débitage auto
+Once a tree you work has no branches left, its trunk falls apart into logs at once: no bucking needed.	Dès qu'un arbre que vous travaillez n'a plus de branches, son tronc se défait aussitôt en rondins : plus besoin de le débiter.
+Automatic pruning	Élagage auto
+A tree you fell comes down with its branches already off.	Un arbre que vous abattez tombe déjà sans ses branches.
+Automatic stump removal	Dessouchage auto
+A tree you fell leaves no stump: its log lies at its foot instead, and nothing grows back there.	Un arbre que vous abattez ne laisse pas de souche : son rondin est posé à son pied, et rien n'y repousse.
+Cutting speed	Vitesse de coupe
+Cutting yield	Rendement de coupe
+Calorie cost	Coût en calories
+Expert (tier +1)	Expert (palier +1)
+Not available yet.	Pas encore disponible.
+TimePercent on fell: hits × (1 - %), rounded up.	TimePercent sur fell : coups × (1 - %), arrondi au-dessus.
+YieldPercent on fell: logs × (1 + %), the fraction a chance of one more.	YieldPercent sur fell : rondins × (1 + %), la fraction donnant une chance d'un de plus.
+CaloriePercent on fell: calories × (1 - %); experience counts them before.	CaloriePercent sur fell : calories × (1 - %) ; l'expérience les compte avant.
+WeightPercent on wood: every wood's weight × (1 - %).	WeightPercent sur wood : poids de chaque bois × (1 - %).
+To come: counts the felling skills as one tier higher.	À venir : compte les compétences d'abattage comme un palier plus haut.
+Firewood, softwood and splitting	Bois de chauffage, bûche tendre et fendage
+You hit hard, sometimes crooked, but it comes down. You know how to split softwood logs to light a fire: that's something.	Vous tapez fort, parfois de travers, mais ça tombe. Vous savez fendre des bûches de bois tendre pour allumer un feu, c'est déjà ça.
+The art of bucking	L'art du débitage
+There you go: you understand the grain and the point of impact. Your blows are more precise, you waste less material and the wood you get is of better quality.	Ça y est, vous comprenez le sens des fibres et le point d'impact. Vos coups sont plus précis, vous gaspillez moins de matière et le bois récupéré est de meilleure qualité.
+Debarking and fine beams	Écorçage et poutre d'excellence
+Wood holds no more secrets for you. You know not only how to fell cleanly, but also how to prepare trunks by stripping their bark to get rough beams ready for use.	Le bois n'a plus de secret pour vous. Vous savez non seulement abattre proprement, mais aussi préparer les troncs en retirant l'écorce pour obtenir des poutres brutes prêtes à l'emploi.
+Wood expertise	Expertise du bois
+Your axe is an extension of your arm. You spot exceptional trees at a glance and know how to make the most of every cubic centimetre of fine wood without crumbling it.	Votre hache est le prolongement de votre bras. Vous repérez les arbres d'exception d'un simple regard et savez tirer le meilleur de chaque centimètre cube de bois noble sans l'effriter.
+Forest communion	Communion sylvestre
+To you, the forest is an open book. You fell century-old giants with artistic ease, extracting perfect wood that will never rot and whose strength defies time.	Pour vous, la forêt est un livre ouvert. Vous abattez les géants centenaires avec une fluidité artistique, extrayant le bois parfait qui ne pourrira jamais et dont la robustesse défie le temps.
+Log weight	Poids des bûches
+Each axe hit on a tree burns fewer calories: 5 % fewer a step. You learn as much.	Chaque coup de hache sur un arbre brûle moins de calories : 5 % de moins par étape. Vous apprenez autant.
+The wood you carry weighs less: 5 % lighter a step.	Le bois que vous portez pèse moins : 5 % plus léger par étape.
+Fewer axe hits to fell, prune and buck: 5 % fewer a step.	Moins de coups de hache pour abattre, élaguer et débiter : 5 % de moins par étape.
+More logs from each tree you fell: 5 % more a step.	Plus de rondins pour chaque arbre abattu : 5 % de plus par étape.
+Calorie cost II	Coût en calories II
+Log weight II	Poids des bûches II
+Cutting speed II	Vitesse de coupe II
+Cutting yield II	Rendement de coupe II
+Calorie cost III	Coût en calories III
+Log weight III	Poids des bûches III
+Cutting speed III	Vitesse de coupe III
+Cutting yield III	Rendement de coupe III
+Each axe hit on a tree burns 32 %, then 40 % fewer calories.	Chaque coup de hache sur un arbre brûle 32 %, puis 40 % de calories en moins.
+The wood you carry is 32 %, then 40 % lighter.	Le bois que vous portez est 32 %, puis 40 % plus léger.
+32 %, then 40 % fewer axe hits to fell, prune and buck.	32 %, puis 40 % de coups de hache en moins pour abattre, élaguer et débiter.
+32 %, then 40 % more logs from each tree you fell.	32 %, puis 40 % de rondins en plus pour chaque arbre abattu.
+Each axe hit on a tree burns half the calories.	Chaque coup de hache sur un arbre brûle moitié moins de calories.
+The wood you carry weighs half as much.	Le bois que vous portez pèse moitié moins.
+Half the axe hits to fell, prune and buck.	Deux fois moins de coups de hache pour abattre, élaguer et débiter.
+Half as many logs again from each tree you fell.	Moitié plus de rondins pour chaque arbre abattu.
+CaloriePercent on fell, in place of Calorie cost.	CaloriePercent sur fell, à la place de Coût en calories.
+WeightPercent on wood, in place of Log weight.	WeightPercent sur wood, à la place de Poids des bûches.
+TimePercent on fell, in place of Cutting speed.	TimePercent sur fell, à la place de Vitesse de coupe.
+YieldPercent on fell, in place of Cutting yield.	YieldPercent sur fell, à la place de Rendement de coupe.
+CaloriePercent on fell, in place of Calorie cost II.	CaloriePercent sur fell, à la place de Coût en calories II.
+WeightPercent on wood, in place of Log weight II.	WeightPercent sur wood, à la place de Poids des bûches II.
+TimePercent on fell, in place of Cutting speed II.	TimePercent sur fell, à la place de Vitesse de coupe II.
+YieldPercent on fell, in place of Cutting yield II.	YieldPercent sur fell, à la place de Rendement de coupe II.
+Automatic work	Travail automatique
+Two of three steps of felling done for you, as you choose.	Deux des trois étapes de l'abattage faites pour vous, au choix.
+Interactions felling.autoBuck, felling.autoPrune, felling.autoStump.	Interactions felling.autoBuck, felling.autoPrune, felling.autoStump.
+Specialist	Spécialiste
+Charcoal specialist	Spécialiste charbon
+Log specialist	Spécialiste rondin
+To come: the effects of both specialists.	À venir : les effets des deux spécialistes.
+Automatic felling	Abattage auto
+{0} % chance a hit finishes it at once	{0} % de chances qu'un seul coup suffise
+Each axe hit on a standing tree has a 10 % chance to fell it at once.	Chaque coup de hache sur un arbre debout a 10 % de chances de l'abattre d'un coup.
+FinishChancePercent on fell: rolled by the server on each axe hit on a standing tree (not when pruning or bucking).	FinishChancePercent sur fell : tiré par le serveur à chaque coup de hache sur un arbre debout (pas à l'élagage ni au débitage).
+To come.	À venir.
+Skill points	Points de compétence
+Total experience	Expérience totale
+Esc	Échap
+Click	Clic
+Select	Sélectionner
+{0} kcal	{0} kcal
+Rank {0}/{1}	Rang {0}/{1}
+{0} choices at most · {1} pt each	{0} choix maximum · {1} pt chacun
+Current bonus	Bonus actuel
+Level	Niveau
+Next level	Prochain niveau
+Skill point cost	Coût en points de compétence
+Requirements	Pré-requis
+Tier {0} reached	Palier {0} atteint
+{0} complete	{0} au maximum
+{0}: at least one step	{0} : au moins une étape
+{0} skill points	{0} points de compétence
+Active	Actif
+Upgrade ({0} pt)	Améliorer ({0} pt)
+Tier {0} · {1} steps	Palier {0} · {1} étapes
+Chosen	Choisie

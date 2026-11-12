@@ -3,18 +3,18 @@ using System.Collections.Generic;
 
 namespace Voxel.Core
 {
-    // What a player can carry: at most 40 blocks, all types together (wood counted as blocks, though
-    // it cannot be placed), and at most 30 kg of everything else (straw, seeds, crops, tools). An
-    // inventory already beyond a limit (a save from before it) is kept as it is: it only cannot take
-    // more of that kind until it is back under.
+    // What a player can carry: at most 40 blocks, all types together, and at most 30 kg of everything
+    // else (wood, straw, seeds, crops, tools). An inventory already beyond a limit (a save from before
+    // it) is kept as it is: it only cannot take more of that kind until it is back under.
     public static class CarryLimits
     {
         public const int MaxBlocks = 40;
         public const float MaxWeight = 30f;
 
-        // What counts against the blocks' limit rather than the weight: blocks, and every wood. A torch
-        // and a door are block types but weigh, like a tool.
-        public static bool CountsAsBlock(int item) => (Items.IsBlock(item) && item != Blocks.Torch && item != Blocks.Door) || Items.IsWood(item);
+        // What counts against the blocks' limit rather than the weight: blocks. A torch and a door are
+        // block types but weigh, like a tool; wood weighs too (ItemWeights), though it is kept on
+        // stockpiles with the blocks (Items.GoesOnStockpile).
+        public static bool CountsAsBlock(int item) => Items.IsBlock(item) && item != Blocks.Torch && item != Blocks.Door;
 
         public static int BlockCount(Inventory inventory)
         {

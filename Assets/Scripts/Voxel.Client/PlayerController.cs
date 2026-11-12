@@ -461,17 +461,15 @@ namespace Voxel.Client
                 return;
             }
 
-            // A tree's seed goes straight into its ground, by anyone; a crop's into tilled soil, by a
-            // gardener. The server applies the natural rules and says why a seed did not take.
+            // A tree's seed goes straight into its ground, a crop's into tilled soil. The server applies
+            // the natural rules and says why a seed did not take.
             if (Items.IsSeed(held))
             {
                 if (!claimSync.LocalCheck(hit.Block.X, hit.Block.Z)) return;
 
                 if (!ecosystemSync.IsTree(Items.SeedSpecies(held)))
                 {
-                    SowRefusal refusal = inventorySync.Speciality != Speciality.Gardener ? SowRefusal.NotGardener
-                        : !EcosystemSync.IsTilled(world, hit.Block.X, hit.Block.Z) ? SowRefusal.NotTilled
-                        : SowRefusal.None;
+                    SowRefusal refusal = !EcosystemSync.IsTilled(world, hit.Block.X, hit.Block.Z) ? SowRefusal.NotTilled : SowRefusal.None;
                     if (refusal != SowRefusal.None)
                     {
                         hotbar.ShowMessage(SowRefusals.TextOf(refusal, ""));
@@ -698,7 +696,9 @@ namespace Voxel.Client
             // The hammer takes construction blocks back, before anything in front of them is struck.
             if (held == Items.Hammer && Unbuild(origin, direction)) return;
 
-            if (ecosystemSync.TryStrike(origin, direction, reachedDistance, held, out int missing, out int plantId, out float distance))
+            // A felled tree lying in front of what else the ray meets is pruned, then bucked.
+            bool fallenHit = logSync.TryAimedFallen(origin.ToUnity(), direction.ToUnity(), reachedDistance, out int fallenId, out float fallenDistance);
+            if (ecosystemSync.TryStrike(origin, direction, fallenHit ? fallenDistance : reachedDistance, held, out int missing, out int plantId, out float distance))
             {
                 if (missing != Items.None)
                 {
@@ -709,6 +709,20 @@ namespace Voxel.Client
                 if (ecosystemSync.TryGetView(plantId, out PlantView plant) && !claimSync.LocalCheck(plant.X, plant.Z)) return;
 
                 if (miningSync.TryStartSwing(model, false)) miningSync.HitPlant(plantId, (origin + direction * distance).ToUnity());
+                return;
+            }
+
+            if (fallenHit && logSync.TryGetFallen(fallenId, out FallenTree fallen))
+            {
+                if (held != Items.Axe && !inventorySync.Creative)
+                {
+                    TellMissing(Items.Axe);
+                    return;
+                }
+
+                if (!claimSync.LocalCheck(fallen.X, fallen.Z)) return;
+
+                if (miningSync.TryStartSwing(model, false)) miningSync.HitFallen(fallenId, (origin + direction * fallenDistance).ToUnity());
                 return;
             }
 

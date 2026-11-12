@@ -433,7 +433,7 @@ namespace Voxel.Client
         private void ShowCarry(Inventory bag)
         {
             int blocks = CarryLimits.BlockCount(bag);
-            float weight = CarryLimits.Weight(bag, ecosystemSync.ItemWeights);
+            float weight = CarryLimits.Weight(bag, inventorySync.LocalCarriedWeights);
             carryBlocks.text = $"{blocks} / {CarryLimits.MaxBlocks}";
             carryWeight.text = $"{Loc.Number(weight, "0.0")} / {CarryLimits.MaxWeight:0} kg";
             ShowShare(carryBlocks, (float)blocks / CarryLimits.MaxBlocks);

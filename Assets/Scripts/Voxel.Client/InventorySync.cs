@@ -44,6 +44,7 @@ namespace Voxel.Client
 
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private EcosystemSync ecosystemSync;
+        [SerializeField] private SkillSync skillSync;
 
         // Local copy of the inventory of this machine's player, when it is not the server.
         private readonly Inventory received = new Inventory();
@@ -70,8 +71,16 @@ namespace Voxel.Client
         // Raised on the player's machine when a seed they sowed did not sprout, with why and its species.
         public event Action<SowRefusal, int> SowRefused;
 
+        // Items' weights as the local player carries them: their wood lighter by their skills.
+        public ItemWeights LocalCarriedWeights =>
+            skillSync != null ? ecosystemSync.ItemWeights.WithWoodFactor(skillSync.LocalWoodWeightFactor) : ecosystemSync.ItemWeights;
+
+        // Server side: the same for a player.
+        public ItemWeights CarriedWeights(ulong clientId) =>
+            skillSync != null ? ecosystemSync.ItemWeights.WithWoodFactor(skillSync.WoodWeightFactor(clientId)) : ecosystemSync.ItemWeights;
+
         // How many more of an item the local player can carry.
-        public int LocalRoomFor(int item) => Creative ? int.MaxValue : CarryLimits.Room(Inventory, item, ecosystemSync.ItemWeights);
+        public int LocalRoomFor(int item) => Creative ? int.MaxValue : CarryLimits.Room(Inventory, item, LocalCarriedWeights);
 
         // Which limit an item runs into: blocks are counted, everything else weighed.
         public static FullReason ReasonFor(int item) => CarryLimits.CountsAsBlock(item) ? FullReason.Blocks : FullReason.Weight;
@@ -170,7 +179,7 @@ namespace Voxel.Client
             if (item == Items.None || count <= 0) return 0;
             if (registry == null || !registry.TryGetState(clientId, out PlayerState state)) return 0;
 
-            int given = Receive(state, item, count);
+            int given = Receive(clientId, state, item, count);
             if (given > 0) Publish(clientId);
             return given;
         }
@@ -200,11 +209,11 @@ namespace Voxel.Client
         {
             if (registry == null || !registry.TryGetState(clientId, out PlayerState state)) return 0;
 
-            return RoomIn(state, item);
+            return RoomIn(clientId, state, item);
         }
 
-        private int RoomIn(PlayerState state, int item) =>
-            state.Creative ? int.MaxValue : CarryLimits.Room(state.Inventory, item, ecosystemSync.ItemWeights);
+        private int RoomIn(ulong clientId, PlayerState state, int item) =>
+            state.Creative ? int.MaxValue : CarryLimits.Room(state.Inventory, item, CarriedWeights(clientId));
 
         // Server side: whether an action giving these rewards may go ahead. One giving nothing at all
         // may; one giving something of which nothing fits may not, and the player is told why.
@@ -291,7 +300,7 @@ namespace Voxel.Client
             else Send(GiveMessage, item, count);
         }
 
-        // Plants a seed in the given block column. Gardeners only.
+        // Plants a seed in the given block column.
         public void RequestPlant(int seed, int x, int z)
         {
             if (!running) return;
@@ -323,7 +332,7 @@ namespace Voxel.Client
             bag.CopyFrom(state.Inventory);
             if (carcassInBag != Items.None && !bag.TryRemove(carcassInBag)) return false;
 
-            int room = state.Creative ? int.MaxValue : CarryLimits.Room(bag, meat, ecosystemSync.ItemWeights);
+            int room = state.Creative ? int.MaxValue : CarryLimits.Room(bag, meat, CarriedWeights(clientId));
             int count = Math.Min(Butchery.FieldMeat(animal), room);
             if (count <= 0)
             {
@@ -333,7 +342,7 @@ namespace Voxel.Client
 
             if (!take()) return false;
 
-            Receive(state, meat, count);
+            Receive(clientId, state, meat, count);
             if (!state.Creative) state.Stomach.Burn(Butchery.LabourOf(animal));
             Publish(clientId);
             return true;
@@ -388,7 +397,7 @@ namespace Voxel.Client
             if (!found || !registry.TryGetState(nearestId, out PlayerState receiver)) return;
 
             // The receiver only takes what they can carry, and the giver only loses that.
-            int given = Math.Min(Math.Min(count, giver.Inventory.Count(item)), RoomIn(receiver, item));
+            int given = Math.Min(Math.Min(count, giver.Inventory.Count(item)), RoomIn(nearestId, receiver, item));
             if (given <= 0)
             {
                 if (giver.Inventory.Has(item)) TellFull(clientId, FullReason.Receiver);
@@ -396,16 +405,16 @@ namespace Voxel.Client
             }
 
             giver.Inventory.TryRemove(item, given);
-            Receive(receiver, item, given);
+            Receive(nearestId, receiver, item, given);
             Publish(clientId);
             Publish(nearestId);
         }
 
         // Adds items to a player's inventory, as many as they can carry, and returns how many; an
         // item they did not have takes an empty hotbar slot.
-        private int Receive(PlayerState state, int item, int count)
+        private int Receive(ulong clientId, PlayerState state, int item, int count)
         {
-            int given = Math.Min(count, RoomIn(state, item));
+            int given = Math.Min(count, RoomIn(clientId, state, item));
             if (given <= 0) return 0;
 
             bool had = state.Inventory.Has(item);
@@ -526,13 +535,7 @@ namespace Voxel.Client
             if (!Items.IsSeed(seed) || !state.Inventory.Has(seed)) return;
             if (IsStarving(clientId)) return;
 
-            // Anyone plants a tree; only gardeners plant crops.
             int species = Items.SeedSpecies(seed);
-            if (!ecosystemSync.IsTree(species) && state.Speciality != Speciality.Gardener)
-            {
-                TellSowRefused(clientId, SowRefusal.NotGardener, species);
-                return;
-            }
 
             // The seed is only spent if it actually sprouted; otherwise the player is told why.
             if (ecosystemSync.TryPlantSeed(clientId, species, x, z, out SowRefusal refusal)) TryConsumePlaced(clientId, seed);

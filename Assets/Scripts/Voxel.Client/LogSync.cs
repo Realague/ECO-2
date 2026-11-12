@@ -8,11 +8,17 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // The logs felled trees leave on the ground, one wood each (MiningRules.LogsOf). The server keeps
-    // them (LyingLogs) and saves them with the world (logs.dat), drops a tree's logs along where it
-    // fell (LogPlacement.AlongFall, shown once it has hit the ground), keeps them resting on the ground
-    // when blocks change under or into them, and gives one to a player picking it up with a right
-    // click if they can carry it. Every machine with a display draws them (LogViews).
+    // The logs felled trees leave on the ground, each worth MiningRules.WoodPerLog wood. The server
+    // keeps them (LyingLogs) and saves them with the world (logs.dat), drops a tree's logs along where
+    // it fell (LogPlacement.AlongFall, shown once it has hit the ground), keeps them resting on the
+    // ground when blocks change under or into them, and gives one to a player picking it up with a
+    // right click if they can carry it. Every machine with a display draws them (LogViews).
+    //
+    // It also keeps the trees lying felled (FallenTrees, fallen.dat): a felled tree lies with its
+    // branches (drawn by PlantRenderer, lying as it fell) until they are pruned with the axe, then as a
+    // row of logs (drawn as logs) bucked off one at a time from its top, each becoming a log lying on
+    // the ground. Skills may do either step at once (SkillInteractions.AutoPrune, AutoBuck). A block
+    // changing under or into a fallen tree breaks it into logs at once.
     public class LogSync : MonoBehaviour
     {
         private const string AllMessage = "Log.All";
@@ -20,7 +26,16 @@ namespace Voxel.Client
         private const string RemovedMessage = "Log.Removed";
         private const string MovedMessage = "Log.Moved";
         private const string PickupMessage = "Log.Pickup";
+        private const string FallenAllMessage = "Fallen.All";
+        private const string FallenAddedMessage = "Fallen.Added";
+        private const string FallenChangedMessage = "Fallen.Changed";
+        private const string FallenRemovedMessage = "Fallen.Removed";
         private const string SaveFileName = "logs.dat";
+        private const string FallenFileName = "fallen.dat";
+
+        // How close a pointer ray must pass to a fallen tree with its branches, around each log of it.
+        private const float CrownHalfWidth = 0.9f;
+        private const float CrownHeight = 1.4f;
 
         private const int EntrySize = sizeof(int) + 4 * sizeof(float) + sizeof(ushort);
 
@@ -36,6 +51,7 @@ namespace Voxel.Client
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private WorldSync worldSync;
         [SerializeField] private ClaimSync claimSync;
+        [SerializeField] private SkillSync skillSync;
         [SerializeField] private Material cutMaterial;
 
         private struct Shown
@@ -48,6 +64,12 @@ namespace Voxel.Client
 
         // Every machine: the logs lying in the world.
         private readonly Dictionary<int, Shown> shown = new Dictionary<int, Shown>();
+
+        // Every machine: the trees lying felled (on the host, the server's own), and when each shows.
+        private FallenTrees fallen = new FallenTrees();
+        private readonly Dictionary<int, float> fallenVisibleAt = new Dictionary<int, float>();
+        private string fallenPath;
+        private readonly List<int> fallenInColumn = new List<int>();
 
         // Server side.
         private readonly List<(System.Numerics.Vector3 position, float yaw)> placed = new List<(System.Numerics.Vector3, float)>();
@@ -75,6 +97,10 @@ namespace Voxel.Client
                 shown[log.Id] = new Shown { Log = log };
             }
 
+            fallenPath = Path.Combine(directory, FallenFileName);
+            fallen = LoadFallen(fallenPath, ecosystemSync.PlantAssets.Count);
+            foreach (FallenTree tree in fallen.All) ShowFallen(tree, 0f);
+
             serverWorld = worldSync.World;
             if (serverWorld != null) serverWorld.BlockChanged += OnBlockChanged;
             Messaging.RegisterNamedMessageHandler(PickupMessage, OnPickup);
@@ -89,6 +115,10 @@ namespace Voxel.Client
             Messaging.RegisterNamedMessageHandler(AddedMessage, OnAdded);
             Messaging.RegisterNamedMessageHandler(RemovedMessage, OnRemoved);
             Messaging.RegisterNamedMessageHandler(MovedMessage, OnMoved);
+            Messaging.RegisterNamedMessageHandler(FallenAllMessage, OnFallenAll);
+            Messaging.RegisterNamedMessageHandler(FallenAddedMessage, OnFallenAdded);
+            Messaging.RegisterNamedMessageHandler(FallenChangedMessage, OnFallenChanged);
+            Messaging.RegisterNamedMessageHandler(FallenRemovedMessage, OnFallenRemoved);
         }
 
         public void Stop()
@@ -104,10 +134,12 @@ namespace Voxel.Client
             store = null;
             serverWorld = null;
             shown.Clear();
+            fallen = new FallenTrees();
+            fallenVisibleAt.Clear();
             running = false;
         }
 
-        // Server side: writes the logs lying in the world next to the other saves.
+        // Server side: writes the logs lying in the world, and the fallen trees, next to the other saves.
         public void Save()
         {
             if (store == null) return;
@@ -115,6 +147,7 @@ namespace Voxel.Client
             try
             {
                 store.SaveToFile(savePath);
+                fallen.SaveToFile(fallenPath);
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
             {
@@ -151,6 +184,345 @@ namespace Voxel.Client
             added.Clear();
             added.Add(store.Add(position, yaw, species));
             Publish(added, 0f);
+        }
+
+        // ---- Fallen trees ----
+
+        // Server side: a felled tree lying where it fell, its count logs placed along the fall (as
+        // DropAlongFall would lay them), with these branches; shown after delay seconds. Felled by a
+        // player whose skills buck a pruned tree at once, it is bucked at once if it has no branches.
+        internal void AddFallen(ulong feller, PlantView plant, float yaw, Vector3 foot, Vector3 direction, float start, float length, int count, int branches, float delay)
+        {
+            if (!IsServer || serverWorld == null || count <= 0) return;
+
+            LogPlacement.AlongFall(serverWorld, foot.ToNumerics(), direction.ToNumerics(), start, length, count, placed);
+            var segments = new List<FallenSegment>();
+            foreach ((System.Numerics.Vector3 position, float logYaw) in placed) segments.Add(new FallenSegment(position, logYaw));
+
+            FallenTree tree = fallen.Add(plant.SpeciesIndex, plant.Stage, plant.X, plant.Y, plant.Z, yaw, branches, segments);
+            if (tree.Branches == 0 && skillSync != null && skillSync.Has(feller, SkillBonusKind.Interaction, SkillInteractions.AutoBuck))
+            {
+                BuckAll(tree, delay);
+                return;
+            }
+
+            ShowFallen(tree, delay);
+            foreach (ulong clientId in networkManager.ConnectedClientsIds)
+            {
+                if (clientId == networkManager.LocalClientId) continue;
+
+                SendFallen(FallenAddedMessage, clientId, writer =>
+                {
+                    writer.WriteValueSafe(delay);
+                    WriteFallen(writer, tree);
+                });
+            }
+        }
+
+        public bool HasFallen(int fallenId) => fallen.TryGet(fallenId, out _);
+
+        public bool TryGetFallen(int fallenId, out FallenTree tree) => fallen.TryGet(fallenId, out tree);
+
+        // The SkillContext of work on a fallen tree: pruning it or bucking it.
+        public string SkillContextOf(FallenTree tree)
+        {
+            string species = (uint)tree.Species < (uint)ecosystemSync.PlantAssets.Count ? ecosystemSync.PlantAssets[tree.Species].name : tree.Species.ToString();
+            return SkillContext.Of(SkillContext.Fell, species, tree.Branches > 0 ? SkillContext.Prune : SkillContext.Buck);
+        }
+
+        // The axe hits the next part of a fallen tree takes for the local player, with their skills.
+        public int LocalHitsNeeded(FallenTree tree)
+        {
+            int hits = FallenTreeRules.HitsFor(tree);
+            return skillSync != null ? SkillBonuses.Hits(hits, skillSync.LocalBonus(SkillBonusKind.TimePercent, SkillContextOf(tree))) : hits;
+        }
+
+        // What a fallen tree is, for the aiming label: "Fallen oak · 3 branches", "Fallen oak · 4 logs".
+        public string DescribeFallen(int fallenId)
+        {
+            if (!fallen.TryGet(fallenId, out FallenTree tree) || (uint)tree.Species >= (uint)ecosystemSync.PlantAssets.Count) return null;
+
+            string species = EcosystemSync.DisplayName(ecosystemSync.PlantAssets[tree.Species].name);
+            string name = Loc.T("Fallen {1}", Loc.Name(species), Loc.Lower(species));
+            return tree.Branches > 0
+                ? Loc.T("{0} · {1} branches", name, tree.Branches)
+                : Loc.T("{0} · {1} logs", name, tree.Segments.Count);
+        }
+
+        // The fallen tree the local player points at, at most maxDistance away: around each of its
+        // logs, wide and high while it has its branches, as a log once pruned.
+        public bool TryAimedFallen(Vector3 origin, Vector3 direction, float maxDistance, out int fallenId, out float distance)
+        {
+            fallenId = 0;
+            distance = maxDistance;
+            float now = Time.time;
+            System.Numerics.Vector3 from = origin.ToNumerics();
+            System.Numerics.Vector3 to = (origin + direction * maxDistance).ToNumerics();
+            foreach (FallenTree tree in fallen.All)
+            {
+                if (fallenVisibleAt.TryGetValue(tree.Id, out float visibleAt) && visibleAt > now) continue;
+
+                float half = tree.Branches > 0 ? CrownHalfWidth : PickHalfWidth;
+                float height = tree.Branches > 0 ? CrownHeight : PickHeight;
+                foreach (FallenSegment segment in tree.Segments)
+                {
+                    System.Numerics.Vector3 position = segment.Position;
+                    var min = new System.Numerics.Vector3(position.X - half, position.Y, position.Z - half);
+                    var max = new System.Numerics.Vector3(position.X + half, position.Y + height, position.Z + half);
+                    float along = ArrowFlight.SegmentEntry(from, to, min, max);
+                    if (along >= 0f && along < distance)
+                    {
+                        distance = along;
+                        fallenId = tree.Id;
+                    }
+                }
+            }
+
+            return fallenId != 0;
+        }
+
+        // Server side: a hit on a fallen tree counts if it is within reach, not on someone else's land,
+        // and the player owns an axe; needed is the hits of its next part (with the player's skills),
+        // calories one axe hit's (before skills), context what the skills see of it.
+        internal bool CheckFallenHit(ulong clientId, int fallenId, out int needed, out float calories, out string context, out int species, out Vector3 min, out Vector3 max)
+        {
+            needed = 0;
+            calories = HungerRules.PerAxeHit;
+            context = null;
+            species = 0;
+            min = max = Vector3.zero;
+            if (!IsServer || !fallen.TryGet(fallenId, out FallenTree tree) || tree.Segments.Count == 0) return false;
+            if (!networkManager.ConnectedClients.TryGetValue(clientId, out NetworkClient client) || client.PlayerObject == null) return false;
+
+            Vector3 eyes = client.PlayerObject.transform.position + Vector3.up * PlayerRules.EyeHeight;
+            float reach = PlayerRules.Reach + BlockEditRules.ReachTolerance + CrownHalfWidth + 1f;
+            bool near = false;
+            foreach (FallenSegment segment in tree.Segments)
+            {
+                if ((segment.Position.ToUnity() - eyes).sqrMagnitude <= reach * reach) near = true;
+            }
+
+            if (!near || !claimSync.Check(clientId, tree.X, tree.Z) || !inventorySync.Owns(clientId, Items.Axe)) return false;
+
+            context = SkillContextOf(tree);
+            species = tree.Species;
+            needed = FallenTreeRules.HitsFor(tree);
+            FallenSegment top = tree.Segments[tree.Segments.Count - 1];
+            float half = tree.Branches > 0 ? CrownHalfWidth : PickHalfWidth;
+            min = top.Position.ToUnity() - new Vector3(half + 20f, 1f, half + 20f);
+            max = top.Position.ToUnity() + new Vector3(half + 20f, CrownHeight + 1f, half + 20f);
+            return true;
+        }
+
+        // Server side: the last hit of a fallen tree's next part: a branch comes off (and, the last one
+        // off, a player whose skills buck at once has its logs fall apart), or its top log comes off and
+        // lies on the ground.
+        internal void FinishFallenPart(ulong clientId, int fallenId)
+        {
+            if (!IsServer || !fallen.TryGet(fallenId, out FallenTree tree)) return;
+
+            if (tree.Branches > 0)
+            {
+                fallen.Prune(fallenId);
+                if (tree.Branches == 0 && skillSync != null && skillSync.Has(clientId, SkillBonusKind.Interaction, SkillInteractions.AutoBuck))
+                {
+                    BuckAll(tree, 0f);
+                    return;
+                }
+
+                if (tree.Branches == 0) ecosystemSync.EndLying(fallenId);
+                BroadcastFallenChanged(tree);
+                return;
+            }
+
+            if (!fallen.Buck(fallenId, out FallenSegment log)) return;
+
+            DropLog(log, tree.Species);
+            if (fallen.TryGet(fallenId, out _)) BroadcastFallenChanged(tree);
+            else RemoveFallen(fallenId, false);
+        }
+
+        // Server side: the whole trunk falls apart into logs where they lie, its branches lost.
+        private void BuckAll(FallenTree tree, float delay)
+        {
+            added.Clear();
+            foreach (FallenSegment segment in tree.Segments) added.Add(store.Add(Settled(segment.Position), segment.Yaw, tree.Species));
+            Publish(added, delay);
+            RemoveFallen(tree.Id, true);
+        }
+
+        private void DropLog(FallenSegment log, int species)
+        {
+            added.Clear();
+            added.Add(store.Add(Settled(log.Position), log.Yaw, species));
+            Publish(added, 0f);
+        }
+
+        private System.Numerics.Vector3 Settled(System.Numerics.Vector3 position) =>
+            serverWorld != null && LogPlacement.Settle(serverWorld, position, out System.Numerics.Vector3 settled) ? settled : position;
+
+        private void RemoveFallen(int fallenId, bool removeFromStore)
+        {
+            if (removeFromStore) fallen.Remove(fallenId);
+            fallenVisibleAt.Remove(fallenId);
+            ecosystemSync.EndLying(fallenId);
+            foreach (ulong clientId in networkManager.ConnectedClientsIds)
+            {
+                if (clientId == networkManager.LocalClientId) continue;
+
+                SendFallen(FallenRemovedMessage, clientId, writer => writer.WriteValueSafe(fallenId));
+            }
+        }
+
+        private void BroadcastFallenChanged(FallenTree tree)
+        {
+            foreach (ulong clientId in networkManager.ConnectedClientsIds)
+            {
+                if (clientId == networkManager.LocalClientId) continue;
+
+                SendFallen(FallenChangedMessage, clientId, writer =>
+                {
+                    writer.WriteValueSafe(tree.Id);
+                    writer.WriteValueSafe(tree.Branches);
+                    writer.WriteValueSafe(tree.Segments.Count);
+                });
+            }
+        }
+
+        // This machine: a fallen tree to show, lying with its branches (PlantRenderer) until pruned.
+        private void ShowFallen(FallenTree tree, float delay)
+        {
+            fallenVisibleAt[tree.Id] = Time.time + delay;
+            if (tree.Branches > 0) ecosystemSync.ShowLying(tree.Id, ViewOf(tree), tree.Yaw);
+        }
+
+        private static PlantView ViewOf(FallenTree tree) => new PlantView { SpeciesIndex = tree.Species, Stage = tree.Stage, X = tree.X, Y = tree.Y, Z = tree.Z };
+
+        private delegate void FallenWriter(FastBufferWriter writer);
+
+        private void SendFallen(string message, ulong clientId, FallenWriter write)
+        {
+            using (var writer = new FastBufferWriter(256, Allocator.Temp, 1 << 24))
+            {
+                write(writer);
+                Messaging.SendNamedMessage(message, clientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
+            }
+        }
+
+        private static void WriteFallen(FastBufferWriter writer, FallenTree tree)
+        {
+            writer.WriteValueSafe(tree.Id);
+            writer.WriteValueSafe((ushort)tree.Species);
+            writer.WriteValueSafe((byte)tree.Stage);
+            writer.WriteValueSafe(tree.X);
+            writer.WriteValueSafe(tree.Y);
+            writer.WriteValueSafe(tree.Z);
+            writer.WriteValueSafe(tree.Yaw);
+            writer.WriteValueSafe(tree.Branches);
+            writer.WriteValueSafe(tree.Segments.Count);
+            foreach (FallenSegment segment in tree.Segments)
+            {
+                writer.WriteValueSafe(segment.Position.X);
+                writer.WriteValueSafe(segment.Position.Y);
+                writer.WriteValueSafe(segment.Position.Z);
+                writer.WriteValueSafe(segment.Yaw);
+            }
+        }
+
+        private bool TryReadFallen(FastBufferReader reader, out FallenTree tree)
+        {
+            tree = new FallenTree();
+            reader.ReadValueSafe(out tree.Id);
+            reader.ReadValueSafe(out ushort species);
+            reader.ReadValueSafe(out byte stage);
+            reader.ReadValueSafe(out tree.X);
+            reader.ReadValueSafe(out tree.Y);
+            reader.ReadValueSafe(out tree.Z);
+            reader.ReadValueSafe(out tree.Yaw);
+            reader.ReadValueSafe(out tree.Branches);
+            reader.ReadValueSafe(out int count);
+            tree.Species = species;
+            tree.Stage = stage;
+            bool valid = species < ecosystemSync.PlantAssets.Count && count >= 0 && count <= 1000 && float.IsFinite(tree.Yaw);
+            for (int i = 0; i < count && i <= 1000; i++)
+            {
+                reader.ReadValueSafe(out float x);
+                reader.ReadValueSafe(out float y);
+                reader.ReadValueSafe(out float z);
+                reader.ReadValueSafe(out float yaw);
+                if (!float.IsFinite(x) || !float.IsFinite(y) || !float.IsFinite(z) || !float.IsFinite(yaw)) valid = false;
+                tree.Segments.Add(new FallenSegment(new System.Numerics.Vector3(x, y, z), yaw));
+            }
+
+            return valid;
+        }
+
+        private void OnFallenAll(ulong senderId, FastBufferReader reader)
+        {
+            foreach (FallenTree tree in fallen.All) ecosystemSync.EndLying(tree.Id);
+            fallen.Clear();
+            fallenVisibleAt.Clear();
+            reader.ReadValueSafe(out int count);
+            for (int i = 0; i < count; i++)
+            {
+                if (!TryReadFallen(reader, out FallenTree tree)) continue;
+
+                fallen.Put(tree);
+                ShowFallen(tree, 0f);
+            }
+        }
+
+        private void OnFallenAdded(ulong senderId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out float delay);
+            if (!TryReadFallen(reader, out FallenTree tree)) return;
+
+            fallen.Put(tree);
+            ShowFallen(tree, float.IsFinite(delay) ? Mathf.Clamp(delay, 0f, 5f) : 0f);
+        }
+
+        private void OnFallenChanged(ulong senderId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out int fallenId);
+            reader.ReadValueSafe(out int branches);
+            reader.ReadValueSafe(out int logs);
+            if (!fallen.TryGet(fallenId, out FallenTree tree)) return;
+
+            tree.Branches = Mathf.Max(0, branches);
+            if (logs >= 0 && logs < tree.Segments.Count) tree.Segments.RemoveRange(logs, tree.Segments.Count - logs);
+            if (tree.Branches == 0) ecosystemSync.EndLying(fallenId);
+        }
+
+        private void OnFallenRemoved(ulong senderId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out int fallenId);
+            fallen.Remove(fallenId);
+            fallenVisibleAt.Remove(fallenId);
+            ecosystemSync.EndLying(fallenId);
+        }
+
+        // Fallen trees of a species this game does not know are dropped.
+        private static FallenTrees LoadFallen(string path, int speciesCount)
+        {
+            if (!File.Exists(path)) return new FallenTrees();
+
+            try
+            {
+                FallenTrees loaded = FallenTrees.LoadFromFile(path);
+                var unknown = new List<int>();
+                foreach (FallenTree tree in loaded.All)
+                {
+                    if (tree.Species >= speciesCount) unknown.Add(tree.Id);
+                }
+
+                foreach (int id in unknown) loaded.Remove(id);
+                return loaded;
+            }
+            catch (Exception e) when (e is IOException || e is InvalidDataException || e is UnauthorizedAccessException)
+            {
+                Debug.LogWarning($"The fallen trees could not be loaded ({e.Message}): the world starts without any.");
+                return new FallenTrees();
+            }
         }
 
         // Server side: whether a log lies in this cell (storage cannot be placed over it).
@@ -213,7 +585,7 @@ namespace Voxel.Client
 
         private void LateUpdate()
         {
-            if (!running || Application.isBatchMode || shown.Count == 0) return;
+            if (!running || Application.isBatchMode || (shown.Count == 0 && fallen.Count == 0)) return;
 
             if (views == null) views = new LogViews(ecosystemSync.PlantAssets, cutMaterial);
 
@@ -222,6 +594,14 @@ namespace Voxel.Client
             foreach (Shown entry in shown.Values)
             {
                 if (entry.VisibleAt <= now) views.Add(OnShownGround(world, entry.Log.Position.ToUnity()), entry.Log.Yaw, entry.Log.Species);
+            }
+
+            // A pruned fallen tree is its row of logs, still to be bucked off.
+            foreach (FallenTree tree in fallen.All)
+            {
+                if (tree.Branches > 0 || (fallenVisibleAt.TryGetValue(tree.Id, out float visibleAt) && visibleAt > now)) continue;
+
+                foreach (FallenSegment segment in tree.Segments) views.Add(OnShownGround(world, segment.Position.ToUnity()), segment.Yaw, tree.Species);
             }
 
             views.Render();
@@ -264,6 +644,21 @@ namespace Voxel.Client
                         Messaging.SendNamedMessage(MovedMessage, clientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
                     }
                 }
+            }
+
+            // A fallen tree a block changed under or into falls apart into logs, its branches lost.
+            fallen.InColumn(pos.X, pos.Z, fallenInColumn);
+            foreach (int id in fallenInColumn)
+            {
+                if (!fallen.TryGet(id, out FallenTree tree)) continue;
+
+                bool near = tree.X == pos.X && tree.Z == pos.Z && Mathf.Abs(tree.Y - pos.Y) <= SettleRange + 1;
+                foreach (FallenSegment segment in tree.Segments)
+                {
+                    if (Mathf.FloorToInt(segment.Position.X) == pos.X && Mathf.FloorToInt(segment.Position.Z) == pos.Z && Mathf.Abs(segment.Position.Y - pos.Y) <= SettleRange + 1) near = true;
+                }
+
+                if (near) BuckAll(tree, 0f);
             }
         }
 
@@ -343,6 +738,12 @@ namespace Voxel.Client
 
                 Messaging.SendNamedMessage(AllMessage, clientId, writer, NetworkDelivery.ReliableFragmentedSequenced);
             }
+
+            SendFallen(FallenAllMessage, clientId, writer =>
+            {
+                writer.WriteValueSafe(fallen.Count);
+                foreach (FallenTree tree in fallen.All) WriteFallen(writer, tree);
+            });
         }
 
         private void OnPickup(ulong senderId, FastBufferReader reader)

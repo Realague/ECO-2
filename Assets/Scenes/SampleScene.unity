@@ -646,6 +646,7 @@ GameObject:
   - component: {fileID: 490447459}
   - component: {fileID: 490447460}
   - component: {fileID: 490447461}
+  - component: {fileID: 490447462}
   m_Layer: 0
   m_Name: GameSession
   m_TagString: Untagged
@@ -677,6 +678,7 @@ MonoBehaviour:
   storageSync: {fileID: 490447458}
   claimSync: {fileID: 490447459}
   craftingSync: {fileID: 490447460}
+  skillSync: {fileID: 490447462}
   appearanceSync: {fileID: 490447452}
   commandSync: {fileID: 490447453}
   playerListSync: {fileID: 490447461}
@@ -686,6 +688,9 @@ MonoBehaviour:
   port: 50000
   autosaveInterval: 60
   openRouterPort: 1
+  showAllSkills: 0
+  showAllSkillTiers: 0
+  showSkillDetails: 0
 --- !u!4 &490447446
 Transform:
   m_ObjectHideFlags: 0
@@ -734,6 +739,7 @@ MonoBehaviour:
   networkManager: {fileID: 947039382}
   inventorySync: {fileID: 490447450}
   logSync: {fileID: 490447456}
+  skillSync: {fileID: 490447462}
   worldSync: {fileID: 490447447}
   claimSync: {fileID: 490447459}
   speciesAssets:
@@ -817,6 +823,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.InventorySync
   networkManager: {fileID: 947039382}
   ecosystemSync: {fileID: 490447448}
+  skillSync: {fileID: 490447462}
 --- !u!114 &490447451
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -878,6 +885,7 @@ MonoBehaviour:
   networkManager: {fileID: 947039382}
   inventorySync: {fileID: 490447450}
   ecosystemSync: {fileID: 490447448}
+  skillSync: {fileID: 490447462}
   worldSync: {fileID: 490447447}
 --- !u!114 &490447455
 MonoBehaviour:
@@ -918,6 +926,7 @@ MonoBehaviour:
   ecosystemSync: {fileID: 490447448}
   worldSync: {fileID: 490447447}
   claimSync: {fileID: 490447459}
+  skillSync: {fileID: 490447462}
   cutMaterial: {fileID: 2100000, guid: a5265f9b2e89b6145b3cde7c40adc3e8, type: 2}
 --- !u!114 &490447457
 MonoBehaviour:
@@ -937,6 +946,8 @@ MonoBehaviour:
   inventorySync: {fileID: 490447450}
   hungerSync: {fileID: 490447454}
   storageSync: {fileID: 490447458}
+  logSync: {fileID: 490447456}
+  skillSync: {fileID: 490447462}
   crackMaterial: {fileID: 2100000, guid: 341a025f25f71654d9010b1edd2ff0be, type: 2}
   chipMaterial: {fileID: 2100000, guid: 97d107f19ba5224459f56d2911206ee9, type: 2}
 --- !u!114 &490447458
@@ -991,6 +1002,7 @@ MonoBehaviour:
   inventorySync: {fileID: 490447450}
   hungerSync: {fileID: 490447454}
   ecosystemSync: {fileID: 490447448}
+  skillSync: {fileID: 490447462}
 --- !u!114 &490447461
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1004,6 +1016,23 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Voxel.Client::Voxel.Client.PlayerListSync
   networkManager: {fileID: 947039382}
+--- !u!114 &490447462
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 490447444}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6688464eb80b614f9dd10750ebb410c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.SkillSync
+  networkManager: {fileID: 947039382}
+  inventorySync: {fileID: 490447450}
+  hotbar: {fileID: 408005230}
+  skillAssets:
+  - {fileID: 11400000, guid: b07b63a99cdac8b4f9f4c0f16303ae8f, type: 2}
 --- !u!1 &593756662
 GameObject:
   m_ObjectHideFlags: 0
@@ -1401,6 +1430,7 @@ MonoBehaviour:
   mapScreen: {fileID: 822296572}
   hotbar: {fileID: 408005230}
   craftingSync: {fileID: 490447460}
+  skillSync: {fileID: 490447462}
 --- !u!114 &1141440428
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2099,6 +2129,7 @@ MonoBehaviour:
   inventoryScreen: {fileID: 1141440427}
   hotbar: {fileID: 408005230}
   inventorySync: {fileID: 490447450}
+  logSync: {fileID: 490447456}
   document: {fileID: 2081992071}
 --- !u!114 &2081992071
 MonoBehaviour:

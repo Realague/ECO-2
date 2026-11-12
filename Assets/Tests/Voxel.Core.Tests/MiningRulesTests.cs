@@ -51,7 +51,7 @@ namespace Voxel.Core.Tests
         {
             Assert.AreEqual(1, MiningRules.HitsToFell(0), "a plant without wood is cut at once");
             Assert.AreEqual(MiningRules.FewestFellingHits, MiningRules.HitsToFell(1));
-            Assert.AreEqual(16, MiningRules.HitsToFell(4), "four hits a wood");
+            Assert.AreEqual(8, MiningRules.HitsToFell(4), "two hits a wood (then it is pruned and bucked)");
             Assert.AreEqual(4, MiningRules.LogsOf(4), "a log a wood");
             Assert.AreEqual(3, MiningRules.WoodPerLog);
             Assert.AreEqual(0, MiningRules.LogsOf(0));

@@ -1,0 +1,523 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f158e2fc7b558d24ead26d0bb5d206d2, type: 3}
+  m_Name: Felling
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.SkillAsset
+  id: felling
+  displayName: Felling
+  description: Felling trees, pruning their branches and bucking their trunks into logs, with an axe. Every calorie spent on it teaches you.
+  icon: {fileID: 2800000, guid: e70e4cfbb2813e84a917d19b160561b9, type: 3}
+  prerequisites: []
+  unlocks:
+  - context: fell
+    tool: 3
+  xpContexts:
+  - fell
+  pointsPerTier: 4
+  tiers:
+  - name: Firewood, softwood and splitting
+    description: 'You hit hard, sometimes crooked, but it comes down. You know how to split softwood logs to light a fire: that''s something.'
+    xpQuota: 100
+    upgrades:
+    - id: calories
+      name: Calorie cost
+      icon: {fileID: 2800000, guid: cc1005199cdb0014ebeb7bf0d47385dc, type: 3}
+      tags:
+      - felling
+      description: 'Each axe hit on a tree burns fewer calories: 5 % fewer a step. You learn as much.'
+      technicalDescription: "CaloriePercent on fell: calories \xD7 (1 - %); experience counts them before."
+      cost: 1
+      steps:
+      - tier: 0
+        bonuses:
+        - kind: 4
+          context: fell
+          value: 5
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 4
+          context: fell
+          value: 10
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 4
+          context: fell
+          value: 15
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 4
+          context: fell
+          value: 20
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 4
+          context: fell
+          value: 25
+          formula: 
+      choices: []
+      maxChoices: 0
+      requires: []
+      replaces: 
+      hidden: 0
+    - id: stackSize
+      name: Log weight
+      icon: {fileID: 2800000, guid: 9b077e6562c73ae4cb4fdade5fb520c4, type: 3}
+      tags:
+      - felling
+      description: 'The wood you carry weighs less: 5 % lighter a step.'
+      technicalDescription: "WeightPercent on wood: every wood's weight \xD7 (1 - %)."
+      cost: 1
+      steps:
+      - tier: 0
+        bonuses:
+        - kind: 5
+          context: wood
+          value: 5
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 5
+          context: wood
+          value: 10
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 5
+          context: wood
+          value: 15
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 5
+          context: wood
+          value: 20
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 5
+          context: wood
+          value: 25
+          formula: 
+      choices: []
+      maxChoices: 0
+      requires: []
+      replaces: 
+      hidden: 0
+    - id: speed
+      name: Cutting speed
+      icon: {fileID: 2800000, guid: e70e4cfbb2813e84a917d19b160561b9, type: 3}
+      tags:
+      - felling
+      description: 'Fewer axe hits to fell, prune and buck: 5 % fewer a step.'
+      technicalDescription: "TimePercent on fell: hits \xD7 (1 - %), rounded up."
+      cost: 1
+      steps:
+      - tier: 0
+        bonuses:
+        - kind: 2
+          context: fell
+          value: 5
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 2
+          context: fell
+          value: 10
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 2
+          context: fell
+          value: 15
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 2
+          context: fell
+          value: 20
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 2
+          context: fell
+          value: 25
+          formula: 
+      choices: []
+      maxChoices: 0
+      requires: []
+      replaces: 
+      hidden: 0
+    - id: yield
+      name: Cutting yield
+      icon: {fileID: 2800000, guid: 9337c4a08189fb74fb54fd0f33458a87, type: 3}
+      tags:
+      - felling
+      description: 'More logs from each tree you fell: 5 % more a step.'
+      technicalDescription: "YieldPercent on fell: logs \xD7 (1 + %), the fraction a chance of one more."
+      cost: 1
+      steps:
+      - tier: 0
+        bonuses:
+        - kind: 0
+          context: fell
+          value: 5
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 0
+          context: fell
+          value: 10
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 0
+          context: fell
+          value: 15
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 0
+          context: fell
+          value: 20
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 0
+          context: fell
+          value: 25
+          formula: 
+      choices: []
+      maxChoices: 0
+      requires: []
+      replaces: 
+      hidden: 0
+  - name: The art of bucking
+    description: 'There you go: you understand the grain and the point of impact. Your blows are more precise, you waste less material and the wood you get is of better quality.'
+    xpQuota: 250
+    upgrades:
+    - id: calories2
+      name: Calorie cost II
+      icon: {fileID: 2800000, guid: cc1005199cdb0014ebeb7bf0d47385dc, type: 3}
+      tags:
+      - felling
+      description: Each axe hit on a tree burns 32 %, then 40 % fewer calories.
+      technicalDescription: CaloriePercent on fell, in place of Calorie cost.
+      cost: 1
+      steps:
+      - tier: 0
+        bonuses:
+        - kind: 4
+          context: fell
+          value: 32
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 4
+          context: fell
+          value: 40
+          formula: 
+      choices: []
+      maxChoices: 0
+      requires:
+      - calories
+      replaces: calories
+      hidden: 0
+    - id: stackSize2
+      name: Log weight II
+      icon: {fileID: 2800000, guid: 9b077e6562c73ae4cb4fdade5fb520c4, type: 3}
+      tags:
+      - felling
+      description: The wood you carry is 32 %, then 40 % lighter.
+      technicalDescription: WeightPercent on wood, in place of Log weight.
+      cost: 1
+      steps:
+      - tier: 0
+        bonuses:
+        - kind: 5
+          context: wood
+          value: 32
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 5
+          context: wood
+          value: 40
+          formula: 
+      choices: []
+      maxChoices: 0
+      requires:
+      - stackSize
+      replaces: stackSize
+      hidden: 0
+    - id: speed2
+      name: Cutting speed II
+      icon: {fileID: 2800000, guid: e70e4cfbb2813e84a917d19b160561b9, type: 3}
+      tags:
+      - felling
+      description: 32 %, then 40 % fewer axe hits to fell, prune and buck.
+      technicalDescription: TimePercent on fell, in place of Cutting speed.
+      cost: 1
+      steps:
+      - tier: 0
+        bonuses:
+        - kind: 2
+          context: fell
+          value: 32
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 2
+          context: fell
+          value: 40
+          formula: 
+      choices: []
+      maxChoices: 0
+      requires:
+      - speed
+      replaces: speed
+      hidden: 0
+    - id: yield2
+      name: Cutting yield II
+      icon: {fileID: 2800000, guid: 9337c4a08189fb74fb54fd0f33458a87, type: 3}
+      tags:
+      - felling
+      description: 32 %, then 40 % more logs from each tree you fell.
+      technicalDescription: YieldPercent on fell, in place of Cutting yield.
+      cost: 1
+      steps:
+      - tier: 0
+        bonuses:
+        - kind: 0
+          context: fell
+          value: 32
+          formula: 
+      - tier: 0
+        bonuses:
+        - kind: 0
+          context: fell
+          value: 40
+          formula: 
+      choices: []
+      maxChoices: 0
+      requires:
+      - yield
+      replaces: yield
+      hidden: 0
+  - name: Debarking and fine beams
+    description: Wood holds no more secrets for you. You know not only how to fell cleanly, but also how to prepare trunks by stripping their bark to get rough beams ready for use.
+    xpQuota: 500
+    upgrades:
+    - id: autoSteps
+      name: Automatic work
+      icon: {fileID: 2800000, guid: e9a260c684b0e9d45a590e65c439747a, type: 3}
+      tags:
+      - felling
+      description: Two of three steps of felling done for you, as you choose.
+      technicalDescription: Interactions felling.autoBuck, felling.autoPrune, felling.autoStump.
+      cost: 2
+      steps: []
+      choices:
+      - id: autoBuck
+        name: Automatic bucking
+        icon: {fileID: 2800000, guid: e9a260c684b0e9d45a590e65c439747a, type: 3}
+        description: 'Once a tree you work has no branches left, its trunk falls apart into logs at once: no bucking needed.'
+        bonuses:
+        - kind: 7
+          context: felling.autoBuck
+          value: 0
+          formula: 
+      - id: autoPrune
+        name: Automatic pruning
+        icon: {fileID: 2800000, guid: 0f2e6c1599776c54d8f248c2020d2c17, type: 3}
+        description: A tree you fell comes down with its branches already off.
+        bonuses:
+        - kind: 7
+          context: felling.autoPrune
+          value: 0
+          formula: 
+      - id: autoStump
+        name: Automatic stump removal
+        icon: {fileID: 2800000, guid: b57519368aecc0a448c67829cf5d9208, type: 3}
+        description: 'A tree you fell leaves no stump: its log lies at its foot instead, and nothing grows back there.'
+        bonuses:
+        - kind: 7
+          context: felling.autoStump
+          value: 0
+          formula: 
+      maxChoices: 2
+      requires: []
+      replaces: 
+      hidden: 0
+    - id: specialist
+      name: Specialist
+      icon: {fileID: 2800000, guid: 9b077e6562c73ae4cb4fdade5fb520c4, type: 3}
+      tags:
+      - felling
+      description: Not available yet.
+      technicalDescription: 'To come: the effects of both specialists.'
+      cost: 2
+      steps: []
+      choices:
+      - id: charcoal
+        name: Charcoal specialist
+        icon: {fileID: 2800000, guid: 52f62591509ae0c4e91fdc875eb698a9, type: 3}
+        description: Not available yet.
+        bonuses: []
+      - id: log
+        name: Log specialist
+        icon: {fileID: 2800000, guid: 475798aa7b7b82744afbee22d5fc5cf5, type: 3}
+        description: Not available yet.
+        bonuses: []
+      maxChoices: 1
+      requires: []
+      replaces: 
+      hidden: 1
+  - name: Wood expertise
+    description: Your axe is an extension of your arm. You spot exceptional trees at a glance and know how to make the most of every cubic centimetre of fine wood without crumbling it.
+    xpQuota: 1000
+    upgrades:
+    - id: calories3
+      name: Calorie cost III
+      icon: {fileID: 2800000, guid: cc1005199cdb0014ebeb7bf0d47385dc, type: 3}
+      tags:
+      - felling
+      description: Each axe hit on a tree burns half the calories.
+      technicalDescription: CaloriePercent on fell, in place of Calorie cost II.
+      cost: 2
+      steps:
+      - tier: 0
+        bonuses:
+        - kind: 4
+          context: fell
+          value: 50
+          formula: 
+      choices: []
+      maxChoices: 0
+      requires:
+      - calories2
+      replaces: calories2
+      hidden: 0
+    - id: stackSize3
+      name: Log weight III
+      icon: {fileID: 2800000, guid: 9b077e6562c73ae4cb4fdade5fb520c4, type: 3}
+      tags:
+      - felling
+      description: The wood you carry weighs half as much.
+      technicalDescription: WeightPercent on wood, in place of Log weight II.
+      cost: 2
+      steps:
+      - tier: 0
+        bonuses:
+        - kind: 5
+          context: wood
+          value: 50
+          formula: 
+      choices: []
+      maxChoices: 0
+      requires:
+      - stackSize2
+      replaces: stackSize2
+      hidden: 0
+    - id: speed3
+      name: Cutting speed III
+      icon: {fileID: 2800000, guid: e70e4cfbb2813e84a917d19b160561b9, type: 3}
+      tags:
+      - felling
+      description: Half the axe hits to fell, prune and buck.
+      technicalDescription: TimePercent on fell, in place of Cutting speed II.
+      cost: 2
+      steps:
+      - tier: 0
+        bonuses:
+        - kind: 2
+          context: fell
+          value: 50
+          formula: 
+      choices: []
+      maxChoices: 0
+      requires:
+      - speed2
+      replaces: speed2
+      hidden: 0
+    - id: yield3
+      name: Cutting yield III
+      icon: {fileID: 2800000, guid: 9337c4a08189fb74fb54fd0f33458a87, type: 3}
+      tags:
+      - felling
+      description: Half as many logs again from each tree you fell.
+      technicalDescription: YieldPercent on fell, in place of Cutting yield II.
+      cost: 2
+      steps:
+      - tier: 0
+        bonuses:
+        - kind: 0
+          context: fell
+          value: 50
+          formula: 
+      choices: []
+      maxChoices: 0
+      requires:
+      - yield2
+      replaces: yield2
+      hidden: 0
+  - name: Forest communion
+    description: To you, the forest is an open book. You fell century-old giants with artistic ease, extracting perfect wood that will never rot and whose strength defies time.
+    xpQuota: 2000
+    upgrades:
+    - id: expert
+      name: Expert (tier +1)
+      icon: {fileID: 2800000, guid: e70e4cfbb2813e84a917d19b160561b9, type: 3}
+      tags:
+      - felling
+      description: Not available yet.
+      technicalDescription: 'To come: counts the felling skills as one tier higher.'
+      cost: 2
+      steps:
+      - tier: 0
+        bonuses: []
+      - tier: 0
+        bonuses: []
+      - tier: 0
+        bonuses: []
+      - tier: 0
+        bonuses: []
+      - tier: 0
+        bonuses: []
+      choices: []
+      maxChoices: 0
+      requires: []
+      replaces: 
+      hidden: 1
+    - id: autoFelling
+      name: Automatic felling
+      icon: {fileID: 2800000, guid: e70e4cfbb2813e84a917d19b160561b9, type: 3}
+      tags:
+      - felling
+      description: Each axe hit on a standing tree has a 10 % chance to fell it at once.
+      technicalDescription: 'FinishChancePercent on fell: rolled by the server on each axe hit on a standing tree (not when pruning or bucking).'
+      cost: 2
+      steps:
+      - tier: 0
+        bonuses:
+        - kind: 8
+          context: fell
+          value: 10
+          formula: 
+      choices: []
+      maxChoices: 0
+      requires: []
+      replaces: 
+      hidden: 0

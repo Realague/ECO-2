@@ -57,7 +57,7 @@ namespace Voxel.Client
         {
             Inventory inventory = inventorySync.Inventory;
             int blocks = CarryLimits.BlockCount(inventory);
-            float weight = CarryLimits.Weight(inventory, ecosystemSync.ItemWeights);
+            float weight = CarryLimits.Weight(inventory, inventorySync.LocalCarriedWeights);
             bool creative = inventorySync.Creative;
             if (blocks == shownBlocks && Mathf.Approximately(weight, shownWeight) && creative == shownCreative) return;
 

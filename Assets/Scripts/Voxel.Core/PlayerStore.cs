@@ -48,20 +48,24 @@ namespace Voxel.Core
         // Whether they play in creative mode (format 11): items for free, flight, one hit breaks
         // anything, no hunger nor carrying limits. Anyone may switch it on or off.
         public bool Creative;
+
+        // Their skills (format 12): unlocked skills, experience and upgrades bought, by id.
+        public SkillState Skills { get; } = new SkillState();
     }
 
     // The state of every player known to the server, by player id.
     public sealed class PlayerStore
     {
         private const uint Magic = 0x504F4345; // "ECOP"
-        private const int FormatVersion = 11;
+        private const int FormatVersion = 12;
 
         // Older formats still load. Without inventory, the player keeps their position; without
         // appearance, they choose one at their next connection; without a hotbar, theirs starts empty
         // (the server fills it with what they own); without a stomach, theirs starts half full;
         // without tools, they get them at their next connection; without a name or storage, they choose
         // a name and get a chest and a stockpile at their next connection; without torches, a knife or a hammer,
-        // they get them at their next connection; without creative mode, they play in survival.
+        // they get them at their next connection; without creative mode, they play in survival; without
+        // skills, they start with none.
         private const int FormatWithoutInventory = 1;
         private const int FormatWithoutAppearance = 2;
         private const int FormatWithoutHotbar = 3;
@@ -72,6 +76,7 @@ namespace Voxel.Core
         private const int FormatWithoutKnife = 8;
         private const int FormatWithoutHammer = 9;
         private const int FormatWithoutCreative = 10;
+        private const int FormatWithoutSkills = 11;
 
         private readonly Dictionary<string, PlayerState> players = new Dictionary<string, PlayerState>();
 
@@ -147,6 +152,7 @@ namespace Voxel.Core
                     writer.Write(state.ReceivedKnife);
                     writer.Write(state.ReceivedHammer);
                     writer.Write(state.Creative);
+                    state.Skills.Write(writer);
                 }
             }
         }
@@ -225,7 +231,8 @@ namespace Voxel.Core
                     if (formatVersion >= FormatWithoutKnife) state.ReceivedTorches = reader.ReadBoolean();
                     if (formatVersion >= FormatWithoutHammer) state.ReceivedKnife = reader.ReadBoolean();
                     if (formatVersion >= FormatWithoutCreative) state.ReceivedHammer = reader.ReadBoolean();
-                    if (formatVersion >= FormatVersion) state.Creative = reader.ReadBoolean();
+                    if (formatVersion >= FormatWithoutSkills) state.Creative = reader.ReadBoolean();
+                    if (formatVersion >= FormatVersion) state.Skills.Read(reader);
 
                     store.Set(playerId, state);
                 }

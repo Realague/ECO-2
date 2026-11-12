@@ -28,6 +28,9 @@ namespace Voxel.Client
     //   -worldsize <x,y,z>    server world size in chunks, instead of the one set in the scene
     //   -seed <seed>          seed of a new world (when the data folder holds none), a number or a word
     //   -noupnp               the server does not ask the router to forward its port
+    //   -skills-showall       players see every skill, also those they have not unlocked
+    //   -skills-showtiers     players see every tier of a skill, also those not open yet
+    //   -skills-details       players see the technical details of skill upgrades
     public class GameSession : MonoBehaviour
     {
         private const string LocalAddress = "127.0.0.1";
@@ -54,6 +57,7 @@ namespace Voxel.Client
         [SerializeField] private StorageSync storageSync;
         [SerializeField] private ClaimSync claimSync;
         [SerializeField] private CraftingSync craftingSync;
+        [SerializeField] private SkillSync skillSync;
         [SerializeField] private AppearanceSync appearanceSync;
         [SerializeField] private CommandSync commandSync;
         [SerializeField] private PlayerListSync playerListSync;
@@ -63,6 +67,11 @@ namespace Voxel.Client
         [SerializeField] private ushort port = 7777;
         [SerializeField] private float autosaveInterval = 60f;
         [SerializeField] private bool openRouterPort = true;
+
+        [Header("Skills (server options, also -skills-showall, -skills-showtiers, -skills-details)")]
+        [SerializeField] private bool showAllSkills;
+        [SerializeField] private bool showAllSkillTiers;
+        [SerializeField] private bool showSkillDetails;
 
         private string address = LocalAddress;
         private string password = "";
@@ -313,6 +322,7 @@ namespace Voxel.Client
             storageSync.StartClient();
             claimSync.StartClient();
             craftingSync.StartClient();
+            skillSync.StartClient();
             appearanceSync.StartClient();
             commandSync.StartClient();
             playerListSync.StartClient();
@@ -362,6 +372,7 @@ namespace Voxel.Client
             storageSync.StartServer(worldDirectory, registry);
             claimSync.StartServer(worldDirectory, registry);
             craftingSync.StartServer(registry);
+            skillSync.StartServer(registry, new SkillOptions { ShowAllSkills = showAllSkills, ShowAllTiers = showAllSkillTiers, ShowDetails = showSkillDetails });
             miningSync.StartServer();
             appearanceSync.StartServer(registry);
             commandSync.StartServer();
@@ -482,6 +493,7 @@ namespace Voxel.Client
             storageSync.Stop();
             claimSync.Stop();
             craftingSync.Stop();
+            skillSync.Stop();
             appearanceSync.Stop();
             commandSync.Stop();
             playerListSync.Stop();
@@ -564,6 +576,9 @@ namespace Voxel.Client
             }
 
             if (Array.IndexOf(arguments, "-noupnp") >= 0) openRouterPort = false;
+            if (Array.IndexOf(arguments, "-skills-showall") >= 0) showAllSkills = true;
+            if (Array.IndexOf(arguments, "-skills-showtiers") >= 0) showAllSkillTiers = true;
+            if (Array.IndexOf(arguments, "-skills-details") >= 0) showSkillDetails = true;
 
             string seedText = ArgumentValue(arguments, "-seed");
             if (!string.IsNullOrEmpty(seedText)) argumentSeed = WorldSlots.SeedOf(seedText, 0);

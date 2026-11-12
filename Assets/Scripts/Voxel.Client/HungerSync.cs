@@ -24,6 +24,7 @@ namespace Voxel.Client
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private EcosystemSync ecosystemSync;
+        [SerializeField] private SkillSync skillSync;
         [SerializeField] private WorldSync worldSync;
 
         // Server side: where each player stood last frame, what their client was last sent and when.
@@ -153,8 +154,16 @@ namespace Voxel.Client
         // than the hits it took (BurnEffort, from MiningSync).
         private void OnEditApplied(ulong clientId, EditKind kind)
         {
-            if (kind == EditKind.Placed || kind == EditKind.TakenBack) BurnEffort(clientId, HungerRules.PerBlockPlaced);
-            else if (kind == EditKind.Tilled) BurnEffort(clientId, HungerRules.PerTill);
+            if (kind == EditKind.Placed || kind == EditKind.TakenBack)
+            {
+                BurnEffort(clientId, HungerRules.PerBlockPlaced);
+                if (kind == EditKind.Placed) skillSync?.Practise(clientId, SkillContext.Place, HungerRules.PerBlockPlaced, Items.None);
+            }
+            else if (kind == EditKind.Tilled)
+            {
+                BurnEffort(clientId, HungerRules.PerTill);
+                skillSync?.Practise(clientId, SkillContext.Till, HungerRules.PerTill, Items.Hoe);
+            }
         }
 
         // Server side: a player's effort (a hit with a tool) burns calories.

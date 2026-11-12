@@ -22,6 +22,7 @@ namespace Voxel.Client
         [SerializeField] private InventoryScreen inventoryScreen;
         [SerializeField] private HotbarHud hotbar;
         [SerializeField] private InventorySync inventorySync;
+        [SerializeField] private LogSync logSync;
         [SerializeField] private UIDocument document;
 
         private VisualElement screen;
@@ -62,9 +63,16 @@ namespace Voxel.Client
             bool carcassHit = ecosystemSync.TryAimedCarcass(eye.transform.position, eye.transform.forward, reached, out int carcassX, out int carcassZ, out int carcassSpecies, out float meat, out float carcassDistance);
             if (carcassHit) reached = carcassDistance;
 
+            // A felled tree lying there: "Fallen oak · 3 branches", with the axe it needs.
+            int fallenId = 0;
+            float fallenDistance = reached;
+            bool fallenHit = logSync != null && logSync.TryAimedFallen(eye.transform.position, eye.transform.forward, reached, out fallenId, out fallenDistance);
+            if (fallenHit) reached = fallenDistance;
+
             // A plant or an animal stands in the column the ray reaches it in, near enough.
             System.Numerics.Vector3 near = origin + direction * Mathf.Max(0f, reached - 0.3f);
             if (ecosystemSync.TryAim(origin, direction, reached, out string name, out int tool)) return OnLand(WithTool(name, tool), Mathf.FloorToInt(near.X), Mathf.FloorToInt(near.Z));
+            if (fallenHit && logSync.TryGetFallen(fallenId, out FallenTree fallen)) return OnLand(WithTool(logSync.DescribeFallen(fallenId), Items.Axe), fallen.X, fallen.Z);
             if (carcassHit) return OnLand(CarcassName(carcassSpecies, meat), carcassX, carcassZ);
             if (storageHit) return StorageName(storageId);
             if (!blockHit) return null;

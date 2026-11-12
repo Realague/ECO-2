@@ -41,6 +41,9 @@ namespace Voxel.Client
         private const float ShrinkSeconds = 0.3f;
         private const float FallViewDistance = 160f;
 
+        // A tree shown lying this recently is still waiting for its fall to be played.
+        private const float RecentSeconds = 2f;
+
         // A stump's cut disc is this share of its trunk's width (PlantModelBuilder.StumpOf).
         private const float CutDiscShare = 0.92f;
 
@@ -259,18 +262,78 @@ namespace Voxel.Client
             int look = LookOf(plant);
             if (look < 0) return;
 
-            float size = PlantShape.Scale(plant.Stage);
+            // Told to lie before its fall was played (the messages crossed): it falls now, then lies.
+            for (int i = 0; i < falls.Count; i++)
+            {
+                Fall lying = falls[i];
+                if (lying.LyingId == 0 || lying.X != plant.X || lying.Z != plant.Z || Time.time - lying.Shown > RecentSeconds) continue;
+
+                Fall replayed = NewFall(look, plant, yaw);
+                replayed.LyingId = lying.LyingId;
+                falls[i] = replayed;
+                return;
+            }
+
+            falls.Add(NewFall(look, plant, yaw));
+        }
+
+        // A felled tree stays lying where it fell, with its branches, until EndLying (FallenTrees,
+        // LogSync): its fall just played is kept lying, else it is shown lying already.
+        public void ShowLying(int lyingId, PlantView plant, float yaw)
+        {
+            plant.Stump = false;
+            int look = LookOf(plant);
+            if (look < 0) return;
+
+            float now = Time.time;
+            for (int i = 0; i < falls.Count; i++)
+            {
+                Fall fall = falls[i];
+                if (fall.LyingId == lyingId) return;
+                if (fall.LyingId != 0 || fall.X != plant.X || fall.Z != plant.Z || now - fall.Started > FallSeconds + BounceSeconds + LieSeconds) continue;
+
+                fall.LyingId = lyingId;
+                falls[i] = fall;
+                return;
+            }
+
+            Fall lying = NewFall(look, plant, yaw);
+            lying.LyingId = lyingId;
+            lying.Started = now - FallSeconds - BounceSeconds;
+            falls.Add(lying);
+        }
+
+        // A fallen tree pruned, bucked or broken up: it shrinks away.
+        public void EndLying(int lyingId)
+        {
+            float now = Time.time;
+            for (int i = 0; i < falls.Count; i++)
+            {
+                Fall fall = falls[i];
+                if (fall.LyingId != lyingId) continue;
+
+                fall.LyingId = 0;
+                fall.Started = Mathf.Min(fall.Started, now - FallSeconds - BounceSeconds - LieSeconds);
+                falls[i] = fall;
+            }
+        }
+
+        private Fall NewFall(int look, PlantView plant, float yaw)
+        {
             var direction = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
-            falls.Add(new Fall
+            return new Fall
             {
                 Look = look,
                 FruitLook = FruitLookOf(look, plant),
                 Foot = FootOf(plant),
                 Turn = TurnOf(plant.X, plant.Z),
-                Size = size,
+                Size = PlantShape.Scale(plant.Stage),
                 Axis = Vector3.Cross(Vector3.up, direction),
-                Started = Time.time
-            });
+                Started = Time.time,
+                Shown = Time.time,
+                X = plant.X,
+                Z = plant.Z
+            };
         }
 
         // Where a plant's stump will be cut: the middle of its trunk there (the widest trunk box at that
@@ -335,6 +398,9 @@ namespace Voxel.Client
                 Fall fall = falls[i];
                 float t = now - fall.Started;
                 float end = FallSeconds + BounceSeconds + LieSeconds + ShrinkSeconds;
+
+                // A tree left lying (ShowLying) stays as it lies once its bounce is over.
+                if (fall.LyingId != 0) t = Mathf.Min(t, FallSeconds + BounceSeconds);
                 if (t >= end)
                 {
                     falls.RemoveAt(i);
@@ -432,6 +498,13 @@ namespace Voxel.Client
             // About which it falls: horizontal, across the way it falls.
             public Vector3 Axis;
             public float Started;
+
+            // When it was added, the column it grew in, and the fallen tree it stays lying for (0: none,
+            // it shrinks away).
+            public float Shown;
+            public int X;
+            public int Z;
+            public int LyingId;
         }
 
         private sealed class Region

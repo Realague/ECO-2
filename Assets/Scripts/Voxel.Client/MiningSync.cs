@@ -15,7 +15,11 @@ namespace Voxel.Client
     // was hit, the tool owned, room for the block), counts it, burns the hit's calories, tells every
     // player (Mine.Struck: the hitter to reconcile, the others to show the hit), then on the last hit
     // breaks the block (WorldSync.TryBreak) or finishes the plant (EcosystemSync.FinishPlant: a tree
-    // falls, leaving its stump and its logs). A refused hit is undone on the hitter's machine.
+    // falls, leaving its stump, and lies there: LogSync), or the next part of a fallen tree (a branch,
+    // then a log: LogSync.FinishFallenPart). A refused hit is undone on the hitter's machine.
+    //
+    // The hitter's skills (SkillSync) take hits and calories off by the hit's context (SkillContext),
+    // alike on their machine and the server, and each hit's calories (before that) are practice.
     //
     // Damage wears off when left alone (MiningRules.HitsAfterIdle), worked out on every machine
     // alike; it is never saved.
@@ -26,6 +30,9 @@ namespace Voxel.Client
 
         private const byte BlockTarget = 0;
         private const byte PlantTarget = 1;
+
+        // A felled tree lying (LogSync): its next branch, or once pruned its next log.
+        private const byte FallenTarget = 2;
 
         private const byte AcceptedFlag = 1;
         private const byte YoursFlag = 2;
@@ -45,6 +52,8 @@ namespace Voxel.Client
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private HungerSync hungerSync;
         [SerializeField] private StorageSync storageSync;
+        [SerializeField] private LogSync logSync;
+        [SerializeField] private SkillSync skillSync;
         [SerializeField] private Material crackMaterial;
         [SerializeField] private Material chipMaterial;
 
@@ -57,12 +66,18 @@ namespace Voxel.Client
         private readonly List<BlockPos> spentBlocks = new List<BlockPos>();
         private readonly List<int> spentPlants = new List<int>();
 
+        // Every machine: the hits shown on the part of each fallen tree being worked.
+        private readonly MiningDamage<int> shownFallen = new MiningDamage<int>();
+        private readonly Dictionary<int, int> pendingFallen = new Dictionary<int, int>();
+
         // Every machine: where the last hit shown on each plant landed, the side its notch is cut on.
         private readonly Dictionary<int, Vector3> plantHitPoints = new Dictionary<int, Vector3>();
 
         // Server side: the hits that count, and each player's pace.
         private readonly MiningDamage<BlockPos> serverBlocks = new MiningDamage<BlockPos>();
         private readonly MiningDamage<int> serverPlants = new MiningDamage<int>();
+        private readonly MiningDamage<int> serverFallen = new MiningDamage<int>();
+        private readonly System.Random finishRoll = new System.Random();
         private readonly Dictionary<ulong, HitPacer> pacers = new Dictionary<ulong, HitPacer>();
 
         private CrackViews cracks;
@@ -117,6 +132,9 @@ namespace Voxel.Client
             pendingPlants.Clear();
             serverBlocks.Clear();
             serverPlants.Clear();
+            shownFallen.Clear();
+            pendingFallen.Clear();
+            serverFallen.Clear();
             pacers.Clear();
             chips?.Clear();
             notches?.Clear();
@@ -146,7 +164,7 @@ namespace Voxel.Client
             if (needed <= 0) return;
 
             // In creative mode one hit breaks anything.
-            if (inventorySync.Creative) needed = 1;
+            needed = inventorySync.Creative ? 1 : LocalHits(needed, SkillContext.OfBlockHit(aimed));
 
             bool last = shownBlocks.Hits(pos, Now) + 1 >= needed;
             SpawnChips(point, FaceNormal(face), BlockAtlas.ChipColour(aimed, face), last);
@@ -168,7 +186,7 @@ namespace Voxel.Client
             if (!running || !ecosystemSync.TryGetView(plantId, out PlantView view)) return;
 
             int natural = ecosystemSync.HitsNeeded(view);
-            int needed = inventorySync.Creative ? 1 : natural;
+            int needed = inventorySync.Creative ? 1 : ecosystemSync.LocalHitsNeeded(view);
             bool last = shownPlants.Hits(plantId, Now) + 1 >= needed;
             SpawnChips(point, PlantNormal(view, point), ecosystemSync.ChipColour(view.SpeciesIndex), last);
             plantHitPoints[plantId] = point;
@@ -185,6 +203,30 @@ namespace Voxel.Client
             if (last && natural == 1) ecosystemSync.PredictRemove(plantId);
             SendHit(PlantTarget, default, plantId, 0, point, NoFace);
         }
+
+        // The local player's swing hits a fallen tree: its next branch, or its next log once pruned.
+        // Nothing is predicted: the server says when a part comes off.
+        public void HitFallen(int fallenId, Vector3 point)
+        {
+            if (!running || logSync == null || !logSync.TryGetFallen(fallenId, out FallenTree tree)) return;
+
+            int needed = inventorySync.Creative ? 1 : logSync.LocalHitsNeeded(tree);
+            bool last = shownFallen.Hits(fallenId, Now) + 1 >= needed;
+            SpawnChips(point, Vector3.up, ecosystemSync.ChipColour(tree.Species), last);
+            if (isServer)
+            {
+                ServerHit(networkManager.LocalClientId, FallenTarget, default, fallenId, 0, point, NoFace);
+                return;
+            }
+
+            shownFallen.AddHit(fallenId, Now);
+            pendingFallen[fallenId] = pendingFallen.TryGetValue(fallenId, out int pending) ? pending + 1 : 1;
+            SendHit(FallenTarget, default, fallenId, 0, point, NoFace);
+        }
+
+        // The hits something takes for the local player, with their skills for that context.
+        private int LocalHits(int hits, string context) =>
+            skillSync != null ? SkillBonuses.Hits(hits, skillSync.LocalBonus(SkillBonusKind.TimePercent, context)) : hits;
 
         private void LateUpdate()
         {
@@ -204,7 +246,9 @@ namespace Voxel.Client
             {
                 foreach (BlockPos pos in shownBlocks.Keys)
                 {
-                    int needed = MiningRules.HitsToBreak(world.GetBlock(pos));
+                    ushort block = world.GetBlock(pos);
+                    int needed = MiningRules.HitsToBreak(block);
+                    if (needed > 0 && !inventorySync.Creative) needed = LocalHits(needed, SkillContext.OfBlockHit(block));
                     cracks.Draw(pos, MiningRules.CrackStage(shownBlocks.Hits(pos, now), needed));
                 }
             }
@@ -219,7 +263,7 @@ namespace Voxel.Client
                     if (!ecosystemSync.TryGetTrunk(view, out Vector3 centre, out Vector2 halfSize, out Material wood)) continue;
 
                     Vector3 toward = plantHitPoints.TryGetValue(plantId, out Vector3 point) ? point - centre : Vector3.forward;
-                    notches.Draw(wood, centre, halfSize, toward, (float)hits / ecosystemSync.HitsNeeded(view));
+                    notches.Draw(wood, centre, halfSize, toward, (float)hits / ecosystemSync.LocalHitsNeeded(view));
                 }
             }
 
@@ -233,6 +277,20 @@ namespace Voxel.Client
             shownPlants.Sweep(now);
             serverBlocks.Sweep(now);
             serverPlants.Sweep(now);
+            shownFallen.Sweep(now);
+            serverFallen.Sweep(now);
+
+            spentPlants.Clear();
+            foreach (int fallenId in shownFallen.Keys)
+            {
+                if (logSync == null || !logSync.HasFallen(fallenId)) spentPlants.Add(fallenId);
+            }
+
+            foreach (int fallenId in spentPlants)
+            {
+                shownFallen.Remove(fallenId);
+                pendingFallen.Remove(fallenId);
+            }
 
             spentBlocks.Clear();
             foreach (BlockPos pos in shownBlocks.Keys)
@@ -286,20 +344,45 @@ namespace Voxel.Client
             float calories;
             Vector3 min, max;
             ushort type = 0;
+            string context;
+            int tool;
             bool valid;
             if (kind == BlockTarget)
             {
                 valid = CheckBlockHit(clientId, client, pos, seen, out type, out needed, out calories);
                 min = new Vector3(pos.X, pos.Y, pos.Z);
                 max = min + Vector3.one;
+                context = SkillContext.OfBlockHit(type);
+                tool = ToolRules.ToBreak(type);
+            }
+            else if (kind == PlantTarget)
+            {
+                valid = ecosystemSync.CheckPlantHit(clientId, plantId, out needed, out calories, out context, out tool, out type, out min, out max);
             }
             else
             {
-                valid = ecosystemSync.CheckPlantHit(clientId, plantId, out needed, out calories, out min, out max);
-                if (valid && ecosystemSync.TryGetView(plantId, out PlantView view)) type = (ushort)view.SpeciesIndex;
+                tool = Items.Axe;
+                if (logSync == null)
+                {
+                    valid = false;
+                    needed = 0;
+                    calories = 0f;
+                    context = null;
+                    min = max = Vector3.zero;
+                }
+                else
+                {
+                    valid = logSync.CheckFallenHit(clientId, plantId, out needed, out calories, out context, out int species, out min, out max);
+                    type = (ushort)Mathf.Max(0, species);
+                }
             }
 
-            // In creative mode one hit breaks anything.
+            // The hitter's skills: fewer hits, fewer calories a hit. In creative mode one hit breaks anything.
+            if (valid && skillSync != null)
+            {
+                needed = SkillBonuses.Hits(needed, skillSync.Bonus(clientId, SkillBonusKind.TimePercent, context));
+            }
+
             if (valid && inventorySync.IsCreative(clientId)) needed = 1;
 
             // A starving player swings at nothing: what they predicted comes back.
@@ -309,9 +392,25 @@ namespace Voxel.Client
                 return;
             }
 
-            int hits = kind == BlockTarget ? serverBlocks.AddHit(pos, now) : serverPlants.AddHit(plantId, now);
-            hungerSync.BurnEffort(clientId, calories);
+            int hits = kind == BlockTarget ? serverBlocks.AddHit(pos, now) : ServerDamage(kind).AddHit(plantId, now);
+            float burnt = skillSync != null ? calories * (float)SkillBonuses.Factor(skillSync.Bonus(clientId, SkillBonusKind.CaloriePercent, context)) : calories;
+            hungerSync.BurnEffort(clientId, burnt);
+
+            // Experience counts the hit's calories before any skill took some off.
+            skillSync?.Practise(clientId, context, calories, tool);
             bool finished = hits >= needed;
+
+            // The hitter's skills may fell a standing tree in one blow (drawn by the server, never by
+            // the simulation: a tree's fall is never predicted by the hitter's machine anyway).
+            if (!finished && kind == PlantTarget && tool == Items.Axe && skillSync != null)
+            {
+                double chance = skillSync.Bonus(clientId, SkillBonusKind.FinishChancePercent, context) / 100.0;
+                if (chance > 0 && finishRoll.NextDouble() < chance)
+                {
+                    finished = true;
+                    hits = needed;
+                }
+            }
 
             // Told before the block breaks, so that the others colour the chips while they still know it.
             point = Vector3.Max(min, Vector3.Min(max, point));
@@ -328,12 +427,19 @@ namespace Voxel.Client
                     worldSync.SendRealBlock(clientId, pos);
                 }
             }
-            else
+            else if (kind == PlantTarget)
             {
                 serverPlants.Remove(plantId);
                 ecosystemSync.FinishPlant(clientId, plantId);
             }
+            else
+            {
+                serverFallen.Remove(plantId);
+                logSync.FinishFallenPart(clientId, plantId);
+            }
         }
+
+        private MiningDamage<int> ServerDamage(byte kind) => kind == FallenTarget ? serverFallen : serverPlants;
 
         // A hit on a block counts if it is within reach, still the block the hitter saw, breakable
         // with a tool they own, and they have room for it.
@@ -369,10 +475,10 @@ namespace Voxel.Client
         {
             if (clientId == networkManager.LocalClientId) return;
 
-            int hits = kind == BlockTarget ? serverBlocks.Hits(pos, now) : serverPlants.Hits(plantId, now);
+            int hits = kind == BlockTarget ? serverBlocks.Hits(pos, now) : ServerDamage(kind).Hits(plantId, now);
             SendStruck(clientId, kind, pos, plantId, 0, YoursFlag, hits, 0, Vector3.zero, NoFace);
             if (kind == BlockTarget) worldSync.SendRealBlock(clientId, pos);
-            else ecosystemSync.RestorePlantTo(clientId, plantId);
+            else if (kind == PlantTarget) ecosystemSync.RestorePlantTo(clientId, plantId);
         }
 
         // Every player hears of an accepted hit; the host shows it here.
@@ -403,7 +509,7 @@ namespace Voxel.Client
             Vector3 point = ReadVector(reader);
             reader.ReadValueSafe(out byte face);
             if (kind == BlockTarget) ServerHit(senderId, kind, new BlockPos(x, y, z), 0, seen, point, face);
-            else if (kind == PlantTarget) ServerHit(senderId, kind, default, x, 0, point, NoFace);
+            else if (kind == PlantTarget || kind == FallenTarget) ServerHit(senderId, kind, default, x, 0, point, NoFace);
         }
 
         // ---- Client ----
@@ -461,6 +567,19 @@ namespace Voxel.Client
                     SpawnChips(point, PlantNormal(view, point), ecosystemSync.ChipColour(type), (flags & FinishedFlag) != 0);
                     plantHitPoints[plantId] = point;
                 }
+            }
+            else if (kind == FallenTarget)
+            {
+                int pending = 0;
+                if (yours && !host && pendingFallen.TryGetValue(plantId, out pending))
+                {
+                    pending--;
+                    if (pending > 0) pendingFallen[plantId] = pending;
+                    else pendingFallen.Remove(plantId);
+                }
+
+                shownFallen.Set(plantId, (flags & FinishedFlag) != 0 ? 0 : hits + pending, now);
+                if (!yours && (flags & AcceptedFlag) != 0) SpawnChips(point, Vector3.up, ecosystemSync.ChipColour(type), (flags & FinishedFlag) != 0);
             }
         }
 

@@ -22,10 +22,11 @@ namespace Voxel.Core
         // Shovel hits to dig a stump out.
         public const int StumpHits = 3;
 
-        // Axe hits a tree takes for each wood of its size (WoodOf), within these bounds.
-        public const int FellingHitsPerWood = 4;
-        public const int FewestFellingHits = 8;
-        public const int MostFellingHits = 32;
+        // Axe hits a tree takes for each wood of its size (WoodOf), within these bounds, to fell it; it
+        // then lies to be pruned and bucked (FallenTreeRules).
+        public const int FellingHitsPerWood = 2;
+        public const int FewestFellingHits = 4;
+        public const int MostFellingHits = 16;
 
         // The wood a log lying on the ground gives when picked up.
         public const int WoodPerLog = 3;

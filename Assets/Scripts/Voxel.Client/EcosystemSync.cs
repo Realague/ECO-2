@@ -85,6 +85,7 @@ namespace Voxel.Client
         [SerializeField] private NetworkManager networkManager;
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private LogSync logSync;
+        [SerializeField] private SkillSync skillSync;
 
         // The world of this machine, on which the display works out the way each animal walks.
         [SerializeField] private WorldSync worldSync;
@@ -196,7 +197,8 @@ namespace Voxel.Client
         // Items' weights for the carrying limit, crops' from their species.
         public ItemWeights ItemWeights => itemWeights ??= new ItemWeights(
             Array.ConvertAll(speciesAssets, asset => asset.ProduceWeight),
-            Array.ConvertAll(animalAssets, asset => ItemWeights.CarcassWeightFor(asset.Health)));
+            Array.ConvertAll(animalAssets, asset => ItemWeights.CarcassWeightFor(asset.Health)),
+            Array.ConvertAll(speciesAssets, asset => asset.WoodWeight));
 
         private void Awake()
         {
@@ -476,19 +478,25 @@ namespace Voxel.Client
         // Server side: whether a player's hit on a plant counts: it exists, it is within their reach,
         // and they own the tool it takes (the server cannot see the one in hand). needed is the hits
         // it takes, calories what a hit costs, min and max its aiming box.
-        internal bool CheckPlantHit(ulong clientId, int plantId, out int needed, out float calories, out Vector3 min, out Vector3 max)
+        internal bool CheckPlantHit(ulong clientId, int plantId, out int needed, out float calories, out string context, out int tool, out ushort speciesIndex, out Vector3 min, out Vector3 max)
         {
             needed = 0;
             calories = 0f;
+            context = null;
+            tool = Items.None;
+            speciesIndex = 0;
             min = max = Vector3.zero;
             if (ecosystem == null || !ecosystem.TryGet(plantId, out Plant plant) || !IsWithinReach(clientId, plant)) return false;
             if (!claimSync.Check(clientId, plant.X, plant.Z)) return false;
 
             PlantView view = ViewOf(plant);
-            if (!inventorySync.Owns(clientId, ToolFor(view))) return false;
+            tool = ToolFor(view);
+            if (!inventorySync.Owns(clientId, tool)) return false;
 
             needed = HitsNeeded(view);
             calories = HitCalories(view);
+            context = SkillContextOf(view);
+            speciesIndex = (ushort)view.SpeciesIndex;
             BoundsOf(view, out min, out max);
             return true;
         }
@@ -1165,16 +1173,66 @@ namespace Voxel.Client
             Vector3 direction = away.sqrMagnitude > 1e-4f ? away.normalized : Vector3.right;
             float yaw = Mathf.Atan2(direction.x, direction.z);
 
+            // The feller's skills: more logs, no stump (its log at the foot instead), the tree pruned or
+            // even bucked as it falls.
+            string context = SkillContext.Of(SkillContext.Fell, asset.name);
+            int logs = MiningRules.LogsOf(wood);
+            bool autoStump = false, autoPrune = false, autoBuck = false;
+            if (skillSync != null)
+            {
+                logs = SkillBonuses.Yield(logs, skillSync.Bonus(clientId, SkillBonusKind.YieldPercent, context), skillSync.Bonus(clientId, SkillBonusKind.YieldFlat, context), UnityEngine.Random.value);
+                autoStump = skillSync.Has(clientId, SkillBonusKind.Interaction, SkillInteractions.AutoStump);
+                autoPrune = skillSync.Has(clientId, SkillBonusKind.Interaction, SkillInteractions.AutoPrune);
+                autoBuck = skillSync.Has(clientId, SkillBonusKind.Interaction, SkillInteractions.AutoBuck);
+            }
+
             PlantView view = ViewOf(plant);
-            bool stump = asset.HasStump;
+            bool stump = asset.HasStump && !autoStump;
             BroadcastFelled(plantId, view, yaw, stump);
             plantRenderer?.StartFall(view, yaw);
             if (stump) ecosystem.CutToStump(plantId);
             else ecosystem.Remove(plantId);
 
+            if (asset.HasStump && autoStump) logSync.DropAt(foot, UnityEngine.Random.Range(0f, 2f * Mathf.PI), plant.SpeciesIndex);
+
             float length = Mathf.Max(FirstLogDistance, species[plant.SpeciesIndex].Height * PlantShape.Scale(plant.Stage));
-            logSync.DropAlongFall(foot, direction, FirstLogDistance, length, MiningRules.LogsOf(wood), plant.SpeciesIndex, LogsAppearAfter);
+            if (autoPrune && autoBuck)
+            {
+                logSync.DropAlongFall(foot, direction, FirstLogDistance, length, logs, plant.SpeciesIndex, LogsAppearAfter);
+                return;
+            }
+
+            // It lies where it fell, to prune then buck with the axe (LogSync); a skill may have pruned it.
+            int branches = autoPrune ? 0 : FallenTreeRules.BranchesOf(wood);
+            logSync.AddFallen(clientId, view, yaw, foot, direction, FirstLogDistance, length, logs, branches, LogsAppearAfter);
         }
+
+        // What the skills see of work on a plant: felling it (fell:<species>), digging it up
+        // (dig:<species>) or its stump out (dig:stump:<species>), cutting it (cut:<species>).
+        internal string SkillContextOf(PlantView view)
+        {
+            string name = speciesAssets[view.SpeciesIndex].name;
+            if (view.Stump) return SkillContext.Of(SkillContext.Dig, SkillContext.Stump, name);
+
+            switch (FellingTool(view.SpeciesIndex))
+            {
+                case Items.Axe: return SkillContext.Of(SkillContext.Fell, name);
+                case Items.Shovel: return SkillContext.Of(SkillContext.Dig, name);
+                default: return SkillContext.Of(SkillContext.Cut, name);
+            }
+        }
+
+        // The hits a plant shown here takes for the local player, with their skills.
+        internal int LocalHitsNeeded(PlantView view)
+        {
+            int hits = HitsNeeded(view);
+            return skillSync != null ? SkillBonuses.Hits(hits, skillSync.LocalBonus(SkillBonusKind.TimePercent, SkillContextOf(view))) : hits;
+        }
+
+        // A fallen tree lying with its branches (LogSync), drawn as it fell until EndLying.
+        internal void ShowLying(int fallenId, PlantView view, float yaw) => plantRenderer?.ShowLying(fallenId, view, yaw);
+
+        internal void EndLying(int fallenId) => plantRenderer?.EndLying(fallenId);
 
         // Where a player stands, or fallback if they are gone.
         private Vector3 PlayerPosition(ulong clientId, Vector3 fallback)

@@ -83,9 +83,9 @@ namespace Voxel.Core
             return Items.IsStorage(item);
         }
 
-        public static bool AcceptsInChest(int item) => Items.IsValid(item) && !CarryLimits.CountsAsBlock(item);
+        public static bool AcceptsInChest(int item) => Items.IsValid(item) && !Items.GoesOnStockpile(item);
 
-        public static bool AcceptsInStockpile(int item) => Items.IsValid(item) && CarryLimits.CountsAsBlock(item);
+        public static bool AcceptsInStockpile(int item) => Items.IsValid(item) && Items.GoesOnStockpile(item);
 
         public static float ChestWeight(Inventory contents, ItemWeights weights)
         {

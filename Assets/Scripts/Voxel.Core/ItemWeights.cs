@@ -1,8 +1,8 @@
 namespace Voxel.Core
 {
-    // How heavy each item is, in kg, for the carrying limit. Blocks and wood weigh nothing here: they
-    // are counted apart (CarryLimits.MaxBlocks). A crop's weight comes from its plant species, a
-    // carcass's from its animal species, both given by index.
+    // How heavy each item is, in kg, for the carrying limit. Blocks weigh nothing here: they are
+    // counted apart (CarryLimits.MaxBlocks). A crop's and a wood's weight come from their plant species,
+    // a carcass's from its animal species, all given by index.
     public sealed class ItemWeights
     {
         public const float Straw = 0.3f;
@@ -33,14 +33,26 @@ namespace Voxel.Core
             }
         }
 
+        // A wood of a species the table does not know.
+        public const float DefaultWood = 0.5f;
+
         private readonly float[] produce;
         private readonly float[] carcasses;
+        private readonly float[] woods;
 
-        public ItemWeights(float[] produceWeights, float[] carcassWeights = null)
+        // What a player's skills take off the weight of wood (Felling's "Taille des stacks"), 1 for none.
+        public float WoodFactor { get; }
+
+        public ItemWeights(float[] produceWeights, float[] carcassWeights = null, float[] woodWeights = null, float woodFactor = 1f)
         {
             produce = produceWeights ?? new float[0];
             carcasses = carcassWeights ?? new float[0];
+            woods = woodWeights ?? new float[0];
+            WoodFactor = woodFactor;
         }
+
+        // The same weights, with wood weighing this share of its own (a player's skills).
+        public ItemWeights WithWoodFactor(float factor) => factor == WoodFactor ? this : new ItemWeights(produce, carcasses, woods, factor);
 
         // A carcass's weight by its animal's health (how big it is; AnimalSpeciesAsset.health: small
         // game 30, a fox or a heron 50, a deer or a wolf 60, a bear or a crocodile 100): 1 kg, 3, 6
@@ -96,6 +108,12 @@ namespace Voxel.Core
             {
                 int species = Items.CarcassSpecies(item);
                 return species < carcasses.Length ? carcasses[species] : CarcassWeightFor(60f);
+            }
+
+            if (Items.IsWood(item))
+            {
+                int species = Items.WoodSpecies(item);
+                return (species < woods.Length && woods[species] > 0f ? woods[species] : DefaultWood) * WoodFactor;
             }
 
             return 0f;
