@@ -148,6 +148,9 @@
                             <ui:Label name="creative-toggle-text" class="button-text" />
                         </ui:Button>
                         <ui:Label name="creative-hint" class="creative-hint" />
+                        <ui:Button name="creative-clear" class="button button--danger creative-clear">
+                            <ui:Label name="creative-clear-text" class="button-text" />
+                        </ui:Button>
                     </ui:VisualElement>
                     <ui:VisualElement class="creative-body">
                         <ui:VisualElement class="categories">
@@ -251,6 +254,10 @@
                         <ui:VisualElement class="details-hint">
                             <ui:VisualElement class="sheet-key"><ui:Label text="Right click" class="sheet-key-text" /></ui:VisualElement>
                             <ui:Label text="eat food, butcher a carcass (knife), empty a hotbar slot" class="details-hint-text" />
+                        </ui:VisualElement>
+                        <ui:VisualElement name="details-delete-hint" class="details-hint">
+                            <ui:VisualElement class="sheet-key"><ui:Label text="Delete" class="sheet-key-text" /></ui:VisualElement>
+                            <ui:Label text="throw the stack away (Shift: one), creative mode" class="details-hint-text" />
                         </ui:VisualElement>
                         <ui:VisualElement class="details-hint">
                             <ui:VisualElement class="sheet-key"><ui:Label text="Tab" class="sheet-key-text" /></ui:VisualElement>

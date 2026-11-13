@@ -78,6 +78,7 @@ namespace Voxel.Client
         private VisualElement detailsBurnLine;
         private Label detailsBurn;
         private VisualElement detailsFood;
+        private VisualElement detailsDeleteHint;
         private Label detailsCalories;
         private readonly Label[] detailsNutrients = new Label[Nutrition.NutrientCount];
         private readonly VisualElement[] detailsNutrientBars = new VisualElement[Nutrition.NutrientCount];
@@ -149,6 +150,7 @@ namespace Voxel.Client
             detailsBurnLine = root.Q("details-burn-line");
             detailsBurn = root.Q<Label>("details-burn");
             detailsFood = root.Q("details-food");
+            detailsDeleteHint = root.Q("details-delete-hint");
             detailsCalories = root.Q<Label>("details-calories");
             for (int i = 0; i < detailsNutrients.Length; i++)
             {
@@ -248,6 +250,7 @@ namespace Voxel.Client
                     int slot = HotbarHud.PressedSlot(keyboard);
                     int item = hoveredItem != Items.None ? hoveredItem : selectedItem;
                     if (slot >= 0 && item != Items.None) PutInHotbar(item, slot);
+                    else if (keyboard.deleteKey.wasPressedThisFrame) DeleteItem(item, keyboard.shiftKey.isPressed);
                 }
                 else if (IsOpen && tab == Tab.Creative && inventorySync.Creative)
                 {
@@ -258,6 +261,10 @@ namespace Voxel.Client
                     {
                         inventorySync.RequestCreativeGive(item, CreativeRules.StackOf(item));
                         PutInHotbar(item, slot);
+                    }
+                    else if (keyboard.deleteKey.wasPressedThisFrame)
+                    {
+                        DeleteItem(item, keyboard.shiftKey.isPressed);
                     }
                 }
             }
@@ -620,6 +627,26 @@ namespace Voxel.Client
             hotbar.Select(slot);
         }
 
+        // Delete, in creative mode: throws the whole stack away (Shift: one); out of creative mode it
+        // says why nothing happens. The server checks again.
+        private void DeleteItem(int item, bool one)
+        {
+            int held = inventorySync.Inventory.Count(item);
+            if (item == Items.None || held <= 0) return;
+
+            if (!inventorySync.Creative)
+            {
+                hotbar.ShowMessage("Items can only be thrown away in creative mode");
+                return;
+            }
+
+            inventorySync.RequestCreativeDelete(item, one ? 1 : held);
+            if (one && held > 1) return;
+
+            if (selectedItem == item) selectedItem = Items.None;
+            if (hoveredItem == item) hoveredItem = Items.None;
+        }
+
         // The item under the pointer, else the chosen one (the slots show no names); on the Creative
         // tab, the catalog item under the pointer.
         private void ShowDetails()
@@ -628,6 +655,10 @@ namespace Voxel.Client
                 : hoveredItem != Items.None && !dragging && inventorySync.Inventory.Has(hoveredItem) ? hoveredItem : selectedItem;
             details.style.visibility = item == Items.None ? Visibility.Hidden : Visibility.Visible;
             if (item == Items.None) return;
+
+            // Delete throws the stack away, in creative mode only.
+            bool deletable = inventorySync.Creative && inventorySync.Inventory.Count(item) > 0;
+            detailsDeleteHint.style.display = deletable ? DisplayStyle.Flex : DisplayStyle.None;
 
             detailsIcon.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(item, ecosystemSync));
             detailsName.text = ItemCatalog.NameOf(item, ecosystemSync);

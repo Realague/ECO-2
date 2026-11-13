@@ -393,7 +393,11 @@ namespace Voxel.Client
                 int nx = x + normal.x;
                 int ny = y + normal.y;
                 int nz = z + normal.z;
-                if (HidesFace(world, nx, ny, nz) || world.IsWater(nx, ny, nz)) continue;
+                // Any opaque block hides a water face, smooth ground too: the ground draws its own faces
+                // toward the water (and keeps its corners at the surface on the grid), so a water face
+                // there would only lie inside the bed or a bank, translucent, and show through the
+                // surface as staircases over every lake.
+                if (world.IsOpaque(nx, ny, nz) || world.IsWater(nx, ny, nz)) continue;
 
                 // A water face is lit by the air in front of it: open sky over a lake, darkness in a cave.
                 float level = light.Get(nx, ny, nz) / (float)SkyLight.Max;

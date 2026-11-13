@@ -10,8 +10,9 @@ namespace Voxel.Client
     // local player's creative mode on or off (InventorySync.RequestCreative) with a reminder of what it
     // does, then categories, a search and every item of the game (ItemCatalog.AllItems) with how many
     // the player holds. In creative mode a click takes a stack (CreativeRules.StackOf), a right click
-    // one (InventorySync.RequestCreativeGive); out of it the catalog is greyed. The item under the
-    // pointer shows on the inventory's details sheet (InventoryScreen).
+    // one (InventorySync.RequestCreativeGive); out of it the catalog is greyed. In creative mode a red
+    // button empties the whole bag and hotbar after a second click (RequestCreativeClear). The item
+    // under the pointer shows on the inventory's details sheet (InventoryScreen).
     internal sealed class CreativePage
     {
         private const string SelectedCategoryClass = "category--selected";
@@ -22,6 +23,8 @@ namespace Voxel.Client
         private readonly Button toggle;
         private readonly Label toggleText;
         private readonly Label hint;
+        private readonly Button clear;
+        private readonly Label clearText;
         private readonly TextField search;
         private readonly VisualElement searchHint;
         private readonly Label empty;
@@ -33,6 +36,11 @@ namespace Voxel.Client
         private List<int> catalog;
         private ItemCategory? category;
         private bool? shownCreative;
+
+        // Emptying the bag asks first: a click arms the button for ConfirmSeconds, a second one empties.
+        private const float ConfirmSeconds = 3f;
+        private float confirmUntil = -1f;
+        private string shownClearText;
 
         public CreativePage(VisualElement root, InventorySync inventorySync, EcosystemSync ecosystemSync)
         {
@@ -50,6 +58,11 @@ namespace Voxel.Client
 
             toggle.focusable = false;
             toggle.clicked += () => inventorySync.RequestCreative(!inventorySync.Creative);
+
+            clear = root.Q<Button>("creative-clear");
+            clearText = root.Q<Label>("creative-clear-text");
+            clear.focusable = false;
+            clear.clicked += OnClear;
 
             VisualElement searchBox = root.Q("creative-search-box");
             search.RegisterValueChangedCallback(e => searchHint.style.display = string.IsNullOrEmpty(e.newValue) ? DisplayStyle.Flex : DisplayStyle.None);
@@ -77,6 +90,7 @@ namespace Voxel.Client
         {
             page.style.display = shown ? DisplayStyle.Flex : DisplayStyle.None;
             shownCreative = null;
+            confirmUntil = -1f;
             grid.Invalidate();
         }
 
@@ -88,6 +102,7 @@ namespace Voxel.Client
             }
 
             shownCreative = null;
+            shownClearText = null;
             grid.Invalidate();
         }
 
@@ -126,6 +141,49 @@ namespace Voxel.Client
             grid.Show(entries, _ => !creative);
             empty.text = entries.Count == 0 ? Loc.T("No item matches.") : "";
             empty.style.display = entries.Count == 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            ShowClear(creative, inventory);
+        }
+
+        // The button that empties the bag: in creative mode with something in the bag; armed, it asks
+        // for a second click, and disarms after ConfirmSeconds.
+        private void ShowClear(bool creative, Inventory inventory)
+        {
+            bool any = false;
+            foreach (KeyValuePair<int, int> entry in inventory.Entries)
+            {
+                if (entry.Value > 0)
+                {
+                    any = true;
+                    break;
+                }
+            }
+
+            bool shown = creative && any;
+            clear.style.display = shown ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!shown) confirmUntil = -1f;
+
+            bool armed = Time.unscaledTime < confirmUntil;
+            clear.EnableInClassList("creative-clear--confirm", armed);
+            string text = armed ? "Click again to empty it" : "Empty the inventory";
+            if (text == shownClearText) return;
+
+            shownClearText = text;
+            clearText.text = Loc.T(text);
+        }
+
+        private void OnClear()
+        {
+            if (!inventorySync.Creative) return;
+
+            if (Time.unscaledTime < confirmUntil)
+            {
+                confirmUntil = -1f;
+                inventorySync.RequestCreativeClear();
+            }
+            else
+            {
+                confirmUntil = Time.unscaledTime + ConfirmSeconds;
+            }
         }
 
         // A click takes a stack, a right click one; nothing out of creative mode (the slots are greyed).

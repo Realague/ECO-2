@@ -20,7 +20,8 @@ using Voxel.Core;
 // - an animal's carcass (Carcass_<asset>.png) is its model lying on its side, a torch (Torch.png) its stick and flame;
 // - tools and the arrow (Tool_<name>.png, Arrow.png) are painted as illustrations (ToolIconPainter).
 // Species are found by asset in Assets/Species and named after the asset, so the icons do not depend
-// on the order of species. Every file is written again; rerun the menu after adding a species.
+// on the order of species. Every file is written again, but the icons painted by hand listed in
+// Assets/Editor/PaintedItemIcons.txt, which are kept; rerun the menu after adding a species.
 public static class ItemIconBuilder
 {
     public const int IconSize = 128;
@@ -35,6 +36,8 @@ public static class ItemIconBuilder
     public static void Rebuild()
     {
         Directory.CreateDirectory(Folder);
+        painted = null;
+        keptPainted = 0;
         int written = 0;
 
         for (int type = 1; type <= Blocks.LastType; type++)
@@ -182,11 +185,40 @@ public static class ItemIconBuilder
         }
 
         AssetDatabase.Refresh();
-        Debug.Log($"Wrote {written} item icons to {Folder}.");
+        Debug.Log($"Wrote {written - keptPainted} item icons to {Folder}, kept {keptPainted} painted by hand ({PaintedList}).");
+    }
+
+    // Icons painted by hand (PaintedList, one name per line, # for comments): kept, never written over.
+    private const string PaintedList = "Assets/Editor/PaintedItemIcons.txt";
+    private static HashSet<string> painted;
+    private static int keptPainted;
+
+    private static bool IsPainted(string name)
+    {
+        if (painted == null)
+        {
+            painted = new HashSet<string>(StringComparer.Ordinal);
+            if (File.Exists(PaintedList))
+            {
+                foreach (string line in File.ReadAllLines(PaintedList))
+                {
+                    string entry = line.Trim();
+                    if (entry.Length > 0 && !entry.StartsWith("#")) painted.Add(entry);
+                }
+            }
+        }
+
+        return painted.Contains(name) && File.Exists($"{Folder}/{name}.png");
     }
 
     private static void Write(string name, Texture2D icon)
     {
+        if (IsPainted(name))
+        {
+            keptPainted++;
+            return;
+        }
+
         string path = $"{Folder}/{name}.png";
         File.WriteAllBytes(path, icon.EncodeToPNG());
         AssetDatabase.ImportAsset(path);

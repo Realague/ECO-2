@@ -206,6 +206,11 @@ Gardener	Jardinier
 Drag	Glisser
 to a hotbar slot	vers un emplacement de la barre
 Right click	Clic droit
+Delete	Suppr
+throw the stack away (Shift: one), creative mode	jeter la pile (Maj : un seul), mode créatif
+Items can only be thrown away in creative mode	On ne peut jeter des objets qu'en mode créatif
+Empty the inventory	Vider l'inventaire
+Click again to empty it	Cliquez encore pour vider
 eat food, butcher a carcass (knife), empty a hotbar slot	manger, découper une carcasse (couteau), vider un emplacement de la barre
 put in that hotbar slot	mettre dans cet emplacement de la barre
 choose	choisir

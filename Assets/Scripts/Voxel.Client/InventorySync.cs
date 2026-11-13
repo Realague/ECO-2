@@ -22,13 +22,17 @@ namespace Voxel.Client
     // is limited (CarryLimits: 40 blocks, 30 kg of the rest): items are only given while they fit, and
     // an action that would give nothing that fits is refused, the player being told why (Refused).
     // A player in creative mode (PlayerState.Creative, switched by anyone for themselves) takes any
-    // item for free (RequestCreativeGive), carries without limit, owns every tool, never starves and
-    // places blocks, doors, storage, seeds and arrows without spending them (TryConsumePlaced).
+    // item for free (RequestCreativeGive), throws items away (RequestCreativeDelete) or empties the
+    // whole bag (RequestCreativeClear), carries without
+    // limit, owns every tool, never starves and places blocks, doors, storage, seeds and arrows
+    // without spending them (TryConsumePlaced).
     public class InventorySync : MonoBehaviour
     {
         private const string FullMessage = "Inv.Full";
         private const string CreativeMessage = "Inv.Creative";
         private const string CreativeGiveMessage = "Inv.CreativeGive";
+        private const string CreativeDeleteMessage = "Inv.CreativeDelete";
+        private const string CreativeClearMessage = "Inv.CreativeClear";
         private const byte CreativeFlag = 1;
         private const string SowRefusedMessage = "Inv.SowRefused";
 
@@ -119,6 +123,8 @@ namespace Voxel.Client
             Messaging.RegisterNamedMessageHandler(ButcherMessage, OnButcher);
             Messaging.RegisterNamedMessageHandler(CreativeMessage, OnCreative);
             Messaging.RegisterNamedMessageHandler(CreativeGiveMessage, OnCreativeGive);
+            Messaging.RegisterNamedMessageHandler(CreativeDeleteMessage, OnCreativeDelete);
+            Messaging.RegisterNamedMessageHandler(CreativeClearMessage, (senderId, _) => CreativeClear(senderId));
             networkManager.OnClientConnectedCallback += OnClientConnected;
 
             // The host's own player connected before this was listening.
@@ -291,6 +297,25 @@ namespace Voxel.Client
             else Send(CreativeGiveMessage, item, count);
         }
 
+        // Throws items of the local player's bag away (only in creative mode): as many as asked, at
+        // most what the bag holds.
+        public void RequestCreativeDelete(int item, int count)
+        {
+            if (!running) return;
+
+            if (registry != null) CreativeDelete(networkManager.LocalClientId, item, count);
+            else Send(CreativeDeleteMessage, item, count);
+        }
+
+        // Empties the local player's bag and hotbar (only in creative mode).
+        public void RequestCreativeClear()
+        {
+            if (!running) return;
+
+            if (registry != null) CreativeClear(networkManager.LocalClientId);
+            else Send(CreativeClearMessage, 0);
+        }
+
         // Gives items to the nearest player, if within reach.
         public void RequestGive(int item, int count)
         {
@@ -441,6 +466,42 @@ namespace Voxel.Client
 
             if (catalog == null) catalog = new HashSet<int>(ItemCatalog.AllItems(ecosystemSync));
             if (catalog.Contains(item)) Give(clientId, item, count);
+        }
+
+        // A creative player throws items away, up to what they hold; an item wholly gone also leaves
+        // its hotbar slot (outside creative mode a slot keeps an item run out of, but this one was
+        // thrown away on purpose).
+        private void CreativeDelete(ulong clientId, int item, int count)
+        {
+            if (!IsCreative(clientId) || count <= 0 || !registry.TryGetState(clientId, out PlayerState state)) return;
+
+            int held = state.Inventory.Count(item);
+            if (held <= 0 || !state.Inventory.TryRemove(item, Math.Min(count, held))) return;
+
+            if (!state.Inventory.Has(item))
+            {
+                int slot = state.Hotbar.SlotOf(item);
+                if (slot >= 0) state.Hotbar.Set(slot, Items.None);
+            }
+
+            Publish(clientId);
+        }
+
+        // A creative player throws everything away: the whole bag, and the hotbar's slots with it.
+        private void CreativeClear(ulong clientId)
+        {
+            if (!IsCreative(clientId) || !registry.TryGetState(clientId, out PlayerState state)) return;
+
+            state.Inventory.Clear();
+            state.Hotbar.Clear();
+            Publish(clientId);
+        }
+
+        private void OnCreativeDelete(ulong senderId, FastBufferReader reader)
+        {
+            reader.ReadValueSafe(out int item);
+            reader.ReadValueSafe(out int count);
+            CreativeDelete(senderId, item, count);
         }
 
         private void OnCreative(ulong senderId, FastBufferReader reader)

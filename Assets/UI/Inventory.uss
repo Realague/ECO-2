@@ -586,6 +586,8 @@
 }
 
 .details-hint-text {
+    flex-shrink: 1;
+    white-space: normal;
     font-size: 16px;
     color: var(--inv-sheet-muted);
     margin: 0;
@@ -1119,6 +1121,20 @@
     padding: 0;
 }
 
+/* Empties the bag, in creative mode: a first click asks, a second one empties. */
+.creative-clear {
+    flex-shrink: 0;
+    height: 42px;
+    padding: 0 18px;
+    margin-left: 18px;
+    font-size: 17px;
+}
+
+.creative-clear--confirm {
+    background-color: var(--danger-action-hover);
+    border-color: var(--accent);
+}
+
 .creative-body {
     flex-grow: 1;
     flex-direction: row;
@@ -1154,12 +1170,9 @@
     overflow: hidden;
 }
 
-/* With the skills tab the sheet on the right is narrower, as in the mockup. */
+/* With the skills tab the sheet on the right is narrower, as in the mockup, in the same frame. */
 .inventory-screen--skills .inventory-side {
     width: 400px;
-    padding: 0;
-    background-color: rgba(0, 0, 0, 0);
-    border-width: 0;
 }
 
 /* The skills down the left, as categories. */
@@ -1695,21 +1708,28 @@
     min-height: 86px;
 }
 
-/* ---- The dark sheet on the right ---- */
+/* ---- The sheet on the right: a cream sheet in the dark frame, as on the other tabs ---- */
 
 .skill-sheet {
+    --skill-ink-gold: #8a6420;
+    --skill-ink-danger: #a8402c;
+    --skill-green-dark: #3f7d2c;
+    --skill-gold-edge: #b8862c;
     flex-grow: 1;
     padding: 20px 20px 18px 20px;
-    background-color: rgba(18, 19, 20, 0.92);
+    background-color: var(--inv-sheet);
     border-width: 1px;
-    border-color: var(--panel-border);
+    border-color: var(--inv-sheet-line);
     border-radius: 6px;
 }
 
 .skill-sheet-head {
     flex-direction: row;
     align-items: center;
+    padding-bottom: 16px;
     margin-bottom: 16px;
+    border-bottom-width: 1px;
+    border-color: var(--inv-sheet-line);
 }
 
 .skill-sheet-icon-frame {
@@ -1717,10 +1737,10 @@
     height: 104px;
     flex-shrink: 0;
     margin-right: 16px;
-    background-color: #2b2d2c;
-    border-width: 2px;
-    border-color: #8a6d3b;
-    border-radius: 6px;
+    background-color: #e8dfcf;
+    border-width: 1px;
+    border-color: #bba98f;
+    border-radius: 4px;
 }
 
 .skill-sheet-icon {
@@ -1737,7 +1757,7 @@
 .skill-sheet-name {
     font-size: 26px;
     -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
-    color: var(--text);
+    color: var(--inv-sheet-text);
     white-space: normal;
     margin: 0 0 4px 0;
     padding: 0;
@@ -1745,7 +1765,7 @@
 
 .skill-sheet-kind {
     font-size: 16px;
-    color: #d9a441;
+    color: var(--skill-ink-gold);
     white-space: normal;
     margin: 0;
     padding: 0;
@@ -1758,7 +1778,7 @@
 
 .skill-sheet-description {
     font-size: 16px;
-    color: var(--text-body);
+    color: var(--inv-sheet-text);
     white-space: normal;
     margin: 0 0 14px 0;
     padding: 0;
@@ -1768,13 +1788,13 @@
 .skill-info-box {
     padding: 10px 14px;
     margin-bottom: 8px;
-    background-color: rgba(255, 255, 255, 0.06);
+    background-color: var(--inv-sheet-well);
     border-radius: 4px;
 }
 
 .skill-info-title {
     font-size: 14px;
-    color: var(--text-muted);
+    color: var(--inv-sheet-muted);
     margin: 0 0 2px 0;
     padding: 0;
 }
@@ -1782,7 +1802,7 @@
 .skill-info-big {
     font-size: 28px;
     -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
-    color: var(--text);
+    color: var(--inv-sheet-text);
     white-space: normal;
     margin: 0;
     padding: 0;
@@ -1794,13 +1814,13 @@
     align-items: center;
     padding: 9px 14px;
     margin-bottom: 4px;
-    background-color: rgba(255, 255, 255, 0.03);
+    background-color: rgba(30, 23, 17, 0.06);
     border-radius: 4px;
 }
 
 .skill-info-label {
     font-size: 15px;
-    color: var(--text-body);
+    color: var(--inv-sheet-muted);
     margin: 0;
     padding: 0;
 }
@@ -1808,7 +1828,7 @@
 .skill-info-value {
     font-size: 15px;
     -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
-    color: var(--text);
+    color: var(--inv-sheet-text);
     margin: 0;
     padding: 0;
 }
@@ -1824,16 +1844,16 @@
     height: 18px;
     flex-shrink: 0;
     margin-right: 10px;
-    -unity-background-image-tint-color: var(--skill-green);
+    -unity-background-image-tint-color: var(--skill-green-dark);
 }
 
 .skill-requirement--missing > .skill-requirement-icon {
-    -unity-background-image-tint-color: var(--danger);
+    -unity-background-image-tint-color: var(--skill-ink-danger);
 }
 
 .skill-requirement-text {
     font-size: 14px;
-    color: var(--text-body);
+    color: var(--inv-sheet-text);
     white-space: normal;
     flex-shrink: 1;
     margin: 0;
@@ -1841,62 +1861,62 @@
 }
 
 .skill-requirement--missing > .skill-requirement-text {
-    color: var(--text-muted);
+    color: var(--inv-sheet-muted);
 }
 
 .skill-effect {
     font-size: 15px;
-    color: var(--text-body);
+    color: var(--inv-sheet-text);
     white-space: normal;
     margin: 0 0 6px 0;
     padding: 0;
 }
 
-/* The options of an upgrade with choices, on the dark sheet. */
+/* The options of an upgrade with choices, on the sheet. */
 .skill-choices {
     flex-direction: row;
     flex-wrap: wrap;
 }
 
 .skill-choice {
-    background-color: rgba(255, 255, 255, 0.06);
-    border-color: var(--line);
+    background-color: rgba(30, 23, 17, 0.05);
+    border-color: var(--inv-sheet-line);
 }
 
 .skill-choice:hover {
-    background-color: rgba(255, 255, 255, 0.12);
+    background-color: rgba(30, 23, 17, 0.1);
 }
 
 .skill-choice.choice--selected,
 .skill-choice.choice--selected:hover {
-    background-color: rgba(217, 173, 79, 0.2);
-    border-color: var(--skill-gold);
+    background-color: rgba(217, 173, 79, 0.35);
+    border-color: var(--skill-gold-edge);
 }
 
 .skill-choice > .choice-text {
-    color: var(--text);
+    color: var(--inv-sheet-text);
 }
 
 .skill-technical {
     font-size: 13px;
-    color: var(--text-muted);
+    color: var(--inv-sheet-muted);
     white-space: normal;
     margin: 12px 0 0 0;
     padding: 10px;
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(30, 23, 17, 0.06);
     border-radius: 5px;
 }
 
 .skill-sheet-reason {
     font-size: 15px;
-    color: var(--danger);
+    color: var(--skill-ink-danger);
     white-space: normal;
     margin: 10px 0 8px 0;
     padding: 0;
 }
 
 .skill-sheet-reason--done {
-    color: var(--skill-gold);
+    color: var(--skill-ink-gold);
 }
 
 .skill-sheet-buy {
