@@ -58,8 +58,8 @@ namespace Voxel.Client
         private readonly Dictionary<VisualElement, VisualElement> bandOf = new Dictionary<VisualElement, VisualElement>();
         private VisualElement linkLayer;
 
-        // The space between two tier bands (Inventory.uss, .skill-band's bottom margin).
-        private const float BandGap = 14f;
+        // The space under a tier's cards, where the links turn (Inventory.uss, .skill-tier-cards' bottom margin).
+        private const float BandGap = 22f;
 
         private string selectedSkill;
         private string selectedUpgrade;
@@ -294,7 +294,11 @@ namespace Voxel.Client
 
             // A tier shows once the one before it is open; all of them when the server says so.
             int shownTiers = skillSync.Options.ShowAllTiers ? skill.Tiers.Length : Mathf.Max(1, open);
-            for (int t = 1; t <= shownTiers && t <= skill.Tiers.Length; t++) tiers.Add(Band(skill, progress, t, open));
+            int lastTier = Mathf.Min(shownTiers, skill.Tiers.Length);
+            var tree = new VisualElement();
+            tree.AddToClassList("skill-tree");
+            for (int t = 1; t <= lastTier; t++) tree.Add(Band(skill, progress, t, open, t == lastTier));
+            tiers.Add(tree);
 
             // Each level joined to the one that replaces it, when both are shown.
             foreach (UpgradeDefinition upgrade in skill.Upgrades)
@@ -333,61 +337,63 @@ namespace Voxel.Client
             headerXp.text = Loc.T("{0} / {1} kcal", Loc.Number(xp, "0"), Loc.Number(tier.XpQuota, "0"));
         }
 
-        // A tier: its title strip (number, name, experience in quarters), then its upgrades.
-        private VisualElement Band(SkillDefinition skill, SkillProgress progress, int tier, int open)
+        // A tier: a row of its upgrades beside the rail, where its number sits on a disc and a bar
+        // down to the next tier's disc fills with the experience in it (ticked at each quarter, each
+        // giving a share of the tier's points). Its name, description and experience are the rail's
+        // tooltip.
+        private VisualElement Band(SkillDefinition skill, SkillProgress progress, int tier, int open, bool last)
         {
             TierDefinition definition = skill.Tiers[tier - 1];
-            var band = new VisualElement();
-            band.AddToClassList("skill-band");
-            band.EnableInClassList("skill-band--closed", tier > open);
+            float share = SkillRules.TierProgress(skill, progress, tier);
+            var row = new VisualElement();
+            row.AddToClassList("skill-tier");
+            row.EnableInClassList("skill-tier--closed", tier > open);
+            row.EnableInClassList("skill-tier--done", tier <= open && share >= 1f);
+            row.EnableInClassList("skill-tier--current", tier == open && share < 1f);
 
-            var head = new VisualElement();
-            head.AddToClassList("skill-band-head");
-            if (!string.IsNullOrEmpty(definition.Description)) head.tooltip = Loc.T(definition.Description);
-            var number = new Label(Loc.T("Tier {0}", tier).ToUpper(Loc.Culture));
-            number.AddToClassList("skill-band-number");
-            head.Add(number);
-            var name = new Label(string.IsNullOrEmpty(definition.Name) ? "" : Loc.T(definition.Name));
-            name.AddToClassList("skill-band-name");
-            head.Add(name);
+            var rail = new VisualElement();
+            rail.AddToClassList("skill-rail");
+            float xp = progress != null ? Mathf.Clamp(progress.Xp - skill.TierStart(tier), 0f, definition.XpQuota) : 0f;
+            string tip = string.IsNullOrEmpty(definition.Name) ? Loc.T("Tier {0}", tier) : Loc.T("Tier {0} · {1}", tier, Loc.T(definition.Name));
+            tip += "\n" + Loc.T("{0} / {1} kcal", Loc.Number(xp, "0"), Loc.Number(definition.XpQuota, "0"));
+            if (!string.IsNullOrEmpty(definition.Description)) tip += "\n" + Loc.T(definition.Description);
+            rail.tooltip = tip;
 
             var bar = new VisualElement();
-            bar.AddToClassList("skill-band-xp");
+            bar.AddToClassList("skill-rail-bar");
+            bar.EnableInClassList("skill-rail-bar--last", last);
             var fill = new VisualElement();
-            fill.AddToClassList("skill-band-xp-fill");
-            fill.style.width = Length.Percent(SkillRules.TierProgress(skill, progress, tier) * 100f);
+            fill.AddToClassList("skill-rail-fill");
+            fill.style.height = Length.Percent(share * 100f);
             bar.Add(fill);
-
-            // The quarters: each one reached gives a share of the tier's points.
             for (int q = 1; q < SkillDefinition.QuartersPerTier; q++)
             {
                 var tick = new VisualElement();
-                tick.AddToClassList("skill-band-xp-tick");
-                tick.style.left = Length.Percent(100f * q / SkillDefinition.QuartersPerTier);
+                tick.AddToClassList("skill-rail-tick");
+                tick.style.top = Length.Percent(100f * q / SkillDefinition.QuartersPerTier);
                 bar.Add(tick);
             }
 
-            head.Add(bar);
-            float xp = progress != null ? Mathf.Clamp(progress.Xp - skill.TierStart(tier), 0f, definition.XpQuota) : 0f;
-            var amount = new Label(Loc.T("{0} / {1} kcal", Loc.Number(xp, "0"), Loc.Number(definition.XpQuota, "0")));
-            amount.AddToClassList("skill-band-xp-text");
-            head.Add(amount);
-            band.Add(head);
+            rail.Add(bar);
+            var number = new Label(tier.ToString(Loc.Culture));
+            number.AddToClassList("skill-rail-number");
+            rail.Add(number);
+            row.Add(rail);
 
-            var row = new VisualElement();
-            row.AddToClassList("skill-band-row");
+            var cardsRow = new VisualElement();
+            cardsRow.AddToClassList("skill-tier-cards");
             foreach (UpgradeDefinition upgrade in definition.Upgrades)
             {
                 if (upgrade.Hidden) continue;
 
                 VisualElement card = upgrade.HasChoices ? Group(skill, progress, upgrade, open) : Card(skill, progress, upgrade, open);
-                bandOf[card] = band;
-                row.Add(card);
+                bandOf[card] = cardsRow;
+                cardsRow.Add(card);
             }
 
-            band.Add(row);
-            bands.Add(band);
-            return band;
+            row.Add(cardsRow);
+            bands.Add(cardsRow);
+            return row;
         }
 
         // An upgrade in steps (or a single one): icon, name, rank and a pip per step with its value; a
@@ -566,8 +572,8 @@ namespace Voxel.Client
                 Rect b = linkLayer.WorldToLocal(to.worldBound);
                 if (a.width <= 0f || b.width <= 0f || !bandOf.TryGetValue(from, out VisualElement fromBand)) continue;
 
-                // Down out of its band, across in the gap under it, then down to the next level, broken
-                // where it would cross a band between them (a tier the chain skips).
+                // Down out of its tier's cards, across in the gap under them, then down to the next level,
+                // broken where it would cross the cards of a tier between them (one the chain skips).
                 Rect source = linkLayer.WorldToLocal(fromBand.worldBound);
                 float turn = source.yMax + BandGap * 0.5f;
                 var start = new Vector2(a.center.x, a.yMax);

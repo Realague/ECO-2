@@ -1145,7 +1145,6 @@
     --skill-green: #5fa645;
     --skill-green-dark: #3f7d2c;
     --skill-band: rgba(16, 17, 18, 0.72);
-    --skill-band-head: rgba(255, 255, 255, 0.06);
     flex-grow: 1;
     flex-direction: row;
     background-color: var(--inv-main);
@@ -1391,91 +1390,102 @@
     padding: 0;
 }
 
-/* ---- A tier: a band with its title strip, then its upgrades ---- */
+/* ---- The tiers: one panel, a row of upgrades per tier beside the rail (SkillsPage.Band) ---- */
 
-.skill-band {
-    margin: 0 10px 14px 0;
+.skill-tree {
+    margin: 0 10px 12px 0;
+    padding: 14px 10px 0 4px;
     background-color: var(--skill-band);
     border-width: 1px;
     border-color: rgba(255, 255, 255, 0.09);
     border-radius: 6px;
-    overflow: hidden;
 }
 
-.skill-band-head {
+.skill-tier {
     flex-direction: row;
+}
+
+/* The rail: the tier's number on a disc, and a bar from it down to the next tier's disc. */
+.skill-rail {
+    width: 64px;
+    flex-shrink: 0;
     align-items: center;
-    height: 36px;
-    padding: 0 14px;
-    background-color: var(--skill-band-head);
-    border-bottom-width: 1px;
-    border-color: rgba(255, 255, 255, 0.08);
 }
 
-.skill-band-number {
-    font-size: 17px;
+.skill-rail-number {
+    width: 40px;
+    height: 40px;
+    margin: 10px 0 0 0;
+    padding: 0;
+    border-width: 2px;
+    border-radius: 20px;
+    border-color: rgba(255, 255, 255, 0.22);
+    background-color: #1c1d1f;
+    -unity-text-align: middle-center;
     -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
-    letter-spacing: 2px;
-    color: #f1e6cf;
-    margin: 0 18px 0 0;
-    padding: 0;
-}
-
-.skill-band-name {
-    flex-grow: 1;
-    flex-shrink: 1;
-    font-size: 15px;
+    font-size: 19px;
     color: var(--text-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin: 0;
-    padding: 0;
 }
 
-.skill-band-xp {
-    width: 120px;
-    height: 8px;
-    margin: 0 10px 0 12px;
-    background-color: var(--well);
-    border-radius: 4px;
-    overflow: hidden;
+.skill-tier--current .skill-rail-number {
+    border-color: var(--skill-gold);
+    color: var(--skill-gold-light);
 }
 
-.skill-band-xp-fill {
-    height: 100%;
-    background-color: var(--skill-green);
+.skill-tier--done .skill-rail-number {
+    background-color: var(--skill-gold);
+    border-color: var(--skill-gold-edge);
+    color: var(--skill-ink);
 }
 
-.skill-band-xp-tick {
+/* From the disc's centre (10 + 20) to the next one's, the same height below. */
+.skill-rail-bar {
     position: absolute;
+    left: 29px;
+    width: 6px;
+    top: 30px;
+    bottom: -30px;
+    background-color: var(--well);
+    border-radius: 3px;
+}
+
+.skill-rail-bar--last {
+    bottom: 14px;
+}
+
+.skill-rail-fill {
+    position: absolute;
+    left: 0;
+    right: 0;
     top: 0;
-    bottom: 0;
-    width: 2px;
-    margin-left: -1px;
+    background-color: var(--skill-green);
+    border-radius: 3px;
+}
+
+.skill-tier--done .skill-rail-fill {
+    background-color: var(--skill-gold);
+}
+
+.skill-rail-tick {
+    position: absolute;
+    left: -2px;
+    right: -2px;
+    height: 2px;
+    margin-top: -1px;
     background-color: rgba(16, 17, 18, 0.9);
 }
 
-.skill-band-xp-text {
-    width: 120px;
-    -unity-text-align: middle-right;
-    font-size: 13px;
-    color: var(--text-muted);
-    margin: 0;
-    padding: 0;
-}
-
-.skill-band-row {
+/* The bottom margin is SkillsPage.BandGap, where the links turn. */
+.skill-tier-cards {
+    flex-grow: 1;
     flex-direction: row;
     justify-content: center;
-    padding: 12px 8px;
+    padding: 10px 8px 0 8px;
+    margin-bottom: 22px;
 }
 
-.skill-band--closed > .skill-band-row {
+.skill-tier--closed > .skill-tier-cards {
     opacity: 0.5;
-}
-
-.skill-band--closed .skill-band-number {
-    color: var(--text-muted);
 }
 
 /* The gold lines from each level to the next one (SkillsPage.DrawLinks). */
