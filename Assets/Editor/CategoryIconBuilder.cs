@@ -9,13 +9,15 @@ using UnityEngine;
 // and CategoryMaterials.png, a tied sheaf (Materials holds straw and carcasses since wood has a
 // category of its own). The other category icons (CategoryAll, the bag; CategoryTools,
 // CategoryBlocks, CategoryFood, and CategoryWood, the logs that were Materials' icon) were cut from
-// the mockup; these are drawn to match them. Supersampled four times.
+// the mockup; these are drawn to match them. It also writes the Skills tab's glyph, TabSkills.png,
+// an open book (also beside the skill points). Supersampled four times.
 public static class CategoryIconBuilder
 {
     private const int Size = 128;
     private const int Supersample = 4;
     private const string SeedsPath = "Assets/UI/Icons/CategorySeeds.png";
     private const string MaterialsPath = "Assets/UI/Icons/CategoryMaterials.png";
+    private const string SkillsPath = "Assets/UI/Icons/TabSkills.png";
 
     [MenuItem("Eco/Write category icons")]
     public static void Write()
@@ -30,6 +32,35 @@ public static class CategoryIconBuilder
         });
 
         WriteIcon(MaterialsPath, SheafParts());
+        WriteIcon(SkillsPath, new List<Func<Vector2, bool>> { OpenBook });
+    }
+
+    // An open book seen from the front: two pages dipping toward the spine, a few lines of text cut
+    // out of each, over the cover's edge, set apart from the pages by a thin gap.
+    private static bool OpenBook(Vector2 p)
+    {
+        const float spine = 64f;
+        const float halfGap = 3f;
+        const float pageWidth = 50f;
+        float fromSpine = Mathf.Abs(p.x - spine);
+        float t = 1f - Mathf.Clamp01((fromSpine - halfGap) / pageWidth);
+        float dip = 9f * t * t;
+        float top = 100f - dip;
+        float bottom = 32f - dip;
+
+        if (fromSpine >= halfGap && fromSpine <= halfGap + pageWidth && p.y >= bottom && p.y <= top)
+        {
+            for (int line = 1; line <= 4; line++)
+            {
+                float lineY = top - 4f - line * 12f;
+                if (fromSpine >= halfGap + 7f && fromSpine <= halfGap + pageWidth - 8f && Mathf.Abs(p.y - lineY) < 2f) return false;
+            }
+
+            return true;
+        }
+
+        // The cover: a band under the pages, a little wider, meeting at the spine.
+        return fromSpine <= halfGap + pageWidth + 5f && p.y >= bottom - 11f && p.y <= bottom - 4f;
     }
 
     // A sheaf: seven stalks drawn together at a band and fanning out above and below it, an ear on

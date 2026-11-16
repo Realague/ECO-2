@@ -16,7 +16,7 @@
                 <ui:Label text="Crafting" class="inventory-tab-text" />
             </ui:Button>
             <ui:Button name="tab-skills" class="inventory-tab">
-                <ui:VisualElement class="icon icon--plant inventory-tab-icon" />
+                <ui:VisualElement class="icon icon--tab-skills inventory-tab-icon" />
                 <ui:Label text="Skills" class="inventory-tab-text" />
             </ui:Button>
             <ui:Button name="tab-creative" class="inventory-tab">
@@ -26,7 +26,7 @@
             <ui:VisualElement class="inventory-tabs-space" />
             <!-- The skill points to spend, all skills together, when there are any. -->
             <ui:VisualElement name="skill-points-box" class="speciality" tooltip="Skill points to spend (Skills tab)">
-                <ui:VisualElement class="icon icon--plant" />
+                <ui:VisualElement class="icon icon--tab-skills" />
                 <ui:Label name="skill-points" class="speciality-name" />
             </ui:VisualElement>
         </ui:VisualElement>
@@ -117,7 +117,7 @@
                             </ui:VisualElement>
                             <ui:VisualElement class="skill-header-side">
                                 <ui:VisualElement class="skill-header-points" tooltip="Skill points to spend">
-                                    <ui:VisualElement class="icon icon--plant skill-header-points-icon" />
+                                    <ui:VisualElement class="icon icon--tab-skills skill-header-points-icon" />
                                     <ui:Label name="skill-page-points" class="skill-header-points-text" />
                                 </ui:VisualElement>
                                 <ui:Label name="skill-header-tier" class="skill-header-tier" />

@@ -97,6 +97,7 @@
 .icon--category-materials { background-image: url("Icons/CategoryMaterials.png"); }
 .icon--category-wood { background-image: url("Icons/CategoryWood.png"); }
 .icon--tab-inventory { background-image: url("Icons/TabInventory.png"); }
+.icon--tab-skills { background-image: url("Icons/TabSkills.png"); }
 .icon--fire { background-image: url("Icons/Fire.png"); }
 .icon--hourglass { background-image: url("Icons/Hourglass.png"); }
 .icon--scales { background-image: url("Icons/Scales.png"); }
