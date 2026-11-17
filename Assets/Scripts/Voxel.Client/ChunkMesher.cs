@@ -279,10 +279,14 @@ namespace Voxel.Client
         // A smooth block at (x, y, z) in the chunk: each face that does not meet other smooth ground, as a
         // quad through the smoothed vertices of its four corners (SmoothTerrain), lit at those corners.
         // The blue of its vertex colour is the ore its block holds (OreKind, 0 for none): an ore shows on
-        // its own block's faces, whatever the rock around.
+        // its own block's faces, whatever the rock around. Its alpha is the block's own material: the
+        // shader shows it over most of the face and the corners' materials only near them, or a block
+        // placed amid another ground (a stone in a field of dirt) took the material of the ground around
+        // it, which is what most of its corners' cells hold.
         private void AddSmoothBlock(World world, SkyLight light, ushort block, int x, int y, int z)
         {
             byte ore = (byte)Ores.OreOf(block);
+            byte own = (byte)SmoothTerrain.MaterialOf(block);
             for (int face = 0; face < ChunkMesher.FaceCount; face++)
             {
                 Vector3Int n = ChunkMesher.FaceNormals[face];
@@ -308,7 +312,7 @@ namespace Voxel.Client
                     vertices.Add(cornerPositions[corner]);
                     normals.Add(cornerNormals[corner] == Vector3.zero ? (Vector3)n : cornerNormals[corner]);
                     uvs.Add(Vector2.zero);
-                    colours.Add(new Color32((byte)Mathf.RoundToInt(cornerSky[corner] * 255f), (byte)Mathf.RoundToInt(cornerTorch[corner] * 255f), ore, 255));
+                    colours.Add(new Color32((byte)Mathf.RoundToInt(cornerSky[corner] * 255f), (byte)Mathf.RoundToInt(cornerTorch[corner] * 255f), ore, own));
                     smoothMaterials.Add(materials);
                     smoothWeights.Add(new Vector4(i == 0 ? 1f : 0f, i == 1 ? 1f : 0f, i == 2 ? 1f : 0f, i == 3 ? 1f : 0f));
                 }
@@ -431,6 +435,33 @@ namespace Voxel.Client
                 level = Mathf.Max(level, light.Get(nx, ny, nz) - 1);
                 if (glow != null) torch = Mathf.Max(torch, glow.Get(nx, ny, nz) - 1);
             }
+        }
+
+        // The light of a sloping face (a ramp, a roof corner's slopes) of the shaped block at cell, whose
+        // normal is given in the cell: the brightest of the cells it opens onto, the one above and those
+        // on its low sides, as 0 to 1. Lit by the cell above only, a slope under a full block was black.
+        private void SlopedFaceLight(World world, SkyLight light, Vector3Int cell, Vector3 normal, out float level, out float torchLevel)
+        {
+            int best = 0, bestGlow = 0;
+            for (int axis = 0; axis < 3; axis++)
+            {
+                float component = axis == 0 ? normal.x : axis == 1 ? normal.y : normal.z;
+                if (Mathf.Abs(component) < 0.1f) continue;
+
+                int step = component > 0f ? 1 : -1;
+                int x = cell.x + (axis == 0 ? step : 0), y = cell.y + (axis == 1 ? step : 0), z = cell.z + (axis == 2 ? step : 0);
+                if (world.IsOpaque(x, y, z)) continue;
+
+                int cellLevel = light.Get(x, y, z);
+                int cellGlow = glow != null ? glow.Get(x, y, z) : 0;
+                if (cellLevel == 0 && Blocks.BlocksLight(world.GetBlock(x, y, z))) BorrowLight(world, light, x, y, z, out cellLevel, out cellGlow);
+
+                best = Mathf.Max(best, cellLevel);
+                bestGlow = Mathf.Max(bestGlow, cellGlow);
+            }
+
+            level = best / (float)SkyLight.Max;
+            torchLevel = bestGlow / (float)Blocks.TorchLight;
         }
 
         // Reads the cells in front of a face and works out the light of its four corners.
@@ -631,17 +662,13 @@ namespace Voxel.Client
 
         // A flat face of three or four corners given facing +z, turned with the block: face is the cell
         // side it lies on (culled against an opaque neighbour, lit by the cell beyond it) or -1 for a
-        // sloping face (lit by the cell above). Its normal is worked out from its corners, which are
+        // sloping face (lit by the cells it opens onto, SlopedFaceLight). Its normal is worked out from its corners, which are
         // put in the order that faces it outward: toward its side, or upward for a sloping face.
         private void AddShapeFace(World world, SkyLight light, ushort block, Vector3 origin, Vector3Int cell, int facing, int face, params Vector3[] given)
         {
             int turned = face < 0 ? ChunkMesher.TopFace : TurnFace(face, facing);
             Vector3Int toward = ChunkMesher.FaceNormals[turned];
             if (face >= 0 && HidesFace(world, cell.x + toward.x, cell.y + toward.y, cell.z + toward.z)) return;
-
-            SampleFront(world, light, cell.x + toward.x, cell.y + toward.y, cell.z + toward.z, turned);
-            float level = frontLevel[4] / (float)SkyLight.Max;
-            float torchLevel = frontGlow[4] / (float)Blocks.TorchLight;
 
             // Newell's normal of the turned corners (a triangle repeats its last corner), which points
             // the way cross(b - a, c - a) does, the front side here as for AddSlope's ramp; the order is
@@ -660,6 +687,16 @@ namespace Voxel.Client
             {
                 System.Array.Reverse(points);
                 normal = -normal;
+            }
+
+            // A side face is lit by the cell beyond it, a sloping one by those it opens onto.
+            float level, torchLevel;
+            if (face < 0) SlopedFaceLight(world, light, cell, normal, out level, out torchLevel);
+            else
+            {
+                SampleFront(world, light, cell.x + toward.x, cell.y + toward.y, cell.z + toward.z, turned);
+                level = frontLevel[4] / (float)SkyLight.Max;
+                torchLevel = frontGlow[4] / (float)Blocks.TorchLight;
             }
 
             for (int i = 0; i < 4; i++)
@@ -725,8 +762,8 @@ namespace Voxel.Client
             AddSlopeFace(world, light, block, origin, cell, facing, -1, new[] { new Vector3(0, 0, 0), new Vector3(0, 1, 1), new Vector3(1, 1, 1), new Vector3(1, 0, 0) });
         }
 
-        // One face of a slope given facing +z (face: the cell side it lies on, or -1 for the ramp, which
-        // is lit by the cell above): turned, culled against an opaque neighbour, lit evenly by the cell
+        // One face of a slope given facing +z (face: the cell side it lies on, or -1 for the ramp, lit by
+        // the cells it opens onto): turned, culled against an opaque neighbour, lit evenly by the cell
         // in front of it.
         private void AddSlopeFace(World world, SkyLight light, ushort block, Vector3 origin, Vector3Int cell, int facing, int face, Vector3[] given)
         {
@@ -734,23 +771,28 @@ namespace Voxel.Client
             Vector3Int toward = ChunkMesher.FaceNormals[turned];
             if (face >= 0 && HidesFace(world, cell.x + toward.x, cell.y + toward.y, cell.z + toward.z)) return;
 
-            SampleFront(world, light, cell.x + toward.x, cell.y + toward.y, cell.z + toward.z, turned);
-            float level = frontLevel[4] / (float)SkyLight.Max;
-            float torchLevel = frontGlow[4] / (float)Blocks.TorchLight;
+            Vector3 normal = face < 0 ? TurnPoint(new Vector3(0.5f, 0.5f + 0.70710678f, 0.5f - 0.70710678f), facing) - new Vector3(0.5f, 0.5f, 0.5f) : (Vector3)toward;
+            float level, torchLevel;
+            if (face < 0) SlopedFaceLight(world, light, cell, normal, out level, out torchLevel);
+            else
+            {
+                SampleFront(world, light, cell.x + toward.x, cell.y + toward.y, cell.z + toward.z, turned);
+                level = frontLevel[4] / (float)SkyLight.Max;
+                torchLevel = frontGlow[4] / (float)Blocks.TorchLight;
+            }
+
             for (int i = 0; i < 4; i++)
             {
                 cornerLight[i] = level;
                 cornerGlow[i] = torchLevel;
                 corners[i] = TurnPoint(given[i], facing);
             }
-
-            Vector3 normal = face < 0 ? TurnPoint(new Vector3(0.5f, 0.5f + 0.70710678f, 0.5f - 0.70710678f), facing) - new Vector3(0.5f, 0.5f, 0.5f) : (Vector3)toward;
             AddQuad(origin, corners, normal, false);
             AddLocalUvs(BlockAtlas.TileFor(block, turned), turned, corners, cell);
         }
 
         // A point of the cell turned about its middle by quarter turns: (x, z) -> (z, 1 - x).
-        private static Vector3 TurnPoint(Vector3 point, int facing)
+        internal static Vector3 TurnPoint(Vector3 point, int facing)
         {
             for (int turn = 0; turn < (facing & 3); turn++)
             {

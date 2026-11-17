@@ -22,7 +22,7 @@ MonoBehaviour:
     tool: 3
   xpContexts:
   - fell
-  pointsPerTier: 4
+  pointsPerTier: 8
   tiers:
   - name: Firewood, softwood and splitting
     description: 'You hit hard, sometimes crooked, but it comes down. You know how to split softwood logs to light a fire: that''s something.'

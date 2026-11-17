@@ -60,7 +60,8 @@ SAMPLER(sampler_OreOverlay);
 // materials (block types) of its quad's four corners and which corner it is: each pixel shows one of
 // them, picked by their shares there, dithered too. A material's tile depends on how much its ground
 // faces up (BlockAtlas.SetSmoothTables), its variant on the block cell the pixel lies in, as
-// TileVariants weighs them. The blue of the vertex colour is the ore of the quad's own block.
+// TileVariants weighs them. The blue of the vertex colour is the ore of the quad's own block, its
+// alpha that block's material, which shows over the face but near the corners.
 TEXTURE2D(_SmoothMaterials);
 TEXTURE2D(_SmoothVariants);
 float4 _SmoothAtlas; // x: the atlas's slots, y: the overlays' slots, z: the row of the first overlay
@@ -151,7 +152,7 @@ struct Attributes
     float2 dynamicLightmapUV  : TEXCOORD2;
 #endif
     float2 overlayUV          : TEXCOORD3; // ECO: an ore's overlay, its place (only where color.b is full)
-    half4 color               : COLOR; // ECO: r is the sky light, g the torches', b full on an ore's faces (on smoothed ground, the ore)
+    half4 color               : COLOR; // ECO: r is the sky light, g the torches', b full on an ore's faces (on smoothed ground, the ore; a its own block's material)
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
@@ -314,8 +315,9 @@ Varyings LitPassVertex(Attributes input)
 
     output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
 #if defined(_ECO_SMOOTH)
-    // ECO: on smoothed ground, the quad's materials and corner weights, and its ore in z.
-    output.voxelLight = float4(input.color.rg, round(input.color.b * 255.0), 0.0);
+    // ECO: on smoothed ground, the quad's materials and corner weights, its ore in z, its own block's
+    // material in w.
+    output.voxelLight = float4(input.color.rg, round(input.color.b * 255.0), round(input.color.a * 255.0));
     output.smoothMaterials = input.smoothMaterials;
     output.smoothWeights = input.smoothWeights;
 #else
@@ -398,6 +400,14 @@ half3 EcoSmoothAlbedo(Varyings input)
     float pickMaterial = EcoRandom(texel, 1u) * (w.x + w.y + w.z + w.w);
     float4 ids = input.smoothMaterials;
     float id = pickMaterial < w.x ? ids.x : (pickMaterial < w.x + w.y ? ids.y : (pickMaterial < w.x + w.y + w.z ? ids.z : ids.w));
+
+    // The quad's own block over most of its face: its corners' materials only near them (from a
+    // corner's weight of 0.5, the middle of an edge, fading in to 0.9), dithered too. A corner's
+    // material is what most of the cells around it hold, so without this a block amid another ground
+    // took that ground's look.
+    float4 raw = input.smoothWeights;
+    float nearest = max(max(raw.x, raw.y), max(raw.z, raw.w));
+    if (EcoRandom(texel, 5u) < saturate((0.9 - nearest) / 0.4)) id = input.voxelLight.w;
     float4 tiles = LOAD_TEXTURE2D(_SmoothMaterials, int2((int)round(id), 0));
 
     // Its top where the ground faces up enough (the threshold dithered), its bottom facing down, else its side.
