@@ -9,28 +9,38 @@ namespace Voxel.Client
 {
     // What the hammer builds (the "build-panel" box of Assets/UI/Hotbar.uxml, shown above the bar while
     // the hammer is in hand): the construction block chosen from the bag (B, Shift+B back), the shape a
-    // wood block takes (R, Shift+R back; a door has none) and the mode, block by block or in lines (V).
-    // Holding R opens a wheel (the "build-wheel" box): the shapes on the inner ring, the bag's
-    // construction blocks on the outer one; the mouse moves a pointer over it (the view stays still,
-    // WheelOpen), and releasing R or a click chooses what it points at (a click keeps the wheel open,
-    // to choose a shape and a block in one go). In line mode the first click sets where the line
-    // starts (LineStart), the second builds or takes back the line (PlayerController). All of it is
-    // this machine's own: nothing is sent or saved.
+    // wood block takes (R, Shift+R back; a door has none), its rotation (E, Shift+E back: Shapes'
+    // rotations of the shape, turned from the way the player looks; kept per shape) and the mode, block
+    // by block or in lines (V). Holding R opens a wheel (the "build-wheel" box): the shapes on the inner
+    // ring, the bag's construction blocks on the outer one; holding E opens it with the shape's
+    // rotations on its one ring. The mouse moves a pointer over it (the view stays still, WheelOpen),
+    // and releasing the key or a click chooses what it points at (a click keeps the wheel open, to
+    // choose a shape and a block in one go). In line mode the first click sets where the line starts
+    // (LineStart), the second builds or takes back the line (PlayerController). All of it is this
+    // machine's own: nothing is sent or saved.
     public class BuildingHud : MonoBehaviour
     {
         private const string HiddenClass = "hidden";
         private const string HoverClass = "wheel-slot--hover";
         private const string ChosenClass = "wheel-slot--chosen";
 
-        // Holding R longer than this opens the wheel; a shorter press cycles the shape.
+        // Holding R or E longer than this opens the wheel; a shorter press cycles the shape or rotation.
         private const float HoldSeconds = 0.35f;
 
-        // The wheel's rings (panel units): shapes, then blocks, at least this far out and far enough for
-        // their slots not to touch; within DeadZone of the middle the pointer points at nothing.
+        // The wheel's rings (panel units): shapes (or rotations), then blocks, at least this far out and
+        // far enough for their slots not to touch; within DeadZone of the middle the pointer points at
+        // nothing.
         private const float InnerRadius = 172f;
         private const float OuterRadius = 292f;
         private const float BlockSpacing = 74f;
         private const float DeadZone = 56f;
+
+        // What a wheel shows: shapes and blocks (R), or the shape's rotations (E).
+        private enum WheelKind
+        {
+            Shapes,
+            Rotations
+        }
 
         [SerializeField] private UIDocument document;
         [SerializeField] private HotbarHud hotbar;
@@ -41,23 +51,29 @@ namespace Voxel.Client
         private VisualElement icon;
         private Label blockName;
         private Label detail;
+        private Label modeLabel;
         private VisualElement wheel;
         private VisualElement wheelSlots;
         private VisualElement innerDisc;
         private VisualElement outerDisc;
         private VisualElement pointerDot;
         private Label wheelName;
+        private Label wheelHint;
         private readonly List<int> held = new List<int>();
         private readonly List<VisualElement> shapeSlots = new List<VisualElement>();
         private readonly List<VisualElement> blockSlots = new List<VisualElement>();
         private readonly List<int> blockSlotItems = new List<int>();
+        private readonly int[] rotations = new int[Shapes.Families.Length];
         private int block = Items.None;
-        private int shapeIndex;
+        private int familyIndex;
         private int shownBlock = -1;
         private string shownDetail;
 
-        // When R went down (-1 while it is up), and where the wheel's pointer is, from its middle.
-        private float rPressedAt = -1f;
+        // Which key went down and when (-1 while none is down), what the open wheel shows, and where
+        // its pointer is, from its middle.
+        private WheelKind pressedKind;
+        private float pressedAt = -1f;
+        private WheelKind wheelKind;
         private Vector2 pointer;
 
         // Whether the pointer has pointed at something since the wheel opened.
@@ -73,7 +89,10 @@ namespace Voxel.Client
         // The construction block to place (an item, a block type), or Items.None when the bag holds none.
         public int Block => block;
 
-        public Shape Shape => Shapes.All[shapeIndex];
+        public ShapeFamily Family => Shapes.Families[familyIndex];
+
+        // The chosen rotation of the chosen shape.
+        public int Rotation => rotations[familyIndex];
 
         public bool LineMode { get; private set; }
 
@@ -98,12 +117,14 @@ namespace Voxel.Client
             icon = root.Q("build-icon");
             blockName = root.Q<Label>("build-block");
             detail = root.Q<Label>("build-detail");
+            modeLabel = root.Q<Label>("build-mode");
             wheel = root.Q("build-wheel");
             wheelSlots = root.Q("wheel-slots");
             innerDisc = root.Q("wheel-inner-disc");
             outerDisc = root.Q("wheel-outer-disc");
             pointerDot = root.Q("wheel-pointer");
             wheelName = root.Q<Label>("wheel-name");
+            wheelHint = root.Q<Label>("wheel-hint");
             Loc.Changed += OnLanguageChanged;
         }
 
@@ -119,15 +140,8 @@ namespace Voxel.Client
         }
 
         // The block a click places by a player looking along yaw (degrees): the chosen block in the chosen
-        // shape, facing the way they look (a roof's corner, the diagonal they look along).
-        public ushort BlockToPlace(float yaw)
-        {
-            var type = (ushort)block;
-            if (!Shapes.HasShapes(type)) return type;
-
-            int facing = Shapes.IsCorner(Shape) ? Shapes.CornerFacingOf(yaw) : StorageRules.FacingOf(yaw);
-            return Shapes.Make(type, Shape, facing);
-        }
+        // shape and rotation, turned from the way they look (a roof's corner, the diagonal they look along).
+        public ushort BlockToPlace(float yaw) => Shapes.Place((ushort)block, Family, Rotation, yaw);
 
         public void StartLine(BlockPos start, bool takeBack)
         {
@@ -142,22 +156,53 @@ namespace Voxel.Client
             LineLength = 0;
         }
 
-        // The shape's name, as shown in the panel and the aiming label.
+        // A shaped block's name, as the aiming label shows it: its family's, or "Beam" for a lying post.
         internal static string NameOf(Shape shape)
         {
-            switch (shape)
+            return shape == Shape.Beam || shape == Shape.EdgeBeam ? Loc.T("Beam") : NameOf(Shapes.FamilyOf(shape));
+        }
+
+        // A shape's name, as shown in the panel and the wheel.
+        internal static string NameOf(ShapeFamily family)
+        {
+            switch (family)
             {
-                case Shape.Wall: return Loc.T("Wall");
-                case Shape.Post: return Loc.T("Post");
-                case Shape.Floor: return Loc.T("Floor");
-                case Shape.FlatRoof: return Loc.T("Flat roof");
-                case Shape.Slope: return Loc.T("Sloped roof");
-                case Shape.Fence: return Loc.T("Fence");
-                case Shape.Stairs: return Loc.T("Stairs");
-                case Shape.OuterCorner: return Loc.T("Roof corner (outer)");
-                case Shape.InnerCorner: return Loc.T("Roof corner (inner)");
-                case Shape.Ladder: return Loc.T("Ladder");
+                case ShapeFamily.Wall: return Loc.T("Wall");
+                case ShapeFamily.Post: return Loc.T("Post");
+                case ShapeFamily.Slab: return Loc.T("Slab");
+                case ShapeFamily.Slope: return Loc.T("Sloped roof");
+                case ShapeFamily.Fence: return Loc.T("Fence");
+                case ShapeFamily.LowWall: return Loc.T("Low wall");
+                case ShapeFamily.Column: return Loc.T("Column");
+                case ShapeFamily.Stairs: return Loc.T("Stairs");
+                case ShapeFamily.OuterCorner: return Loc.T("Roof corner (outer)");
+                case ShapeFamily.InnerCorner: return Loc.T("Roof corner (inner)");
+                case ShapeFamily.Ladder: return Loc.T("Ladder");
                 default: return Loc.T("Full block");
+            }
+        }
+
+        private static readonly string[] PostRotations =
+        {
+            "Upright, in the middle", "Upright, far left corner", "Upright, far right corner", "Upright, near right corner",
+            "Upright, near left corner", "Lying across", "Lying ahead", "Lying on the far top edge", "Lying on the right top edge",
+            "Lying on the near top edge", "Lying on the left top edge"
+        };
+
+        private static readonly string[] SlabRotations = { "Top", "Bottom", "Upright, far", "Upright, right", "Upright, near", "Upright, left" };
+
+        // A rotation's name: where a post or a slab lies, a column's part, a fence's way, else the
+        // quarter turns from the way the player looks.
+        internal static string RotationName(ShapeFamily family, int rotation)
+        {
+            switch (family)
+            {
+                case ShapeFamily.Post: return Loc.T(PostRotations[rotation]);
+                case ShapeFamily.Slab: return Loc.In("slab", SlabRotations[rotation]);
+                case ShapeFamily.Column: return Loc.In("column", rotation == 0 ? "Shaft" : rotation == 1 ? "Base" : "Top");
+                case ShapeFamily.Fence:
+                case ShapeFamily.LowWall: return Loc.T(rotation == 0 ? "Across" : "Ahead");
+                default: return (rotation * 90) + "°";
             }
         }
 
@@ -169,7 +214,7 @@ namespace Voxel.Client
             {
                 ClearLine();
                 CloseWheel();
-                rPressedAt = -1f;
+                pressedAt = -1f;
                 panel.AddToClassList(HiddenClass);
                 return;
             }
@@ -199,38 +244,48 @@ namespace Voxel.Client
             if (keyboard == null || mouse == null || UnityEngine.Cursor.lockState != CursorLockMode.Locked || CommandConsole.HoldsInput)
             {
                 CloseWheel();
-                rPressedAt = -1f;
+                pressedAt = -1f;
                 return;
             }
 
             int step = keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed ? -1 : 1;
             KeyControl shapeKey = KeyFor(keyboard, "r", keyboard.rKey);
-            if (shapeKey.wasPressedThisFrame) rPressedAt = Time.unscaledTime;
+            KeyControl turnKey = KeyFor(keyboard, "e", keyboard.eKey);
+            if (!WheelOpen && pressedAt < 0f)
+            {
+                if (shapeKey.wasPressedThisFrame) Press(WheelKind.Shapes);
+                else if (turnKey.wasPressedThisFrame) Press(WheelKind.Rotations);
+            }
 
-            if (rPressedAt >= 0f && shapeKey.isPressed && !WheelOpen && Time.unscaledTime - rPressedAt >= HoldSeconds) OpenWheel();
+            KeyControl key = pressedKind == WheelKind.Shapes ? shapeKey : turnKey;
+            if (pressedAt >= 0f && key.isPressed && !WheelOpen && Time.unscaledTime - pressedAt >= HoldSeconds && CanOpen(pressedKind)) OpenWheel(pressedKind);
 
             if (WheelOpen)
             {
                 MovePointer(mouse);
                 if (TryHovered(out _, out _)) wheelPointed = true;
                 if (mouse.leftButton.wasPressedThisFrame) ChooseHovered();
-                if (!shapeKey.isPressed)
+                if (!key.isPressed)
                 {
                     // Released without ever pointing at anything (a slow press): it was meant as a press.
                     if (TryHovered(out _, out _)) ChooseHovered();
-                    else if (!wheelPointed) NextShape(step);
+                    else if (!wheelPointed) Cycle(wheelKind, step);
                     CloseWheel();
-                    rPressedAt = -1f;
+                    pressedAt = -1f;
                 }
 
                 return;
             }
 
-            // A short press cycles the shape, as before the wheel.
-            if (shapeKey.wasReleasedThisFrame && rPressedAt >= 0f)
+            // A short press cycles the shape or the rotation, as before the wheel.
+            if (pressedAt >= 0f && key.wasReleasedThisFrame)
             {
-                rPressedAt = -1f;
-                NextShape(step);
+                pressedAt = -1f;
+                Cycle(pressedKind, step);
+            }
+            else if (pressedAt >= 0f && !key.isPressed)
+            {
+                pressedAt = -1f;
             }
 
             if (KeyFor(keyboard, "b", keyboard.bKey).wasPressedThisFrame && held.Count > 0)
@@ -246,10 +301,21 @@ namespace Voxel.Client
             }
         }
 
-        // The next shape (or the one before, step -1); a door has none.
-        private void NextShape(int step)
+        private void Press(WheelKind kind)
         {
-            if (block != Blocks.Door) shapeIndex = Wrap(shapeIndex + step, Shapes.All.Length);
+            pressedKind = kind;
+            pressedAt = Time.unscaledTime;
+        }
+
+        // Whether a wheel has anything to choose from: a door has no shape, a full block no rotation.
+        private bool CanOpen(WheelKind kind) => kind == WheelKind.Shapes || (block != Blocks.Door && Shapes.RotationCount(Family) > 1);
+
+        private void Cycle(WheelKind kind, int step)
+        {
+            if (block == Blocks.Door) return;
+
+            if (kind == WheelKind.Shapes) familyIndex = Wrap(familyIndex + step, Shapes.Families.Length);
+            else rotations[familyIndex] = Wrap(Rotation + step, Shapes.RotationCount(Family));
         }
 
         private static int Wrap(int value, int count) => ((value % count) + count) % count;
@@ -260,16 +326,25 @@ namespace Voxel.Client
             return keyboard.FindKeyOnCurrentKeyboardLayout(letter) ?? fallback;
         }
 
+        // A glyph of a family in a rotation, as the player would place it looking ahead.
+        private static ShapeGlyph GlyphOf(ShapeFamily family, int rotation)
+        {
+            (Shape shape, int turns) = Shapes.RotationOf(family, rotation);
+            return new ShapeGlyph(shape, turns & 3);
+        }
+
         // ---- The wheel ----
 
-        private void OpenWheel()
+        private void OpenWheel(WheelKind kind)
         {
             if (wheel == null) return;
 
             WheelOpen = true;
+            wheelKind = kind;
             wheelPointed = false;
             pointer = Vector2.zero;
             BuildWheel();
+            if (wheelHint != null) wheelHint.text = Loc.T(kind == WheelKind.Shapes ? "Point at one, then release R or click" : "Point at one, then release E or click");
             wheel.RemoveFromClassList(HiddenClass);
             ShowHover();
         }
@@ -282,7 +357,8 @@ namespace Voxel.Client
             wheel.AddToClassList(HiddenClass);
         }
 
-        // The slots, made again at each opening since the bag may have changed.
+        // The slots, made again at each opening since the bag may have changed: the shapes (each in its
+        // chosen rotation) and the blocks, or the chosen shape's rotations.
         private void BuildWheel()
         {
             wheelSlots.Clear();
@@ -290,41 +366,45 @@ namespace Voxel.Client
             blockSlots.Clear();
             blockSlotItems.Clear();
 
-            for (int i = 0; i < Shapes.All.Length; i++)
+            int count = wheelKind == WheelKind.Shapes ? Shapes.Families.Length : Shapes.RotationCount(Family);
+            for (int i = 0; i < count; i++)
             {
                 var slot = new VisualElement { pickingMode = PickingMode.Ignore };
                 slot.AddToClassList("wheel-slot");
                 slot.AddToClassList("wheel-slot--shape");
                 slot.EnableInClassList("wheel-slot--faded", block == Blocks.Door);
-                var glyph = new ShapeGlyph(Shapes.All[i]);
+                ShapeGlyph glyph = wheelKind == WheelKind.Shapes ? GlyphOf(Shapes.Families[i], rotations[i]) : GlyphOf(Family, i);
                 glyph.AddToClassList("shape-glyph");
                 slot.Add(glyph);
-                Place(slot, AngleOf(i, Shapes.All.Length), InnerRadius);
+                Place(slot, AngleOf(i, count), InnerRadius);
                 wheelSlots.Add(slot);
                 shapeSlots.Add(slot);
             }
 
-            outerRadius = Mathf.Max(OuterRadius, held.Count * BlockSpacing / (2f * Mathf.PI));
-            for (int i = 0; i < held.Count; i++)
+            if (wheelKind == WheelKind.Shapes)
             {
-                var slot = new VisualElement { pickingMode = PickingMode.Ignore };
-                slot.AddToClassList("wheel-slot");
-                slot.AddToClassList("wheel-slot--block");
-                var picture = new VisualElement { pickingMode = PickingMode.Ignore };
-                picture.AddToClassList("wheel-block-icon");
-                picture.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(held[i], ecosystemSync));
-                slot.Add(picture);
-                var count = new Label(inventorySync.Inventory.Count(held[i]).ToString()) { pickingMode = PickingMode.Ignore };
-                count.AddToClassList("wheel-block-count");
-                slot.Add(count);
-                Place(slot, AngleOf(i, held.Count), outerRadius);
-                wheelSlots.Add(slot);
-                blockSlots.Add(slot);
-                blockSlotItems.Add(held[i]);
+                outerRadius = Mathf.Max(OuterRadius, held.Count * BlockSpacing / (2f * Mathf.PI));
+                for (int i = 0; i < held.Count; i++)
+                {
+                    var slot = new VisualElement { pickingMode = PickingMode.Ignore };
+                    slot.AddToClassList("wheel-slot");
+                    slot.AddToClassList("wheel-slot--block");
+                    var picture = new VisualElement { pickingMode = PickingMode.Ignore };
+                    picture.AddToClassList("wheel-block-icon");
+                    picture.style.backgroundImage = new StyleBackground(ItemCatalog.IconOf(held[i], ecosystemSync));
+                    slot.Add(picture);
+                    var countLabel = new Label(inventorySync.Inventory.Count(held[i]).ToString()) { pickingMode = PickingMode.Ignore };
+                    countLabel.AddToClassList("wheel-block-count");
+                    slot.Add(countLabel);
+                    Place(slot, AngleOf(i, held.Count), outerRadius);
+                    wheelSlots.Add(slot);
+                    blockSlots.Add(slot);
+                    blockSlotItems.Add(held[i]);
+                }
             }
 
             SizeDisc(innerDisc, InnerRadius + 56f);
-            SizeDisc(outerDisc, held.Count > 0 ? outerRadius + 48f : 0f);
+            SizeDisc(outerDisc, blockSlots.Count > 0 ? outerRadius + 48f : 0f);
             MarkChosen();
         }
 
@@ -362,8 +442,8 @@ namespace Voxel.Client
             ShowHover();
         }
 
-        // What the pointer points at: a shape (isShape) or a block's slot, by its ring and angle; false
-        // near the middle.
+        // What the pointer points at: a shape or rotation (isShape) or a block's slot, by its ring and
+        // angle; false near the middle.
         private bool TryHovered(out bool isShape, out int index)
         {
             isShape = true;
@@ -373,6 +453,8 @@ namespace Voxel.Client
 
             isShape = blockSlots.Count == 0 || distance < (InnerRadius + outerRadius) * 0.5f;
             int count = isShape ? shapeSlots.Count : blockSlots.Count;
+            if (count == 0) return false;
+
             float angle = Mathf.Atan2(pointer.x, -pointer.y);
             if (angle < 0f) angle += 2f * Mathf.PI;
             index = Wrap(Mathf.RoundToInt(angle / (2f * Mathf.PI / count)), count);
@@ -388,8 +470,9 @@ namespace Voxel.Client
             pointerDot.style.left = pointer.x;
             pointerDot.style.top = pointer.y;
             wheelName.text = !any ? CurrentChoice()
-                : isShape ? NameOf(Shapes.All[index])
-                : ItemCatalog.NameOf(blockSlotItems[index], ecosystemSync);
+                : !isShape ? ItemCatalog.NameOf(blockSlotItems[index], ecosystemSync)
+                : wheelKind == WheelKind.Shapes ? NameOf(Shapes.Families[index])
+                : NameOf(Family) + "\n" + RotationName(Family, index);
         }
 
         // What is chosen now, shown in the middle while the pointer points at nothing.
@@ -398,15 +481,22 @@ namespace Voxel.Client
             if (block == Items.None) return Loc.T("No construction block in the bag");
 
             string name = ItemCatalog.NameOf(block, ecosystemSync);
-            return block == Blocks.Door ? name : name + "\n" + NameOf(Shape);
+            return block == Blocks.Door ? name : name + "\n" + ShapeText(" · ");
+        }
+
+        // The shape and, when it has several, its rotation.
+        private string ShapeText(string separator)
+        {
+            return Shapes.RotationCount(Family) > 1 ? NameOf(Family) + separator + RotationName(Family, Rotation) : NameOf(Family);
         }
 
         private void ChooseHovered()
         {
             if (!TryHovered(out bool isShape, out int index)) return;
 
-            if (isShape) shapeIndex = index;
-            else block = blockSlotItems[index];
+            if (!isShape) block = blockSlotItems[index];
+            else if (block != Blocks.Door && wheelKind == WheelKind.Shapes) familyIndex = index;
+            else if (block != Blocks.Door) rotations[familyIndex] = index;
 
             for (int i = 0; i < shapeSlots.Count; i++) shapeSlots[i].EnableInClassList("wheel-slot--faded", block == Blocks.Door);
             MarkChosen();
@@ -414,7 +504,8 @@ namespace Voxel.Client
 
         private void MarkChosen()
         {
-            for (int i = 0; i < shapeSlots.Count; i++) shapeSlots[i].EnableInClassList(ChosenClass, i == shapeIndex);
+            int chosen = wheelKind == WheelKind.Shapes ? familyIndex : Rotation;
+            for (int i = 0; i < shapeSlots.Count; i++) shapeSlots[i].EnableInClassList(ChosenClass, i == chosen);
             for (int i = 0; i < blockSlots.Count; i++) blockSlots[i].EnableInClassList(ChosenClass, blockSlotItems[i] == block);
         }
 
@@ -429,15 +520,17 @@ namespace Voxel.Client
                 blockName.text = block == Items.None ? Loc.T("No construction block in the bag") : ItemCatalog.NameOf(block, ecosystemSync);
             }
 
-            string shape = block == Blocks.Door || block == Items.None ? "" : NameOf(Shape) + " · ";
+            string shape = block == Blocks.Door || block == Items.None ? "" : ShapeText(" · ");
             string mode = !LineMode ? Loc.T("Block by block")
                 : HasLineStart ? Loc.T("Line · {0} / {1}", LineLength, BuildLines.MaxLength)
                 : Loc.T("Line");
-            string text = shape + mode;
+            string text = shape + "\n" + mode;
             if (text == shownDetail) return;
 
             shownDetail = text;
-            detail.text = text;
+            detail.text = shape;
+            detail.EnableInClassList(HiddenClass, shape.Length == 0);
+            if (modeLabel != null) modeLabel.text = mode;
         }
     }
 }

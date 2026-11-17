@@ -637,14 +637,12 @@ A door stands on the ground, with room for two blocks	Une porte se dresse sur le
 
 # Hammer and building shapes
 Hammer	Marteau
-Builds with planks, logs and doors: right click to place the block chosen in its panel (B), in the shape chosen (R), one at a time or in lines of up to 16 (V: a first click where the line starts, a second where it ends). A left click takes a building block back at once.	Construit avec les planches, les rondins et les portes : clic droit pour poser le bloc choisi dans son panneau (B), dans la forme choisie (R), un à un ou en lignes de 16 au plus (V : un premier clic où la ligne commence, un second où elle finit). Un clic gauche reprend aussitôt un bloc de construction.
+Builds with planks, logs and doors: right click to place the block chosen in its panel (B), in the shape (R) and rotation (E) chosen, one at a time or in lines of up to 16 (V: a first click where the line starts, a second where it ends). A left click takes a building block back at once.	Construit avec les planches, les rondins et les portes : clic droit pour poser le bloc choisi dans son panneau (B), dans la forme (R) et la rotation (E) choisies, un à un ou en lignes de 16 au plus (V : un premier clic où la ligne commence, un second où elle finit). Un clic gauche reprend aussitôt un bloc de construction.
 You need a hammer to build	Il faut un marteau pour construire
 No construction block in the bag	Aucun bloc de construction dans le sac
 Full block	Bloc plein
 Wall	Mur
 Post	Poteau
-Floor	Sol
-Flat roof	Toit plat
 Sloped roof	Toit incliné
 Fence	Barrière
 Shape	Forme
@@ -658,6 +656,34 @@ Stairs	Escalier
 Roof corner (outer)	Angle de toit (extérieur)
 Roof corner (inner)	Angle de toit (intérieur)
 Ladder	Échelle
+Rotation (hold: menu)	Rotation (maintenir : menu)
+Point at one, then release E or click	Pointez-en une, puis relâchez E ou cliquez
+Slab	Dalle
+Beam	Poutre
+Low wall	Muret
+Column	Colonne
+Upright, in the middle	Debout, au centre
+Upright, far left corner	Debout, coin arrière gauche
+Upright, far right corner	Debout, coin arrière droit
+Upright, near right corner	Debout, coin avant droit
+Upright, near left corner	Debout, coin avant gauche
+Lying across	Couché en travers
+Lying ahead	Couché dans l'axe
+Lying on the far top edge	Couché sur l'arête haute arrière
+Lying on the right top edge	Couché sur l'arête haute droite
+Lying on the near top edge	Couché sur l'arête haute avant
+Lying on the left top edge	Couché sur l'arête haute gauche
+slab|Top	Haut
+slab|Bottom	Bas
+slab|Upright, far	Debout, à l'arrière
+slab|Upright, right	Debout, à droite
+slab|Upright, near	Debout, à l'avant
+slab|Upright, left	Debout, à gauche
+column|Shaft	Fût
+column|Base	Base
+column|Top	Sommet
+Across	En travers
+Ahead	Dans l'axe
 
 # Creative mode
 Creative	Créatif

@@ -21,7 +21,7 @@ namespace Voxel.Core.Tests
         public void EveryShapeAndFacing_ReadsBack_AndGivesThePlainBlockBack()
         {
             ushort planks = Planks();
-            foreach (Shape shape in Shapes.All)
+            foreach (Shape shape in (Shape[])System.Enum.GetValues(typeof(Shape)))
             {
                 for (int facing = 0; facing < 4; facing++)
                 {
@@ -31,10 +31,13 @@ namespace Voxel.Core.Tests
                     Assert.IsTrue(Blocks.IsSolid(block) && Blocks.IsPlaceable(block) && Blocks.IsConstruction(block));
                     Assert.AreEqual((int)planks, Items.DropOf(block), "a shape takes and gives back one block");
                     if (Shapes.HasFacing(shape)) Assert.AreEqual(facing, Shapes.FacingOf(block));
+                    if (Shapes.HasAxis(shape)) Assert.AreEqual(facing & 1, Shapes.FacingOf(block));
                 }
             }
 
             Assert.IsFalse(Blocks.IsValid(Blocks.WithOrientation(planks, Shapes.LastOrientation + 1)));
+            Assert.IsFalse(Blocks.IsValid(Blocks.WithVariant(planks, 3, 5)), "past the column's top");
+            Assert.IsFalse(Blocks.IsValid(Blocks.WithVariant(planks, 4, 0)));
             Assert.IsFalse(Blocks.IsValid(Blocks.WithOrientation(Blocks.Stone, 1)), "natural blocks have no shapes");
             Assert.AreEqual(Shape.Cube, Shapes.ShapeOf(Blocks.WithOrientation(Blocks.Torch, 1)), "a torch's orientation is not a shape");
 
@@ -44,7 +47,6 @@ namespace Voxel.Core.Tests
             Assert.AreEqual(planks, Blocks.TypeOf(stairs));
             Assert.AreEqual(1, Blocks.VariantOf(stairs));
             Assert.IsTrue(WoodBlocks.IsPlanks(stairs));
-            Assert.IsFalse(Blocks.IsValid(Blocks.WithVariant(planks, 2, 0)));
             Assert.IsFalse(Blocks.IsValid(Blocks.WithVariant(Blocks.Dirt, 1, 0)));
             Assert.IsFalse(Blocks.IsValid(Blocks.WithVariant(Blocks.Stone, Ores.Count + 1, 0)), "past the last ore");
             Assert.IsFalse(Blocks.IsValid(Blocks.WithVariant(Blocks.Torch, 1, Torches.Standing)));
@@ -326,6 +328,129 @@ namespace Voxel.Core.Tests
             Assert.AreEqual(SkyLight.Max - 4, light.Get(13, Ground, 13), "as under a roof of full blocks");
             Assert.AreEqual(0, light.Get(13, 12, 13), "a slab holds the light");
             Assert.AreEqual(SkyLight.Max - 1, light.Get(25, 12, 13), "light goes through a fence");
+        }
+
+        // Every rotation of every shape the hammer offers places a valid block of that shape.
+        [Test]
+        public void EveryRotation_PlacesItsShape()
+        {
+            ushort planks = Planks();
+            foreach (ShapeFamily family in Shapes.Families)
+            {
+                for (int rotation = 0; rotation < Shapes.RotationCount(family); rotation++)
+                {
+                    foreach (float yaw in new[] { 0f, 90f, 180f, 270f })
+                    {
+                        ushort block = Shapes.Place(planks, family, rotation, yaw);
+                        Assert.IsTrue(Blocks.IsValid(block), $"{family} {rotation} {yaw}");
+                        Assert.AreEqual(Shapes.RotationOf(family, rotation).shape, Shapes.ShapeOf(block));
+                        Assert.AreEqual(family, Shapes.FamilyOf(Shapes.ShapeOf(block)));
+                    }
+                }
+            }
+
+            Assert.AreEqual(Shapes.RotationOf(ShapeFamily.Wall, 1), Shapes.RotationOf(ShapeFamily.Wall, 5), "rotations wrap");
+        }
+
+        // Rotations count from the way the player looks: looking toward +z, a wall turned once stands
+        // on the right (+x), a post's second rotation is in the far left corner, a slab's first is the
+        // upper half and its third stands upright against the far edge; looking toward +x, the same post
+        // is in the far left corner seen from there (+x +z).
+        [Test]
+        public void Rotations_TurnFromTheWayThePlayerLooks()
+        {
+            ushort planks = Planks();
+            AssertBox(Shapes.Place(planks, ShapeFamily.Wall, 1, 0f), new Vector3(0.75f, 0f, 0f), new Vector3(1f, 1f, 1f));
+            AssertBox(Shapes.Place(planks, ShapeFamily.Post, 1, 0f), new Vector3(0f, 0f, 0.75f), new Vector3(0.25f, 1f, 1f));
+            AssertBox(Shapes.Place(planks, ShapeFamily.Post, 2, 0f), new Vector3(0.75f, 0f, 0.75f), new Vector3(1f, 1f, 1f));
+            AssertBox(Shapes.Place(planks, ShapeFamily.Post, 1, 90f), new Vector3(0.75f, 0f, 0.75f), new Vector3(1f, 1f, 1f));
+            AssertBox(Shapes.Place(planks, ShapeFamily.Post, 5, 0f), new Vector3(0f, 0.375f, 0.375f), new Vector3(1f, 0.625f, 0.625f));
+            AssertBox(Shapes.Place(planks, ShapeFamily.Post, 6, 0f), new Vector3(0.375f, 0.375f, 0f), new Vector3(0.625f, 0.625f, 1f));
+            AssertBox(Shapes.Place(planks, ShapeFamily.Post, 7, 0f), new Vector3(0f, 0.75f, 0.75f), new Vector3(1f, 1f, 1f));
+            AssertBox(Shapes.Place(planks, ShapeFamily.Slab, 0, 0f), new Vector3(0f, 0.5f, 0f), new Vector3(1f, 1f, 1f));
+            AssertBox(Shapes.Place(planks, ShapeFamily.Slab, 1, 0f), new Vector3(0f, 0f, 0f), new Vector3(1f, 0.5f, 1f));
+            AssertBox(Shapes.Place(planks, ShapeFamily.Slab, 2, 0f), new Vector3(0f, 0f, 0.5f), new Vector3(1f, 1f, 1f));
+            AssertBox(Shapes.Place(planks, ShapeFamily.Slab, 3, 0f), new Vector3(0.5f, 0f, 0f), new Vector3(1f, 1f, 1f));
+            Assert.AreEqual(Shapes.Make(planks, Shape.Slope, 3), Shapes.Place(planks, ShapeFamily.Slope, 1, 180f));
+        }
+
+        private static void AssertBox(ushort block, Vector3 min, Vector3 max)
+        {
+            var boxes = new List<(Vector3 min, Vector3 max)>();
+            Shapes.GetBoxes(FlatGenerator.CreateWorld(), new BlockPos(0, 0, 0), block, boxes);
+            Assert.AreEqual(1, boxes.Count, Shapes.ShapeOf(block).ToString());
+            Assert.AreEqual(min.X, boxes[0].min.X, 1e-5f);
+            Assert.AreEqual(min.Y, boxes[0].min.Y, 1e-5f);
+            Assert.AreEqual(min.Z, boxes[0].min.Z, 1e-5f);
+            Assert.AreEqual(max.X, boxes[0].max.X, 1e-5f);
+            Assert.AreEqual(max.Y, boxes[0].max.Y, 1e-5f);
+            Assert.AreEqual(max.Z, boxes[0].max.Z, 1e-5f);
+        }
+
+        // A fence alone lies along its axis; one joining other fences joins them only. A fence of earlier
+        // versions has no axis: alone, it is a bare post.
+        [Test]
+        public void ALoneFence_LiesAlongItsAxis()
+        {
+            World world = FlatGenerator.CreateWorld();
+            var pos = new BlockPos(5, Ground, 5);
+            ushort alongZ = Shapes.Make(Planks(), Shape.Fence, 1);
+            Assert.AreEqual(Shapes.TowardPlusZ | Shapes.TowardMinusZ, Shapes.ConnectionsOf(world, pos, alongZ));
+
+            world.SetBlock(6, Ground, 5, Shapes.Make(Planks(), Shape.Fence, 0));
+            Assert.AreEqual(Shapes.TowardPlusX, Shapes.ConnectionsOf(world, pos, alongZ));
+
+            ushort legacy = Blocks.WithVariant(Planks(), 0, 12);
+            Assert.AreEqual(Shape.Fence, Shapes.ShapeOf(legacy));
+            Assert.AreEqual(0, Shapes.ConnectionsOf(world, new BlockPos(9, Ground, 9), legacy));
+        }
+
+        // A low wall joins low walls and full blocks; between two, straight, it is one length without its
+        // post; it lets light by and stops animals and, for collision, players.
+        [Test]
+        public void ALowWall_JoinsLowWallsAndBlocks()
+        {
+            World world = FlatGenerator.CreateWorld();
+            ushort wall = Shapes.Make(Planks(), Shape.LowWall, 0);
+            world.SetBlock(4, Ground, 5, wall);
+            world.SetBlock(6, Ground, 5, Planks());
+            var boxes = new List<(Vector3 min, Vector3 max)>();
+            Shapes.GetBoxes(world, new BlockPos(5, Ground, 5), wall, boxes);
+            Assert.AreEqual(1, boxes.Count, "straight: no post");
+            Assert.AreEqual(Shapes.LowWallHeight, boxes[0].max.Y - Ground, 1e-5f);
+
+            world.SetBlock(5, Ground, 6, wall);
+            boxes.Clear();
+            Shapes.GetBoxes(world, new BlockPos(5, Ground, 5), wall, boxes, true);
+            Assert.AreEqual(4, boxes.Count, "a post and three sides");
+            foreach ((Vector3 _, Vector3 max) in boxes) Assert.AreEqual(Ground + Shapes.FenceHeight, max.Y);
+
+            Assert.IsFalse(Blocks.BlocksLight(wall));
+            Assert.IsTrue(Shapes.StopsAnimals(wall));
+        }
+
+        // A column's base and top are wider at their foot and head, within the cell; light passes.
+        [Test]
+        public void AColumn_HasABaseAndATop()
+        {
+            ushort planks = Planks();
+            foreach (Shape shape in new[] { Shape.Column, Shape.ColumnBase, Shape.ColumnTop })
+            {
+                var boxes = new List<(Vector3 min, Vector3 max)>();
+                Shapes.GetBoxes(FlatGenerator.CreateWorld(), new BlockPos(0, 0, 0), Shapes.Make(planks, shape, 0), boxes);
+                foreach ((Vector3 min, Vector3 max) in boxes)
+                {
+                    Assert.IsTrue(min.X >= 0f && min.Z >= 0f && max.X <= 1f && max.Z <= 1f && min.Y >= 0f && max.Y <= 1f, shape.ToString());
+                }
+
+                Assert.AreEqual(shape == Shape.Column ? 1 : 3, boxes.Count);
+                Assert.IsFalse(Blocks.BlocksLight(Shapes.Make(planks, shape, 0)));
+            }
+
+            var baseBoxes = new List<(Vector3 min, Vector3 max)>();
+            Shapes.GetLocalBoxes(Shape.ColumnBase, 0, 0, baseBoxes);
+            Assert.Greater(baseBoxes[0].max.X - baseBoxes[0].min.X, Shapes.ColumnWidth, "the foot is wider than the shaft");
+            Assert.AreEqual(0f, baseBoxes[0].min.Y);
         }
 
         // A shaped block counts by its boxes: a wall at the far edge of the cell beside a player is not in them.

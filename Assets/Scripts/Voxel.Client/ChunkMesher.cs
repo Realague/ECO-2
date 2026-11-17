@@ -613,8 +613,16 @@ namespace Voxel.Client
                 case Shape.Ladder:
                     AddLadder(world, light, block, origin, cell, facing);
                     break;
+                default:
+                    // Posts in a corner, beams, upright slabs, low walls and columns: their boxes.
+                    shapeBoxes.Clear();
+                    Shapes.GetLocalBoxes(Shapes.ShapeOf(block), facing, Shapes.ConnectionsOf(world, new BlockPos(cell.x, cell.y, cell.z), block), shapeBoxes);
+                    foreach ((System.Numerics.Vector3 min, System.Numerics.Vector3 max) in shapeBoxes) AddBox(world, light, block, origin, cell, min.ToUnity(), max.ToUnity());
+                    break;
             }
         }
+
+        private readonly List<(System.Numerics.Vector3 min, System.Numerics.Vector3 max)> shapeBoxes = new List<(System.Numerics.Vector3 min, System.Numerics.Vector3 max)>();
 
         // A box given facing +z (Shapes.Turned), turned with the block.
         private void AddTurnedBox(World world, SkyLight light, ushort block, Vector3 origin, Vector3Int cell, Vector3 min, Vector3 max, int facing)
@@ -710,14 +718,15 @@ namespace Voxel.Client
             AddLocalUvs(BlockAtlas.TileFor(block, turned), turned, corners, cell);
         }
 
-        // A post a little thinner than a wall, and two rails toward each fence beside it.
+        // A post a little thinner than a wall, and two rails toward each side it joins (Shapes.ConnectionsOf:
+        // the fences beside it, or along its axis when alone).
         private void AddFence(World world, SkyLight light, ushort block, Vector3 origin, Vector3Int cell)
         {
             AddBox(world, light, block, origin, cell, new Vector3(0.39f, 0f, 0.39f), new Vector3(0.61f, 1f, 0.61f));
-            var pos = new BlockPos(cell.x, cell.y, cell.z);
-            foreach ((int dx, int dz) in new[] { (0, 1), (0, -1), (1, 0), (-1, 0) })
+            int connections = Shapes.ConnectionsOf(world, new BlockPos(cell.x, cell.y, cell.z), block);
+            foreach ((int dx, int dz, int bit) in new[] { (0, 1, Shapes.TowardPlusZ), (0, -1, Shapes.TowardMinusZ), (1, 0, Shapes.TowardPlusX), (-1, 0, Shapes.TowardMinusX) })
             {
-                if (!Shapes.ConnectsToward(world, pos, dx, dz)) continue;
+                if ((connections & bit) == 0) continue;
 
                 foreach ((float bottom, float top) in new[] { (0.3f, 0.45f), (0.7f, 0.85f) })
                 {
