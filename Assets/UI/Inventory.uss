@@ -1148,19 +1148,27 @@
 
 /* ---- The skills tab (SkillsPage), after the user's mockup ---- */
 
-/* Parchment cards on dark tier bands, gold for what is mastered, green for what can be bought. */
+/* Dark cards trimmed in brass on dark tier rows (after the user's second mockup): what is under way
+   lights up green, what is complete gold, through glows behind icons, pips and discs. */
 .skills-page {
-    --skill-parchment: #ddd2bd;
-    --skill-parchment-hover: #e8decb;
-    --skill-parchment-edge: #b8a68a;
     --skill-ink: #1e1711;
-    --skill-ink-muted: #5a4e40;
     --skill-gold: #d9ad4f;
     --skill-gold-light: #ecd290;
     --skill-gold-edge: #b8862c;
     --skill-green: #5fa645;
     --skill-green-dark: #3f7d2c;
     --skill-band: rgba(16, 17, 18, 0.72);
+    --skill-card: #1d201e;
+    --skill-card-hover: #262a27;
+    --skill-card-done: #2a2519;
+    --skill-card-done-hover: #332d1e;
+    --skill-card-edge: #4f4430;
+    --skill-card-text: #ece3cf;
+    --skill-card-muted: #a39883;
+    --skill-glow-green: #74d94f;
+    --skill-glow-gold: #f2c45a;
+    --skill-green-wash: rgba(95, 166, 69, 0.035);
+    --skill-gold-wash: rgba(236, 210, 144, 0.035);
     flex-grow: 1;
     flex-direction: row;
     background-color: var(--inv-main);
@@ -1440,9 +1448,74 @@
     color: var(--text-muted);
 }
 
+/* Green while its experience comes in, gold once its quota is reached, each over a glow. */
 .skill-tier--current .skill-rail-number {
-    border-color: var(--skill-gold);
-    color: var(--skill-gold-light);
+    border-color: var(--skill-glow-green);
+    color: #d7f5c8;
+}
+
+/* ---- Glows (SkillsPage.NewGlow; Assets/UI/Icons/Glow.png and GlowRound.png, UiGlowBuilder) ---- */
+
+.skill-glow {
+    position: absolute;
+    display: none;
+}
+
+/* Round, its disc 0.625 of its width: 64 px around a 40 px tier disc (centred at 32, 30). */
+.skill-rail-glow {
+    left: 0;
+    top: -2px;
+    width: 64px;
+    height: 64px;
+    background-image: url("Icons/GlowRound.png");
+}
+
+.skill-tier--current .skill-rail-glow {
+    display: flex;
+    -unity-background-image-tint-color: rgba(116, 217, 79, 0.55);
+}
+
+.skill-tier--done .skill-rail-glow {
+    display: flex;
+    -unity-background-image-tint-color: rgba(242, 196, 90, 0.7);
+}
+
+/* Round, 26 px around a 16 px pip. */
+.skill-pip-glow {
+    display: flex;
+    left: 2px;
+    top: -5px;
+    width: 26px;
+    height: 26px;
+    background-image: url("Icons/GlowRound.png");
+    -unity-background-image-tint-color: rgba(116, 217, 79, 0.7);
+}
+
+.skill-card--complete .skill-pip-glow {
+    -unity-background-image-tint-color: rgba(242, 196, 90, 0.75);
+}
+
+/* 9-sliced, its solid square 10 px in from its edges: 72 px around a 52 px icon frame. */
+.skill-card-glow {
+    left: -10px;
+    top: -10px;
+    right: -10px;
+    bottom: -10px;
+    background-image: url("Icons/Glow.png");
+    -unity-slice-left: 24;
+    -unity-slice-right: 24;
+    -unity-slice-top: 24;
+    -unity-slice-bottom: 24;
+}
+
+.skill-card--started .skill-card-glow {
+    display: flex;
+    -unity-background-image-tint-color: rgba(116, 217, 79, 0.75);
+}
+
+.skill-card--complete .skill-card-glow {
+    display: flex;
+    -unity-background-image-tint-color: rgba(242, 196, 90, 0.85);
 }
 
 .skill-tier--done .skill-rail-number {
@@ -1501,6 +1574,31 @@
     opacity: 0.5;
 }
 
+/* Each tier's row washed in its state's colour, so the panel reads gold, green, then grey down. */
+.skill-tier-wash {
+    position: absolute;
+    left: 34px;
+    right: 0;
+    top: 4px;
+    bottom: 6px;
+    border-top-left-radius: 22px;
+    border-bottom-left-radius: 22px;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.skill-tier--done > .skill-tier-wash {
+    background-color: var(--skill-gold-wash);
+    border-left-width: 2px;
+    border-color: rgba(217, 173, 79, 0.35);
+}
+
+.skill-tier--current > .skill-tier-wash {
+    background-color: var(--skill-green-wash);
+    border-left-width: 2px;
+    border-color: rgba(95, 166, 69, 0.35);
+}
+
 /* The gold lines from each level to the next one (SkillsPage.DrawLinks). */
 .skill-links {
     position: absolute;
@@ -1512,7 +1610,9 @@
 
 /* ---- An upgrade's card ---- */
 
-/* The icon and name on top, the pips (or the value) across the card below. */
+/* Dark, trimmed in brass; the icon and name on top, the pips (or the value) across the card below.
+   Untouched its icon is dimmed; under way its icon frame glows green, complete the card turns gold
+   (SkillsPage.Card: skill-card--started, skill-card--complete). */
 .skill-card {
     flex-direction: column;
     align-items: stretch;
@@ -1521,15 +1621,19 @@
     max-width: 260px;
     min-height: 104px;
     margin: 0 5px;
-    padding: 8px;
-    background-color: var(--skill-parchment);
+    padding: 10px;
+    background-color: var(--skill-card);
     border-width: 2px;
-    border-color: var(--skill-parchment-edge);
+    border-color: var(--skill-card-edge);
     border-radius: 5px;
 }
 
 .skill-card:hover {
-    background-color: var(--skill-parchment-hover);
+    background-color: var(--skill-card-hover);
+}
+
+.skill-card--started {
+    border-color: var(--skill-green-dark);
 }
 
 .skill-card--available {
@@ -1538,7 +1642,7 @@
 
 .skill-card--locked > .skill-card-top,
 .skill-card--locked > .skill-card-foot {
-    opacity: 0.55;
+    opacity: 0.5;
 }
 
 .skill-card-top {
@@ -1549,17 +1653,16 @@
 .skill-card-foot {
     flex-direction: row;
     justify-content: center;
-    margin-top: 6px;
+    margin-top: 8px;
 }
 
-/* A one-step upgrade showing its value: gold once it is bought. */
-.skill-card--gold {
-    background-color: var(--skill-gold-light);
+.skill-card--complete {
+    background-color: var(--skill-card-done);
     border-color: var(--skill-gold-edge);
 }
 
-.skill-card--gold:hover {
-    background-color: #f2dda4;
+.skill-card--complete:hover {
+    background-color: var(--skill-card-done-hover);
 }
 
 .skill-card--selected,
@@ -1568,25 +1671,39 @@
     border-width: 3px;
 }
 
-.skill-card-icon-frame {
+.skill-card-icon-holder {
     width: 52px;
     height: 52px;
     flex-shrink: 0;
-    margin-right: 9px;
-    background-color: #2b2d2c;
+    margin-right: 10px;
+}
+
+.skill-card-icon-frame {
+    flex-grow: 1;
+    background-color: #131514;
     border-width: 2px;
     border-color: #5b4f3d;
     border-radius: 4px;
 }
 
-.skill-card--gold .skill-card-icon-frame {
-    border-color: var(--skill-gold-edge);
+.skill-card--started .skill-card-icon-frame {
+    border-color: var(--skill-glow-green);
+}
+
+.skill-card--complete .skill-card-icon-frame {
+    border-color: var(--skill-glow-gold);
 }
 
 .skill-card-icon {
     flex-grow: 1;
     margin: 4px;
     -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: #8f8f8f;
+}
+
+.skill-card--started .skill-card-icon,
+.skill-card--complete .skill-card-icon {
+    -unity-background-image-tint-color: #ffffff;
 }
 
 .skill-card-body {
@@ -1599,15 +1716,19 @@
     -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
     -unity-text-align: upper-left;
     white-space: normal;
-    color: var(--skill-ink);
+    color: var(--skill-card-text);
     margin: 0 0 2px 0;
     padding: 0;
+}
+
+.skill-card--complete .skill-card-name {
+    color: var(--skill-gold-light);
 }
 
 .skill-card-rank {
     font-size: 13px;
     -unity-text-align: upper-left;
-    color: var(--skill-ink-muted);
+    color: var(--skill-card-muted);
     margin: 0;
     padding: 0;
 }
@@ -1616,9 +1737,13 @@
     font-size: 28px;
     -unity-font-definition: url("Fonts/Inter-SemiBold.ttf");
     -unity-text-align: middle-center;
-    color: var(--skill-ink);
+    color: var(--skill-card-muted);
     margin: 0;
     padding: 0;
+}
+
+.skill-card--complete .skill-card-value {
+    color: var(--skill-glow-gold);
 }
 
 .skill-pips {
@@ -1631,29 +1756,35 @@
     align-items: center;
 }
 
+/* A ring while it can be bought, lit (over a glow) once bought, green, or gold on a complete card. */
 .skill-pip {
     width: 16px;
     height: 16px;
     border-width: 2px;
-    border-color: var(--skill-green);
+    border-color: #5f8f4c;
     border-radius: 8px;
-    background-color: rgba(255, 255, 255, 0.35);
+    background-color: #121413;
 }
 
 .skill-pip--bought {
-    background-color: var(--skill-green);
-    border-color: var(--skill-green-dark);
+    background-color: var(--skill-glow-green);
+    border-color: #c5f5b0;
+}
+
+.skill-card--complete .skill-pip--bought {
+    background-color: var(--skill-glow-gold);
+    border-color: #fbe7b5;
 }
 
 .skill-pip--closed {
-    border-color: #9a8f7b;
-    background-color: #b8ad98;
+    border-color: #4a4a46;
+    background-color: #24262a;
 }
 
 .skill-pip-label {
     font-size: 12px;
-    color: var(--skill-ink-muted);
-    margin: 2px 0 0 0;
+    color: var(--skill-card-muted);
+    margin: 3px 0 0 0;
     padding: 0;
 }
 
@@ -1667,6 +1798,15 @@
     border-width: 1px;
     border-color: rgba(255, 255, 255, 0.14);
     border-radius: 5px;
+}
+
+/* Framed green once an option is taken, gold once as many as may be are. */
+.skill-group--started {
+    border-color: var(--skill-green-dark);
+}
+
+.skill-group--complete {
+    border-color: var(--skill-gold-edge);
 }
 
 .skill-group--selected {
@@ -1790,6 +1930,39 @@
     margin-bottom: 8px;
     background-color: var(--inv-sheet-well);
     border-radius: 4px;
+}
+
+/* The bonus box in the colour of how far the upgrade has gone, with a bar of the share bought. */
+.skill-info-box--started {
+    background-color: #d3e2c4;
+    border-left-width: 4px;
+    border-color: var(--skill-green-dark);
+}
+
+.skill-info-box--complete {
+    background-color: #ecd9a6;
+    border-left-width: 4px;
+    border-color: var(--skill-gold-edge);
+}
+
+.skill-info-bar {
+    height: 6px;
+    margin-top: 8px;
+    background-color: rgba(60, 45, 25, 0.15);
+    border-radius: 3px;
+}
+
+.skill-info-bar-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background-color: var(--skill-green-dark);
+    border-radius: 3px;
+}
+
+.skill-info-box--complete .skill-info-bar-fill {
+    background-color: var(--skill-gold-edge);
 }
 
 .skill-info-title {

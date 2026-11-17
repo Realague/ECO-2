@@ -19,7 +19,9 @@ namespace Voxel.Client
     // options, its technical details when the server shows them, and Upgrade.
     internal sealed class SkillsPage
     {
-        private static readonly Color LinkColour = new Color(0.85f, 0.68f, 0.31f, 0.85f);
+        private static readonly Color LinkColour = new Color(0.95f, 0.77f, 0.35f, 1f);
+        private static readonly Color LinkGlowColour = new Color(0.95f, 0.77f, 0.35f, 0.18f);
+        private static readonly Color LinkDimColour = new Color(0.55f, 0.46f, 0.32f, 0.55f);
 
         private readonly SkillSync skillSync;
 
@@ -53,7 +55,7 @@ namespace Voxel.Client
 
         // The cards of the skill drawn, by upgrade id, and the lines from a level to the next.
         private readonly Dictionary<string, VisualElement> cards = new Dictionary<string, VisualElement>();
-        private readonly List<(VisualElement from, VisualElement to)> links = new List<(VisualElement, VisualElement)>();
+        private readonly List<(VisualElement from, VisualElement to, bool lit)> links = new List<(VisualElement, VisualElement, bool)>();
         private readonly List<VisualElement> bands = new List<VisualElement>();
         private readonly Dictionary<VisualElement, VisualElement> bandOf = new Dictionary<VisualElement, VisualElement>();
         private VisualElement linkLayer;
@@ -300,11 +302,15 @@ namespace Voxel.Client
             for (int t = 1; t <= lastTier; t++) tree.Add(Band(skill, progress, t, open, t == lastTier));
             tiers.Add(tree);
 
-            // Each level joined to the one that replaces it, when both are shown.
+            // Each level joined to the one that replaces it, when both are shown; lit once the level
+            // before is complete.
             foreach (UpgradeDefinition upgrade in skill.Upgrades)
             {
                 if (string.IsNullOrEmpty(upgrade.Replaces)) continue;
-                if (cards.TryGetValue(upgrade.Replaces, out VisualElement from) && cards.TryGetValue(upgrade.Id, out VisualElement to)) links.Add((from, to));
+                if (!cards.TryGetValue(upgrade.Replaces, out VisualElement from) || !cards.TryGetValue(upgrade.Id, out VisualElement to)) continue;
+
+                bool lit = progress != null && skill.TryGetUpgrade(upgrade.Replaces, out UpgradeDefinition before) && SkillRules.IsComplete(before, progress.Of(before.Id));
+                links.Add((from, to, lit));
             }
 
             linkLayer = new VisualElement { pickingMode = PickingMode.Ignore };
@@ -351,6 +357,11 @@ namespace Voxel.Client
             row.EnableInClassList("skill-tier--done", tier <= open && share >= 1f);
             row.EnableInClassList("skill-tier--current", tier == open && share < 1f);
 
+            // Behind the rest, the row washed in its state's colour (gold done, green open).
+            var wash = new VisualElement { pickingMode = PickingMode.Ignore };
+            wash.AddToClassList("skill-tier-wash");
+            row.Add(wash);
+
             var rail = new VisualElement();
             rail.AddToClassList("skill-rail");
             float xp = progress != null ? Mathf.Clamp(progress.Xp - skill.TierStart(tier), 0f, definition.XpQuota) : 0f;
@@ -375,6 +386,7 @@ namespace Voxel.Client
             }
 
             rail.Add(bar);
+            rail.Add(NewGlow("skill-rail-glow"));
             var number = new Label(tier.ToString(Loc.Culture));
             number.AddToClassList("skill-rail-number");
             rail.Add(number);
@@ -411,7 +423,8 @@ namespace Voxel.Client
             card.EnableInClassList("skill-card--selected", upgrade.Id == selectedUpgrade);
             card.EnableInClassList("skill-card--available", refusal == SkillRefusal.None);
             card.EnableInClassList("skill-card--locked", !complete && refusal != SkillRefusal.None && refusal != SkillRefusal.NotEnoughPoints);
-            card.EnableInClassList("skill-card--gold", single != null && complete);
+            card.EnableInClassList("skill-card--started", done > 0 && !complete);
+            card.EnableInClassList("skill-card--complete", complete);
 
             var rank = new Label(Loc.T("Rank {0}/{1}", done, count));
             rank.AddToClassList("skill-card-rank");
@@ -453,6 +466,8 @@ namespace Voxel.Client
             var group = new VisualElement();
             group.AddToClassList("skill-group");
             group.EnableInClassList("skill-group--selected", upgrade.Id == selectedUpgrade);
+            group.EnableInClassList("skill-group--started", bought.ChoiceCount > 0 && !SkillRules.IsComplete(upgrade, bought));
+            group.EnableInClassList("skill-group--complete", SkillRules.IsComplete(upgrade, bought));
 
             var head = new VisualElement();
             head.AddToClassList("skill-group-head");
@@ -480,7 +495,7 @@ namespace Voxel.Client
                 card.EnableInClassList("skill-card--selected", upgrade.Id == selectedUpgrade && selectedChoice == c);
                 card.EnableInClassList("skill-card--available", refusal == SkillRefusal.None);
                 card.EnableInClassList("skill-card--locked", !taken && refusal != SkillRefusal.None && refusal != SkillRefusal.NotEnoughPoints);
-                card.EnableInClassList("skill-card--gold", taken);
+                card.EnableInClassList("skill-card--complete", taken);
 
                 var pips = new VisualElement();
                 pips.AddToClassList("skill-pips");
@@ -515,13 +530,18 @@ namespace Voxel.Client
 
             var top = new VisualElement();
             top.AddToClassList("skill-card-top");
+            // The icon's frame over a glow, lit green while the upgrade is in progress, gold once complete.
+            var holder = new VisualElement();
+            holder.AddToClassList("skill-card-icon-holder");
+            holder.Add(NewGlow("skill-card-glow"));
             var frame = new VisualElement();
             frame.AddToClassList("skill-card-icon-frame");
             var image = new VisualElement();
             image.AddToClassList("skill-card-icon");
             SetIcon(image, icon);
             frame.Add(image);
-            top.Add(frame);
+            holder.Add(frame);
+            top.Add(holder);
 
             body = new VisualElement();
             body.AddToClassList("skill-card-body");
@@ -542,6 +562,7 @@ namespace Voxel.Client
         {
             var column = new VisualElement();
             column.AddToClassList("skill-pip-column");
+            if (bought) column.Add(NewGlow("skill-pip-glow"));
             var pip = new VisualElement();
             pip.AddToClassList("skill-pip");
             pip.EnableInClassList("skill-pip--bought", bought);
@@ -557,41 +578,45 @@ namespace Voxel.Client
             return column;
         }
 
-        // The gold lines from the bottom of a level's card to the top of the next level's.
+        // A soft glow (Assets/UI/Icons/Glow.png, 9-sliced and tinted by USS) laid behind what follows it.
+        private static VisualElement NewGlow(string className)
+        {
+            var glow = new VisualElement { pickingMode = PickingMode.Ignore };
+            glow.AddToClassList("skill-glow");
+            glow.AddToClassList(className);
+            return glow;
+        }
+
+        // The lines from the bottom of a level's card to the top of the next level's: lit gold, over a
+        // wide faint glow, once the level it leaves is complete (the way open to the next), dim before.
         private void DrawLinks(MeshGenerationContext context)
         {
             if (linkLayer == null || links.Count == 0) return;
 
             Painter2D painter = context.painter2D;
-            painter.strokeColor = LinkColour;
-            painter.fillColor = LinkColour;
-            painter.lineWidth = 2f;
-            foreach ((VisualElement from, VisualElement to) in links)
+            foreach ((VisualElement from, VisualElement to, bool lit) in links)
             {
                 Rect a = linkLayer.WorldToLocal(from.worldBound);
                 Rect b = linkLayer.WorldToLocal(to.worldBound);
                 if (a.width <= 0f || b.width <= 0f || !bandOf.TryGetValue(from, out VisualElement fromBand)) continue;
 
-                // Down out of its tier's cards, across in the gap under them, then down to the next level,
-                // broken where it would cross the cards of a tier between them (one the chain skips).
                 Rect source = linkLayer.WorldToLocal(fromBand.worldBound);
                 float turn = source.yMax + BandGap * 0.5f;
                 var start = new Vector2(a.center.x, a.yMax);
                 var end = new Vector2(b.center.x, b.yMin);
-                painter.BeginPath();
-                painter.MoveTo(start);
-                painter.LineTo(new Vector2(start.x, turn));
-                painter.LineTo(new Vector2(end.x, turn));
-                foreach (VisualElement band in bands)
+                if (lit)
                 {
-                    Rect between = linkLayer.WorldToLocal(band.worldBound);
-                    if (between.yMin <= turn || between.yMax >= end.y) continue;
-
-                    painter.LineTo(new Vector2(end.x, between.yMin));
-                    painter.MoveTo(new Vector2(end.x, between.yMax));
+                    painter.strokeColor = LinkGlowColour;
+                    painter.lineWidth = 8f;
+                    TraceLink(painter, start, end, turn);
+                    painter.Stroke();
                 }
 
-                painter.LineTo(new Vector2(end.x, end.y - 5f));
+                Color colour = lit ? LinkColour : LinkDimColour;
+                painter.strokeColor = colour;
+                painter.fillColor = colour;
+                painter.lineWidth = lit ? 2.5f : 2f;
+                TraceLink(painter, start, end, turn);
                 painter.Stroke();
 
                 // A small arrowhead on the card it leads to.
@@ -602,6 +627,26 @@ namespace Voxel.Client
                 painter.ClosePath();
                 painter.Fill();
             }
+        }
+
+        // Down out of its tier's cards, across in the gap under them, then down to the next level,
+        // broken where it would cross the cards of a tier between them (one the chain skips).
+        private void TraceLink(Painter2D painter, Vector2 start, Vector2 end, float turn)
+        {
+            painter.BeginPath();
+            painter.MoveTo(start);
+            painter.LineTo(new Vector2(start.x, turn));
+            painter.LineTo(new Vector2(end.x, turn));
+            foreach (VisualElement band in bands)
+            {
+                Rect between = linkLayer.WorldToLocal(band.worldBound);
+                if (between.yMin <= turn || between.yMax >= end.y) continue;
+
+                painter.LineTo(new Vector2(end.x, between.yMin));
+                painter.MoveTo(new Vector2(end.x, between.yMax));
+            }
+
+            painter.LineTo(new Vector2(end.x, end.y - 5f));
         }
 
         private void DrawSheet(SkillState state)
@@ -659,23 +704,33 @@ namespace Voxel.Client
                 ? Loc.T(upgrade.Choices[selectedChoice].Description)
                 : string.IsNullOrEmpty(upgrade.Description) ? "" : Loc.T(upgrade.Description);
 
-            int count = upgrade.HasChoices ? upgrade.ChoiceLimit : upgrade.Steps.Length;
-            int done = upgrade.HasChoices ? bought.ChoiceCount : Mathf.Min(bought.Steps, upgrade.Steps.Length);
             if (upgrade.HasChoices)
             {
                 // The options, the one chosen to buy framed; what each does is its card's tooltip.
                 for (int c = 0; c < upgrade.Choices.Length; c++) sheetChoices.Add(ChoiceRow(upgrade, bought, c));
             }
 
-            // The bonus now, then the level, the next one and the cost.
+            // The bonus now, in the colour of how far the upgrade has gone (neutral, green, gold once
+            // complete) over a bar of the share bought; then the level, the next one and the cost.
+            int done = upgrade.HasChoices ? bought.ChoiceCount : Mathf.Min(bought.Steps, upgrade.Steps.Length);
+            int count = upgrade.HasChoices ? upgrade.ChoiceLimit : upgrade.Steps.Length;
             var box = new VisualElement();
             box.AddToClassList("skill-info-box");
+            box.EnableInClassList("skill-info-box--started", done > 0 && !complete);
+            box.EnableInClassList("skill-info-box--complete", complete);
             var boxTitle = new Label(Loc.T("Current bonus"));
             boxTitle.AddToClassList("skill-info-title");
             box.Add(boxTitle);
             var boxValue = new Label(CurrentBonus(upgrade, bought));
             boxValue.AddToClassList("skill-info-big");
             box.Add(boxValue);
+            var progressBar = new VisualElement();
+            progressBar.AddToClassList("skill-info-bar");
+            var progressFill = new VisualElement();
+            progressFill.AddToClassList("skill-info-bar-fill");
+            progressFill.style.width = Length.Percent(count > 0 ? Mathf.Clamp01((float)done / count) * 100f : 0f);
+            progressBar.Add(progressFill);
+            box.Add(progressBar);
             sheetEffects.Add(box);
 
             AddInfoRow(sheetEffects, Loc.T("Level"), $"{done} / {count}");
