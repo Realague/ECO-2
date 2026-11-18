@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace Voxel.Client
 {
-    // A green halo around what a right click would pick up (an arrow, a carcass still worth taking),
+    // A green halo around what a right click would pick up (a log, an arrow, a carcass still worth taking),
     // so the player sees it can be taken. PlayerController fills Parts each frame with the meshes of
     // what it aims at, placed as they are drawn; they are drawn here again, a little inflated, back
     // faces only (ECO/PickupHalo): a wide faint glow, then a thin bright rim, gently pulsing. The

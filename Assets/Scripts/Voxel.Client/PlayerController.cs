@@ -866,7 +866,7 @@ namespace Voxel.Client
             }
         }
 
-        // A green halo around the arrow or the carcass a right click would pick up (not a carcass too
+        // A green halo around the log, the arrow or the carcass a right click would pick up (not a carcass too
         // far gone to take), within the same reach and in front of the same block as the click.
         private void HighlightPickup()
         {
@@ -875,6 +875,7 @@ namespace Voxel.Client
             bool blockHit = VoxelRaycast.Cast(world, cameraTransform.position.ToNumerics(), cameraTransform.forward.ToNumerics(), PlayerRules.Reach, out VoxelHit hit);
             Pickup pickup = AimedPickup(blockHit ? hit.Distance : PlayerRules.Reach);
             if (pickup.Kind == PickupKind.Arrow) bowSync.CollectArrowParts(pickup.Id, pickupHalo.Parts);
+            else if (pickup.Kind == PickupKind.Log) logSync.CollectLogParts(pickup.Id, pickupHalo.Parts);
             else if (pickup.Kind == PickupKind.Carcass && pickup.Meat >= EcosystemSync.CarcassMinMeat) ecosystemSync.CollectCarcassParts(pickup.X, pickup.Z, pickupHalo.Parts);
         }
 

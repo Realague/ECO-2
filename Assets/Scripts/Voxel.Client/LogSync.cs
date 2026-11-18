@@ -14,9 +14,10 @@ namespace Voxel.Client
     // ground when blocks change under or into them, and gives one to a player picking it up with a
     // right click if they can carry it. Every machine with a display draws them (LogViews).
     //
-    // It also keeps the trees lying felled (FallenTrees, fallen.dat): a felled tree lies with its
-    // branches (drawn by PlantRenderer, lying as it fell) until they are pruned with the axe, then as a
-    // row of logs (drawn as logs) bucked off one at a time from its top, each becoming a log lying on
+    // It also keeps the trees lying felled (FallenTrees, fallen.dat): a felled tree lies beside its
+    // stump with its branches (drawn by PlantRenderer, lying as it fell) until they are pruned with the
+    // axe, then as its bare trunk (PlantRenderer.SetLyingBare; its row of logs for a model without one)
+    // bucked off one log at a time from its top, the trunk shortening, each becoming a log lying on
     // the ground. Skills may do either step at once (SkillInteractions.AutoPrune, AutoBuck). A block
     // changing under or into a fallen tree breaks it into logs at once.
     public class LogSync : MonoBehaviour
@@ -68,6 +69,10 @@ namespace Voxel.Client
         // Every machine: the trees lying felled (on the host, the server's own), and when each shows.
         private FallenTrees fallen = new FallenTrees();
         private readonly Dictionary<int, float> fallenVisibleAt = new Dictionary<int, float>();
+
+        // Pruned fallen trees whose model has no bare trunk (PlantRenderer.SetLyingBare): drawn as their
+        // row of logs instead.
+        private readonly HashSet<int> logRows = new HashSet<int>();
         private string fallenPath;
         private readonly List<int> fallenInColumn = new List<int>();
 
@@ -136,6 +141,7 @@ namespace Voxel.Client
             shown.Clear();
             fallen = new FallenTrees();
             fallenVisibleAt.Clear();
+            logRows.Clear();
             running = false;
         }
 
@@ -330,7 +336,7 @@ namespace Voxel.Client
                     return;
                 }
 
-                if (tree.Branches == 0) ecosystemSync.EndLying(fallenId);
+                ShowBare(tree);
                 BroadcastFallenChanged(tree);
                 return;
             }
@@ -338,8 +344,15 @@ namespace Voxel.Client
             if (!fallen.Buck(fallenId, out FallenSegment log)) return;
 
             DropLog(log, tree.Species);
-            if (fallen.TryGet(fallenId, out _)) BroadcastFallenChanged(tree);
-            else RemoveFallen(fallenId, false);
+            if (fallen.TryGet(fallenId, out _))
+            {
+                ShowBare(tree);
+                BroadcastFallenChanged(tree);
+            }
+            else
+            {
+                RemoveFallen(fallenId, false);
+            }
         }
 
         // Server side: the whole trunk falls apart into logs where they lie, its branches lost.
@@ -365,6 +378,7 @@ namespace Voxel.Client
         {
             if (removeFromStore) fallen.Remove(fallenId);
             fallenVisibleAt.Remove(fallenId);
+            logRows.Remove(fallenId);
             ecosystemSync.EndLying(fallenId);
             foreach (ulong clientId in networkManager.ConnectedClientsIds)
             {
@@ -389,11 +403,44 @@ namespace Voxel.Client
             }
         }
 
-        // This machine: a fallen tree to show, lying with its branches (PlantRenderer) until pruned.
+        // This machine: a fallen tree to show, lying (PlantRenderer) with its branches, or pruned as its
+        // bare trunk.
         private void ShowFallen(FallenTree tree, float delay)
         {
             fallenVisibleAt[tree.Id] = Time.time + delay;
-            if (tree.Branches > 0) ecosystemSync.ShowLying(tree.Id, ViewOf(tree), tree.Yaw);
+            ecosystemSync.ShowLying(tree.Id, ViewOf(tree), tree.Yaw);
+            ShowBare(tree);
+        }
+
+        // This machine: a pruned fallen tree is drawn as its bare trunk as far as its last log still to
+        // buck, or, when its model has none, as its row of logs.
+        private void ShowBare(FallenTree tree)
+        {
+            if (tree.Branches > 0) return;
+
+            if (ecosystemSync.SetLyingBare(tree.Id, TrunkLengthOf(tree))) logRows.Remove(tree.Id);
+            else logRows.Add(tree.Id);
+        }
+
+        // How far from its stump's middle a fallen tree's trunk reaches along its fall: to the far end of
+        // its last log still to buck.
+        private static float TrunkLengthOf(FallenTree tree)
+        {
+            if (tree.Segments.Count == 0) return 0f;
+
+            var foot = new Vector3(tree.X + 0.5f, tree.Y, tree.Z + 0.5f);
+            var direction = new Vector3(Mathf.Sin(tree.Yaw), 0f, Mathf.Cos(tree.Yaw));
+            Vector3 last = tree.Segments[tree.Segments.Count - 1].Position.ToUnity();
+            return Vector3.Dot(last - foot, direction) + LogViews.Length * 0.5f;
+        }
+
+        // The meshes of a lying log as drawn, for the pickup halo.
+        internal void CollectLogParts(int logId, List<(Mesh mesh, Matrix4x4 matrix)> into)
+        {
+            if (views == null || !shown.TryGetValue(logId, out Shown entry)) return;
+
+            World world = TerrainSettings.Smooth ? worldSync.World : null;
+            views.CollectParts(OnShownGround(world, entry.Log.Position.ToUnity()), entry.Log.Yaw, into);
         }
 
         private static PlantView ViewOf(FallenTree tree) => new PlantView { SpeciesIndex = tree.Species, Stage = tree.Stage, X = tree.X, Y = tree.Y, Z = tree.Z };
@@ -459,9 +506,10 @@ namespace Voxel.Client
 
         private void OnFallenAll(ulong senderId, FastBufferReader reader)
         {
-            foreach (FallenTree tree in fallen.All) ecosystemSync.EndLying(tree.Id);
+            foreach (FallenTree tree in fallen.All) ecosystemSync.EndLying(tree.Id, true);
             fallen.Clear();
             fallenVisibleAt.Clear();
+            logRows.Clear();
             reader.ReadValueSafe(out int count);
             for (int i = 0; i < count; i++)
             {
@@ -490,7 +538,7 @@ namespace Voxel.Client
 
             tree.Branches = Mathf.Max(0, branches);
             if (logs >= 0 && logs < tree.Segments.Count) tree.Segments.RemoveRange(logs, tree.Segments.Count - logs);
-            if (tree.Branches == 0) ecosystemSync.EndLying(fallenId);
+            ShowBare(tree);
         }
 
         private void OnFallenRemoved(ulong senderId, FastBufferReader reader)
@@ -498,6 +546,7 @@ namespace Voxel.Client
             reader.ReadValueSafe(out int fallenId);
             fallen.Remove(fallenId);
             fallenVisibleAt.Remove(fallenId);
+            logRows.Remove(fallenId);
             ecosystemSync.EndLying(fallenId);
         }
 
@@ -596,10 +645,10 @@ namespace Voxel.Client
                 if (entry.VisibleAt <= now) views.Add(OnShownGround(world, entry.Log.Position.ToUnity()), entry.Log.Yaw, entry.Log.Species);
             }
 
-            // A pruned fallen tree is its row of logs, still to be bucked off.
+            // A pruned fallen tree with no bare trunk to show is its row of logs, still to be bucked off.
             foreach (FallenTree tree in fallen.All)
             {
-                if (tree.Branches > 0 || (fallenVisibleAt.TryGetValue(tree.Id, out float visibleAt) && visibleAt > now)) continue;
+                if (tree.Branches > 0 || !logRows.Contains(tree.Id) || (fallenVisibleAt.TryGetValue(tree.Id, out float visibleAt) && visibleAt > now)) continue;
 
                 foreach (FallenSegment segment in tree.Segments) views.Add(OnShownGround(world, segment.Position.ToUnity()), segment.Yaw, tree.Species);
             }

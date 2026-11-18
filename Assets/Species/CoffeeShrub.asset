@@ -33,7 +33,9 @@ MonoBehaviour:
   needsShade: 0
   woodYield: 1
   woodColour: {r: 0.62, g: 0.46, b: 0.32, a: 1}
+  woodWeight: 0.5
   harvest: 2
+  harvestTool: 0
   produceName: Coffee beans
   produceYield: 5
   seedYield: 0

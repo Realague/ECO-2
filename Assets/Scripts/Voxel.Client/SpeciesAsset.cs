@@ -203,6 +203,96 @@ namespace Voxel.Client
 
         [NonSerialized] private Material woodMaterial;
 
+        // A model's trunk without its leaves and branches, lying felled once pruned (PlantRenderer): the
+        // parts of its wood (its stump's material) and in each the boxes whose middle lies within
+        // TrunkAxisShare of the trunk's half width from its axis (both from its stump's cut disc), and
+        // the top of those boxes above the foot (model units).
+        public sealed class BareTrunk
+        {
+            public int[] Parts;
+            public int[][] Boxes;
+            public float Top;
+        }
+
+        // A stump's cut disc is this share of its trunk's width (PlantModelBuilder.StumpOf).
+        public const float CutDiscShare = 0.92f;
+        private const float TrunkAxisShare = 1.3f;
+
+        [NonSerialized] private BareTrunk[] bareTrunks;
+        [NonSerialized] private bool[] bareTrunksMade;
+
+        // The bare trunk of a model, read from its meshes once; null for a model without a stump or
+        // whose meshes are not boxes (PlantModelBuilder: 24 vertices and 36 indices each, readable).
+        public BareTrunk BareTrunkOf(int model)
+        {
+            if (model < 0 || model >= models.Length) return null;
+            if (bareTrunks == null || bareTrunks.Length != models.Length)
+            {
+                bareTrunks = new BareTrunk[models.Length];
+                bareTrunksMade = new bool[models.Length];
+            }
+
+            if (bareTrunksMade[model]) return bareTrunks[model];
+
+            bareTrunksMade[model] = true;
+            Part[] stump = models[model].stump;
+            Part[] parts = models[model].parts;
+            if (stump == null || stump.Length < 2 || parts == null) return null;
+
+            Part cut = stump[stump.Length - 1];
+            if (cut.mesh == null) return null;
+
+            Bounds disc = cut.mesh.bounds;
+            Vector3 middle = cut.offset + Vector3.Scale(disc.center, cut.scale);
+            Vector3 extents = Vector3.Scale(disc.extents, cut.scale) / CutDiscShare;
+            var axis = new Vector2(middle.x, middle.z);
+            float reach = Mathf.Max(Mathf.Abs(extents.x), Mathf.Abs(extents.z)) * TrunkAxisShare;
+
+            var keptParts = new List<int>();
+            var keptBoxes = new List<int[]>();
+            float top = 0f;
+            for (int p = 0; p < parts.Length; p++)
+            {
+                Part part = parts[p];
+                if (part.material != stump[0].material || part.mesh == null || !part.mesh.isReadable) continue;
+
+                Vector3[] vertices = part.mesh.vertices;
+                int[] triangles = part.mesh.triangles;
+                if (vertices.Length % 24 != 0 || triangles.Length != vertices.Length / 24 * 36) continue;
+
+                // Each box's indices must stay within its own vertices.
+                bool boxed = true;
+                for (int t = 0; t < triangles.Length && boxed; t++) boxed = triangles[t] / 24 == t / 36;
+                if (!boxed) continue;
+
+                var boxes = new List<int>();
+                for (int box = 0; box < vertices.Length / 24; box++)
+                {
+                    Vector3 sum = Vector3.zero;
+                    float high = float.MinValue;
+                    for (int v = 0; v < 24; v++)
+                    {
+                        sum += vertices[box * 24 + v];
+                        high = Mathf.Max(high, vertices[box * 24 + v].y);
+                    }
+
+                    Vector3 centre = part.offset + Vector3.Scale(sum / 24f, part.scale);
+                    if ((new Vector2(centre.x, centre.z) - axis).magnitude > reach) continue;
+
+                    boxes.Add(box);
+                    top = Mathf.Max(top, part.offset.y + high * part.scale.y);
+                }
+
+                if (boxes.Count == 0) continue;
+
+                keptParts.Add(p);
+                keptBoxes.Add(boxes.ToArray());
+            }
+
+            if (keptParts.Count > 0) bareTrunks[model] = new BareTrunk { Parts = keptParts.ToArray(), Boxes = keptBoxes.ToArray(), Top = top };
+            return bareTrunks[model];
+        }
+
         public static Material WoodMaterialFrom(Material bark, Color colour)
         {
             var material = new Material(bark) { name = bark.name + " Wood" };

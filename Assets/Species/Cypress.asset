@@ -33,7 +33,9 @@ MonoBehaviour:
   needsShade: 0
   woodYield: 4
   woodColour: {r: 0.8, g: 0.55, b: 0.37, a: 1}
+  woodWeight: 0.5
   harvest: 0
+  harvestTool: 0
   produceName: 
   produceYield: 3
   seedYield: 2

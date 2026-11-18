@@ -33,7 +33,9 @@ MonoBehaviour:
   needsShade: 0
   woodYield: 3
   woodColour: {r: 0.78, g: 0.56, b: 0.42, a: 1}
+  woodWeight: 0.5
   harvest: 2
+  harvestTool: 0
   produceName: Apple
   produceYield: 6
   seedYield: 0

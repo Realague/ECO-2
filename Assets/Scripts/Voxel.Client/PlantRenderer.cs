@@ -44,8 +44,15 @@ namespace Voxel.Client
         // A tree shown lying this recently is still waiting for its fall to be played.
         private const float RecentSeconds = 2f;
 
-        // A stump's cut disc is this share of its trunk's width (PlantModelBuilder.StumpOf).
-        private const float CutDiscShare = 0.92f;
+        private const float CutDiscShare = SpeciesAsset.CutDiscShare;
+
+        // Once down, a felled tree slides off its stump, so that the stump shows: its foot lies this far
+        // from the stump's middle, where its first log will be (EcosystemSync.FirstLogDistance less
+        // half a log), its trunk resting on the ground.
+        public const float LyingFootDistance = PlantShape.StumpHeight + 0.6f - LogViews.Length * 0.5f;
+
+        // A pruned tree's trunk (SpeciesAsset.BareTrunkOf) is clipped to lengths rounded up to this.
+        private const float BareStep = 0.05f;
 
         private const int RegionSize = 32;
         private const int MaxInstancesPerCall = 1023;
@@ -82,6 +89,17 @@ namespace Voxel.Client
         private readonly float[] lookTops;
         private readonly RenderParams[][] renderParams;
         private readonly Dictionary<long, Region> regions = new Dictionary<long, Region>();
+
+        // By model look: its species and model, and its trunk's half width at full size, from its
+        // stump's cut disc (0 without a stump).
+        private readonly int[] lookSpecies;
+        private readonly int[] lookModel;
+        private readonly float[] trunkHalves;
+
+        // By model look: its bare trunk (BareTrunkOf), made when first needed; and its meshes clipped to
+        // a length (by look and length in BareStep).
+        private readonly Dictionary<int, BareTrunk> bareTrunks = new Dictionary<int, BareTrunk>();
+        private readonly Dictionary<long, Mesh[]> bareMeshes = new Dictionary<long, Mesh[]>();
 
         // The world shown and whether its ground is smoothed (ShowOn).
         private World ground;
@@ -133,6 +151,27 @@ namespace Voxel.Client
             }
 
             lookParts = parts.ToArray();
+
+            // The species and model of each model look, and its trunk's half width, from its stump.
+            lookSpecies = new int[fruitLooks.Length];
+            lookModel = new int[fruitLooks.Length];
+            trunkHalves = new float[fruitLooks.Length];
+            model = 0;
+            for (int s = 0; s < species.Length; s++)
+            {
+                for (int m = 0; m < species[s].ModelCount; m++, model++)
+                {
+                    lookSpecies[model] = s;
+                    lookModel[model] = m;
+                    if (stumpLooks[model] < 0) continue;
+
+                    IReadOnlyList<SpeciesAsset.Part> stump = lookParts[stumpLooks[model]];
+                    SpeciesAsset.Part cut = stump[stump.Count - 1];
+                    Vector3 extents = Vector3.Scale(cut.mesh.bounds.extents, cut.scale) / SpeciesAsset.CutDiscShare;
+                    trunkHalves[model] = Mathf.Max(Mathf.Abs(extents.x), Mathf.Abs(extents.z));
+                }
+            }
+
             lookBottoms = new float[lookParts.Length];
             lookTops = new float[lookParts.Length];
             renderParams = new RenderParams[lookParts.Length][];
@@ -303,14 +342,48 @@ namespace Voxel.Client
             falls.Add(lying);
         }
 
-        // A fallen tree pruned, bucked or broken up: it shrinks away.
-        public void EndLying(int lyingId)
+        // A fallen tree pruned: from now on only its trunk shows, bare, from its foot to length along
+        // the way it fell from its stump's middle (its logs still to buck), clipped there. False when
+        // its model has no bare trunk (no stump): it is then left to shrink away, and its logs show.
+        public bool SetLyingBare(int lyingId, float length)
         {
-            float now = Time.time;
             for (int i = 0; i < falls.Count; i++)
             {
                 Fall fall = falls[i];
                 if (fall.LyingId != lyingId) continue;
+
+                BareTrunk bare = BareTrunkOf(fall.Look);
+                if (bare == null)
+                {
+                    EndLying(lyingId);
+                    return false;
+                }
+
+                // Its foot lies at LyingFootDistance; what is past length is bucked off.
+                float kept = Mathf.Max(0f, (length - LyingFootDistance) / fall.Size);
+                fall.BareKey = ((long)fall.Look << 32) | (uint)Mathf.CeilToInt(kept / BareStep);
+                falls[i] = fall;
+                return true;
+            }
+
+            return false;
+        }
+
+        // A fallen tree pruned with no bare trunk, bucked or broken up: it shrinks away; or, at once,
+        // gone (its last log off).
+        public void EndLying(int lyingId, bool atOnce = false)
+        {
+            float now = Time.time;
+            for (int i = falls.Count - 1; i >= 0; i--)
+            {
+                Fall fall = falls[i];
+                if (fall.LyingId != lyingId) continue;
+
+                if (atOnce || fall.BareKey >= 0)
+                {
+                    falls.RemoveAt(i);
+                    continue;
+                }
 
                 fall.LyingId = 0;
                 fall.Started = Mathf.Min(fall.Started, now - FallSeconds - BounceSeconds - LieSeconds);
@@ -318,17 +391,107 @@ namespace Voxel.Client
             }
         }
 
+        // The bare trunk of a model look (SpeciesAsset.BareTrunkOf: its wood's boxes near the trunk's
+        // axis, no branches, no leaves) with its meshes' data, read once; null without one.
+        private BareTrunk BareTrunkOf(int look)
+        {
+            if (bareTrunks.TryGetValue(look, out BareTrunk known)) return known;
+
+            BareTrunk bare = null;
+            SpeciesAsset.BareTrunk source = look >= 0 && look < lookSpecies.Length ? species[lookSpecies[look]].BareTrunkOf(lookModel[look]) : null;
+            if (source != null)
+            {
+                var kept = new BarePart[source.Parts.Length];
+                for (int i = 0; i < kept.Length; i++)
+                {
+                    Mesh mesh = lookParts[look][source.Parts[i]].mesh;
+                    kept[i] = new BarePart
+                    {
+                        Part = source.Parts[i],
+                        Boxes = source.Boxes[i],
+                        Vertices = mesh.vertices,
+                        Normals = mesh.normals,
+                        Uvs = mesh.uv,
+                        Triangles = mesh.triangles
+                    };
+                }
+
+                bare = new BareTrunk { Parts = kept };
+            }
+
+            bareTrunks[look] = bare;
+            return bare;
+        }
+
+        // A bare trunk's meshes, part by part, clipped to its length key (BareKey): a box past it is left
+        // out, one across it cut there (its vertices above brought down to it).
+        private Mesh[] BareMeshesOf(long key)
+        {
+            if (bareMeshes.TryGetValue(key, out Mesh[] made)) return made;
+
+            int look = (int)(key >> 32);
+            float length = (uint)key * BareStep;
+            BareTrunk bare = BareTrunkOf(look);
+            var meshes = new Mesh[bare.Parts.Length];
+            for (int i = 0; i < bare.Parts.Length; i++)
+            {
+                BarePart source = bare.Parts[i];
+                SpeciesAsset.Part part = lookParts[look][source.Part];
+                float limit = part.scale.y != 0f ? (length - part.offset.y) / part.scale.y : float.MaxValue;
+                var vertices = new List<Vector3>();
+                var normals = new List<Vector3>();
+                var uvs = new List<Vector2>();
+                var triangles = new List<int>();
+                foreach (int box in source.Boxes)
+                {
+                    float bottom = float.MaxValue;
+                    for (int v = 0; v < 24; v++) bottom = Mathf.Min(bottom, source.Vertices[box * 24 + v].y);
+                    if (bottom >= limit) continue;
+
+                    int start = vertices.Count;
+                    for (int v = 0; v < 24; v++)
+                    {
+                        Vector3 vertex = source.Vertices[box * 24 + v];
+                        vertex.y = Mathf.Min(vertex.y, limit);
+                        vertices.Add(vertex);
+                        normals.Add(source.Normals.Length > 0 ? source.Normals[box * 24 + v] : Vector3.up);
+                        uvs.Add(source.Uvs.Length > 0 ? source.Uvs[box * 24 + v] : Vector2.zero);
+                    }
+
+                    for (int t = 0; t < 36; t++) triangles.Add(source.Triangles[box * 36 + t] - box * 24 + start);
+                }
+
+                var mesh = new Mesh { name = "Bare trunk" };
+                mesh.SetVertices(vertices);
+                mesh.SetNormals(normals);
+                mesh.SetUVs(0, uvs);
+                mesh.SetTriangles(triangles, 0);
+                mesh.RecalculateBounds();
+                meshes[i] = mesh;
+            }
+
+            bareMeshes[key] = meshes;
+            return meshes;
+        }
+
         private Fall NewFall(int look, PlantView plant, float yaw)
         {
             var direction = new Vector3(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
+            float size = PlantShape.Scale(plant.Stage);
+            float cut = PlantShape.StumpHeight * size;
+            float trunkHalf = look < trunkHalves.Length && trunkHalves[look] > 0f ? trunkHalves[look] * size : 0.15f * size;
             return new Fall
             {
                 Look = look,
                 FruitLook = FruitLookOf(look, plant),
                 Foot = FootOf(plant),
                 Turn = TurnOf(plant.X, plant.Z),
-                Size = PlantShape.Scale(plant.Stage),
+                Size = size,
                 Axis = Vector3.Cross(Vector3.up, direction),
+                Direction = direction,
+                Slide = LyingFootDistance + cut,
+                Drop = Mathf.Max(0f, cut - trunkHalf),
+                BareKey = -1,
                 Started = Time.time,
                 Shown = Time.time,
                 X = plant.X,
@@ -419,7 +582,16 @@ namespace Voxel.Client
 
                 Quaternion fallen = Quaternion.AngleAxis(angle, fall.Axis);
                 float cut = PlantShape.StumpHeight * fall.Size;
-                Vector3 pivot = fall.Foot + Vector3.up * cut;
+
+                // Down, it slides off its stump onto the ground over its bounce.
+                float slid = t <= FallSeconds ? 0f : Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((t - FallSeconds) / BounceSeconds));
+                Vector3 pivot = fall.Foot + Vector3.up * cut + slid * (fall.Direction * fall.Slide - Vector3.up * fall.Drop);
+                if (fall.BareKey >= 0)
+                {
+                    DrawBare(fall, fallen, pivot, cut);
+                    continue;
+                }
+
                 DrawFallen(fall.Look, fall, fallen, pivot, cut, shrink);
                 if (fall.FruitLook >= 0) DrawFallen(fall.FruitLook, fall, fallen, pivot, cut, shrink);
             }
@@ -438,6 +610,25 @@ namespace Voxel.Client
                 position = centre + (position - centre) * shrink;
                 Matrix4x4 matrix = Matrix4x4.TRS(position, fallen * fall.Turn, parts[p].scale * (fall.Size * shrink));
                 Graphics.RenderMesh(renderParams[look][p], parts[p].mesh, 0, matrix);
+            }
+        }
+
+        // A pruned tree: its bare trunk, clipped to the logs it still holds.
+        private void DrawBare(Fall fall, Quaternion fallen, Vector3 pivot, float cut)
+        {
+            BareTrunk bare = BareTrunkOf(fall.Look);
+            if (bare == null) return;
+
+            Mesh[] meshes = BareMeshesOf(fall.BareKey);
+            IReadOnlyList<SpeciesAsset.Part> parts = lookParts[fall.Look];
+            for (int i = 0; i < bare.Parts.Length; i++)
+            {
+                if (meshes[i].vertexCount == 0) continue;
+
+                SpeciesAsset.Part part = parts[bare.Parts[i].Part];
+                Vector3 local = fall.Turn * part.offset * fall.Size - Vector3.up * cut;
+                Matrix4x4 matrix = Matrix4x4.TRS(pivot + fallen * local, fallen * fall.Turn, part.scale * fall.Size);
+                Graphics.RenderMesh(renderParams[fall.Look][bare.Parts[i].Part], meshes[i], 0, matrix);
             }
         }
 
@@ -495,8 +686,16 @@ namespace Voxel.Client
             public Quaternion Turn;
             public float Size;
 
-            // About which it falls: horizontal, across the way it falls.
+            // About which it falls: horizontal, across the way it falls; the way it falls; how far its
+            // pivot slides along it once down (its foot then lies at LyingFootDistance, off its stump)
+            // and how far it drops (onto the ground).
             public Vector3 Axis;
+            public Vector3 Direction;
+            public float Slide;
+            public float Drop;
+
+            // Pruned: its bare trunk's look and length (BareMeshesOf), else -1.
+            public long BareKey;
             public float Started;
 
             // When it was added, the column it grew in, and the fallen tree it stays lying for (0: none,
@@ -505,6 +704,23 @@ namespace Voxel.Client
             public int X;
             public int Z;
             public int LyingId;
+        }
+
+        // A model's trunk without its leaves and branches: per part of its wood, the boxes kept and the
+        // part mesh's data, to clip from.
+        private sealed class BareTrunk
+        {
+            public BarePart[] Parts;
+        }
+
+        private sealed class BarePart
+        {
+            public int Part;
+            public int[] Boxes;
+            public Vector3[] Vertices;
+            public Vector3[] Normals;
+            public Vector2[] Uvs;
+            public int[] Triangles;
         }
 
         private sealed class Region

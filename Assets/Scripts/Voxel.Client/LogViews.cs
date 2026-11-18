@@ -66,6 +66,14 @@ namespace Voxel.Client
             all.Add(matrix);
         }
 
+        // A log's meshes placed as Add draws it, for the pickup halo.
+        public void CollectParts(Vector3 position, float yaw, List<(Mesh mesh, Matrix4x4 matrix)> into)
+        {
+            Matrix4x4 matrix = Matrix4x4.TRS(position, Quaternion.Euler(0f, yaw * Mathf.Rad2Deg, 0f), Vector3.one);
+            into.Add((bark, matrix));
+            into.Add((ends, matrix));
+        }
+
         // Draws the logs added since the last call.
         public void Render()
         {

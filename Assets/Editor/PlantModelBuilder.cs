@@ -1248,7 +1248,30 @@ namespace Voxel.EditorTools
                 boxes.Add(new Box(box.Centre.x, (bottom + top) * 0.5f, box.Centre.z, box.Size.x, top - bottom, box.Size.z));
             }
 
-            if (!found) return null;
+            // A leaning trunk (no upright box): its stump is an upright block under the foot of its
+            // lowest leaning box, as wide, from the ground to the cut.
+            if (!found)
+            {
+                Box lowest = default;
+                float lowestFoot = float.MaxValue;
+                foreach (Box box in trunk.Boxes)
+                {
+                    if (box.Tilt == Vector2.zero) continue;
+
+                    Vector3 foot = box.Centre + Quaternion.Euler(box.Tilt.x, 0f, box.Tilt.y) * (Vector3.down * box.Size.y * 0.5f);
+                    if (foot.y < lowestFoot)
+                    {
+                        lowestFoot = foot.y;
+                        lowest = new Box(foot.x, StumpHeight * 0.5f, foot.z, box.Size.x, StumpHeight, box.Size.z);
+                    }
+                }
+
+                if (lowestFoot >= StumpHeight - 0.05f) return null;
+
+                widest = lowest;
+                found = true;
+                boxes.Add(new Box(lowest.Centre.x, (StumpHeight - 0.013f) * 0.5f, lowest.Centre.z, lowest.Size.x, StumpHeight - 0.013f, lowest.Size.z));
+            }
 
             var cut = new Box(widest.Centre.x, StumpHeight - 0.025f, widest.Centre.z, widest.Size.x * 0.92f, 0.11f, widest.Size.z * 0.92f);
             return new[]

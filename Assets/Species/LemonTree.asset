@@ -33,7 +33,9 @@ MonoBehaviour:
   needsShade: 0
   woodYield: 3
   woodColour: {r: 0.92, g: 0.84, b: 0.56, a: 1}
+  woodWeight: 0.5
   harvest: 2
+  harvestTool: 0
   produceName: Lemon
   produceYield: 5
   seedYield: 0

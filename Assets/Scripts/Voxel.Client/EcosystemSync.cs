@@ -38,8 +38,9 @@ namespace Voxel.Client
         // A falling tree's logs show up once it has hit the ground.
         private const float LogsAppearAfter = PlantRenderer.FallSeconds + 0.2f;
 
-        // The first log lies this far from the tree's foot along its fall, past the stump.
-        private const float FirstLogDistance = PlantShape.StumpHeight + 0.6f;
+        // The first log lies this far from the tree's foot along its fall, past the stump, where the
+        // felled tree's foot lies (PlantRenderer.LyingFootDistance) plus half a log.
+        private const float FirstLogDistance = PlantRenderer.LyingFootDistance + LogViews.Length * 0.5f;
 
         // A joining player receives the existing plants in batches, one per network tick, so as not to
         // flood their connection: 500 plants are about 9 KB.
@@ -1195,7 +1196,13 @@ namespace Voxel.Client
 
             if (asset.HasStump && autoStump) logSync.DropAt(foot, UnityEngine.Random.Range(0f, 2f * Mathf.PI), plant.SpeciesIndex);
 
-            float length = Mathf.Max(FirstLogDistance, species[plant.SpeciesIndex].Height * PlantShape.Scale(plant.Stage));
+            // Its logs lie along its trunk as it will lie bare (SpeciesAsset.BareTrunkOf), its foot past
+            // the stump, the last log's far end at its top; else along its whole height.
+            float size = PlantShape.Scale(plant.Stage);
+            SpeciesAsset.BareTrunk trunk = asset.BareTrunkOf(asset.ModelAt(plant.X, plant.Z));
+            float length = trunk != null
+                ? Mathf.Max(FirstLogDistance, PlantRenderer.LyingFootDistance + trunk.Top * size - LogViews.Length * 0.5f)
+                : Mathf.Max(FirstLogDistance, species[plant.SpeciesIndex].Height * size);
             if (autoPrune && autoBuck)
             {
                 logSync.DropAlongFall(foot, direction, FirstLogDistance, length, logs, plant.SpeciesIndex, LogsAppearAfter);
@@ -1232,7 +1239,11 @@ namespace Voxel.Client
         // A fallen tree lying with its branches (LogSync), drawn as it fell until EndLying.
         internal void ShowLying(int fallenId, PlantView view, float yaw) => plantRenderer?.ShowLying(fallenId, view, yaw);
 
-        internal void EndLying(int fallenId) => plantRenderer?.EndLying(fallenId);
+        internal void EndLying(int fallenId, bool atOnce = false) => plantRenderer?.EndLying(fallenId, atOnce);
+
+        // A fallen tree pruned: drawn as its bare trunk up to length from its stump (PlantRenderer.SetLyingBare);
+        // false when it cannot be, its logs then drawn instead.
+        internal bool SetLyingBare(int fallenId, float length) => plantRenderer != null && plantRenderer.SetLyingBare(fallenId, length);
 
         // Where a player stands, or fallback if they are gone.
         private Vector3 PlayerPosition(ulong clientId, Vector3 fallback)
