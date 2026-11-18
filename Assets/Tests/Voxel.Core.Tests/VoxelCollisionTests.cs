@@ -50,6 +50,40 @@ namespace Voxel.Core.Tests
             Assert.AreEqual(11.9f, result.Position.Y, Tolerance);
         }
 
+        // The player walks up a block without jumping (PlayerRules.StepHeight), not a block and a half,
+        // nor a block with no room above it; by default a box only steps up half a block.
+        [Test]
+        public void ThePlayer_StepsUpABlock_ButNotABlockAndAHalf()
+        {
+            World world = FlatGenerator.CreateWorld();
+            int ground = FlatGenerator.GroundHeight;
+            world.SetBlock(12, ground, 8, Blocks.Stone);
+            world.SetBlock(12, ground, 10, Blocks.Stone);
+            Assert.IsTrue(WoodBlocks.TryPlanksOf(0, out ushort planks));
+            world.SetBlock(12, ground + 1, 10, Shapes.Make(planks, Shape.Floor, 0));
+            world.SetBlock(12, ground, 12, Blocks.Stone);
+            world.SetBlock(12, ground + 2, 12, Blocks.Stone);
+
+            Vector3 Walk(float z, float stepHeight)
+            {
+                var position = new Vector3(9.5f, ground, z);
+                for (int i = 0; i < 30; i++)
+                {
+                    position = VoxelCollision.Move(world, position, HalfWidth, Height, new Vector3(0.1f, -0.05f, 0f), stepHeight: stepHeight).Position;
+                }
+
+                return position;
+            }
+
+            Vector3 onBlock = Walk(8.5f, PlayerRules.StepHeight);
+            Assert.AreEqual(ground + 1f, onBlock.Y, Tolerance, "walked onto the block");
+            Assert.AreEqual(12.5f, onBlock.X, Tolerance);
+
+            Assert.AreEqual(ground, Walk(10.5f, PlayerRules.StepHeight).Y, Tolerance, "a block and a slab: a jump and more");
+            Assert.AreEqual(ground, Walk(12.5f, PlayerRules.StepHeight).Y, Tolerance, "no room above the block");
+            Assert.AreEqual(ground, Walk(8.5f, VoxelCollision.StepHeight).Y, Tolerance, "half a block by default");
+        }
+
         [Test]
         public void Move_IntoWall_StopsAtWallAndReportsHit()
         {

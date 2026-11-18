@@ -39,6 +39,11 @@ namespace Voxel.Client
         // Climbing a ladder, up or down (blocks a second).
         private const float ClimbSpeed = 3f;
 
+        // A move lifted more than this by a step up (PlayerRules.StepHeight) is smoothed for the view,
+        // which catches up at this speed at least (blocks a second), faster while far below.
+        private const float StepSmoothingFrom = 0.3f;
+        private const float StepSmoothingSpeed = 3f;
+
         // Flying in creative mode: two presses on Space this close switch it; speeds.
         private const float DoubleTapSeconds = 0.3f;
         private const float FlyVerticalSpeed = 8f;
@@ -88,6 +93,9 @@ namespace Voxel.Client
 
         // The last move was stopped by a block on the side.
         private bool againstWall;
+
+        // How far below the eyes the view still is after a step up (PlaceCamera).
+        private float stepSmoothing;
 
         // Flying (creative mode), and when Space was last pressed (-1: not lately), for a double press.
         private bool flying;
@@ -275,8 +283,10 @@ namespace Voxel.Client
         // player sees its own body from the front.
         private void PlaceCamera()
         {
+            // Just after a step up, the view is still a little below the eyes, catching up.
+            stepSmoothing = Mathf.MoveTowards(stepSmoothing, 0f, Mathf.Max(StepSmoothingSpeed, stepSmoothing * 12f) * Time.deltaTime);
             cameraTransform.SetPositionAndRotation(
-                transform.position + transform.rotation * PlayerModel.EyeOffset(pitch),
+                transform.position + transform.rotation * PlayerModel.EyeOffset(pitch) - Vector3.up * stepSmoothing,
                 Quaternion.Euler(pitch, transform.eulerAngles.y, 0f));
             ShowUnderwater(IsWaterAt(cameraTransform.position));
         }
@@ -1014,7 +1024,12 @@ namespace Voxel.Client
                 PlayerRules.Height,
                 displacement.ToNumerics(),
                 storageSync != null ? storageSync.IsSolid : (System.Func<int, int, int, bool>)null,
-                ecosystemSync);
+                ecosystemSync,
+                PlayerRules.StepHeight);
+
+            // A step up (a block walked onto) lifts the player at once: the view follows it smoothly.
+            float climbed = result.Position.Y - (transform.position.y + displacement.y);
+            if (grounded && climbed > StepSmoothingFrom) stepSmoothing = Mathf.Min(stepSmoothing + climbed, PlayerRules.StepHeight);
 
             transform.position = result.Position.ToUnity();
             grounded = result.Grounded;

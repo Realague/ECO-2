@@ -22,8 +22,9 @@ namespace Voxel.Core
     // Collision of an axis-aligned box against the block grid.
     // The position is the centre of the bottom of the box.
     // Full blocks stop it by their cells; shaped blocks (Shapes: walls, slabs, slopes, fences) by
-    // their boxes, met like obstacles. A box on the ground that a wall stops climbs StepHeight by
-    // itself if there is room (onto a floor, up a slope), never a full block.
+    // their boxes, met like obstacles. A box on the ground that a wall stops climbs a step height by
+    // itself if there is room: StepHeight by default (onto a floor, up a slope), a whole block for
+    // the player (PlayerRules.StepHeight).
     public static class VoxelCollision
     {
         private const float Skin = 0.001f;
@@ -39,23 +40,24 @@ namespace Voxel.Core
         [ThreadStatic] private static List<(Vector3 min, Vector3 max)> obstacleBoxes;
 
         // extraSolid, when given, names cells that are solid besides the blocks (placed storage);
-        // obstacles, boxes thinner than a block that stop the box too (tree trunks).
+        // obstacles, boxes thinner than a block that stop the box too (tree trunks); stepHeight, how
+        // high it steps up by itself (the player a whole block, PlayerRules.StepHeight).
         public static MoveResult Move(World world, Vector3 position, float halfWidth, float height, Vector3 delta,
-            Func<int, int, int, bool> extraSolid = null, ICollisionObstacles obstacles = null)
+            Func<int, int, int, bool> extraSolid = null, ICollisionObstacles obstacles = null, float stepHeight = StepHeight)
         {
             bool grounded = HasGroundBelow(world, extraSolid, position, halfWidth) || StandsOnObstacle(world, obstacles, position, halfWidth, height);
             MoveResult result = Sweep(world, position, halfWidth, height, delta, extraSolid, obstacles);
 
-            // Stopped on the ground by something low: from StepHeight up, if the box fits there, it may
+            // Stopped on the ground by something low: from stepHeight up, if the box fits there, it may
             // go further; then it comes back down onto what it climbed.
             var horizontal = new Vector3(delta.X, 0f, delta.Z);
-            if (grounded && result.HitWall && horizontal.LengthSquared() > 0f)
+            if (grounded && result.HitWall && horizontal.LengthSquared() > 0f && stepHeight > 0f)
             {
-                Vector3 raised = position + new Vector3(0f, StepHeight, 0f);
+                Vector3 raised = position + new Vector3(0f, stepHeight, 0f);
                 if (Fits(world, extraSolid, obstacles, raised, halfWidth, height))
                 {
                     MoveResult stepped = Sweep(world, raised, halfWidth, height, horizontal, extraSolid, obstacles);
-                    MoveResult settled = Sweep(world, stepped.Position, halfWidth, height, new Vector3(0f, -StepHeight, 0f), extraSolid, obstacles);
+                    MoveResult settled = Sweep(world, stepped.Position, halfWidth, height, new Vector3(0f, -stepHeight, 0f), extraSolid, obstacles);
                     if (Travelled(position, settled.Position) > Travelled(position, result.Position) + Skin)
                     {
                         settled.HitWall = stepped.HitWall;
