@@ -48,6 +48,10 @@
                     <ui:VisualElement class="key"><ui:Label name="build-block-key" text="B" class="key-text" /></ui:VisualElement>
                     <ui:Label text="Block" class="build-hint-text" />
                 </ui:VisualElement>
+                <ui:VisualElement class="build-hint" picking-mode="Ignore">
+                    <ui:VisualElement class="key"><ui:Label text="Wheel" class="key-text" /></ui:VisualElement>
+                    <ui:Label text="Pick block" class="build-hint-text" />
+                </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:Label name="held-name" class="hotbar-held strong" picking-mode="Ignore" />

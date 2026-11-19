@@ -178,6 +178,32 @@ namespace Voxel.Core.Tests
             Assert.IsFalse(SmoothTerrain.IsPinned(world, 4, Ground + 3, 4));
         }
 
+        // Ground a fence or a low wall joins (a block beside it, at its height) stays a cube, so their
+        // rails meet a flat side; a wall or any other shape beside it does not pin it.
+        [Test]
+        public void GroundBesideAFence_StaysACube()
+        {
+            var world = new World(2, 1, 2);
+            world.Generate(new FlatGenerator(), 0);
+            Assert.IsTrue(WoodBlocks.TryPlanksOf(0, out ushort planks));
+            world.SetBlock(8, Ground, 5, Blocks.Stone);
+            Assert.IsFalse(SmoothTerrain.IsPinned(world, 8, Ground, 5));
+
+            world.SetBlock(9, Ground, 5, Shapes.Make(planks, Shape.Fence, 0));
+            Assert.IsTrue(SmoothTerrain.IsPinned(world, 8, Ground, 5));
+            world.SetBlock(9, Ground, 5, Shapes.Make(planks, Shape.LowWall, 0));
+            Assert.IsTrue(SmoothTerrain.IsPinned(world, 8, Ground, 5));
+            world.SetBlock(9, Ground, 5, Shapes.Make(planks, Shape.Wall, 3));
+            Assert.IsFalse(SmoothTerrain.IsPinned(world, 8, Ground, 5));
+
+            // Only chunks holding a fence or a low wall are looked into, the one beside an edge included.
+            Assert.IsFalse(world.GetChunk(new ChunkCoord(0, Ground >> Chunk.SizeBits, 0)).HoldsJoins, "the fence is gone");
+            world.SetBlock(15, Ground, 5, Blocks.Stone);
+            world.SetBlock(16, Ground, 5, Shapes.Make(planks, Shape.Fence, 0));
+            Assert.IsTrue(world.GetChunk(new ChunkCoord(1, Ground >> Chunk.SizeBits, 0)).HoldsJoins);
+            Assert.IsTrue(SmoothTerrain.IsPinned(world, 15, Ground, 5), "a fence in the next chunk");
+        }
+
         // A lower strength keeps the vertices nearer the block corners: a step's edge is pulled half as
         // far, flat ground stays where it is.
         [Test]

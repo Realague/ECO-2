@@ -394,6 +394,18 @@ namespace Voxel.Client
             else if (strikeHeld && held != Items.Bow && held != Items.Hammer && miningSync.CanSwing) queuedStrike = Time.time;
             if (queuedStrike >= 0f && Time.time - queuedStrike > StrikeQueueSeconds) queuedStrike = -1f;
 
+            // The hammer's pipette: a middle click on a construction block chooses that block, shape and
+            // rotation in its panel (BuildingHud.Pick).
+            if (held == Items.Hammer && building != null && mouse.middleButton.wasPressedThisFrame)
+            {
+                if (VoxelRaycast.Cast(world, cameraTransform.position.ToNumerics(), cameraTransform.forward.ToNumerics(), PlayerRules.Reach, true, out VoxelHit picked))
+                {
+                    building.Pick(world.GetBlock(picked.Block), transform.eulerAngles.y);
+                }
+
+                return;
+            }
+
             bool strike = queuedStrike >= 0f && miningSync.CanSwing;
             bool use = mouse.rightButton.wasPressedThisFrame;
             if (!strike && !use) return;

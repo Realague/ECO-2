@@ -13,6 +13,11 @@ namespace Voxel.Core
         // writers (ChunkSerializer.Read) call RecountBlocks.
         private int filledCount;
 
+        // How many fences and low walls it holds (Shapes.JoinsGround): smoothed ground beside one stays
+        // a cube (SmoothTerrain.IsPinned), and only chunks holding one are looked into. Kept like
+        // filledCount.
+        private int joinCount;
+
         public Chunk(ChunkCoord coord)
         {
             Coord = coord;
@@ -29,28 +34,36 @@ namespace Voxel.Core
         // True when every block is air.
         public bool IsEmpty => filledCount == 0;
 
+        // Whether it holds a fence or a low wall.
+        public bool HoldsJoins => joinCount > 0;
+
         public ushort Get(int x, int y, int z) => blocks[Index(x, y, z)];
 
         // Raw write, reserved for generators: the game goes through World.SetBlock.
         public void Set(int x, int y, int z, ushort block)
         {
             int index = Index(x, y, z);
-            bool wasFilled = Blocks.TypeOf(blocks[index]) != Blocks.Air;
+            ushort previous = blocks[index];
+            bool wasFilled = Blocks.TypeOf(previous) != Blocks.Air;
             bool isFilled = Blocks.TypeOf(block) != Blocks.Air;
             blocks[index] = block;
             if (wasFilled != isFilled) filledCount += isFilled ? 1 : -1;
+            if (Shapes.JoinsGround(previous)) joinCount--;
+            if (Shapes.JoinsGround(block)) joinCount++;
         }
 
         // Counts the blocks again, after a raw write into RawBlocks.
         internal void RecountBlocks()
         {
-            int count = 0;
+            int count = 0, joins = 0;
             foreach (ushort block in blocks)
             {
                 if (Blocks.TypeOf(block) != Blocks.Air) count++;
+                if (Shapes.JoinsGround(block)) joins++;
             }
 
             filledCount = count;
+            joinCount = joins;
         }
 
         private static int Index(int x, int y, int z) => x | (z << SizeBits) | (y << (SizeBits * 2));

@@ -216,6 +216,10 @@ namespace Voxel.Core
         // Whether a shape joins its neighbours (ConnectionsOf).
         public static bool Connects(Shape shape) => shape == Shape.Fence || shape == Shape.LowWall;
 
+        // Whether a block is a fence or a low wall: they join the ground beside them, which then stays
+        // a cube on smoothed terrain (SmoothTerrain.IsPinned, counted per chunk: Chunk.HoldsJoins).
+        public static bool JoinsGround(ushort block) => HasShapes(block) && Connects(ShapeOf(block));
+
         // The facing of a corner placed by a player looking along yaw (degrees, 0 toward +z, 90 toward
         // +x): the corner it rises toward is the one looked at (facing 0: +x +z, 1: +x -z, 2: -x -z, 3: -x +z).
         public static int CornerFacingOf(float yawDegrees) => StorageRules.FacingOf(yawDegrees - 45f);
@@ -349,12 +353,29 @@ namespace Voxel.Core
             }
         }
 
-        // The sides a fence or a low wall (block) at pos joins, one bit each (TowardPlusZ…): a fence the
-        // fences beside it, a low wall the low walls and full blocks beside it; one joining none lies
-        // along its axis, if it has one.
+        // What a shaped block (block) at pos makes of its neighbours, worked out from them as it is drawn
+        // and collided with, never stored (ConnectionsOf):
+        // - a fence or a low wall: the sides it joins, one bit each (TowardPlusZ…): fences, low walls,
+        //   full blocks, and walls or upright slabs standing against the side they share; one joining
+        //   none lies along its axis, if it has one;
+        // - a wall: the other ways it also stands against, one bit per facing (1 << facing), making an L
+        //   where a wall meets it at an inside corner: the wall in front of it (on its open side) facing
+        //   across it, so a room's walls, laid against the outer edges of its cells, close their corners;
+        // - stairs: a corner, as other stairs beside them turn (StairsOuter or StairsInner, plus the turn
+        //   from its facing to the side the corner turns toward, 1 or 3), or 0 for a straight flight:
+        //   stairs behind their high side facing across them make an outer corner (only the quarter
+        //   between both high sides stays high), stairs before their low side facing across them an
+        //   inner corner (the high half and the quarter beside it), unless stairs facing their way stand
+        //   on that side already (they carry the flight on, straight).
         public static int ConnectionsOf(World world, BlockPos pos, ushort block)
         {
             Shape shape = ShapeOf(block);
+            switch (shape)
+            {
+                case Shape.Wall: return WallCorners(world, pos, FacingOf(block));
+                case Shape.Stairs: return StairsCorner(world, pos, FacingOf(block));
+            }
+
             if (!Connects(shape)) return 0;
 
             int mask = 0;
@@ -362,26 +383,97 @@ namespace Voxel.Core
             {
                 int x = pos.X + dx;
                 int z = pos.Z + dz;
-                if (world.InBounds(x, pos.Y, z) && Joins(shape, world.GetBlock(x, pos.Y, z))) mask |= bit;
+                if (world.InBounds(x, pos.Y, z) && Joins(world.GetBlock(x, pos.Y, z), FacingToward(dx, dz))) mask |= bit;
             }
 
             if (mask == 0 && HasAxis(block)) mask = AxisMask(FacingOf(block));
             return mask;
         }
 
+        // Stairs' corners (ConnectionsOf): an outer or an inner one, plus the turn to the side it turns toward.
+        public const int StairsOuter = 4, StairsInner = 8;
+
         // The two sides of an axis (0 along x, 1 along z).
         public static int AxisMask(int axis) => (axis & 1) == 0 ? TowardPlusX | TowardMinusX : TowardPlusZ | TowardMinusZ;
 
-        private static bool Joins(Shape shape, ushort neighbour)
+        // Whether a fence or a low wall joins its neighbour that lies the way of facing toward.
+        private static bool Joins(ushort neighbour, int toward)
         {
+            if (!HasShapes(neighbour)) return Blocks.IsOpaque(neighbour);
+
             Shape other = ShapeOf(neighbour);
-            if (shape == Shape.Fence) return other == Shape.Fence;
-            return other == Shape.LowWall || Blocks.IsOpaque(neighbour);
+            if (other == Shape.Fence || other == Shape.LowWall || other == Shape.Cube) return true;
+            // A wall or an upright slab against the side they share: it faces back toward us.
+            return (other == Shape.Wall || other == Shape.HalfWall) && FacingOf(neighbour) == ((toward + 2) & 3);
+        }
+
+        // The facing (0 +z, 1 +x, 2 -z, 3 -x) of a step to a side.
+        private static int FacingToward(int dx, int dz) => dz > 0 ? 0 : dx > 0 ? 1 : dz < 0 ? 2 : 3;
+
+        private static (int dx, int dz) StepOf(int facing)
+        {
+            switch (facing & 3)
+            {
+                case 0: return (0, 1);
+                case 1: return (1, 0);
+                case 2: return (0, -1);
+                default: return (-1, 0);
+            }
+        }
+
+        // The shape and facing of the block a step away (dx, dz) from pos, if it is a shaped wood block.
+        private static bool TryShapeAt(World world, BlockPos pos, int dx, int dz, out Shape shape, out int facing)
+        {
+            shape = Shape.Cube;
+            facing = 0;
+            int x = pos.X + dx, z = pos.Z + dz;
+            if (!world.InBounds(x, pos.Y, z)) return false;
+
+            ushort block = world.GetBlock(x, pos.Y, z);
+            if (!HasShapes(block)) return false;
+
+            shape = ShapeOf(block);
+            facing = FacingOf(block);
+            return true;
+        }
+
+        private static int WallCorners(World world, BlockPos pos, int facing)
+        {
+            (int dx, int dz) = StepOf(facing);
+            if (TryShapeAt(world, pos, -dx, -dz, out Shape front, out int across) && front == Shape.Wall && ((across - facing) & 1) == 1) return 1 << across;
+            return 0;
+        }
+
+        private static int StairsCorner(World world, BlockPos pos, int facing)
+        {
+            (int dx, int dz) = StepOf(facing);
+            if (TryShapeAt(world, pos, dx, dz, out Shape back, out int backFacing) && back == Shape.Stairs && ((backFacing - facing) & 1) == 1
+                && !IsStairsFacing(world, pos, backFacing + 2, facing))
+            {
+                return StairsOuter | ((backFacing - facing) & 3);
+            }
+
+            if (TryShapeAt(world, pos, -dx, -dz, out Shape front, out int frontFacing) && front == Shape.Stairs && ((frontFacing - facing) & 1) == 1
+                && !IsStairsFacing(world, pos, frontFacing, facing))
+            {
+                return StairsInner | ((frontFacing - facing) & 3);
+            }
+
+            return 0;
+        }
+
+        // Whether the neighbour the way of side holds stairs facing facing.
+        private static bool IsStairsFacing(World world, BlockPos pos, int side, int facing)
+        {
+            (int dx, int dz) = StepOf(side);
+            return TryShapeAt(world, pos, dx, dz, out Shape shape, out int its) && shape == Shape.Stairs && its == facing;
         }
 
         // Whether a fence or a low wall (block) at pos reaches toward its neighbour that way.
         public static bool ConnectsToward(World world, BlockPos pos, ushort block, int dx, int dz)
         {
+            if (!Connects(ShapeOf(block))) return false;
+
             int mask = ConnectionsOf(world, pos, block);
             foreach ((int sx, int sz, int bit) in Sides)
             {
@@ -410,7 +502,17 @@ namespace Voxel.Core
             switch (shape)
             {
                 case Shape.Wall:
+                    // Its own, then that of the corner it closes (connections: one bit per facing), short of
+                    // its own so that no faces lie on each other.
                     into.Add(Turned(new Vector3(0f, 0f, 1f - WallThickness), new Vector3(1f, 1f, 1f), facing));
+                    for (int other = 0; other < 4; other++)
+                    {
+                        if (((other - facing) & 1) == 0 || (connections & (1 << other)) == 0) continue;
+
+                        bool ownOnRight = ((facing - other) & 3) == 1;
+                        into.Add(Turned(new Vector3(ownOnRight ? 0f : WallThickness, 0f, 1f - WallThickness), new Vector3(ownOnRight ? 1f - WallThickness : 1f, 1f, 1f), other));
+                    }
+
                     break;
                 case Shape.Post:
                     into.Add(Square(PostWidth, 0f, 1f));
@@ -444,7 +546,7 @@ namespace Voxel.Core
                     break;
                 case Shape.Stairs:
                     into.Add((Vector3.Zero, new Vector3(1f, 0.5f, 1f)));
-                    into.Add(Turned(new Vector3(0f, 0.5f, 0.5f), Vector3.One, facing));
+                    AddStairsTop(into, facing, connections);
                     break;
                 case Shape.OuterCorner:
                     // Each step a quarter shorter both ways: what is left rises toward the corner (1, 1).
@@ -494,6 +596,23 @@ namespace Voxel.Core
                     into.Add((Vector3.Zero, Vector3.One));
                     break;
             }
+        }
+
+        // Stairs' upper step, given facing +z then turned: the back half; at an outer corner only its
+        // quarter on the side the corner turns toward (x 1 for a turn of 1, x 0 for 3), at an inner corner
+        // the back half and the front quarter on that side.
+        private static void AddStairsTop(List<(Vector3 min, Vector3 max)> into, int facing, int corner)
+        {
+            bool right = (corner & 3) == 1;
+            float x0 = right ? 0.5f : 0f, x1 = right ? 1f : 0.5f;
+            if ((corner & StairsOuter) != 0)
+            {
+                into.Add(Turned(new Vector3(x0, 0.5f, 0.5f), Vector3.One, facing));
+                return;
+            }
+
+            into.Add(Turned(new Vector3(0f, 0.5f, 0.5f), Vector3.One, facing));
+            if ((corner & StairsInner) != 0) into.Add(Turned(new Vector3(x0, 0.5f, 0f), new Vector3(x1, 1f, 0.5f), facing));
         }
 
         // A low wall: a post with sides toward what it joins, or, joining two opposite sides only, one

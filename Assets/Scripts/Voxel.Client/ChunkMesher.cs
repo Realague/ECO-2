@@ -573,18 +573,15 @@ namespace Voxel.Client
             }
         }
 
-        // A shaped wood block (Shapes): its boxes, a slope's ramp, or a fence's post and rails toward the
-        // fences beside it. Each face is lit by the cell it faces (a shaped block that stops light holds
-        // none of its own), and one on its cell's side is left out against an opaque block.
+        // A shaped wood block (Shapes): its boxes, a slope's ramp, or a fence's post and rails toward
+        // the fences, low walls, full blocks and walls beside it. Each face is lit by the cell it faces
+        // (a shaped block that stops light holds none of its own), and one on its cell's side is left out
+        // against an opaque block.
         private void AddShape(World world, SkyLight light, ushort block, Vector3 origin, Vector3Int cell)
         {
             int facing = Shapes.FacingOf(block);
             switch (Shapes.ShapeOf(block))
             {
-                case Shape.Wall:
-                    (System.Numerics.Vector3 min, System.Numerics.Vector3 max) wall = Shapes.Turned(new System.Numerics.Vector3(0f, 0f, 1f - Shapes.WallThickness), System.Numerics.Vector3.One, facing);
-                    AddBox(world, light, block, origin, cell, wall.min.ToUnity(), wall.max.ToUnity());
-                    break;
                 case Shape.Post:
                     AddBox(world, light, block, origin, cell, new Vector3(0.375f, 0f, 0.375f), new Vector3(0.625f, 1f, 0.625f));
                     break;
@@ -600,10 +597,6 @@ namespace Voxel.Client
                 case Shape.Fence:
                     AddFence(world, light, block, origin, cell);
                     break;
-                case Shape.Stairs:
-                    AddBox(world, light, block, origin, cell, Vector3.zero, new Vector3(1f, 0.5f, 1f));
-                    AddTurnedBox(world, light, block, origin, cell, new Vector3(0f, 0.5f, 0.5f), Vector3.one, facing);
-                    break;
                 case Shape.OuterCorner:
                     AddOuterCorner(world, light, block, origin, cell, facing);
                     break;
@@ -614,7 +607,8 @@ namespace Voxel.Client
                     AddLadder(world, light, block, origin, cell, facing);
                     break;
                 default:
-                    // Posts in a corner, beams, upright slabs, low walls and columns: their boxes.
+                    // Walls (an L at a corner), stairs (turning at corners), posts in a corner, beams, upright
+                    // slabs, low walls and columns: their boxes, from Shapes.ConnectionsOf for what joins.
                     shapeBoxes.Clear();
                     Shapes.GetLocalBoxes(Shapes.ShapeOf(block), facing, Shapes.ConnectionsOf(world, new BlockPos(cell.x, cell.y, cell.z), block), shapeBoxes);
                     foreach ((System.Numerics.Vector3 min, System.Numerics.Vector3 max) in shapeBoxes) AddBox(world, light, block, origin, cell, min.ToUnity(), max.ToUnity());
@@ -719,7 +713,7 @@ namespace Voxel.Client
         }
 
         // A post a little thinner than a wall, and two rails toward each side it joins (Shapes.ConnectionsOf:
-        // the fences beside it, or along its axis when alone).
+        // fences, low walls, full blocks and walls facing it beside it, or along its axis when alone).
         private void AddFence(World world, SkyLight light, ushort block, Vector3 origin, Vector3Int cell)
         {
             AddBox(world, light, block, origin, cell, new Vector3(0.39f, 0f, 0.39f), new Vector3(0.61f, 1f, 0.61f));

@@ -190,7 +190,8 @@ namespace Voxel.Core.Tests
             }
         }
 
-        // A fence joins the fences beside it with rails, and stands taller for collision than for aiming.
+        // A fence joins the fences and full blocks beside it with rails, and stands taller for collision
+        // than for aiming.
         [Test]
         public void AFence_JoinsTheFencesBesideIt()
         {
@@ -203,7 +204,7 @@ namespace Voxel.Core.Tests
             var boxes = new List<(Vector3 min, Vector3 max)>();
 
             Shapes.GetBoxes(world, new BlockPos(5, Ground, 5), fence, boxes);
-            Assert.AreEqual(3, boxes.Count, "a post and two rails: a full block is not a fence");
+            Assert.AreEqual(4, boxes.Count, "a post and three rails, one to the full block");
             foreach ((Vector3 _, Vector3 max) in boxes) Assert.AreEqual(Ground + 1f, max.Y);
 
             boxes.Clear();
@@ -451,6 +452,86 @@ namespace Voxel.Core.Tests
             Shapes.GetLocalBoxes(Shape.ColumnBase, 0, 0, baseBoxes);
             Assert.Greater(baseBoxes[0].max.X - baseBoxes[0].min.X, Shapes.ColumnWidth, "the foot is wider than the shaft");
             Assert.AreEqual(0f, baseBoxes[0].min.Y);
+        }
+
+        // A fence or a low wall joins fences, low walls, full blocks (natural ones too) and a wall standing
+        // against the side they share, not one turned away.
+        [Test]
+        public void FencesAndLowWalls_JoinEachOther_BlocksAndWallsFacingThem()
+        {
+            World world = FlatGenerator.CreateWorld();
+            var pos = new BlockPos(5, Ground, 5);
+            ushort fence = Shapes.Make(Planks(), Shape.Fence, 0);
+            world.SetBlock(pos.X, pos.Y, pos.Z, fence);
+            world.SetBlock(6, Ground, 5, Shapes.Make(Planks(), Shape.LowWall, 0));
+            world.SetBlock(4, Ground, 5, Blocks.Stone);
+            world.SetBlock(5, Ground, 6, Shapes.Make(Planks(), Shape.Wall, 2));
+            world.SetBlock(5, Ground, 4, Shapes.Make(Planks(), Shape.Wall, 2));
+
+            Assert.AreEqual(Shapes.TowardPlusX | Shapes.TowardMinusX | Shapes.TowardPlusZ, Shapes.ConnectionsOf(world, pos, fence),
+                "the wall at +z stands against the shared side (facing -z), the one at -z against its far side");
+            Assert.AreEqual(Shapes.TowardMinusX, Shapes.ConnectionsOf(world, new BlockPos(6, Ground, 5), Shapes.Make(Planks(), Shape.LowWall, 0)),
+                "the low wall joins the fence");
+        }
+
+        // A room's walls, laid against the outer edges of its cells, close their corners: the corner's
+        // wall makes an L with the wall in front of it, without boxes lying on each other.
+        [Test]
+        public void Walls_CloseTheInsideCorner()
+        {
+            World world = FlatGenerator.CreateWorld();
+            var corner = new BlockPos(5, Ground, 5);
+            ushort north = Shapes.Make(Planks(), Shape.Wall, 0);
+            world.SetBlock(corner.X, corner.Y, corner.Z, north);
+            world.SetBlock(5, Ground, 4, Shapes.Make(Planks(), Shape.Wall, 1));
+            world.SetBlock(4, Ground, 5, north);
+
+            Assert.AreEqual(1 << 1, Shapes.ConnectionsOf(world, corner, north));
+            var boxes = new List<(Vector3 min, Vector3 max)>();
+            Shapes.GetBoxes(world, corner, north, boxes);
+            Assert.AreEqual(2, boxes.Count);
+            Assert.IsTrue(Covers(boxes, new Vector3(5.9f, Ground + 0.5f, 5.1f)), "the east side, down to the wall in front");
+            Assert.IsTrue(Covers(boxes, new Vector3(5.1f, Ground + 0.5f, 5.9f)), "the north side");
+            Assert.IsFalse(Covers(boxes, new Vector3(5.5f, Ground + 0.5f, 5.5f)), "the inside stays open");
+            float overlapX = System.MathF.Min(boxes[0].max.X, boxes[1].max.X) - System.MathF.Max(boxes[0].min.X, boxes[1].min.X);
+            float overlapZ = System.MathF.Min(boxes[0].max.Z, boxes[1].max.Z) - System.MathF.Max(boxes[0].min.Z, boxes[1].min.Z);
+            Assert.IsTrue(overlapX <= 1e-5f || overlapZ <= 1e-5f, "the two boxes do not overlap");
+
+            Assert.AreEqual(0, Shapes.ConnectionsOf(world, new BlockPos(4, Ground, 5), north), "a straight run stays straight");
+        }
+
+        // Stairs turn as stairs beside them do: an outer corner where stairs behind their high side face
+        // across them, an inner one where stairs before their low side do, unless stairs facing their
+        // way carry the flight on.
+        [Test]
+        public void Stairs_TurnAtCorners()
+        {
+            ushort up = Shapes.Make(Planks(), Shape.Stairs, 0);
+            ushort across = Shapes.Make(Planks(), Shape.Stairs, 1);
+            var pos = new BlockPos(5, Ground, 5);
+            var boxes = new List<(Vector3 min, Vector3 max)>();
+
+            World outer = FlatGenerator.CreateWorld();
+            outer.SetBlock(5, Ground, 6, across);
+            Assert.AreEqual(Shapes.StairsOuter | 1, Shapes.ConnectionsOf(outer, pos, up));
+            Shapes.GetBoxes(outer, pos, up, boxes);
+            Assert.IsTrue(Covers(boxes, new Vector3(5.75f, Ground + 0.75f, 5.75f)), "high at the corner between both high sides");
+            Assert.IsFalse(Covers(boxes, new Vector3(5.25f, Ground + 0.75f, 5.75f)));
+            Assert.IsFalse(Covers(boxes, new Vector3(5.75f, Ground + 0.75f, 5.25f)));
+
+            World inner = FlatGenerator.CreateWorld();
+            inner.SetBlock(5, Ground, 4, across);
+            Assert.AreEqual(Shapes.StairsInner | 1, Shapes.ConnectionsOf(inner, pos, up));
+            boxes.Clear();
+            Shapes.GetBoxes(inner, pos, up, boxes);
+            Assert.IsTrue(Covers(boxes, new Vector3(5.25f, Ground + 0.75f, 5.75f)), "the high half");
+            Assert.IsTrue(Covers(boxes, new Vector3(5.75f, Ground + 0.75f, 5.25f)), "and the quarter beside it");
+            Assert.IsFalse(Covers(boxes, new Vector3(5.25f, Ground + 0.75f, 5.25f)), "low in the other quarter");
+
+            // Stairs facing their way on the side the outer corner would leave low: the flight goes on.
+            outer.SetBlock(4, Ground, 5, up);
+            Assert.AreEqual(0, Shapes.ConnectionsOf(outer, pos, up));
+            Assert.AreEqual(0, Shapes.ConnectionsOf(FlatGenerator.CreateWorld(), pos, up), "alone, straight");
         }
 
         // A shaped block counts by its boxes: a wall at the far edge of the cell beside a player is not in them.

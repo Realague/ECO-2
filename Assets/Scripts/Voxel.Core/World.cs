@@ -210,6 +210,20 @@ namespace Voxel.Core
             return 0;
         }
 
+        // Whether a fence or a low wall may stand beside the cell (x, y, z), in the same layer: its chunk,
+        // or the chunk beside it when the cell is on that side's edge, holds one (Chunk.HoldsJoins).
+        public bool MayHoldJoinsBeside(int x, int y, int z)
+        {
+            if (!InBounds(x, y, z)) return false;
+            if (ChunkAt(x, y, z).HoldsJoins) return true;
+
+            int localX = x & Chunk.SizeMask, localZ = z & Chunk.SizeMask;
+            return (localX == 0 && x > 0 && ChunkAt(x - 1, y, z).HoldsJoins)
+                || (localX == Chunk.SizeMask && x + 1 < SizeX && ChunkAt(x + 1, y, z).HoldsJoins)
+                || (localZ == 0 && z > 0 && ChunkAt(x, y, z - 1).HoldsJoins)
+                || (localZ == Chunk.SizeMask && z + 1 < SizeZ && ChunkAt(x, y, z + 1).HoldsJoins);
+        }
+
         private Chunk ChunkAt(int x, int y, int z) =>
             chunks[ChunkIndex(x >> Chunk.SizeBits, y >> Chunk.SizeBits, z >> Chunk.SizeBits)];
 

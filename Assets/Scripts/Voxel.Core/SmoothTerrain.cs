@@ -72,13 +72,20 @@ namespace Voxel.Core
         public static bool IsPlayerBlock(ushort block) => Blocks.IsConstruction(block) || Blocks.IsTorch(block);
 
         // Ground under a player's block (IsPlayerBlock) or under what players placed that is not a block
-        // (World.Pins: storage, stations) is not smoothed: it stays a cube, drawn as a block with its own
-        // tiles (ChunkMesher), so what stands on it stands on a flat, square top. It still counts as
-        // ground for the vertices around it.
+        // (World.Pins: storage, stations), or beside a fence or a low wall (which join it: their rails
+        // and sides meet its face, Shapes.ConnectionsOf), is not smoothed: it stays a cube, drawn as a
+        // block with its own tiles (ChunkMesher), so what stands on it stands on a flat, square top and
+        // what joins it meets a flat, square side. It still counts as ground for the vertices around it.
         public static bool IsPinned(World world, int x, int y, int z)
         {
             if (!world.InBounds(x, y, z) || !IsSmooth(world.GetBlock(x, y, z))) return false;
-            return (y + 1 < world.SizeY && IsPlayerBlock(world.GetBlock(x, y + 1, z))) || world.Pins.Contains(x, y, z);
+            if ((y + 1 < world.SizeY && IsPlayerBlock(world.GetBlock(x, y + 1, z))) || world.Pins.Contains(x, y, z)) return true;
+
+            // Fences are few: the cells beside are read only where a chunk holds one.
+            if (!world.MayHoldJoinsBeside(x, y, z)) return false;
+
+            return Shapes.JoinsGround(world.GetBlock(x + 1, y, z)) || Shapes.JoinsGround(world.GetBlock(x - 1, y, z))
+                || Shapes.JoinsGround(world.GetBlock(x, y, z + 1)) || Shapes.JoinsGround(world.GetBlock(x, y, z - 1));
         }
 
         public static bool TouchesPinned(World world, int cx, int cy, int cz)

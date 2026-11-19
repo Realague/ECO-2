@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -67,6 +68,10 @@ namespace Voxel.Client
         private readonly int[] rotations = new int[Shapes.Families.Length];
         private int block = Items.None;
         private int familyIndex;
+        // A block picked in creative mode, given by the server: kept chosen while it is on its way.
+        private const float PickWaitSeconds = 2f;
+        private int pickedBlock = Items.None;
+        private float pickedUntil;
         private int shownBlock = -1;
         private string shownDetail;
 
@@ -145,6 +150,55 @@ namespace Voxel.Client
         // shape and rotation, turned from the way they look (a roof's corner, the diagonal they look along).
         public ushort BlockToPlace(float yaw) => Shapes.Place((ushort)block, Family, Rotation, yaw);
 
+        // The pipette (a middle click with the hammer on a construction block, PlayerController): that
+        // block, with the shape and rotation that would place it again as it is for a player looking
+        // along yaw. In creative mode a block the bag lacks is given (a stack); otherwise the bag must hold
+        // it, or nothing changes.
+        public void Pick(ushort aimed, float yaw)
+        {
+            int type = Blocks.TypeOf(aimed);
+            if (!Blocks.IsConstruction((ushort)type))
+            {
+                hotbar.ShowMessage("Only construction blocks can be picked");
+                return;
+            }
+
+            if (!inventorySync.Inventory.Has(type))
+            {
+                if (!inventorySync.Creative)
+                {
+                    string name = ItemCatalog.NameOf(type, ecosystemSync);
+                    hotbar.ShowMessage(Loc.T("You have no {1}", name, name.ToLower(Loc.Culture)));
+                    return;
+                }
+
+                inventorySync.RequestCreativeGive(type, CreativeRules.StackOf(type));
+                // Until the server's answer puts it in the bag, the panel keeps it (Update).
+                pickedBlock = type;
+                pickedUntil = Time.unscaledTime + PickWaitSeconds;
+            }
+
+            block = type;
+            if (type == Blocks.Door) return;
+
+            // The family and rotation that place this very code; a code no rotation gives (a fence of
+            // earlier versions, without its axis) keeps its family and the rotation chosen before.
+            for (int family = 0; family < Shapes.Families.Length; family++)
+            {
+                for (int rotation = 0; rotation < Shapes.RotationCount(Shapes.Families[family]); rotation++)
+                {
+                    if (Shapes.Place((ushort)type, Shapes.Families[family], rotation, yaw) != aimed) continue;
+
+                    familyIndex = family;
+                    rotations[family] = rotation;
+                    return;
+                }
+            }
+
+            int index = Array.IndexOf(Shapes.Families, Shapes.FamilyOf(Shapes.ShapeOf(aimed)));
+            if (index >= 0) familyIndex = index;
+        }
+
         public void StartLine(BlockPos start, bool takeBack)
         {
             HasLineStart = true;
@@ -222,7 +276,8 @@ namespace Voxel.Client
             }
 
             GatherHeld();
-            if (!held.Contains(block)) block = held.Count > 0 ? held[0] : Items.None;
+            bool waitingForPick = block == pickedBlock && Time.unscaledTime < pickedUntil;
+            if (!held.Contains(block) && !waitingForPick) block = held.Count > 0 ? held[0] : Items.None;
 
             ReadKeys();
             // The inventory and a storage window take the screen: the panel would stand over their sheets.

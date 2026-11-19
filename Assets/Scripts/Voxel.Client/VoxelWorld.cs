@@ -359,13 +359,15 @@ namespace Voxel.Client
             // smoothed ground, it moves the vertices of its eight corners, which the faces of every
             // block around it share, diagonals included, and a player's block placed or taken also
             // pins or frees the ground under it (SmoothTerrain.IsPinned), so one more layer below.
+            // A fence or a low wall also pins or frees the ground beside it (one more column each way).
             if (smoothShown)
             {
-                for (int dz = -1; dz <= 1; dz++)
+                int reach = Shapes.JoinsGround(previous) || Shapes.JoinsGround(current) ? 2 : 1;
+                for (int dz = -reach; dz <= reach; dz++)
                 {
                     for (int dy = -2; dy <= 1; dy++)
                     {
-                        for (int dx = -1; dx <= 1; dx++)
+                        for (int dx = -reach; dx <= reach; dx++)
                         {
                             MarkDirty(new BlockPos(pos.X + dx, pos.Y + dy, pos.Z + dz));
                         }

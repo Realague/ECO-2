@@ -855,3 +855,6 @@ Active	Actif
 Upgrade ({0} pt)	Améliorer ({0} pt)
 Tier {0} · {1} steps	Palier {0} · {1} étapes
 Chosen	Choisie
+Only construction blocks can be picked	Seuls les blocs de construction se copient à la pipette
+You have no {1}	Vous n'avez pas de {1}
+Pick block	Pipette
