@@ -102,8 +102,12 @@ namespace Voxel.Client
             if (roomFor(drop) <= 0) return drop;
 
             OreKind ore = Ores.OreOf(block);
-            if (ore != OreKind.None && roomFor(Items.Ore(ore)) < Ores.Yield(ore)) return Items.Ore(ore);
-            return Items.None;
+            if (ore == OreKind.None) return Items.None;
+
+            // Ores count as blocks: with a rock, both take room among the blocks.
+            int oreItem = Items.Ore(ore);
+            int needed = Ores.Yield(ore) + (CarryLimits.CountsAsBlock(drop) && CarryLimits.CountsAsBlock(oreItem) ? 1 : 0);
+            return roomFor(oreItem) < needed ? oreItem : Items.None;
         }
 
         // Tells the local player at once, without asking the server (an action checked beforehand).

@@ -647,6 +647,7 @@ GameObject:
   - component: {fileID: 490447460}
   - component: {fileID: 490447461}
   - component: {fileID: 490447462}
+  - component: {fileID: 490447463}
   m_Layer: 0
   m_Name: GameSession
   m_TagString: Untagged
@@ -675,6 +676,7 @@ MonoBehaviour:
   bowSync: {fileID: 490447455}
   miningSync: {fileID: 490447457}
   logSync: {fileID: 490447456}
+  rubbleSync: {fileID: 490447463}
   storageSync: {fileID: 490447458}
   claimSync: {fileID: 490447459}
   craftingSync: {fileID: 490447460}
@@ -724,6 +726,7 @@ MonoBehaviour:
   ecosystemSync: {fileID: 490447448}
   storageSync: {fileID: 490447458}
   claimSync: {fileID: 490447459}
+  rubbleSync: {fileID: 490447463}
 --- !u!114 &490447448
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -967,6 +970,7 @@ MonoBehaviour:
   inventorySync: {fileID: 490447450}
   ecosystemSync: {fileID: 490447448}
   logSync: {fileID: 490447456}
+  rubbleSync: {fileID: 490447463}
   claimSync: {fileID: 490447459}
   woodMaterial: {fileID: 2100000, guid: 17965ac439377474abca152ff17c9021, type: 2}
   ironMaterial: {fileID: 2100000, guid: 582f92c22b627724db3f3da36c5b3b4f, type: 2}
@@ -1033,6 +1037,24 @@ MonoBehaviour:
   hotbar: {fileID: 408005230}
   skillAssets:
   - {fileID: 11400000, guid: b07b63a99cdac8b4f9f4c0f16303ae8f, type: 2}
+--- !u!114 &490447463
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 490447444}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 09e20ea08f4603c44980570db722fbfb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Voxel.Client::Voxel.Client.RubbleSync
+  networkManager: {fileID: 947039382}
+  inventorySync: {fileID: 490447450}
+  worldSync: {fileID: 490447447}
+  claimSync: {fileID: 490447459}
+  voxelWorld: {fileID: 1566503039}
+  hungerSync: {fileID: 490447454}
 --- !u!1 &593756662
 GameObject:
   m_ObjectHideFlags: 0
@@ -2130,6 +2152,7 @@ MonoBehaviour:
   hotbar: {fileID: 408005230}
   inventorySync: {fileID: 490447450}
   logSync: {fileID: 490447456}
+  rubbleSync: {fileID: 490447463}
   document: {fileID: 2081992071}
 --- !u!114 &2081992071
 MonoBehaviour:

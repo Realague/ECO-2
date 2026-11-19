@@ -54,6 +54,7 @@ namespace Voxel.Client
         [SerializeField] private BowSync bowSync;
         [SerializeField] private MiningSync miningSync;
         [SerializeField] private LogSync logSync;
+        [SerializeField] private RubbleSync rubbleSync;
         [SerializeField] private StorageSync storageSync;
         [SerializeField] private ClaimSync claimSync;
         [SerializeField] private CraftingSync craftingSync;
@@ -319,6 +320,7 @@ namespace Voxel.Client
             bowSync.StartClient();
             miningSync.StartClient();
             logSync.StartClient();
+            rubbleSync.StartClient();
             storageSync.StartClient();
             claimSync.StartClient();
             craftingSync.StartClient();
@@ -369,6 +371,7 @@ namespace Voxel.Client
             hungerSync.StartServer(registry);
             bowSync.StartServer(worldDirectory);
             logSync.StartServer(worldDirectory);
+            rubbleSync.StartServer(worldDirectory);
             storageSync.StartServer(worldDirectory, registry);
             claimSync.StartServer(worldDirectory, registry);
             craftingSync.StartServer(registry);
@@ -448,6 +451,7 @@ namespace Voxel.Client
             ecosystemSync.Save();
             bowSync.Save();
             logSync.Save();
+            rubbleSync.Save();
             storageSync.Save();
             claimSync.Save();
         }
@@ -482,6 +486,7 @@ namespace Voxel.Client
             ecosystemSync.Save();
             bowSync.Save();
             logSync.Save();
+            rubbleSync.Save();
             storageSync.Save();
             claimSync.Save();
             ecosystemSync.Stop();
@@ -490,6 +495,7 @@ namespace Voxel.Client
             bowSync.Stop();
             miningSync.Stop();
             logSync.Stop();
+            rubbleSync.Stop();
             storageSync.Stop();
             claimSync.Stop();
             craftingSync.Stop();

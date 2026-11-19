@@ -239,7 +239,7 @@ namespace Voxel.Core
                         {
                             int item = Items.Upgrade(reader.ReadInt32());
                             int amount = reader.ReadInt32();
-                            if (amount > 0 && StorageRules.AcceptsInChest(item)) storage.Contents.Add(item, amount);
+                            if (amount > 0 && StorageRules.KeptInChest(item)) storage.Contents.Add(item, amount);
                         }
                     }
                     else if (StorageRules.IsStation(storage.Kind))

@@ -31,6 +31,15 @@ namespace Voxel.Core
         // The wood a log lying on the ground gives when picked up.
         public const int WoodPerLog = 3;
 
+        // Whether breaking this block leaves rubble on the ground (to pick up with a right click) instead
+        // of putting it in the breaker's bag: whatever a pickaxe breaks (rocks, the ores they hold, ice).
+        public static bool LeavesRubble(ushort block) => ToolRules.ToBreak(block) == Items.Pickaxe;
+
+        // How many pieces of rubble a block leaves, each worth one of its rock (Items.DropOf); the
+        // first also holds its ore. A block a player placed leaves one, so that placing and breaking
+        // stone makes no more of it.
+        public const int RubblePieces = 3;
+
         // Hits a block takes to break, by hardness; 0 for one that cannot be broken. A rock holding an
         // ore takes the more of its own and the ore's (Ores.Hardness).
         public static int HitsToBreak(ushort block)

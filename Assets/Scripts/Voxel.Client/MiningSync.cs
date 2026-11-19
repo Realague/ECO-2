@@ -463,6 +463,9 @@ namespace Voxel.Client
             int tool = ToolRules.ToBreak(type);
             if (tool != Items.None && !inventorySync.Owns(clientId, tool)) return false;
 
+            // Rubble is left on the ground, and checked when picked up.
+            if (worldSync.LeavesRubble(clientId, type)) return true;
+
             int unfitting = inventorySync.UnfittingDrop(clientId, type);
             if (unfitting == Items.None) return true;
 

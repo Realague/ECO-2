@@ -85,6 +85,7 @@ namespace Voxel.Client
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private LogSync logSync;
+        [SerializeField] private RubbleSync rubbleSync;
         [SerializeField] private ClaimSync claimSync;
         [SerializeField] private Material woodMaterial;
         [SerializeField] private Material ironMaterial;
@@ -666,7 +667,7 @@ namespace Voxel.Client
             {
                 if (refusal != null) break;
 
-                if (IsInsideAnyPlayer(cell) || ecosystemSync.IsAnimalInside(cell) || logSync.HasLogIn(cell)) refusal = StorageRefusal.NoRoom;
+                if (IsInsideAnyPlayer(cell) || ecosystemSync.IsAnimalInside(cell) || logSync.HasLogIn(cell) || (rubbleSync != null && rubbleSync.HasRubbleIn(cell))) refusal = StorageRefusal.NoRoom;
                 else if (ecosystemSync.IsPlantAt(cell.X, cell.Z)) refusal = StorageRefusal.PlantInTheWay;
             }
 
@@ -1017,7 +1018,7 @@ namespace Voxel.Client
                     {
                         reader.ReadValueSafe(out int item);
                         reader.ReadValueSafe(out int amount);
-                        if (amount > 0 && StorageRules.AcceptsInChest(item)) member.Contents.Add(item, amount);
+                        if (amount > 0 && StorageRules.KeptInChest(item)) member.Contents.Add(item, amount);
                     }
                 }
 

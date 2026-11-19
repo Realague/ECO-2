@@ -64,6 +64,11 @@ namespace Voxel.Client
         private BowSync bowSync;
         private MiningSync miningSync;
         private LogSync logSync;
+        private RubbleSync rubbleSync;
+        private ICollisionObstacles obstacles;
+
+        // What stops the player besides blocks and storage: tree trunks and rubble.
+        private ICollisionObstacles Obstacles => obstacles ?? (obstacles = new CollisionObstacleSet(ecosystemSync, rubbleSync));
         private StorageSync storageSync;
         private ClaimSync claimSync;
         private StorageScreen storageScreen;
@@ -136,6 +141,7 @@ namespace Voxel.Client
             bowSync = FindAnyObjectByType<BowSync>();
             miningSync = FindAnyObjectByType<MiningSync>();
             logSync = FindAnyObjectByType<LogSync>();
+            rubbleSync = FindAnyObjectByType<RubbleSync>();
             storageSync = FindAnyObjectByType<StorageSync>();
             claimSync = FindAnyObjectByType<ClaimSync>();
             storageScreen = FindAnyObjectByType<StorageScreen>();
@@ -758,8 +764,9 @@ namespace Voxel.Client
                     if (!CanBreakOnClaims(hit.Block)) return;
 
                     // A block the player cannot carry (or the ore it holds) stays in place, and the
-                    // server would refuse it anyway.
-                    int unfitting = inventorySync.LocalUnfittingDrop(aimed);
+                    // server would refuse it anyway; rubble lies on the ground until picked up.
+                    bool rubble = MiningRules.LeavesRubble(aimed) && !inventorySync.Creative;
+                    int unfitting = rubble ? Items.None : inventorySync.LocalUnfittingDrop(aimed);
                     if (unfitting != Items.None)
                     {
                         inventorySync.TellLocalFull(InventorySync.ReasonFor(unfitting));
@@ -794,10 +801,10 @@ namespace Voxel.Client
             return true;
         }
 
-        private enum PickupKind { None, Storage, Log, Arrow, Carcass }
+        private enum PickupKind { None, Storage, Log, Arrow, Carcass, Rubble }
 
-        // What a right click would open or pick up: the storage, log or arrow by its id, a carcass by
-        // its column and what is left of it.
+        // What a right click would open or pick up: the storage, log, arrow or rubble by its id, a
+        // carcass by its column and what is left of it.
         private struct Pickup
         {
             public PickupKind Kind;
@@ -807,7 +814,7 @@ namespace Voxel.Client
             public float Meat;
         }
 
-        // The storage, log, arrow or carcass pointed at, the nearest, at most maxDistance away.
+        // The storage, log, arrow, rubble or carcass pointed at, the nearest, at most maxDistance away.
         private Pickup AimedPickup(float maxDistance)
         {
             Vector3 origin = cameraTransform.position;
@@ -835,6 +842,13 @@ namespace Voxel.Client
                 pickup = new Pickup { Kind = PickupKind.Arrow, Id = arrowId, X = Mathf.FloorToInt(at.x), Z = Mathf.FloorToInt(at.z) };
             }
 
+            if (rubbleSync != null && rubbleSync.TryAimed(origin, forward, nearest, out int rubbleId, out float rubbleDistance) && rubbleDistance < nearest)
+            {
+                nearest = rubbleDistance;
+                Vector3 at = origin + forward * rubbleDistance;
+                pickup = new Pickup { Kind = PickupKind.Rubble, Id = rubbleId, X = Mathf.FloorToInt(at.x), Z = Mathf.FloorToInt(at.z) };
+            }
+
             if (ecosystemSync.TryAimedCarcass(origin, forward, nearest, out int carcassX, out int carcassZ, out _, out float meat, out float carcassDistance) && carcassDistance < nearest)
             {
                 pickup = new Pickup { Kind = PickupKind.Carcass, X = carcassX, Z = carcassZ, Meat = meat };
@@ -843,7 +857,7 @@ namespace Voxel.Client
             return pickup;
         }
 
-        // Opens the storage, or picks up the log, arrow or carcass, pointed at: the nearest. Returns
+        // Opens the storage, or picks up the log, arrow, rubble or carcass, pointed at: the nearest. Returns
         // false if there is none.
         private bool TryPickUp(float maxDistance)
         {
@@ -858,6 +872,10 @@ namespace Voxel.Client
                     return true;
                 case PickupKind.Arrow:
                     if (claimSync.LocalCheck(pickup.X, pickup.Z)) bowSync.RequestPickup(pickup.Id);
+                    return true;
+                case PickupKind.Rubble:
+                    if (hungerSync.Stomach.IsStarving) hotbar.ShowMessage(InventorySync.TooHungryMessage);
+                    else if (claimSync.LocalCheck(pickup.X, pickup.Z)) rubbleSync.RequestPickup(pickup.Id);
                     return true;
                 case PickupKind.Carcass:
                     // With a knife in hand it is butchered where it lies (half its meat), else taken whole.
@@ -876,7 +894,7 @@ namespace Voxel.Client
             }
         }
 
-        // A green halo around the log, the arrow or the carcass a right click would pick up (not a carcass too
+        // A green halo around the log, the arrow, the rubble or the carcass a right click would pick up (not a carcass too
         // far gone to take), within the same reach and in front of the same block as the click.
         private void HighlightPickup()
         {
@@ -886,6 +904,7 @@ namespace Voxel.Client
             Pickup pickup = AimedPickup(blockHit ? hit.Distance : PlayerRules.Reach);
             if (pickup.Kind == PickupKind.Arrow) bowSync.CollectArrowParts(pickup.Id, pickupHalo.Parts);
             else if (pickup.Kind == PickupKind.Log) logSync.CollectLogParts(pickup.Id, pickupHalo.Parts);
+            else if (pickup.Kind == PickupKind.Rubble) rubbleSync.CollectRubbleParts(pickup.Id, pickupHalo.Parts);
             else if (pickup.Kind == PickupKind.Carcass && pickup.Meat >= EcosystemSync.CarcassMinMeat) ecosystemSync.CollectCarcassParts(pickup.X, pickup.Z, pickupHalo.Parts);
         }
 
@@ -927,7 +946,7 @@ namespace Voxel.Client
                 PlayerRules.Height,
                 (velocity * deltaTime).ToNumerics(),
                 storageSync != null ? storageSync.IsSolid : (System.Func<int, int, int, bool>)null,
-                ecosystemSync);
+                Obstacles);
 
             transform.position = result.Position.ToUnity();
             grounded = result.Grounded;
@@ -1024,7 +1043,7 @@ namespace Voxel.Client
                 PlayerRules.Height,
                 displacement.ToNumerics(),
                 storageSync != null ? storageSync.IsSolid : (System.Func<int, int, int, bool>)null,
-                ecosystemSync,
+                Obstacles,
                 PlayerRules.StepHeight);
 
             // A step up (a block walked onto) lifts the player at once: the view follows it smoothly.

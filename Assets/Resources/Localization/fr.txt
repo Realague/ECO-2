@@ -609,6 +609,7 @@ Planks	Planches
 Log	Rondin
 {0} planks	Planches de {1}
 {0} log	Rondin de {1}
+{0} rubble	Débris de {1}
 Door	Porte
 Carpentry	Menuiserie
 Stockpiles	Réserves
@@ -703,7 +704,7 @@ Players online	Joueurs en ligne
 Host	Hôte
 {0} ms	{0} ms
 Ore	Minerai
-Found in rock: a block of rock holding it gives it, besides itself, when broken with a pickaxe. Kept in a chest.	Se trouve dans la roche : un bloc de roche qui en contient le donne, en plus de lui-même, quand on le casse à la pioche. Se range dans un coffre.
+Found in rock: a block of rock holding it gives it, besides itself, when broken with a pickaxe. It counts as a block in your bag, and is kept on a stockpile.	Se trouve dans la roche : un bloc de roche qui en contient le donne, en plus de lui-même, quand on le casse à la pioche. Il compte comme un bloc dans votre sac et se range sur une réserve.
 
 # Skills (SkillSync, SkillsPage, Assets/Skills), felling in steps
 Fallen {1}	{0} abattu

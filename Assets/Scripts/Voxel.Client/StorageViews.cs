@@ -300,7 +300,10 @@ namespace Voxel.Client
             {
                 int first = vertices.Count;
                 Vector3[] corners = ChunkMesher.FaceCorners[face];
-                int tile = isWood ? 0 : BlockAtlas.TileFor(Items.BlockOf(item), face);
+                // An ore is drawn with its own tile (the ore on grey stone, which also paints its icon).
+                int tile = isWood ? 0
+                    : Items.IsOre(item) ? BlockAtlas.CoalTile + (int)Items.OreKindOf(item) - 1
+                    : BlockAtlas.TileFor(Items.BlockOf(item), face);
                 for (int c = 0; c < corners.Length; c++)
                 {
                     vertices.Add(origin + corners[c] * CubeSize);

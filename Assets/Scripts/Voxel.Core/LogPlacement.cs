@@ -89,7 +89,8 @@ namespace Voxel.Core
 
         // Where a log at position goes once the blocks around it changed: pushed up out of a solid
         // block, or dropped onto the ground or water under it. Returns false if it stays where it is.
-        public static bool Settle(World world, Vector3 position, out Vector3 settled)
+        // What does not float (rubble) sinks through water to its bed.
+        public static bool Settle(World world, Vector3 position, out Vector3 settled, bool floats = true)
         {
             int x = (int)MathF.Floor(position.X);
             int z = (int)MathF.Floor(position.Z);
@@ -105,14 +106,14 @@ namespace Voxel.Core
                     pushed++;
                 }
 
-                if (world.IsSolid(x, y, z)) y = world.GetTopHeight(x, z);
-                settled = new Vector3(position.X, RestHeight(world, x, y, z), position.Z);
+                if (world.IsSolid(x, y, z)) y = floats ? world.GetTopHeight(x, z) : world.GetSurfaceHeight(x, z);
+                settled = new Vector3(position.X, floats ? RestHeight(world, x, y, z) : y, position.Z);
                 return true;
             }
 
             int ground = y;
-            while (ground > 0 && !world.IsSolid(x, ground - 1, z) && !world.IsWater(x, ground - 1, z)) ground--;
-            float rest = RestHeight(world, x, ground, z);
+            while (ground > 0 && !world.IsSolid(x, ground - 1, z) && (!floats || !world.IsWater(x, ground - 1, z))) ground--;
+            float rest = floats ? RestHeight(world, x, ground, z) : ground;
             if (rest >= position.Y - 0.01f) return false;
 
             settled = new Vector3(position.X, rest, position.Z);

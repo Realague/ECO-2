@@ -11,6 +11,22 @@ namespace Voxel.Core
         void Collect(int minX, int maxX, int minZ, int maxZ, List<(Vector3 min, Vector3 max)> into);
     }
 
+    // Several sources of obstacles met as one (tree trunks and rubble); any of them may be null.
+    public sealed class CollisionObstacleSet : ICollisionObstacles
+    {
+        private readonly ICollisionObstacles[] sources;
+
+        public CollisionObstacleSet(params ICollisionObstacles[] sources)
+        {
+            this.sources = sources;
+        }
+
+        public void Collect(int minX, int maxX, int minZ, int maxZ, List<(Vector3 min, Vector3 max)> into)
+        {
+            foreach (ICollisionObstacles source in sources) source?.Collect(minX, maxX, minZ, maxZ, into);
+        }
+    }
+
     public struct MoveResult
     {
         public Vector3 Position;

@@ -54,6 +54,7 @@ namespace Voxel.Client
         [SerializeField] private EcosystemSync ecosystemSync;
         [SerializeField] private StorageSync storageSync;
         [SerializeField] private ClaimSync claimSync;
+        [SerializeField] private RubbleSync rubbleSync;
 
         private readonly Dictionary<ulong, ChunkStream> streams = new Dictionary<ulong, ChunkStream>();
         private readonly List<ulong> finishedStreams = new List<ulong>();
@@ -164,12 +165,20 @@ namespace Voxel.Client
             if (!inventorySync.TryConsumePlaced(clientId, Items.OfBlock(block))) return false;
 
             serverWorld.SetBlock(pos, block);
+
+            // Broken again, a block a player placed leaves one piece of rubble, not several.
+            if (rubbleSync != null && MiningRules.LeavesRubble(block)) rubbleSync.MarkPlaced(pos);
             EditApplied?.Invoke(clientId, EditKind.Placed);
             return true;
         }
 
+        // Server side: whether a block this player breaks leaves rubble on the ground (RubbleSync)
+        // rather than going into their bag: what a pickaxe breaks, but not in creative mode.
+        internal bool LeavesRubble(ulong clientId, ushort block) => rubbleSync != null && MiningRules.LeavesRubble(block) && !inventorySync.IsCreative(clientId);
+
         // Server side: the last hit on a block breaks it (MiningSync). It goes to the player's
-        // inventory, so a player who cannot carry it cannot break it; and it needs the right tool,
+        // inventory, so a player who cannot carry it cannot break it (what a pickaxe breaks lies on
+        // the ground as rubble instead, RubbleSync); and it needs the right tool,
         // which the server cannot see in hand (the hotbar's choice is the client's): the player must
         // at least own it.
         internal bool TryBreak(ulong clientId, BlockPos pos, float extraReach = 0f)
@@ -181,8 +190,10 @@ namespace Voxel.Client
             int tool = ToolRules.ToBreak(previous);
             if (tool != Items.None && !inventorySync.Owns(clientId, tool)) return false;
 
-            // The block and the ore a rock holds, together: both must fit.
-            int unfitting = inventorySync.UnfittingDrop(clientId, previous);
+            // The block and the ore a rock holds, together: both must fit (rubble is checked when
+            // picked up).
+            bool rubble = LeavesRubble(clientId, previous);
+            int unfitting = rubble ? Items.None : inventorySync.UnfittingDrop(clientId, previous);
             if (unfitting != Items.None)
             {
                 inventorySync.TellFull(clientId, InventorySync.ReasonFor(unfitting));
@@ -190,9 +201,16 @@ namespace Voxel.Client
             }
 
             serverWorld.SetBlock(pos, Blocks.Air);
-            inventorySync.Give(clientId, Items.DropOf(previous), 1);
-            OreKind ore = Ores.OreOf(previous);
-            if (ore != OreKind.None) inventorySync.Give(clientId, Items.Ore(ore), Ores.Yield(ore));
+            if (rubble)
+            {
+                rubbleSync.Drop(pos, previous);
+            }
+            else
+            {
+                inventorySync.Give(clientId, Items.DropOf(previous), 1);
+                OreKind ore = Ores.OreOf(previous);
+                if (ore != OreKind.None) inventorySync.Give(clientId, Items.Ore(ore), Ores.Yield(ore));
+            }
 
             // A door goes whole, both halves for one door.
             if (Blocks.IsDoor(previous)) RemoveDoorHalf(Doors.OtherHalf(pos, previous));

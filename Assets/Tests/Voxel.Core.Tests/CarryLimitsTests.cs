@@ -75,6 +75,26 @@ namespace Voxel.Core.Tests
             Assert.IsFalse(Items.GoesOnStockpile(Items.Axe));
         }
 
+        // Ores count with the blocks and go on stockpiles; those saved in a chest before stay there.
+        [Test]
+        public void Ores_CountAsBlocks_AndGoOnStockpiles()
+        {
+            int iron = Items.Ore(OreKind.Iron);
+            Assert.IsTrue(CarryLimits.CountsAsBlock(iron));
+            Assert.IsTrue(StorageRules.AcceptsInStockpile(iron));
+            Assert.IsFalse(StorageRules.AcceptsInChest(iron));
+            Assert.IsTrue(StorageRules.KeptInChest(iron));
+            Assert.IsFalse(StorageRules.KeptInChest(Blocks.Stone));
+
+            var inventory = new Inventory();
+            inventory.Add(Blocks.Stone, 30);
+            inventory.Add(iron, 9);
+            Assert.AreEqual(39, CarryLimits.BlockCount(inventory));
+            Assert.AreEqual(1, CarryLimits.Room(inventory, Items.Ore(OreKind.Coal), Weights));
+            Assert.AreEqual(1, CarryLimits.Room(inventory, Blocks.Dirt, Weights));
+            Assert.AreEqual(0f, CarryLimits.Weight(inventory, Weights), "ores weigh nothing in the bag");
+        }
+
         [Test]
         public void Room_ForWhatExactlyFits_IsNotRefused()
         {

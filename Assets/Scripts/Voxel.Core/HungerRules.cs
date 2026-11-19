@@ -25,6 +25,9 @@ namespace Voxel.Core
 
         public const float PerBlockPlaced = 1f;
 
+        // Picking up a piece of rubble (RubbleSync).
+        public const float PerRubblePickedUp = 1f;
+
         // A move longer than this in one frame is a teleport, which costs nothing.
         public const float LongestStep = 10f;
 

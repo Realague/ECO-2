@@ -658,7 +658,7 @@ namespace Voxel.Client
 
         // On smoothed ground (a world given), a log lying on a block's top rests at the height the ground
         // shows there (SmoothTerrain.HeightAt); afloat or on anything else, where it is.
-        private static Vector3 OnShownGround(World world, Vector3 position)
+        internal static Vector3 OnShownGround(World world, Vector3 position)
         {
             if (world == null) return position;
 

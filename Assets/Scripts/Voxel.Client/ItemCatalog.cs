@@ -190,7 +190,7 @@ namespace Voxel.Client
             if (Items.IsWood(item)) return WithPlant("From {2} once felled, pruned and bucked: each log on the ground gives three. It weighs in your bag, and is kept on a stockpile.", Items.WoodSpecies(item), ecosystemSync);
             if (Items.IsCarcass(item)) return WithAnimal("The body of {2}, taken from the ground while at least half of it was left. Butcher it with a knife (right click it here) for half its meat, or on a butcher's table for all of it, with the hide, bones and fat.", Items.CarcassSpecies(item), ecosystemSync);
             if (Items.IsMeat(item)) return Loc.T("Raw: it is not eaten as it is. Cook it on a campfire.");
-            if (Items.IsOre(item)) return Loc.T("Found in rock: a block of rock holding it gives it, besides itself, when broken with a pickaxe. Kept in a chest.");
+            if (Items.IsOre(item)) return Loc.T("Found in rock: a block of rock holding it gives it, besides itself, when broken with a pickaxe. It counts as a block in your bag, and is kept on a stockpile.");
             if (item == Items.Straw) return Loc.T("Left over when wheat is harvested.");
             if (IsWoodBlock(item))
             {
@@ -207,6 +207,14 @@ namespace Voxel.Client
         private static string WithPlant(string english, int species, EcosystemSync ecosystemSync) => WithName(english, PlantName(species, ecosystemSync));
 
         private static string WithAnimal(string english, int species, EcosystemSync ecosystemSync) => WithName(english, AnimalName(species, ecosystemSync));
+
+        // Rubble lying on the ground, by the block it came from: "Granite rubble · Iron ore".
+        public static string RubbleName(ushort block, EcosystemSync ecosystemSync)
+        {
+            string name = WithName("{0} rubble", Items.NameOf(Blocks.TypeOf(block)));
+            OreKind ore = Ores.OreOf(block);
+            return ore != OreKind.None ? name + " · " + NameOf(Items.Ore(ore), ecosystemSync) : name;
+        }
 
         private static string WithName(string english, string name) =>
             Loc.T(english, Loc.Name(name), Loc.Lower(name), Article(name.ToLowerInvariant()));

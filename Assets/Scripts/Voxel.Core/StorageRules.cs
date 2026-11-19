@@ -85,6 +85,10 @@ namespace Voxel.Core
 
         public static bool AcceptsInChest(int item) => Items.IsValid(item) && !Items.GoesOnStockpile(item);
 
+        // What a saved chest keeps: what it accepts, and the ores put in before they went on stockpiles
+        // (they can be taken out, not put back).
+        public static bool KeptInChest(int item) => AcceptsInChest(item) || (Items.IsValid(item) && Items.IsOre(item));
+
         public static bool AcceptsInStockpile(int item) => Items.IsValid(item) && Items.GoesOnStockpile(item);
 
         public static float ChestWeight(Inventory contents, ItemWeights weights)

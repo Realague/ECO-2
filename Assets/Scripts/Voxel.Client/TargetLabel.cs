@@ -23,6 +23,7 @@ namespace Voxel.Client
         [SerializeField] private HotbarHud hotbar;
         [SerializeField] private InventorySync inventorySync;
         [SerializeField] private LogSync logSync;
+        [SerializeField] private RubbleSync rubbleSync;
         [SerializeField] private UIDocument document;
 
         private VisualElement screen;
@@ -62,6 +63,10 @@ namespace Voxel.Client
             if (storageHit) reached = storageDistance;
             bool carcassHit = ecosystemSync.TryAimedCarcass(eye.transform.position, eye.transform.forward, reached, out int carcassX, out int carcassZ, out int carcassSpecies, out float meat, out float carcassDistance);
             if (carcassHit) reached = carcassDistance;
+            int rubbleId = 0;
+            float rubbleDistance = reached;
+            bool rubbleHit = rubbleSync != null && rubbleSync.TryAimed(eye.transform.position, eye.transform.forward, reached, out rubbleId, out rubbleDistance);
+            if (rubbleHit) reached = rubbleDistance;
 
             // A felled tree lying there: "Fallen oak · 3 branches", with the axe it needs.
             int fallenId = 0;
@@ -73,6 +78,7 @@ namespace Voxel.Client
             System.Numerics.Vector3 near = origin + direction * Mathf.Max(0f, reached - 0.3f);
             if (ecosystemSync.TryAim(origin, direction, reached, out string name, out int tool)) return OnLand(WithTool(name, tool), Mathf.FloorToInt(near.X), Mathf.FloorToInt(near.Z));
             if (fallenHit && logSync.TryGetFallen(fallenId, out FallenTree fallen)) return OnLand(WithTool(logSync.DescribeFallen(fallenId), Items.Axe), fallen.X, fallen.Z);
+            if (rubbleHit && rubbleSync.TryGetShown(rubbleId, out ushort rubble, out int rubbleX, out int rubbleZ)) return OnLand(ItemCatalog.RubbleName(rubble, ecosystemSync), rubbleX, rubbleZ);
             if (carcassHit) return OnLand(CarcassName(carcassSpecies, meat), carcassX, carcassZ);
             if (storageHit) return StorageName(storageId);
             if (!blockHit) return null;
