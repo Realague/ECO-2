@@ -20,23 +20,34 @@
                 <ui:VisualElement name="wheel-pointer" class="wheel-pointer" picking-mode="Ignore" />
             </ui:VisualElement>
         </ui:VisualElement>
-        <!-- BuildingHud shows it while the hammer is in hand: the block to place, its shape, the mode. -->
+        <!-- BuildingHud shows it while the hammer is in hand, at the bottom right in place of the key
+             hints (HudBanner hides them meanwhile): the block to place, its shape, the mode, the keys. -->
         <ui:VisualElement name="build-panel" class="build-panel hidden" picking-mode="Ignore">
-            <ui:VisualElement name="build-icon" class="build-icon" picking-mode="Ignore" />
-            <ui:VisualElement class="build-text" picking-mode="Ignore">
-                <ui:Label name="build-block" class="build-block strong" picking-mode="Ignore" />
-                <ui:Label name="build-detail" class="build-detail" picking-mode="Ignore" />
-                <ui:Label name="build-mode" class="build-detail build-mode" picking-mode="Ignore" />
+            <ui:VisualElement class="build-head" picking-mode="Ignore">
+                <ui:VisualElement name="build-icon" class="build-icon" picking-mode="Ignore" />
+                <ui:VisualElement class="build-text" picking-mode="Ignore">
+                    <ui:Label name="build-block" class="build-block strong" picking-mode="Ignore" />
+                    <ui:Label name="build-detail" class="build-detail" picking-mode="Ignore" />
+                    <ui:Label name="build-mode" class="build-detail build-mode" picking-mode="Ignore" />
+                </ui:VisualElement>
             </ui:VisualElement>
-            <ui:VisualElement class="keys build-keys" picking-mode="Ignore">
-                <ui:VisualElement class="key"><ui:Label name="build-shape-key" text="R" class="key-text" /></ui:VisualElement>
-                <ui:Label text="Shape (hold: menu)" class="key-label" />
-                <ui:VisualElement class="key"><ui:Label name="build-turn-key" text="E" class="key-text" /></ui:VisualElement>
-                <ui:Label text="Rotation (hold: menu)" class="key-label" />
-                <ui:VisualElement class="key"><ui:Label name="build-mode-key" text="V" class="key-text" /></ui:VisualElement>
-                <ui:Label text="Mode" class="key-label" />
-                <ui:VisualElement class="key"><ui:Label name="build-block-key" text="B" class="key-text" /></ui:VisualElement>
-                <ui:Label text="Block" class="key-label" />
+            <ui:VisualElement class="build-keys" picking-mode="Ignore">
+                <ui:VisualElement class="build-hint" picking-mode="Ignore">
+                    <ui:VisualElement class="key"><ui:Label name="build-shape-key" text="R" class="key-text" /></ui:VisualElement>
+                    <ui:Label text="Shape (hold: menu)" class="build-hint-text" />
+                </ui:VisualElement>
+                <ui:VisualElement class="build-hint" picking-mode="Ignore">
+                    <ui:VisualElement class="key"><ui:Label name="build-turn-key" text="E" class="key-text" /></ui:VisualElement>
+                    <ui:Label text="Rotation (hold: menu)" class="build-hint-text" />
+                </ui:VisualElement>
+                <ui:VisualElement class="build-hint" picking-mode="Ignore">
+                    <ui:VisualElement class="key"><ui:Label name="build-mode-key" text="V" class="key-text" /></ui:VisualElement>
+                    <ui:Label text="Mode" class="build-hint-text" />
+                </ui:VisualElement>
+                <ui:VisualElement class="build-hint" picking-mode="Ignore">
+                    <ui:VisualElement class="key"><ui:Label name="build-block-key" text="B" class="key-text" /></ui:VisualElement>
+                    <ui:Label text="Block" class="build-hint-text" />
+                </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:Label name="held-name" class="hotbar-held strong" picking-mode="Ignore" />

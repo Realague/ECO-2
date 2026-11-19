@@ -12,7 +12,7 @@ namespace Voxel.Client
     // (EcosystemSync.StepTime, the same on every machine), the sun or the moon, the speed when it is
     // not 1, and the kind of land under the player (Biomes); key hints at the bottom right. Hidden in
     // the menu, while the character is being created and while the full-screen map is open; the
-    // hints also while the inventory is.
+    // hints also while the inventory is open or the hammer is in hand (its panel takes their place).
     public class HudBanner : MonoBehaviour
     {
         private const float PlaceInterval = 0.25f;
@@ -47,6 +47,7 @@ namespace Voxel.Client
         [SerializeField] private PlayerListSync playerListSync;
 
         private VisualElement screen;
+        private BuildingHud buildingHud;
 
         // The players online, while P is held.
         private PlayerListView playerList;
@@ -79,6 +80,7 @@ namespace Voxel.Client
                 return;
             }
 
+            buildingHud = FindAnyObjectByType<BuildingHud>();
             VisualElement root = document.rootVisualElement;
             screen = root.Q("screen");
             hints = root.Q("hints");
@@ -160,7 +162,9 @@ namespace Voxel.Client
             // The inventory and the storage window take the whole screen: the hour, the place and the
             // key hints make room for them.
             bool windowOpen = inventoryScreen.IsOpen || StorageScreen.IsOpen;
-            hints.style.display = windowOpen ? DisplayStyle.None : DisplayStyle.Flex;
+            // With the hammer in hand, its panel takes the hints' corner (BuildingHud).
+            bool building = buildingHud != null && buildingHud.HammerInHand;
+            hints.style.display = windowOpen || building ? DisplayStyle.None : DisplayStyle.Flex;
             banner.style.display = windowOpen ? DisplayStyle.None : DisplayStyle.Flex;
             // Not over the inventory's or a storage's tab bar.
             bool creativeShown = inventorySync != null && inventorySync.Creative && !windowOpen;

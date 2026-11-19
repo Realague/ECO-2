@@ -7,9 +7,9 @@ using Voxel.Core;
 
 namespace Voxel.Client
 {
-    // What the hammer builds (the "build-panel" box of Assets/UI/Hotbar.uxml, shown above the bar while
-    // the hammer is in hand): the construction block chosen from the bag (B, Shift+B back), the shape a
-    // wood block takes (R, Shift+R back; a door has none), its rotation (E, Shift+E back: Shapes'
+    // What the hammer builds (the "build-panel" box of Assets/UI/Hotbar.uxml, shown at the bottom right
+    // while the hammer is in hand, in place of the key hints, which HudBanner hides; not while a window
+    // is open): the construction block chosen from the bag (B, Shift+B back), the shape a wood block takes (R, Shift+R back; a door has none), its rotation (E, Shift+E back: Shapes'
     // rotations of the shape, turned from the way the player looks; kept per shape) and the mode, block
     // by block or in lines (V). Holding R opens a wheel (the "build-wheel" box): the shapes on the inner
     // ring, the bag's construction blocks on the outer one; holding E opens it with the shape's
@@ -48,6 +48,7 @@ namespace Voxel.Client
         [SerializeField] private EcosystemSync ecosystemSync;
 
         private VisualElement panel;
+        private InventoryScreen inventoryScreen;
         private VisualElement icon;
         private Label blockName;
         private Label detail;
@@ -112,6 +113,7 @@ namespace Voxel.Client
                 return;
             }
 
+            inventoryScreen = FindAnyObjectByType<InventoryScreen>();
             VisualElement root = document.rootVisualElement;
             panel = root.Q("build-panel");
             icon = root.Q("build-icon");
@@ -223,7 +225,10 @@ namespace Voxel.Client
             if (!held.Contains(block)) block = held.Count > 0 ? held[0] : Items.None;
 
             ReadKeys();
-            panel.RemoveFromClassList(HiddenClass);
+            // The inventory and a storage window take the screen: the panel would stand over their sheets.
+            bool windowOpen = (inventoryScreen != null && inventoryScreen.IsOpen) || StorageScreen.IsOpen;
+            if (windowOpen) panel.AddToClassList(HiddenClass);
+            else panel.RemoveFromClassList(HiddenClass);
             Refresh();
         }
 
