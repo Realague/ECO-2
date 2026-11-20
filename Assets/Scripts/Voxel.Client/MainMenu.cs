@@ -41,6 +41,7 @@ namespace Voxel.Client
         private Slider minimapSize;
         private Label minimapSizeValue;
         private VisualElement terrainList;
+        private VisualElement keyHintsList;
         private Slider terrainSmoothing;
         private Label terrainSmoothingValue;
         private Label hostHint;
@@ -123,6 +124,7 @@ namespace Voxel.Client
             minimapSize.SetValueWithoutNotify(MinimapSettings.Scale * 100f);
             minimapSize.RegisterValueChangedCallback(OnMinimapSizeChanged);
             terrainList = root.Q("terrain-list");
+            keyHintsList = root.Q("key-hints-list");
             terrainSmoothing = root.Q<Slider>("terrain-smoothing");
             terrainSmoothingValue = root.Q<Label>("terrain-smoothing-value");
             terrainSmoothing.focusable = false;
@@ -165,6 +167,28 @@ namespace Voxel.Client
             ShowMinimapSize();
             ShowTerrain();
             ShowTerrainSmoothing();
+            ShowKeyHints();
+        }
+
+        // Two buttons, shown or hidden (HudSettings.ShowKeyHints); the one in use is the primary one.
+        private void ShowKeyHints()
+        {
+            keyHintsList.Clear();
+            foreach ((bool shown, string name) in new[] { (true, "Shown"), (false, "Hidden") })
+            {
+                var button = new Button { focusable = false };
+                button.AddToClassList("button");
+                button.AddToClassList(shown == HudSettings.ShowKeyHints ? "button--primary" : "button--secondary");
+                var text = new Label(Loc.T(name));
+                text.AddToClassList("button-text");
+                button.Add(text);
+                button.clicked += () =>
+                {
+                    HudSettings.SetShowKeyHints(shown);
+                    ShowKeyHints();
+                };
+                keyHintsList.Add(button);
+            }
         }
 
         // In steps of 5 %.

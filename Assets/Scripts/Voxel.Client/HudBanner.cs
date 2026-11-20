@@ -164,7 +164,7 @@ namespace Voxel.Client
             bool windowOpen = inventoryScreen.IsOpen || StorageScreen.IsOpen;
             // With the hammer in hand, its panel takes the hints' corner (BuildingHud).
             bool building = buildingHud != null && buildingHud.HammerInHand;
-            hints.style.display = windowOpen || building ? DisplayStyle.None : DisplayStyle.Flex;
+            hints.style.display = windowOpen || building || !HudSettings.ShowKeyHints ? DisplayStyle.None : DisplayStyle.Flex;
             banner.style.display = windowOpen ? DisplayStyle.None : DisplayStyle.Flex;
             // Not over the inventory's or a storage's tab bar.
             bool creativeShown = inventorySync != null && inventorySync.Creative && !windowOpen;

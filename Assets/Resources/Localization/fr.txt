@@ -33,7 +33,7 @@ Minimap size	Taille de la minimap
 The round map at the top right of the screen. It shows the same area at any size.	La carte ronde en haut à droite de l'écran. Elle montre la même zone à toutes les tailles.
 Smooth	Lisse
 The natural ground's look: rounded, or in cubes. Only the look changes: you walk and dig by blocks either way.	L'aspect du sol naturel : arrondi, ou en cubes. Seul l'aspect change : on marche et on creuse par blocs dans les deux cas.
-Language, minimap and terrain.	Langue, minimap et terrain.
+Language, minimap, terrain and key hints.	Langue, minimap, terrain et raccourcis.
 Terrain smoothing	Lissage du terrain
 Lower keeps steeper slopes and sharper edges; higher rounds them off.	Plus bas, les pentes restent raides et les arêtes vives ; plus haut, elles s'arrondissent.
 Players who join need it. Leave it empty for an open game. Players connect on UDP port {0}.	Les joueurs qui vous rejoignent en ont besoin. Laissez vide pour une partie ouverte. Les joueurs se connectent sur le port UDP {0}.
@@ -858,3 +858,7 @@ Chosen	Choisie
 Only construction blocks can be picked	Seuls les blocs de construction se copient à la pipette
 You have no {1}	Vous n'avez pas de {1}
 Pick block	Pipette
+Key hints	Raccourcis clavier
+Shown	Affichés
+Hidden	Masqués
+The box of keys at the bottom right of the screen while playing (inventory, map, commands…).	Le cadre des touches en bas à droite de l'écran pendant la partie (inventaire, carte, commandes…).

@@ -40,7 +40,7 @@
                     <ui:VisualElement class="icon icon--gear" />
                     <ui:VisualElement class="menu-button-texts">
                         <ui:Label text="Options" class="menu-button-title" />
-                        <ui:Label text="Language, minimap and terrain." class="menu-button-text" />
+                        <ui:Label text="Language, minimap, terrain and key hints." class="menu-button-text" />
                     </ui:VisualElement>
                 </ui:Button>
                 <ui:Button name="quit-button" class="link-button">
@@ -139,6 +139,10 @@
                     <ui:Label name="terrain-smoothing-value" class="option-slider-value" />
                 </ui:VisualElement>
                 <ui:Label text="Lower keeps steeper slopes and sharper edges; higher rounds them off." class="field-hint" />
+                <!-- The key hints at the bottom right of the screen (HudSettings): MainMenu fills it with two buttons. -->
+                <ui:Label text="Key hints" class="field-label" />
+                <ui:VisualElement name="key-hints-list" class="language-list" />
+                <ui:Label text="The box of keys at the bottom right of the screen while playing (inventory, map, commands…)." class="field-hint" />
                 <ui:VisualElement class="view-buttons">
                     <ui:Button name="options-back" class="button button--secondary">
                         <ui:VisualElement class="icon icon--arrow-left" />
